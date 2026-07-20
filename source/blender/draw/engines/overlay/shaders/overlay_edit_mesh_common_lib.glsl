@@ -8,6 +8,11 @@
 
 SHADER_LIBRARY_CREATE_INFO(overlay_edit_mesh_common)
 
+bool EDIT_MESH_vertex_only_select_mode()
+{
+  return select_vert && !select_edge && !select_face;
+}
+
 float4 EDIT_MESH_edge_color_outer(uint edge_flag, uint /*face_flag*/, float crease, float bweight)
 {
   float4 color = float4(0.0f);
@@ -24,8 +29,12 @@ float4 EDIT_MESH_edge_color_inner(uint edge_flag)
   float4 color = theme.colors.wire_edit;
   float4 selected_edge_col = (select_edge) ? theme.colors.edge_mode_select :
                                              theme.colors.edge_select;
-  color = ((edge_flag & EDGE_SELECTED) != 0u) ? selected_edge_col : color;
-  color = ((edge_flag & EDGE_ACTIVE) != 0u) ? theme.colors.edit_mesh_active : color;
+  color = ((edge_flag & EDGE_SELECTED) != 0u && !EDIT_MESH_vertex_only_select_mode()) ?
+              selected_edge_col :
+              color;
+  color = ((edge_flag & EDGE_ACTIVE) != 0u && !EDIT_MESH_vertex_only_select_mode()) ?
+              theme.colors.edit_mesh_active :
+              color;
   color.a = 1.0f;
   return color;
 }
@@ -36,6 +45,7 @@ float4 EDIT_MESH_edge_vertex_color(uint vertex_flag)
   float4 selected_edge_col = (select_edge) ? theme.colors.edge_mode_select :
                                              theme.colors.edge_select;
   bool edge_selected = (vertex_flag & (VERT_ACTIVE | VERT_SELECTED)) != 0u;
+  edge_selected = edge_selected && !EDIT_MESH_vertex_only_select_mode();
   float4 color = (edge_selected) ? selected_edge_col : theme.colors.wire_edit;
   color.a = 1.0f;
   return color;
@@ -59,8 +69,9 @@ float4 EDIT_MESH_vertex_color(uint vertex_flag, float vertex_crease)
 float4 EDIT_MESH_face_color(uint face_flag)
 {
   bool face_freestyle = (face_flag & FACE_FREESTYLE) != 0u;
-  bool face_selected = (face_flag & FACE_SELECTED) != 0u;
-  bool face_active = (face_flag & FACE_ACTIVE) != 0u;
+  bool face_selected = (face_flag & FACE_SELECTED) != 0u &&
+                       !EDIT_MESH_vertex_only_select_mode();
+  bool face_active = (face_flag & FACE_ACTIVE) != 0u && !EDIT_MESH_vertex_only_select_mode();
   bool face_retopo = (retopology_offset > 0.0f);
   float4 selected_face_col = (select_face) ? theme.colors.face_mode_select :
                                              theme.colors.face_select;

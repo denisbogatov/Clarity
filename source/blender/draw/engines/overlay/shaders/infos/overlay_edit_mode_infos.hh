@@ -54,6 +54,7 @@ PUSH_CONSTANT(float, ndc_offset_factor)
 /* Per pass factor. */
 PUSH_CONSTANT(float, ndc_offset)
 PUSH_CONSTANT(bool, wire_shading)
+PUSH_CONSTANT(bool, select_vert)
 PUSH_CONSTANT(bool, select_face)
 PUSH_CONSTANT(bool, select_edge)
 PUSH_CONSTANT(float, alpha)

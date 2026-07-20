@@ -227,6 +227,7 @@ class Meshes : Overlay {
       pass.bind_texture("depth_tx", depth_tex);
       /* TODO(fclem): UBO. */
       pass.push_constant("wire_shading", is_wire_shading_mode);
+      pass.push_constant("select_vert", select_vert_);
       pass.push_constant("select_face", select_face_);
       pass.push_constant("select_edge", select_edge_);
       pass.push_constant("alpha", alpha);
