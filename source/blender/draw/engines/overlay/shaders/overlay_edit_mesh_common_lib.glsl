@@ -8,9 +8,17 @@
 
 SHADER_LIBRARY_CREATE_INFO(overlay_edit_mesh_common)
 
+#define COMPONENT_SELECTED_COLOR float4(1.0f, 0.0f, 0.0f, 1.0f)
+#define COMPONENT_ACTIVE_COLOR float4(1.0f, 0.25f, 0.25f, 1.0f)
+
 bool EDIT_MESH_vertex_only_select_mode()
 {
   return select_vert && !select_edge && !select_face;
+}
+
+bool EDIT_MESH_show_edge_selection()
+{
+  return select_edge || select_face;
 }
 
 float4 EDIT_MESH_edge_color_outer(uint edge_flag, uint /*face_flag*/, float crease, float bweight)
@@ -27,13 +35,11 @@ float4 EDIT_MESH_edge_color_outer(uint edge_flag, uint /*face_flag*/, float crea
 float4 EDIT_MESH_edge_color_inner(uint edge_flag)
 {
   float4 color = theme.colors.wire_edit;
-  float4 selected_edge_col = (select_edge) ? theme.colors.edge_mode_select :
-                                             theme.colors.edge_select;
-  color = ((edge_flag & EDGE_SELECTED) != 0u && !EDIT_MESH_vertex_only_select_mode()) ?
-              selected_edge_col :
+  color = ((edge_flag & EDGE_SELECTED) != 0u && EDIT_MESH_show_edge_selection()) ?
+              COMPONENT_SELECTED_COLOR :
               color;
-  color = ((edge_flag & EDGE_ACTIVE) != 0u && !EDIT_MESH_vertex_only_select_mode()) ?
-              theme.colors.edit_mesh_active :
+  color = ((edge_flag & EDGE_ACTIVE) != 0u && EDIT_MESH_show_edge_selection()) ?
+              COMPONENT_ACTIVE_COLOR :
               color;
   color.a = 1.0f;
   return color;
@@ -42,11 +48,9 @@ float4 EDIT_MESH_edge_color_inner(uint edge_flag)
 float4 EDIT_MESH_edge_vertex_color(uint vertex_flag)
 {
   /* Edge color in vertex selection mode. */
-  float4 selected_edge_col = (select_edge) ? theme.colors.edge_mode_select :
-                                             theme.colors.edge_select;
   bool edge_selected = (vertex_flag & (VERT_ACTIVE | VERT_SELECTED)) != 0u;
   edge_selected = edge_selected && !EDIT_MESH_vertex_only_select_mode();
-  float4 color = (edge_selected) ? selected_edge_col : theme.colors.wire_edit;
+  float4 color = (edge_selected) ? COMPONENT_SELECTED_COLOR : theme.colors.wire_edit;
   color.a = 1.0f;
   return color;
 }
@@ -54,10 +58,10 @@ float4 EDIT_MESH_edge_vertex_color(uint vertex_flag)
 float4 EDIT_MESH_vertex_color(uint vertex_flag, float vertex_crease)
 {
   if ((vertex_flag & VERT_ACTIVE) != 0u) {
-    return float4(theme.colors.edit_mesh_active.xyz, 1.0f);
+    return COMPONENT_ACTIVE_COLOR;
   }
   if ((vertex_flag & VERT_SELECTED) != 0u) {
-    return theme.colors.vert_select;
+    return COMPONENT_SELECTED_COLOR;
   }
   /* Full crease color if not selected nor active. */
   if (vertex_crease > 0.0f) {
@@ -69,18 +73,16 @@ float4 EDIT_MESH_vertex_color(uint vertex_flag, float vertex_crease)
 float4 EDIT_MESH_face_color(uint face_flag)
 {
   bool face_freestyle = (face_flag & FACE_FREESTYLE) != 0u;
-  bool face_selected = (face_flag & FACE_SELECTED) != 0u &&
-                       !EDIT_MESH_vertex_only_select_mode();
-  bool face_active = (face_flag & FACE_ACTIVE) != 0u && !EDIT_MESH_vertex_only_select_mode();
+  bool face_selected = select_face && (face_flag & FACE_SELECTED) != 0u;
+  bool face_active = select_face && (face_flag & FACE_ACTIVE) != 0u;
   bool face_retopo = (retopology_offset > 0.0f);
-  float4 selected_face_col = (select_face) ? theme.colors.face_mode_select :
-                                             theme.colors.face_select;
+  float4 selected_face_col = float4(COMPONENT_SELECTED_COLOR.rgb, 0.25f);
   float4 color = theme.colors.face;
   color = face_retopo ? theme.colors.face_retopology : color;
   color = face_freestyle ? theme.colors.face_freestyle : color;
   color = face_selected ? selected_face_col : color;
   if (select_face && face_active) {
-    color = mix(selected_face_col, theme.colors.edit_mesh_active, 0.5f);
+    color = float4(COMPONENT_ACTIVE_COLOR.rgb, selected_face_col.a);
     color.a = selected_face_col.a;
   }
   if (wire_shading) {

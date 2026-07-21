@@ -898,7 +898,7 @@ struct RenderData {
    */
   int mode = R_SAVE_OUTPUT;
 
-  short frs_sec = 24;
+  short frs_sec = 120;
 
   /**
    * What to do with the sky/background.

@@ -98,7 +98,8 @@ class Grid : Overlay {
           sub.push_constant("grid_flag", &axis_flag_);
           sub.draw_procedural(GPUPrimType::GPU_PRIM_LINES, -1, axis_vertex_count, 0);
         }
-        if (grid_flag_) {
+        /* The finite grid uses two passes, while its black axes use three. */
+        if (grid_flag_ && (!bool(grid_flag_ & GRID_FINITE) || grid_iter < 2)) {
           sub.push_constant("grid_flag", &grid_flag_);
           sub.draw_procedural(GPUPrimType::GPU_PRIM_LINES, -1, grid_vertex_count, 0);
         }
@@ -229,7 +230,6 @@ class Grid : Overlay {
       return false;
     }
 
-    const View3D *v3d = state.v3d;
     const RegionView3D *rv3d = state.rv3d;
 
     /* Set `grid_flag_` dependent on view configuration. */
@@ -289,114 +289,22 @@ class Grid : Overlay {
       return false;
     }
 
-    /* Query grid scales from unit/scaling; this range suffices for user-visible levels. */
-    Array<float, SI_GRID_STEPS_LEN> steps(SI_GRID_STEPS_LEN);
-    ED_view3d_grid_steps(state.scene, v3d, rv3d, steps.data());
+    /* Match Maya's default finite floor: 40 one-unit cells, centered at the world origin.
+     * Keep all step entries valid because the same shader data layout is shared with SpaceImage. */
+    constexpr float grid_step = 1.0f;
+    constexpr uint grid_cell_count = 40u;
     for (int i : IndexRange(SI_GRID_STEPS_LEN)) {
-      /* If the current level is not specified, or the same size as the previous level,
-       * we apply a 10x scale to the previous level and use that. */
-      if (i > 0 && (steps[i] == 0.0f || steps[i] == steps[i - 1])) {
-        grid_ubo_.steps[i] = grid_ubo_.steps[i - 1] * 10.0f;
-      }
-      else {
-        grid_ubo_.steps[i] = float4(steps[i]);
-      }
+      grid_ubo_.steps[i] = float4(grid_step);
     }
+    grid_ubo_.offset = float2(0.0f);
+    grid_ubo_.clip_rect = float2(float(grid_cell_count) * 0.5f * grid_step);
+    grid_ubo_.level = 0.0f;
+    grid_ubo_.num_lines = grid_cell_count + 1u;
+    /* Two passes for the gray grid, three for the heavier black axes. */
+    num_iters_ = 3u;
 
-    /* Camera parameters. */
-    float3 drw_view_position = rv3d->viewinv[3], drw_view_forward = rv3d->viewinv[2];
-
-    /* Compute distance to a relevant floor point-of-interest from the camera. The grid translates
-     * with this point and is only drawn around it. */
-    float dist;
-    if (rv3d->is_persp) {
-      /* Scale depends on distance to a point on the floor plane; we interpolate between the
-       * point viewed by the camera and the point directly below it, dependent on azimuth. */
-      dist = interpolate(abs(drw_view_position.z / drw_view_forward.z),
-                         abs(drw_view_position.z),
-                         1.0f - abs(drw_view_forward.z));
-    }
-    else if (bool(grid_flag_ & GRID_ALIGNED) || bool(axis_flag_ & GRID_ALIGNED)) {
-      /* #155497: mirror `ED_view3d_grid_view_scale` for axis-aligned orthographic views. */
-      dist = 10.0f * 12.0f / (state.region->sizex * rv3d->winmat[0][0]);
-    }
-    else {
-      /* Scale is simply specified by orthographic view. */
-      dist = rv3d->dist;
-    }
-
-    /* Extract 2D grid offset for moving grid "with the camera" on the floor plane. */
-    if (ELEM(rv3d->view, RV3D_VIEW_RIGHT, RV3D_VIEW_LEFT)) {
-      grid_ubo_.offset = drw_view_position.yz();
-    }
-    else if (ELEM(rv3d->view, RV3D_VIEW_TOP, RV3D_VIEW_BOTTOM)) {
-      grid_ubo_.offset = drw_view_position.xy();
-    }
-    else if (ELEM(rv3d->view, RV3D_VIEW_FRONT, RV3D_VIEW_BACK)) {
-      grid_ubo_.offset = float2(drw_view_position.x, drw_view_position.z);
-    }
-    else if (rv3d->is_persp) {
-      float3 camera_offs = drw_view_position - dist * drw_view_forward;
-      grid_ubo_.offset = camera_offs.xy();
-    }
-    else { /* Orthographic. */
-      const float forward_z = drw_view_forward.z;
-      constexpr float eps = 1e-6f;
-      if (abs(forward_z) > eps) {
-        /* Center the grid on the intersection of the orthographic view ray with the XY plane. */
-        float3 camera_offs = drw_view_position -
-                             drw_view_forward * safe_divide(drw_view_position.z, forward_z);
-        grid_ubo_.offset = camera_offs.xy();
-      }
-      else {
-        grid_ubo_.offset = drw_view_position.xy();
-      }
-    }
-
-    /* Find the lowest relevant grid level for the above distance. */
-    for (int i : IndexRange(SI_GRID_STEPS_LEN)) {
-      float curr = std::min(grid_ubo_.steps[i].x, grid_ubo_.steps[i].y);
-      float next = (i < SI_GRID_STEPS_LEN - 1) ?
-                       std::min(grid_ubo_.steps[i + 1].x, grid_ubo_.steps[i + 1].y) :
-                       curr * 10.0f;
-      if (next >= dist || i == OVERLAY_GRID_STEPS_LEN - 1) {
-        grid_ubo_.level = static_cast<float>(i) + safe_divide(dist - curr, next - curr);
-        break;
-      }
-    }
-
-    /* Set clipping rectangle for lines, dependent on camera/viewport. */
-    /* TODO(not_mark): use for finite grid clipping. */
-    if (rv3d->persp == RV3D_CAMOB && v3d->camera && v3d->camera->type == OB_CAMERA) {
-      Object *camera_object = DEG_get_evaluated(state.depsgraph, v3d->camera);
-      /* Only set the GRID_CAMERA flag when the grid/axis is being drawn. Otherwise this could lead
-       * to an out of bound access in the shader. */
-      if (grid_flag_) {
-        grid_flag_ |= GRID_CAMERA;
-      }
-      if (axis_flag_) {
-        axis_flag_ |= GRID_CAMERA;
-      }
-
-      float clip_dist = ((Camera *)(camera_object->data))->clip_end;
-      grid_ubo_.clip_rect = float2(clip_dist);
-    }
-    else {
-      /* WATCH(not_mark): This appears to function in ortho/VR, but I'm not convinced. */
-      bool use_clip_end = rv3d->is_persp ||
-                          ((v3d->flag & (V3D_XR_SESSION_SURFACE | V3D_XR_SESSION_MIRROR)) != 0);
-      if (use_clip_end) {
-        grid_ubo_.clip_rect = float2(v3d->clip_end);
-      }
-      else {
-        grid_ubo_.clip_rect = float2(4.0f / rv3d->winmat[0][0], 4.0f / rv3d->winmat[1][1]);
-      }
-    }
-
-    /* This suffices for most cases, and in others we fade to hide it. */
-    /* TODO (not_mark): make this view-dependent in orthographic to have full coverage */
-    grid_ubo_.num_lines = rv3d->is_persp ? 151u : 301u;
-    num_iters_ = rv3d->is_persp ? OVERLAY_GRID_ITER_LEN : 1u;
+    grid_flag_ |= (grid_flag_ ? GRID_FINITE : OVERLAY_GridBits(0));
+    axis_flag_ |= (axis_flag_ ? GRID_FINITE : OVERLAY_GridBits(0));
 
     return true;
   }

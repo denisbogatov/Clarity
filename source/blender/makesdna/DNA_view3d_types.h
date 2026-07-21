@@ -640,7 +640,7 @@ struct View3DShading {
 /** 3D Viewport Overlay settings. */
 struct View3DOverlay {
   eView3DOverlay_Flag flag = V3D_OVERLAY_VIEWER_ATTRIBUTE | V3D_OVERLAY_SCULPT_SHOW_MASK |
-                             V3D_OVERLAY_SCULPT_SHOW_FACE_SETS;
+                             V3D_OVERLAY_SCULPT_SHOW_FACE_SETS | V3D_OVERLAY_STATS;
 
   /** Edit mode settings. */
   eView3DOverlay_EditFlag edit_flag = V3D_OVERLAY_EDIT_FACES | V3D_OVERLAY_EDIT_SEAMS |
@@ -715,6 +715,10 @@ struct View3D_Runtime {
   /* Times recorded for performance overlay. */
   float last_sync_time = 0;
   float last_submission_time = 0;
+
+  /* Smoothed redraw rate displayed by the viewport statistics HUD. */
+  float stats_last_redraw_time = 0.0f;
+  float stats_redraw_fps = 0.0f;
 };
 
 /** 3D ViewPort Struct. */

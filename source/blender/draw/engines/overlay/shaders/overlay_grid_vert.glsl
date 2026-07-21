@@ -88,7 +88,7 @@ float2 screen_position(float4 p)
 
 bool use_level_offset(uint grid_flag)
 {
-  return !flag_test(grid_flag, GRID_SIMA | GRID_ALIGNED);
+  return !flag_test(grid_flag, GRID_SIMA | GRID_ALIGNED | GRID_FINITE);
 }
 
 void main()
@@ -96,6 +96,14 @@ void main()
   gl_Position = float4(NAN_FLT); /* Discard by default. */
   LineData line = flag_test(grid_flag, SHOW_GRID) ? decode_grid_data(gl_VertexID) :
                                                     decode_axis_data(gl_VertexID);
+
+  /* A finite 3D grid has only one scale level. The draw call keeps the shared three-level
+   * allocation used by the image editor, so discard the two unused levels here. */
+  if (flag_test(grid_flag, GRID_FINITE) && flag_test(grid_flag, SHOW_GRID) &&
+      line.level != OVERLAY_GRID_STEPS_DRAW - 1)
+  {
+    return;
+  }
 
   /* Compute the actual level of a line, offset by -1 to force a sub-level in the 3D viewport. */
   int level = int(grid_buf.level) + int(line.level) - (use_level_offset(grid_flag) ? 1 : 0);
@@ -106,7 +114,7 @@ void main()
   uint step_axis = flag_test(grid_flag, GRID_SIMA) ? 1u - line.axis : line.axis;
   float step_size = grid_buf.steps[level][step_axis];
 
-  float2 step_offs = grid_buf.offset;
+  float2 step_offs = flag_test(grid_flag, GRID_FINITE) ? float2(0.0f) : grid_buf.offset;
   /* TODO(not_mark): remove all this horrible axis-swapping BS in BSL port. */
   if (flag_test(grid_flag, SHOW_GRID)) {
     /* Line moves with offset along its axis, but snaps to the rounded offset on the other axis. */
@@ -117,7 +125,7 @@ void main()
       step_offs.x = round(grid_buf.offset.x / step_size) * step_size;
     }
   }
-  else if (flag_test(grid_flag, SHOW_AXES)) {
+  else if (flag_test(grid_flag, SHOW_AXES) && !flag_test(grid_flag, GRID_FINITE)) {
     /* Store axis value on X-axis for now, it is swapped later. */
     step_offs = float2(drw_view_position()[line.axis], 0.0f);
   } /* else: GRID_SIMA, do nothing. */
@@ -128,7 +136,7 @@ void main()
   vertex_out_flat.emphasis = saturate(float(line.level) - fract(grid_buf.level));
   /* Output alpha that smoothly transitions the lowest grid level in/out. */
   vertex_out_flat.alpha = saturate(line.level + 1.0f - fract(grid_buf.level));
-  if (!drw_view_is_perspective()) {
+  if (!drw_view_is_perspective() && !flag_test(grid_flag, GRID_FINITE)) {
     /* Also fade by pixel size for orthographic, as we lack proper line DFDX/DFDY. */
     vertex_out_flat.alpha *= smoothstep(
         step_size * 0.25f, step_size * pow3f(0.25f), uniform_buf.pixel_fac);
@@ -205,6 +213,35 @@ void main()
   }
 
   gl_Position = drw_view().winmat * (drw_view().viewmat * float4(vertex_out.pos, 1.0f));
+
+  if (flag_test(grid_flag, GRID_FINITE)) {
+    /* Draw the finite grid twice at half-pixel offsets. Unlike GPU line width, this is stable
+     * across OpenGL, Metal and Vulkan and remains exactly two pixels wide at every zoom level. */
+    float3 line_direction = float3(0.0f);
+    if (flag_test(grid_flag, SHOW_AXES)) {
+      line_direction[line.axis] = 1.0f;
+    }
+    else if (flag_test(grid_flag, PLANE_XY)) {
+      line_direction[line.axis] = 1.0f;
+    }
+    else if (flag_test(grid_flag, PLANE_XZ)) {
+      line_direction[line.axis == 0u ? 0 : 2] = 1.0f;
+    }
+    else if (flag_test(grid_flag, PLANE_YZ)) {
+      line_direction[line.axis == 0u ? 1 : 2] = 1.0f;
+    }
+
+    float4 adjacent_position = drw_view().winmat *
+                               (drw_view().viewmat *
+                                float4(vertex_out.pos + line_direction, 1.0f));
+    float2 projected_direction = screen_position(adjacent_position) - screen_position(gl_Position);
+    float2 line_tangent = projected_direction / max(length(projected_direction), 1e-8f);
+    float2 line_normal = float2(-line_tangent.y, line_tangent.x);
+    float pixel_offset = flag_test(grid_flag, SHOW_AXES) ? float(grid_iter) - 1.0f :
+                                                          (grid_iter == 0 ? -0.5f : 0.5f);
+    gl_Position.xy += line_normal * pixel_offset * 2.0f * gl_Position.w /
+                      uniform_buf.size_viewport;
+  }
 
   /* Adjust z-component. */
   if (drw_view_is_perspective() || flag_test(grid_flag, GRID_SIMA)) {

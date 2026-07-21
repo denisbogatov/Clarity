@@ -1425,6 +1425,52 @@ static float4 get_low_fps_color()
   return alert_rgb;
 }
 
+static void draw_stats_fps(const Scene *scene,
+                           View3D *v3d,
+                           const int xoffset,
+                           int *yoffset,
+                           const int line_height)
+{
+  /* Keep the timestamp small so a runtime-only float retains sub-millisecond precision. */
+  const float now = float(fmod(BLI_time_now_seconds(), 1000.0));
+  float delta = now - v3d->runtime.stats_last_redraw_time;
+  if (delta < 0.0f) {
+    delta += 1000.0f;
+  }
+  if (v3d->runtime.stats_last_redraw_time != 0.0 && delta > 0.0 && delta < 0.5) {
+    const float redraw_fps = float(1.0 / delta);
+    v3d->runtime.stats_redraw_fps = (v3d->runtime.stats_redraw_fps == 0.0f) ? redraw_fps :
+                                                                                 interpf(
+                                                                                     redraw_fps,
+                                                                                     v3d->runtime
+                                                                                         .stats_redraw_fps,
+                                                                                     0.15f);
+  }
+  v3d->runtime.stats_last_redraw_time = now;
+
+  float fps = v3d->runtime.stats_redraw_fps;
+  SceneFPS_State playback_state;
+  if (ED_scene_fps_average_calc(scene, &playback_state)) {
+    fps = playback_state.fps_average;
+  }
+
+  *yoffset -= line_height;
+  const int font_id = BLF_default();
+  const float label_color[4] = {0.15f, 1.0f, 0.15f, 1.0f};
+  const float value_color[4] = {1.0f, 1.0f, 0.15f, 1.0f};
+  BLF_color4fv(font_id, label_color);
+  BLF_draw_default(xoffset, *yoffset, 0.0f, IFACE_("FPS:"), 4);
+
+  char printable[32];
+  SNPRINTF_UTF8(printable, "%.1f", fps);
+  BLF_color4fv(font_id, value_color);
+  BLF_draw_default(xoffset + int(5.5f * U.widget_unit),
+                   *yoffset,
+                   0.0f,
+                   printable,
+                   sizeof(printable));
+}
+
 static void draw_performance_stats(Depsgraph *depsgraph,
                                    Scene *scene,
                                    View3D *v3d,
@@ -1568,7 +1614,9 @@ void view3d_draw_region_info(const bContext *C, ARegion *region)
                       region->runtime->quadview_index == bke::ARegionQuadviewIndex::TopLeft);
 
     if ((v3d->overlay.flag & V3D_OVERLAY_HIDE_TEXT) == 0) {
-      if ((U.uiflag & USER_SHOW_FPS) && ED_screen_animation_no_scrub(wm) && region_ok) {
+      if ((U.uiflag & USER_SHOW_FPS) && ED_screen_animation_no_scrub(wm) && region_ok &&
+          (v3d->overlay.flag & V3D_OVERLAY_STATS) == 0)
+      {
         ED_scene_draw_fps(scene, xoffset, &yoffset);
         BLF_color4fv(font_id, text_color);
       }
@@ -1600,8 +1648,14 @@ void view3d_draw_region_info(const bContext *C, ARegion *region)
 
     if (v3d->overlay.flag & V3D_OVERLAY_STATS && region_ok) {
       View3D *v3d_local = v3d->localvd ? v3d : nullptr;
-      ED_info_draw_stats(
-          bmain, scene, view_layer, v3d_local, xoffset, &yoffset, VIEW3D_OVERLAY_LINEHEIGHT);
+      ED_info_draw_stats(bmain,
+                         scene,
+                         view_layer,
+                         v3d_local,
+                         xoffset,
+                         &yoffset,
+                         VIEW3D_OVERLAY_LINEHEIGHT);
+      draw_stats_fps(scene, v3d, xoffset, &yoffset, VIEW3D_OVERLAY_LINEHEIGHT);
     }
 
     /* Set the size back to the default hard-coded size. Otherwise anyone drawing after this,

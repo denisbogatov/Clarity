@@ -230,6 +230,8 @@ static void blo_update_defaults_screen(bScreen *screen,
       v3d->overlay.normals_constant_screen_size = 7.0f;
       /* Always enable Grease Pencil vertex color overlay by default. */
       v3d->overlay.gpencil_vertex_paint_opacity = 1.0f;
+      /* Show Maya-style polygon statistics in every factory-default viewport. */
+      v3d->overlay.flag |= V3D_OVERLAY_STATS;
       /* Always use theme color for wireframe by default. */
       v3d->shading.wire_color_type = V3D_SHADING_SINGLE_COLOR;
 
@@ -429,6 +431,8 @@ static void blo_update_defaults_scene(Main *bmain, Scene *scene)
   STRNCPY_UTF8(scene->r.engine, RE_engine_id_BLENDER_EEVEE);
 
   scene->r.cfra = 1.0f;
+  scene->r.frs_sec = 120;
+  scene->r.frs_sec_base = 1.0f;
   scene->r.im_format.exr_flag |= R_IMF_EXR_FLAG_MULTIPART;
   scene->r.bake.im_format.exr_flag |= R_IMF_EXR_FLAG_MULTIPART;
 

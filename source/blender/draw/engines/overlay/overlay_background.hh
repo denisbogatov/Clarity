@@ -61,6 +61,12 @@ class Background : Overlay {
       background_type = BG_SOLID;
       color_override = float4(UNPACK3(state.v3d->shading.background_color), 1.0f);
     }
+    else if (state.v3d->shading.background_type == V3D_SHADING_BACKGROUND_THEME) {
+      /* Maya viewport background: linear-light equivalent of sRGB #343434. Keep this in the
+       * renderer so saved themes cannot reduce the contrast of the fixed grid. */
+      background_type = BG_SOLID;
+      color_override = float4(float3(0.03433981f), 1.0f);
+    }
     else {
       switch (ui::theme::get_value(TH_BACKGROUND_TYPE)) {
         case TH_BACKGROUND_GRADIENT_LINEAR:

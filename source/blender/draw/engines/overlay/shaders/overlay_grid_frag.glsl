@@ -34,7 +34,14 @@ void main()
 
   /* Axis color is fixed by theme, while grid color is a mix of [grid, grid_emphasis]
    * dependent on the level. */
-  if (axis_mask.x) {
+  if (flag_test(grid_flag, GRID_FINITE) && any(axis_mask)) {
+    out_color = float4(0.0f, 0.0f, 0.0f, 1.0f);
+  }
+  else if (flag_test(grid_flag, GRID_FINITE)) {
+    /* Linear-light equivalent of Maya's sRGB #404040 grid color. */
+    out_color = float4(float3(0.05126946f), 1.0f);
+  }
+  else if (axis_mask.x) {
     out_color = theme.colors.grid_axis_x;
   }
   else if (axis_mask.y) {
@@ -49,37 +56,12 @@ void main()
 
   /* Fragment alpha. */
   out_color.a *= vertex_out_flat.alpha;
-  if (drw_view_is_perspective()) {
-    /* Fade at edge of grid level. */
-    float length_fade = 1.0f - min(1.0f, length(vertex_out.coord));
-    out_color.a *= length_fade;
-
-    /* Compute normalized view vector. */
-    float3 V = drw_view_position() - vertex_out.pos;
-    float dist = length(V);
-    V /= dist;
-
-    /* Add fade at steep angles for contents of the floor plane. */
-    if (vertex_out.pos.z == 0.0f) {
-      out_color.a *= 1.0f - pow3f(1.0f - abs(V.z));
-    }
-
-    /* Add fade towards camera clip plane. */
-    float far_clip = -drw_view_far();
-    out_color.a *= 1.0f - smoothstep(0.0f, 0.5f * far_clip, dist - 0.5f * far_clip);
-  }
-  else {
-    /* Fade at edge of grid level in orthographic, in case of rather small units. */
-    if (!flag_test(grid_flag, GRID_SIMA)) {
-      float length_fade = 1.0f - min(1.0f, dot(vertex_out.coord, vertex_out.coord));
-      out_color.a *= pow2f(length_fade);
-    }
-
-    /* Add fade at steep angles for contents of the floor plane. */
-    if (flag_test(grid_flag, PLANE_XY)) {
-      float3 V = -drw_view_forward();
-      out_color.a *= 1.0f - pow3f(1.0f - abs(V.z));
-    }
+  /* Keep the 3D viewport grid crisp like Maya: it has a finite, hard boundary and does not
+   * disappear with distance or viewing angle. The image editor still needs its edge fade for
+   * very small UV units. */
+  if (flag_test(grid_flag, GRID_SIMA)) {
+    float length_fade = 1.0f - min(1.0f, dot(vertex_out.coord, vertex_out.coord));
+    out_color.a *= pow2f(length_fade);
   }
 
   /* Viewport anti-aliasing output.
@@ -104,7 +86,7 @@ void main()
 
   /* Grid iteration additive alpha in perspective view; lower iterations
    * are given stronger alpha to minimize pop-in of upper iterations. */
-  if (drw_view_is_perspective()) {
+  if (drw_view_is_perspective() && !flag_test(grid_flag, GRID_FINITE)) {
     constexpr float additive_alpha[OVERLAY_GRID_ITER_LEN] = {1.0f, 0.50f, 0.25f, 0.125f};
     out_color.a *= additive_alpha[grid_iter];
   }

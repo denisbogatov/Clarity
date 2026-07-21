@@ -47,6 +47,7 @@
 #include "BKE_layer.hh"
 #include "BKE_main.hh"
 #include "BKE_mesh.hh"
+#include "BKE_mesh_mapping.hh"
 #include "BKE_object.hh"
 #include "BKE_paint.hh"
 #include "BKE_paint_bvh.hh"
@@ -57,6 +58,7 @@
 #include "DEG_depsgraph_query.hh"
 
 #include "ED_info.hh"
+#include "ED_mesh.hh"
 
 #include "WM_api.hh"
 
@@ -75,6 +77,9 @@ struct SceneStats {
   uint64_t totgplayer, totgpframe, totgpstroke;
   uint64_t totpoints, totpointsel;
   uint64_t totcurves, totcurvesel;
+
+  /* Maya-style viewport polygon statistics: scene, selected objects, selected components. */
+  uint64_t hud_vert[3], hud_edge[3], hud_face[3], hud_tri[3], hud_uv[3];
 };
 
 struct SceneStatsFmt {
@@ -95,7 +100,152 @@ struct SceneStatsFmt {
       totpointsel[BLI_STR_FORMAT_UINT64_GROUPED_SIZE];
   char totcurves[BLI_STR_FORMAT_UINT64_GROUPED_SIZE],
       totcurvesel[BLI_STR_FORMAT_UINT64_GROUPED_SIZE];
+
+  char hud_vert[3][BLI_STR_FORMAT_UINT64_GROUPED_SIZE];
+  char hud_edge[3][BLI_STR_FORMAT_UINT64_GROUPED_SIZE];
+  char hud_face[3][BLI_STR_FORMAT_UINT64_GROUPED_SIZE];
+  char hud_tri[3][BLI_STR_FORMAT_UINT64_GROUPED_SIZE];
+  char hud_uv[3][BLI_STR_FORMAT_UINT64_GROUPED_SIZE];
 };
+
+static uint64_t stats_mesh_unique_uvs(const Mesh &mesh)
+{
+  const bke::AttributeAccessor attributes = mesh.attributes();
+  const bke::AttributeReader<float2> uv_attribute = attributes.lookup<float2>(
+      mesh.active_or_default_uv_map_name(), bke::AttrDomain::Corner);
+  if (!uv_attribute) {
+    return 0;
+  }
+
+  const VArraySpan<float2> uv_map = *uv_attribute;
+  UvVertMap *uv_vert_map = BKE_mesh_uv_vert_map_create(mesh.faces(),
+                                                       mesh.corner_verts(),
+                                                       uv_map,
+                                                       mesh.verts_num,
+                                                       float2(STD_UV_CONNECT_LIMIT),
+                                                       false);
+  if (uv_vert_map == nullptr) {
+    return 0;
+  }
+
+  uint64_t unique_uvs = 0;
+  for (const int vert : IndexRange(mesh.verts_num)) {
+    for (UvMapVert *uv = BKE_mesh_uv_vert_map_get_vert(uv_vert_map, vert); uv; uv = uv->next) {
+      unique_uvs += uv->separate;
+    }
+  }
+  BKE_mesh_uv_vert_map_free(uv_vert_map);
+  return unique_uvs;
+}
+
+static uint64_t stats_bmesh_unique_uvs(BMesh *bm, const bool selected_only)
+{
+  if (!CustomData_has_layer(&bm->ldata, CD_PROP_FLOAT2)) {
+    return 0;
+  }
+
+  UvVertMap *uv_vert_map = BM_uv_vert_map_create(bm, false, true);
+  if (uv_vert_map == nullptr) {
+    return 0;
+  }
+
+  uint64_t unique_uvs = 0;
+  BM_mesh_elem_index_ensure(bm, BM_VERT);
+  for (const int vert : IndexRange(bm->totvert)) {
+    const BMVert *bm_vert = BM_vert_at_index(bm, vert);
+    if (selected_only && !BM_elem_flag_test(bm_vert, BM_ELEM_SELECT)) {
+      continue;
+    }
+    for (UvMapVert *uv = BM_uv_vert_map_at_index(uv_vert_map, vert); uv; uv = uv->next) {
+      unique_uvs += uv->separate;
+    }
+  }
+  BM_uv_vert_map_free(uv_vert_map);
+  return unique_uvs;
+}
+
+static uint64_t stats_bmesh_selected_triangles(BMesh *bm)
+{
+  uint64_t triangles = 0;
+  BMFace *face;
+  BMIter iter;
+  BM_ITER_MESH (face, &iter, bm, BM_FACES_OF_MESH) {
+    if (BM_elem_flag_test(face, BM_ELEM_SELECT)) {
+      triangles += uint64_t(max_ii(face->len - 2, 0));
+    }
+  }
+  return triangles;
+}
+
+static void stats_mesh_hud_update(Depsgraph *depsgraph,
+                                  const View3D *v3d_local,
+                                  SceneStats *stats)
+{
+  DEGObjectIterSettings deg_iter_settings{};
+  deg_iter_settings.depsgraph = depsgraph;
+  deg_iter_settings.flags = DEG_OBJECT_ITER_FOR_RENDER_ENGINE_FLAGS;
+  DEG_OBJECT_ITER_BEGIN (&deg_iter_settings, ob_iter) {
+    if (ob_iter->type != OB_MESH ||
+        (ob_iter->base_flag & BASE_ENABLED_AND_VISIBLE_IN_DEFAULT_VIEWPORT) == 0 ||
+        (v3d_local && !BKE_object_is_visible_in_viewport(v3d_local, ob_iter)))
+    {
+      continue;
+    }
+
+    if (ob_iter->mode & OB_MODE_EDIT) {
+      Object *ob_orig = DEG_get_original(ob_iter);
+      BMEditMesh *em = BKE_editmesh_from_object(ob_orig);
+      if (em == nullptr) {
+        continue;
+      }
+
+      const uint64_t triangles = em->looptris.size();
+      const uint64_t uvs = stats_bmesh_unique_uvs(em->bm, false);
+      stats->hud_vert[0] += em->bm->totvert;
+      stats->hud_edge[0] += em->bm->totedge;
+      stats->hud_face[0] += em->bm->totface;
+      stats->hud_tri[0] += triangles;
+      stats->hud_uv[0] += uvs;
+
+      if (ob_iter->base_flag & BASE_SELECTED) {
+        stats->hud_vert[1] += em->bm->totvert;
+        stats->hud_edge[1] += em->bm->totedge;
+        stats->hud_face[1] += em->bm->totface;
+        stats->hud_tri[1] += triangles;
+        stats->hud_uv[1] += uvs;
+      }
+
+      stats->hud_vert[2] += em->bm->totvertsel;
+      stats->hud_edge[2] += em->bm->totedgesel;
+      stats->hud_face[2] += em->bm->totfacesel;
+      stats->hud_tri[2] += stats_bmesh_selected_triangles(em->bm);
+      stats->hud_uv[2] += stats_bmesh_unique_uvs(em->bm, true);
+      continue;
+    }
+
+    const Mesh *mesh = BKE_object_get_evaluated_mesh_no_subsurf(ob_iter);
+    if (mesh == nullptr) {
+      continue;
+    }
+
+    const uint64_t triangles = poly_to_tri_count(mesh->faces_num, mesh->corners_num);
+    const uint64_t uvs = stats_mesh_unique_uvs(*mesh);
+    stats->hud_vert[0] += mesh->verts_num;
+    stats->hud_edge[0] += mesh->edges_num;
+    stats->hud_face[0] += mesh->faces_num;
+    stats->hud_tri[0] += triangles;
+    stats->hud_uv[0] += uvs;
+
+    if (ob_iter->base_flag & BASE_SELECTED) {
+      stats->hud_vert[1] += mesh->verts_num;
+      stats->hud_edge[1] += mesh->edges_num;
+      stats->hud_face[1] += mesh->faces_num;
+      stats->hud_tri[1] += triangles;
+      stats->hud_uv[1] += uvs;
+    }
+  }
+  DEG_OBJECT_ITER_END;
+}
 
 static bool stats_mesheval(const Mesh *mesh_eval, bool is_selected, SceneStats *stats)
 {
@@ -475,6 +625,8 @@ static void stats_update(const Main *bmain,
 
   memset(stats, 0x0, sizeof(*stats));
 
+  stats_mesh_hud_update(depsgraph, v3d_local, stats);
+
   if (obedit && (ob->type != OB_GREASE_PENCIL)) {
     /* Edit Mode. */
     FOREACH_OBJECT_BEGIN (bmain, scene, view_layer, ob_iter) {
@@ -609,6 +761,14 @@ static bool format_stats(
   SCENE_STATS_FMT_INT(totpointsel);
   SCENE_STATS_FMT_INT(totcurves);
   SCENE_STATS_FMT_INT(totcurvesel);
+
+  for (const int column : IndexRange(3)) {
+    BLI_str_format_uint64_grouped(stats_fmt->hud_vert[column], stats->hud_vert[column]);
+    BLI_str_format_uint64_grouped(stats_fmt->hud_edge[column], stats->hud_edge[column]);
+    BLI_str_format_uint64_grouped(stats_fmt->hud_face[column], stats->hud_face[column]);
+    BLI_str_format_uint64_grouped(stats_fmt->hud_tri[column], stats->hud_tri[column]);
+    BLI_str_format_uint64_grouped(stats_fmt->hud_uv[column], stats->hud_uv[column]);
+  }
 
 #undef SCENE_STATS_FMT_INT
   return true;
@@ -850,19 +1010,23 @@ const char *ED_info_statistics_string(Main *bmain, Scene *scene, ViewLayer *view
   return ED_info_statusbar_string_ex(bmain, scene, view_layer, statistics_status_bar_flag);
 }
 
-static void stats_row(int col1,
-                      const char *key,
-                      int col2,
-                      const char *value1,
-                      const char *value2,
+static void stats_row(const int label_column,
+                      const char *label,
+                      const int value_columns[3],
+                      const char *values[3],
+                      const float label_color[4],
+                      const float value_color[4],
                       int *y,
                       int height)
 {
   *y -= height;
-  BLF_draw_default(col1, *y, 0.0f, key, 128);
-  char values[128];
-  SNPRINTF_UTF8(values, (value2) ? "%s / %s" : "%s", value1, value2);
-  BLF_draw_default(col2, *y, 0.0f, values, sizeof(values));
+  const int font_id = BLF_default();
+  BLF_color4fv(font_id, label_color);
+  BLF_draw_default(label_column, *y, 0.0f, label, 64);
+  BLF_color4fv(font_id, value_color);
+  for (const int column : IndexRange(3)) {
+    BLF_draw_default(value_columns[column], *y, 0.0f, values[column], strlen(values[column]));
+  }
 }
 
 void ED_info_draw_stats(
@@ -874,129 +1038,37 @@ void ED_info_draw_stats(
     return;
   }
 
-  BKE_view_layer_synced_ensure(*bmain, scene, view_layer);
-  Object *ob = BKE_view_layer_active_object_get(view_layer);
-  eObjectMode object_mode = ob ? ob->mode : OB_MODE_OBJECT;
-  const int font_id = BLF_default();
+  const int value_columns[3] = {x + int(5.5f * U.widget_unit),
+                                0,
+                                0};
+  const float label_color[4] = {0.15f, 1.0f, 0.15f, 1.0f};
+  const float value_color[4] = {1.0f, 1.0f, 0.15f, 1.0f};
 
-  /* Translated labels for each stat row. */
-  enum {
-    OBJ,
-    VERTS,
-    EDGES,
-    FACES,
-    TRIS,
-    JOINTS,
-    BONES,
-    LAYERS,
-    FRAMES,
-    STROKES,
-    POINTS,
-    LIGHTS,
-    CURVES,
-    MAX_LABELS_COUNT
+  const char *labels[5] = {
+      IFACE_("Verts:"), IFACE_("Edges:"), IFACE_("Faces:"), IFACE_("Tris:"), IFACE_("UVs:")};
+  const char *values[5][3] = {
+      {stats_fmt.hud_vert[0], stats_fmt.hud_vert[1], stats_fmt.hud_vert[2]},
+      {stats_fmt.hud_edge[0], stats_fmt.hud_edge[1], stats_fmt.hud_edge[2]},
+      {stats_fmt.hud_face[0], stats_fmt.hud_face[1], stats_fmt.hud_face[2]},
+      {stats_fmt.hud_tri[0], stats_fmt.hud_tri[1], stats_fmt.hud_tri[2]},
+      {stats_fmt.hud_uv[0], stats_fmt.hud_uv[1], stats_fmt.hud_uv[2]},
   };
-  char labels[MAX_LABELS_COUNT][64];
 
-  STRNCPY_UTF8(labels[OBJ], IFACE_("Objects"));
-  STRNCPY_UTF8(labels[VERTS], IFACE_("Vertices"));
-  STRNCPY_UTF8(labels[EDGES], IFACE_("Edges"));
-  STRNCPY_UTF8(labels[FACES], IFACE_("Faces"));
-  STRNCPY_UTF8(labels[TRIS], IFACE_("Triangles"));
-  STRNCPY_UTF8(labels[JOINTS], IFACE_("Joints"));
-  STRNCPY_UTF8(labels[BONES], IFACE_("Bones"));
-  STRNCPY_UTF8(labels[LAYERS], IFACE_("Layers"));
-  STRNCPY_UTF8(labels[FRAMES], IFACE_("Frames"));
-  STRNCPY_UTF8(labels[STROKES], IFACE_("Strokes"));
-  STRNCPY_UTF8(labels[POINTS], IFACE_("Points"));
-  STRNCPY_UTF8(labels[LIGHTS], IFACE_("Lights"));
-  STRNCPY_UTF8(labels[CURVES], IFACE_("Curves"));
-
-  int longest_label = 0;
-  for (int i = 0; i < MAX_LABELS_COUNT; ++i) {
-    longest_label = max_ii(longest_label, BLF_width(font_id, labels[i], sizeof(labels[i])));
+  int mutable_value_columns[3] = {value_columns[0], 0, 0};
+  const int font_id = BLF_default();
+  for (const int column : IndexRange(2)) {
+    float widest_value = 0.0f;
+    for (const int row : IndexRange(5)) {
+      widest_value = std::max(
+          widest_value, BLF_width(font_id, values[row][column], strlen(values[row][column])));
+    }
+    mutable_value_columns[column + 1] = mutable_value_columns[column] + int(widest_value) +
+                                        int(0.8f * U.widget_unit);
   }
 
-  int col1 = x;
-  int col2 = x + longest_label + (0.5f * U.widget_unit);
-
-  /* Add some extra margin above this section. */
-  *y -= (0.6f * height);
-
-  bool any_objects = !STREQ(&stats_fmt.totobj[0], "0");
-  bool any_selected = !STREQ(&stats_fmt.totobjsel[0], "0");
-
-  if (any_selected) {
-    stats_row(col1, labels[OBJ], col2, stats_fmt.totobjsel, stats_fmt.totobj, y, height);
-  }
-  else if (any_objects) {
-    stats_row(col1, labels[OBJ], col2, stats_fmt.totobj, nullptr, y, height);
-    /* Show scene totals if nothing is selected. */
-    stats_row(col1, labels[VERTS], col2, stats_fmt.totvert, nullptr, y, height);
-    stats_row(col1, labels[EDGES], col2, stats_fmt.totedge, nullptr, y, height);
-    stats_row(col1, labels[FACES], col2, stats_fmt.totface, nullptr, y, height);
-    stats_row(col1, labels[TRIS], col2, stats_fmt.tottri, nullptr, y, height);
-    return;
-  }
-  else if (!ELEM(object_mode, OB_MODE_SCULPT, OB_MODE_SCULPT_CURVES)) {
-    /* No objects in scene. */
-    stats_row(col1, labels[OBJ], col2, stats_fmt.totobj, nullptr, y, height);
-    return;
-  }
-
-  if ((ob) && ob->type == OB_GREASE_PENCIL) {
-    stats_row(col1, labels[LAYERS], col2, stats_fmt.totgplayer, nullptr, y, height);
-    stats_row(col1, labels[FRAMES], col2, stats_fmt.totgpframe, nullptr, y, height);
-    stats_row(col1, labels[STROKES], col2, stats_fmt.totgpstroke, nullptr, y, height);
-    stats_row(col1, labels[POINTS], col2, stats_fmt.totpoints, nullptr, y, height);
-  }
-  else if (ob && ob->mode == OB_MODE_EDIT) {
-    if (ob->type == OB_MESH) {
-      stats_row(col1, labels[VERTS], col2, stats_fmt.totvertsel, stats_fmt.totvert, y, height);
-      stats_row(col1, labels[EDGES], col2, stats_fmt.totedgesel, stats_fmt.totedge, y, height);
-      stats_row(col1, labels[FACES], col2, stats_fmt.totfacesel, stats_fmt.totface, y, height);
-      stats_row(col1, labels[TRIS], col2, stats_fmt.tottri, nullptr, y, height);
-    }
-    else if (ob->type == OB_ARMATURE) {
-      stats_row(col1, labels[JOINTS], col2, stats_fmt.totvertsel, stats_fmt.totvert, y, height);
-      stats_row(col1, labels[BONES], col2, stats_fmt.totbonesel, stats_fmt.totbone, y, height);
-    }
-    else if (ob->type == OB_POINTCLOUD) {
-      stats_row(col1, labels[POINTS], col2, stats_fmt.totvertsel, stats_fmt.totpoints, y, height);
-    }
-    else if (ELEM(ob->type, OB_CURVES_LEGACY, OB_SURF, OB_CURVES)) {
-      stats_row(col1, labels[POINTS], col2, stats_fmt.totpointsel, stats_fmt.totpoints, y, height);
-      stats_row(col1, labels[CURVES], col2, stats_fmt.totcurvesel, stats_fmt.totcurves, y, height);
-    }
-    else if (ob->type != OB_FONT) {
-      stats_row(col1, labels[VERTS], col2, stats_fmt.totvertsel, stats_fmt.totvert, y, height);
-    }
-  }
-  else if (ob && (object_mode & OB_MODE_SCULPT)) {
-    if (stats_is_object_dynamic_topology_sculpt(ob)) {
-      stats_row(col1, labels[VERTS], col2, stats_fmt.totvertsculpt, nullptr, y, height);
-      stats_row(col1, labels[TRIS], col2, stats_fmt.tottri, nullptr, y, height);
-    }
-    else {
-      stats_row(col1, labels[VERTS], col2, stats_fmt.totvertsculpt, nullptr, y, height);
-      stats_row(col1, labels[FACES], col2, stats_fmt.totfacesculpt, nullptr, y, height);
-    }
-  }
-  else if (ob && (object_mode & OB_MODE_SCULPT_CURVES)) {
-    stats_row(col1, labels[VERTS], col2, stats_fmt.totvertsculpt, nullptr, y, height);
-  }
-  else if (ob && (object_mode & OB_MODE_POSE)) {
-    stats_row(col1, labels[BONES], col2, stats_fmt.totbonesel, stats_fmt.totbone, y, height);
-  }
-  else if ((ob) && (ob->type == OB_LAMP)) {
-    stats_row(col1, labels[LIGHTS], col2, stats_fmt.totlampsel, stats_fmt.totlamp, y, height);
-  }
-  else if ((object_mode == OB_MODE_OBJECT) && ob && ELEM(ob->type, OB_MESH, OB_FONT)) {
-    /* Object mode with the active object a mesh or text object. */
-    stats_row(col1, labels[VERTS], col2, stats_fmt.totvertsel, stats_fmt.totvert, y, height);
-    stats_row(col1, labels[EDGES], col2, stats_fmt.totedgesel, stats_fmt.totedge, y, height);
-    stats_row(col1, labels[FACES], col2, stats_fmt.totfacesel, stats_fmt.totface, y, height);
-    stats_row(col1, labels[TRIS], col2, stats_fmt.tottrisel, stats_fmt.tottri, y, height);
+  for (const int row : IndexRange(5)) {
+    stats_row(
+        x, labels[row], mutable_value_columns, values[row], label_color, value_color, y, height);
   }
 }
 
