@@ -359,7 +359,8 @@ static GPUBackendType g_backend_type = GPU_BACKEND_OPENGL;
 static std::optional<GPUBackendType> g_backend_type_override = std::nullopt;
 static std::optional<bool> g_backend_type_supported = std::nullopt;
 static std::optional<GHOST_GPUDevice> g_preferred_device_override = std::nullopt;
-static std::optional<int> g_vsync_override = std::nullopt;
+/* Keep interactive viewport redraws independent of the monitor refresh rate by default. */
+static std::optional<int> g_vsync_override = 0;
 static GPUBackend *g_backend = nullptr;
 static GHOST_ISystem *g_ghost_system = nullptr;
 

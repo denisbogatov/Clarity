@@ -8,7 +8,9 @@
 
 #include "BLI_math_base.h"
 #include "BLI_math_rotation.h"
+#include "BLI_math_vector.h"
 
+#include "DNA_object_types.h"
 #include "DNA_userdef_types.h"
 
 #include "BLT_translation.hh"
@@ -30,6 +32,24 @@
 
 namespace blender {
 
+static constexpr int VIEW3D_VIEW_DIAGONAL_BASE = 100;
+static constexpr int VIEW3D_VIEW_DIAGONAL_COUNT = 12;
+
+static const eRegionView3D_View diagonal_view_pairs[VIEW3D_VIEW_DIAGONAL_COUNT][2] = {
+    {RV3D_VIEW_LEFT, RV3D_VIEW_FRONT},
+    {RV3D_VIEW_LEFT, RV3D_VIEW_BACK},
+    {RV3D_VIEW_RIGHT, RV3D_VIEW_FRONT},
+    {RV3D_VIEW_RIGHT, RV3D_VIEW_BACK},
+    {RV3D_VIEW_LEFT, RV3D_VIEW_BOTTOM},
+    {RV3D_VIEW_LEFT, RV3D_VIEW_TOP},
+    {RV3D_VIEW_RIGHT, RV3D_VIEW_BOTTOM},
+    {RV3D_VIEW_RIGHT, RV3D_VIEW_TOP},
+    {RV3D_VIEW_FRONT, RV3D_VIEW_BOTTOM},
+    {RV3D_VIEW_FRONT, RV3D_VIEW_TOP},
+    {RV3D_VIEW_BACK, RV3D_VIEW_BOTTOM},
+    {RV3D_VIEW_BACK, RV3D_VIEW_TOP},
+};
+
 /* -------------------------------------------------------------------- */
 /** \name View Axis Operator
  * \{ */
@@ -41,6 +61,18 @@ static const EnumPropertyItem prop_view_items[] = {
     {RV3D_VIEW_TOP, "TOP", ICON_TRIA_UP, "Top", "View from the top"},
     {RV3D_VIEW_FRONT, "FRONT", 0, "Front", "View from the front"},
     {RV3D_VIEW_BACK, "BACK", 0, "Back", "View from the back"},
+    {VIEW3D_VIEW_DIAGONAL_BASE + 0, "LEFT_FRONT", 0, "Left Front", "View from left front"},
+    {VIEW3D_VIEW_DIAGONAL_BASE + 1, "LEFT_BACK", 0, "Left Back", "View from left back"},
+    {VIEW3D_VIEW_DIAGONAL_BASE + 2, "RIGHT_FRONT", 0, "Right Front", "View from right front"},
+    {VIEW3D_VIEW_DIAGONAL_BASE + 3, "RIGHT_BACK", 0, "Right Back", "View from right back"},
+    {VIEW3D_VIEW_DIAGONAL_BASE + 4, "LEFT_BOTTOM", 0, "Left Bottom", "View from left bottom"},
+    {VIEW3D_VIEW_DIAGONAL_BASE + 5, "LEFT_TOP", 0, "Left Top", "View from left top"},
+    {VIEW3D_VIEW_DIAGONAL_BASE + 6, "RIGHT_BOTTOM", 0, "Right Bottom", "View from right bottom"},
+    {VIEW3D_VIEW_DIAGONAL_BASE + 7, "RIGHT_TOP", 0, "Right Top", "View from right top"},
+    {VIEW3D_VIEW_DIAGONAL_BASE + 8, "FRONT_BOTTOM", 0, "Front Bottom", "View from front bottom"},
+    {VIEW3D_VIEW_DIAGONAL_BASE + 9, "FRONT_TOP", 0, "Front Top", "View from front top"},
+    {VIEW3D_VIEW_DIAGONAL_BASE + 10, "BACK_BOTTOM", 0, "Back Bottom", "View from back bottom"},
+    {VIEW3D_VIEW_DIAGONAL_BASE + 11, "BACK_TOP", 0, "Back Top", "View from back top"},
     {0, nullptr, 0, nullptr, nullptr},
 };
 
@@ -61,6 +93,9 @@ static wmOperatorStatus view_axis_exec(bContext *C, wmOperator *op)
   ED_view3d_smooth_view_force_finish(C, v3d, region);
 
   viewnum = RNA_enum_get(op->ptr, "type");
+  const bool is_diagonal_view = viewnum >= VIEW3D_VIEW_DIAGONAL_BASE &&
+                                viewnum < VIEW3D_VIEW_DIAGONAL_BASE +
+                                              VIEW3D_VIEW_DIAGONAL_COUNT;
 
   float align_quat_buf[4];
   float *align_quat = nullptr;
@@ -83,7 +118,7 @@ static wmOperatorStatus view_axis_exec(bContext *C, wmOperator *op)
     }
   }
 
-  if (RNA_boolean_get(op->ptr, "relative")) {
+  if (RNA_boolean_get(op->ptr, "relative") && !is_diagonal_view) {
     float quat_rotate[4];
     float quat_test[4];
 
@@ -150,10 +185,36 @@ static wmOperatorStatus view_axis_exec(bContext *C, wmOperator *op)
   /* Use this to test if we started out with a camera */
   const eRegionView3D_Persp nextperspo = (rv3d->persp == RV3D_CAMOB) ? rv3d->lpersp : perspo;
   float quat[4];
-  const eRegionView3D_View viewnum_enum = eRegionView3D_View(viewnum);
+  eRegionView3D_View viewnum_enum;
   const eRegionView3D_ViewAxisRoll view_axis_roll_enum = eRegionView3D_ViewAxisRoll(
       view_axis_roll);
-  ED_view3d_quat_from_axis_view(viewnum_enum, view_axis_roll_enum, quat);
+  if (is_diagonal_view) {
+    const int diagonal_index = viewnum - VIEW3D_VIEW_DIAGONAL_BASE;
+    float quat_a[4], quat_b[4];
+    ED_view3d_quat_from_axis_view(
+        diagonal_view_pairs[diagonal_index][0], RV3D_VIEW_AXIS_ROLL_0, quat_a);
+    ED_view3d_quat_from_axis_view(
+        diagonal_view_pairs[diagonal_index][1], RV3D_VIEW_AXIS_ROLL_0, quat_b);
+
+    float direction_a[3] = {0.0f, 0.0f, 1.0f};
+    float direction_b[3] = {0.0f, 0.0f, 1.0f};
+    invert_qt_normalized(quat_a);
+    invert_qt_normalized(quat_b);
+    mul_qt_v3(quat_a, direction_a);
+    mul_qt_v3(quat_b, direction_b);
+    add_v3_v3(direction_a, direction_b);
+    normalize_v3(direction_a);
+
+    /* Aim exactly between the two neighboring face normals. */
+    vec_to_quat(quat, direction_a, OB_NEGZ, OB_POSY);
+    normalize_qt(quat);
+    invert_qt_normalized(quat);
+    viewnum_enum = RV3D_VIEW_USER;
+  }
+  else {
+    viewnum_enum = eRegionView3D_View(viewnum);
+    ED_view3d_quat_from_axis_view(viewnum_enum, view_axis_roll_enum, quat);
+  }
   axis_set_view(C,
                 v3d,
                 region,

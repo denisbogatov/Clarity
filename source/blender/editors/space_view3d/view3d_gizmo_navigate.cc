@@ -45,6 +45,9 @@ namespace blender {
 /* Margin around the smaller buttons. */
 #define GIZMO_MINI_OFFSET 2.0f
 
+/* Must match the diagonal enum range in view3d_navigate_view_axis.cc. */
+static constexpr int VIEW3D_VIEW_DIAGONAL_BASE = 100;
+
 namespace {
 
 enum {
@@ -255,6 +258,11 @@ static void WIDGETGROUP_navigate_setup(const bContext *C, wmGizmoGroup *gzgroup)
     for (int part_index = 0; part_index < 6; part_index += 1) {
       PointerRNA *ptr = WM_gizmo_operator_set(gz, part_index + 1, ot_view_axis, nullptr);
       RNA_enum_set(ptr, "type", mapping[part_index]);
+    }
+
+    for (int bevel_index = 0; bevel_index < 12; bevel_index++) {
+      PointerRNA *ptr = WM_gizmo_operator_set(gz, bevel_index + 7, ot_view_axis, nullptr);
+      RNA_enum_set(ptr, "type", VIEW3D_VIEW_DIAGONAL_BASE + bevel_index);
     }
 
     /* When dragging an axis, use this instead. */

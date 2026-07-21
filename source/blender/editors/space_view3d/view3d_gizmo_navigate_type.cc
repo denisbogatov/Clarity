@@ -7,7 +7,7 @@
  *
  * \name Custom Orientation/Navigation Gizmo for the 3D View
  *
- * \brief Simple gizmo to axis and translate.
+ * \brief Maya-style view cube for axis selection and view rotation.
  *
  * - scale_basis: used for the size.
  * - matrix_basis: used for the location.
@@ -15,10 +15,13 @@
  */
 
 #include <algorithm>
+#include <cfloat>
+#include <cstdlib>
+#include <cstring>
 
+#include "BLI_assert.h"
 #include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
-#include "BLI_math_vector_types.hh"
 #include "BLI_sort_utils.h"
 
 #include "BKE_context.hh"
@@ -28,6 +31,7 @@
 #include "GPU_state.hh"
 
 #include "BLF_api.hh"
+#include "BLT_translation.hh"
 
 #include "UI_interface.hh"
 #include "UI_resources.hh"
@@ -42,50 +46,147 @@ namespace blender {
 /* Radius of the entire background. */
 #define WIDGET_RADIUS ((U.gizmo_size_navigate_v3d / 2.0f) * UI_SCALE_FAC)
 
-/* Sizes of axis spheres containing XYZ characters in relation to above. */
-#define AXIS_HANDLE_SIZE 0.20f
+/* Maya-style view-cube dimensions in normalized gizmo space. */
+#define VIEWCUBE_HALF_SIZE 0.68f
+#define VIEWCUBE_BEVEL_SIZE 0.10f
+#define VIEWCUBE_BOUND_RADIUS (VIEWCUBE_HALF_SIZE * 1.74f)
+#define VIEWCUBE_LINE_WIDTH ((U.gizmo_size_navigate_v3d / 55.0f) * U.pixelsize)
+/* Render labels at a higher internal resolution, then scale them onto each face. */
+#define VIEWCUBE_TEXT_SIZE (WIDGET_RADIUS * 0.60f)
 
-#define AXIS_LINE_WIDTH ((U.gizmo_size_navigate_v3d / 40.0f) * U.pixelsize)
-#define AXIS_RING_WIDTH ((U.gizmo_size_navigate_v3d / 60.0f) * U.pixelsize)
-#define AXIS_TEXT_SIZE (WIDGET_RADIUS * AXIS_HANDLE_SIZE * 1.25f)
+struct ViewCubeFace {
+  float depth;
+  char index;
+  char axis;
+  bool is_pos;
+};
 
-/* distance within this from center is considered positive. */
-#define AXIS_DEPTH_BIAS 0.01f
+struct ViewCubePolygon {
+  float depth;
+  float vertices[4][3];
+  float shade;
+  char vertex_count;
+  char face_index;
+  char kind;
+};
 
-static void gizmo_axis_draw(const bContext *C, wmGizmo *gz)
+static void viewcube_main_face_vertices(const int axis,
+                                        const bool is_pos,
+                                        float r_vertices[4][3])
 {
-  struct {
-    float depth;
-    char index;
-    char axis;
-    char axis_opposite;
-    bool is_pos;
-  } axis_order[6] = {
-      {-gz->matrix_offset[0][2], 0, 0, 1, false},
-      {+gz->matrix_offset[0][2], 1, 0, 0, true},
-      {-gz->matrix_offset[1][2], 2, 1, 3, false},
-      {+gz->matrix_offset[1][2], 3, 1, 2, true},
-      {-gz->matrix_offset[2][2], 4, 2, 5, false},
-      {+gz->matrix_offset[2][2], 5, 2, 4, true},
-  };
+  const int axis_u = (axis + 1) % 3;
+  const int axis_v = (axis + 2) % 3;
+  const float side = is_pos ? VIEWCUBE_HALF_SIZE : -VIEWCUBE_HALF_SIZE;
+  const float inner = VIEWCUBE_HALF_SIZE - VIEWCUBE_BEVEL_SIZE;
+  const float coordinates[4][2] = {{-1.0f, -1.0f},
+                                   {1.0f, -1.0f},
+                                   {1.0f, 1.0f},
+                                   {-1.0f, 1.0f}};
 
-  int axis_align = -1;
-  for (int axis = 0; axis < 3; axis++) {
-    if (len_squared_v2(gz->matrix_offset[axis]) < 1e-6f) {
-      axis_align = axis;
-      break;
-    }
+  for (int i = 0; i < 4; i++) {
+    zero_v3(r_vertices[i]);
+    r_vertices[i][axis] = side;
+    r_vertices[i][axis_u] = coordinates[i][0] * inner;
+    r_vertices[i][axis_v] = coordinates[i][1] * inner;
   }
+}
 
-  qsort(&axis_order, ARRAY_SIZE(axis_order), sizeof(axis_order[0]), BLI_sortutil_cmp_float);
+static void viewcube_bevel_vertices(const int axis_a,
+                                    const int axis_b,
+                                    const int sign_a,
+                                    const int sign_b,
+                                    float r_vertices[4][3])
+{
+  const int axis_c = 3 - axis_a - axis_b;
+  const float inner = VIEWCUBE_HALF_SIZE - VIEWCUBE_BEVEL_SIZE;
+  zero_v3(r_vertices[0]);
+  zero_v3(r_vertices[1]);
+  zero_v3(r_vertices[2]);
+  zero_v3(r_vertices[3]);
 
-  /* When the cursor is over any of the gizmos (show circle backdrop). */
-  const bool is_active = ((gz->state & WM_GIZMO_STATE_HIGHLIGHT) != 0);
+  r_vertices[0][axis_a] = sign_a * VIEWCUBE_HALF_SIZE;
+  r_vertices[0][axis_b] = sign_b * inner;
+  r_vertices[0][axis_c] = -inner;
+  r_vertices[1][axis_a] = sign_a * inner;
+  r_vertices[1][axis_b] = sign_b * VIEWCUBE_HALF_SIZE;
+  r_vertices[1][axis_c] = -inner;
+  r_vertices[2][axis_a] = sign_a * inner;
+  r_vertices[2][axis_b] = sign_b * VIEWCUBE_HALF_SIZE;
+  r_vertices[2][axis_c] = inner;
+  r_vertices[3][axis_a] = sign_a * VIEWCUBE_HALF_SIZE;
+  r_vertices[3][axis_b] = sign_b * inner;
+  r_vertices[3][axis_c] = inner;
+}
 
-  /* Background color of the View3D, used to mix colors. */
-  float view_color[4];
-  ED_view3d_background_color_get(CTX_data_scene(C), CTX_wm_view3d(C), view_color);
-  view_color[3] = 1.0f;
+static void viewcube_project_point(const wmGizmo *gz, const float point[3], float r_point[2])
+{
+  r_point[0] = point[0] * gz->matrix_offset[0][0] + point[1] * gz->matrix_offset[1][0] +
+               point[2] * gz->matrix_offset[2][0];
+  r_point[1] = point[0] * gz->matrix_offset[0][1] + point[1] * gz->matrix_offset[1][1] +
+               point[2] * gz->matrix_offset[2][1];
+}
+
+static bool viewcube_point_in_quad(const float point[2], const float quad[4][2])
+{
+  bool has_negative = false;
+  bool has_positive = false;
+  for (int i = 0; i < 4; i++) {
+    const float *a = quad[i];
+    const float *b = quad[(i + 1) % 4];
+    const float cross = (b[0] - a[0]) * (point[1] - a[1]) -
+                        (b[1] - a[1]) * (point[0] - a[0]);
+    has_negative |= cross < -1e-5f;
+    has_positive |= cross > 1e-5f;
+  }
+  return !(has_negative && has_positive);
+}
+
+static const char *viewcube_face_label(const int index)
+{
+  static const char *labels[6] = {
+      N_("LEFT"), N_("RIGHT"), N_("FRONT"), N_("BACK"), N_("BOTTOM"), N_("TOP")};
+  return IFACE_(labels[index]);
+}
+
+static void viewcube_face_text_matrix(const ViewCubeFace &face, float r_matrix[4][4])
+{
+  unit_m4(r_matrix);
+  zero_v3(r_matrix[0]);
+  zero_v3(r_matrix[1]);
+  zero_v3(r_matrix[2]);
+
+  const float sign = face.is_pos ? 1.0f : -1.0f;
+  if (face.axis == 0) {
+    /* U = +/-Y, V = Z. */
+    r_matrix[0][1] = sign;
+    r_matrix[1][2] = 1.0f;
+    r_matrix[2][0] = sign;
+  }
+  else if (face.axis == 1) {
+    /* U = -/+X, V = Z. */
+    r_matrix[0][0] = -sign;
+    r_matrix[1][2] = 1.0f;
+    r_matrix[2][1] = sign;
+  }
+  else {
+    /* U = +/-X, V = Y. */
+    r_matrix[0][0] = sign;
+    r_matrix[1][1] = 1.0f;
+    r_matrix[2][2] = sign;
+  }
+}
+
+static void gizmo_axis_draw(const bContext * /*C*/, wmGizmo *gz)
+{
+  ViewCubeFace faces[6] = {
+      {-gz->matrix_offset[0][2], 0, 0, false},
+      {+gz->matrix_offset[0][2], 1, 0, true},
+      {-gz->matrix_offset[1][2], 2, 1, false},
+      {+gz->matrix_offset[1][2], 3, 1, true},
+      {-gz->matrix_offset[2][2], 4, 2, false},
+      {+gz->matrix_offset[2][2], 5, 2, true},
+  };
+  qsort(faces, ARRAY_SIZE(faces), sizeof(faces[0]), BLI_sortutil_cmp_float);
 
   float matrix_screen[4][4];
   float matrix_unit[4][4];
@@ -99,38 +200,12 @@ static void gizmo_axis_draw(const bContext *C, wmGizmo *gz)
 
   GPUVertFormat *format = immVertexFormat();
   const uint pos_id = GPU_vertformat_attr_add(format, "pos", gpu::VertAttrType::SFLOAT_32_32_32);
-  const uint color_id = GPU_vertformat_attr_add(
-      format, "color", gpu::VertAttrType::SFLOAT_32_32_32_32);
-  float viewport_size[4];
-  GPU_viewport_size_get_f(viewport_size);
 
-  static float axis_color[3][4];
-
-  struct {
-    float matrix[4][4];
-    float matrix_m3[3][3];
-    float matrix_m3_invert[3][3];
-    int id;
-  } font;
-
-  font.id = BLF_default();
-  BLF_disable(font.id, BLF_ROTATION | BLF_SHADOW | BLF_ASPECT | BLF_WORD_WRAP);
-  BLF_enable(font.id, BLF_BOLD);
-  BLF_size(font.id, AXIS_TEXT_SIZE);
-  BLF_position(font.id, 0, 0, 0);
-
-  /* Calculate the inverse of the (matrix_final * matrix_offset).
-   * This allows us to use the final location, while reversing the rotation so fonts
-   * show without any rotation. */
-  float m3[3][3];
-  float m3_offset[3][3];
-  copy_m3_m4(m3, matrix_screen);
-  copy_m3_m4(m3_offset, gz->matrix_offset);
-  mul_m3_m3m3(m3, m3, m3_offset);
-  copy_m3_m3(font.matrix_m3_invert, m3);
-  invert_m3(m3);
-  copy_m3_m3(font.matrix_m3, m3);
-  copy_m4_m3(font.matrix, m3);
+  const int font_id = BLF_default();
+  BLF_disable(font_id, BLF_ROTATION | BLF_SHADOW | BLF_ASPECT | BLF_WORD_WRAP);
+  BLF_enable(font_id, BLF_BOLD);
+  BLF_size(font_id, VIEWCUBE_TEXT_SIZE);
+  BLF_position(font_id, 0, 0, 0);
 
   bool use_project_matrix = (gz->scale_final >= -GPU_MATRIX_ORTHO_CLIP_NEAR_DEFAULT);
   if (use_project_matrix) {
@@ -138,153 +213,155 @@ static void gizmo_axis_draw(const bContext *C, wmGizmo *gz)
     GPU_matrix_ortho_set_z(-gz->scale_final, gz->scale_final);
   }
 
-  draw_roundbox_corner_set(ui::CNR_ALL);
-  GPU_polygon_smooth(false);
-
-  /* Circle defining active area. */
-  if (is_active) {
-    const float rad = WIDGET_RADIUS;
-    GPU_matrix_push();
-    GPU_matrix_scale_1f(1.0f / rad);
-
-    rctf rect{};
-    rect.xmin = -rad;
-    rect.xmax = rad;
-    rect.ymin = -rad;
-    rect.ymax = rad;
-    ui::draw_roundbox_4fv(&rect, true, rad, gz->color_hi);
-    GPU_matrix_pop();
-  }
-
   GPU_matrix_mul(gz->matrix_offset);
 
-  for (int axis_index = 0; axis_index < ARRAY_SIZE(axis_order); axis_index++) {
-    const int index = axis_order[axis_index].index;
-    const int axis = axis_order[axis_index].axis;
-    const bool is_pos = axis_order[axis_index].is_pos;
-    const float depth = axis_order[axis_index].depth;
-    const bool is_behind = (depth <= (AXIS_DEPTH_BIAS * (is_pos ? -1 : 1)));
-    bool is_aligned_front = (axis_align != -1 && axis_align == axis && !is_behind);
-    bool is_aligned_back = (axis_align != -1 && axis_align == axis && is_behind);
-
-    const float v[3] = {0, 0, (1.0f - AXIS_HANDLE_SIZE) * (is_pos ? 1 : -1)};
-    const float v_final[3] = {v[(axis + 2) % 3], v[(axis + 1) % 3], v[axis]};
-
-    bool is_highlight = index + 1 == gz->highlight_part;
-    /* Check if highlight part is the other side when axis aligned. */
-    if (is_aligned_front && (axis_order[axis_index].axis_opposite + 1 == gz->highlight_part)) {
-      is_highlight = true;
+  ViewCubePolygon polygons[26];
+  int polygon_count = 0;
+  const auto add_polygon = [&](const float vertices[][3],
+                               const int vertex_count,
+                               const float shade,
+                               const int kind,
+                               const int face_index) {
+    ViewCubePolygon &polygon = polygons[polygon_count++];
+    polygon.depth = 0.0f;
+    polygon.shade = shade;
+    polygon.vertex_count = vertex_count;
+    polygon.face_index = face_index;
+    polygon.kind = kind;
+    for (int i = 0; i < vertex_count; i++) {
+      copy_v3_v3(polygon.vertices[i], vertices[i]);
+      polygon.depth += vertices[i][0] * gz->matrix_offset[0][2] +
+                       vertices[i][1] * gz->matrix_offset[1][2] +
+                       vertices[i][2] * gz->matrix_offset[2][2];
     }
+    polygon.depth /= vertex_count;
+  };
 
-    ui::theme::get_color_3fv(TH_AXIS_X + axis, axis_color[axis]);
-    axis_color[axis][3] = 1.0f;
+  /* Six inset primary faces. */
+  for (const ViewCubeFace &face : faces) {
+    float vertices[4][3];
+    viewcube_main_face_vertices(face.axis, face.is_pos, vertices);
+    const float shade = 0.68f + 0.10f * ((face.depth + 1.0f) * 0.5f);
+    add_polygon(vertices, 4, shade, 0, face.index);
+  }
 
-    /* Color that is full at front, but 50% view background when in back. */
-    float fading_color[4];
-    interp_v4_v4v4(fading_color, view_color, axis_color[axis], ((depth + 1) * 0.25) + 0.5);
-
-    /* Color that is midway between front and back. */
-    float middle_color[4];
-    interp_v4_v4v4(middle_color, view_color, axis_color[axis], 0.75f);
-
-    GPU_blend(GPU_BLEND_ALPHA);
-
-    /* Axis Line. */
-    if (is_pos || axis_align != -1) {
-
-      /* Extend slightly to meet better at the center. */
-      float v_start[3] = {0.0f, 0.0f, 0.0f};
-      mul_v3_v3fl(v_start, v_final, -(AXIS_LINE_WIDTH / WIDGET_RADIUS * 0.66f));
-
-      /* Decrease length of line by ball radius. */
-      float v_end[3] = {0.0f, 0.0f, 0.0f};
-      mul_v3_v3fl(v_end, v_final, 1.0f - AXIS_HANDLE_SIZE);
-
-      immBindBuiltinProgram(GPU_SHADER_3D_POLYLINE_SMOOTH_COLOR);
-      immUniform2fv("viewportSize", &viewport_size[2]);
-      immUniform1f("lineWidth", AXIS_LINE_WIDTH);
-      immBegin(GPU_PRIM_LINES, 2);
-      immAttr4fv(color_id, middle_color);
-      immVertex3fv(pos_id, v_start);
-      immAttr4fv(color_id, fading_color);
-      immVertex3fv(pos_id, v_end);
-      immEnd();
-      immUnbindProgram();
-    }
-
-    /* Axis Ball. */
-    if (!is_aligned_back) {
-      float *inner_color = fading_color;
-      float *outline_color = fading_color;
-      float negative_color[4];
-      if (!is_pos) {
-        if (is_aligned_front) {
-          interp_v4_v4v4(negative_color, float4{1.0f, 1.0f, 1.0f, 1.0f}, axis_color[axis], 0.5f);
-          negative_color[3] = std::min(depth + 1, 1.0f);
-          outline_color = negative_color;
-        }
-        else {
-          interp_v4_v4v4(negative_color, view_color, axis_color[axis], 0.25f);
-          negative_color[3] = std::min(depth + 1, 1.0f);
-          inner_color = negative_color;
+  /* Twelve bevel polygons connecting pairs of primary faces. */
+  const float inner = VIEWCUBE_HALF_SIZE - VIEWCUBE_BEVEL_SIZE;
+  int bevel_index = 0;
+  for (int axis_a = 0; axis_a < 3; axis_a++) {
+    for (int axis_b = axis_a + 1; axis_b < 3; axis_b++) {
+      for (int sign_a = -1; sign_a <= 1; sign_a += 2) {
+        for (int sign_b = -1; sign_b <= 1; sign_b += 2) {
+          float vertices[4][3];
+          viewcube_bevel_vertices(axis_a, axis_b, sign_a, sign_b, vertices);
+          add_polygon(vertices, 4, 0.61f, 1, bevel_index++);
         }
       }
-
-      GPU_matrix_push();
-      GPU_matrix_translate_3fv(v_final);
-      GPU_matrix_mul(font.matrix);
-      /* Size change from back to front: 0.92f - 1.08f. */
-      float scale = ((depth + 1) * 0.08f) + 0.92f;
-      const float rad = WIDGET_RADIUS * AXIS_HANDLE_SIZE * scale;
-      rctf rect{};
-      rect.xmin = -rad;
-      rect.xmax = rad;
-      rect.ymin = -rad;
-      rect.ymax = rad;
-      ui::draw_roundbox_4fv_ex(
-          &rect, inner_color, nullptr, 0.0f, outline_color, AXIS_RING_WIDTH, rad);
-      GPU_matrix_pop();
     }
+  }
 
-    /* Axis XYZ Character. */
-    if ((is_pos || is_highlight || (axis == axis_align)) && !is_aligned_back) {
-      float axis_str_width, axis_string_height;
-      char axis_str[3] = {char('X' + axis), 0, 0};
-      if (!is_pos) {
-        axis_str[0] = '-';
-        axis_str[1] = 'X' + axis;
+  /* Eight triangular corner polygons. */
+  for (int sign_x = -1; sign_x <= 1; sign_x += 2) {
+    for (int sign_y = -1; sign_y <= 1; sign_y += 2) {
+      for (int sign_z = -1; sign_z <= 1; sign_z += 2) {
+        const float vertices[3][3] = {
+            {sign_x * VIEWCUBE_HALF_SIZE, sign_y * inner, sign_z * inner},
+            {sign_x * inner, sign_y * VIEWCUBE_HALF_SIZE, sign_z * inner},
+            {sign_x * inner, sign_y * inner, sign_z * VIEWCUBE_HALF_SIZE},
+        };
+        add_polygon(vertices, 3, 0.54f, 2, -1);
       }
-      BLF_width_and_height(font.id, axis_str, 3, &axis_str_width, &axis_string_height);
+    }
+  }
+  BLI_assert(polygon_count == ARRAY_SIZE(polygons));
+  qsort(polygons, polygon_count, sizeof(polygons[0]), BLI_sortutil_cmp_float);
 
-      /* Calculate pixel-aligned location, without this text draws fuzzy. */
-      float v_final_px[3];
-      mul_v3_m3v3(v_final_px, font.matrix_m3_invert, v_final);
-      /* Center the text and pixel align, it's important to round once
-       * otherwise the characters are noticeably not-centered.
-       * If this wasn't an issue we could use #BLF_position to place the text. */
-      v_final_px[0] = roundf(v_final_px[0] - (axis_str_width * (is_pos ? 0.5f : 0.55f)));
-      v_final_px[1] = roundf(v_final_px[1] - (axis_string_height / 2.0f));
-      mul_m3_v3(font.matrix_m3, v_final_px);
+  GPU_blend(GPU_BLEND_ALPHA);
+  GPU_line_smooth(true);
+  GPU_polygon_smooth(true);
+  for (const ViewCubePolygon &polygon : polygons) {
+    const bool is_highlight =
+        (polygon.kind == 0 && polygon.face_index + 1 == gz->highlight_part) ||
+        (polygon.kind == 1 && polygon.face_index + 7 == gz->highlight_part);
+    const float face_color[4] = {
+        is_highlight ? 0.16f : polygon.shade,
+        is_highlight ? 0.48f : polygon.shade,
+        is_highlight ? 0.92f : polygon.shade,
+        0.98f,
+    };
+    const float outline_color[4] = {
+        is_highlight ? 0.08f : 0.12f,
+        is_highlight ? 0.30f : 0.12f,
+        is_highlight ? 0.70f : 0.12f,
+        1.0f,
+    };
+
+    immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+    immUniformColor4fv(face_color);
+    immBegin(GPU_PRIM_TRIS, polygon.vertex_count == 4 ? 6 : 3);
+    immVertex3fv(pos_id, polygon.vertices[0]);
+    immVertex3fv(pos_id, polygon.vertices[1]);
+    immVertex3fv(pos_id, polygon.vertices[2]);
+    if (polygon.vertex_count == 4) {
+      immVertex3fv(pos_id, polygon.vertices[0]);
+      immVertex3fv(pos_id, polygon.vertices[2]);
+      immVertex3fv(pos_id, polygon.vertices[3]);
+    }
+    immEnd();
+
+    GPU_line_width(VIEWCUBE_LINE_WIDTH);
+    immUniformColor4fv(outline_color);
+    immBegin(GPU_PRIM_LINE_LOOP, polygon.vertex_count);
+    for (int i = 0; i < polygon.vertex_count; i++) {
+      immVertex3fv(pos_id, polygon.vertices[i]);
+    }
+    immEnd();
+    immUnbindProgram();
+  }
+
+  GPU_polygon_smooth(false);
+
+  /* Face labels are drawn last so bevel polygons cannot cover them. */
+  for (const ViewCubeFace &face : faces) {
+    const bool is_highlight = face.index + 1 == gz->highlight_part;
+
+    if (face.depth > 0.20f) {
+      const char *label = viewcube_face_label(face.index);
+      float label_width, label_height;
+      BLF_width_and_height(font_id, label, strlen(label), &label_width, &label_height);
+
+      float center[3] = {0.0f, 0.0f, 0.0f};
+      center[face.axis] = (face.is_pos ? VIEWCUBE_HALF_SIZE : -VIEWCUBE_HALF_SIZE) * 1.01f;
+      const float label_scale = std::min((inner * 2.0f * 0.72f) / label_width,
+                                         (inner * 2.0f * 0.42f) / label_height);
+      float text_matrix[4][4];
+      viewcube_face_text_matrix(face, text_matrix);
+
       GPU_matrix_push();
-      GPU_matrix_translate_3fv(v_final_px);
-      GPU_matrix_mul(font.matrix);
-      float text_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-      if (!is_highlight) {
-        zero_v4(text_color);
-        text_color[3] = is_active ? 1.0f : 0.9f;
-      }
-      BLF_color4fv(font.id, text_color);
-      BLF_draw(font.id, axis_str, 2);
+      GPU_matrix_translate_3fv(center);
+      GPU_matrix_mul(text_matrix);
+      GPU_matrix_scale_2f(label_scale, label_scale);
+      GPU_matrix_translate_2f(-label_width * 0.5f, -label_height * 0.5f);
+      const float text_color[4] = {
+          is_highlight ? 1.0f : 0.08f,
+          is_highlight ? 1.0f : 0.08f,
+          is_highlight ? 1.0f : 0.08f,
+          1.0f,
+      };
+      BLF_color4fv(font_id, text_color);
+      BLF_draw(font_id, label, strlen(label));
       GPU_matrix_pop();
     }
   }
 
+  GPU_line_width(1.0f);
+  GPU_line_smooth(false);
   if (use_project_matrix) {
     GPU_matrix_pop_projection();
   }
 
   GPU_blend(GPU_BLEND_NONE);
-  BLF_disable(font.id, BLF_BOLD);
+  BLF_disable(font_id, BLF_BOLD);
   GPU_matrix_pop();
 }
 
@@ -294,51 +371,55 @@ static int gizmo_axis_test_select(bContext * /*C*/, wmGizmo *gz, const int mval[
   sub_v2_v2(point_local, gz->matrix_basis[3]);
   mul_v2_fl(point_local, 1.0f / gz->scale_final);
 
-  const float len_sq = len_squared_v2(point_local);
-  if (len_sq > 1.0) {
+  if (len_squared_v2(point_local) > VIEWCUBE_BOUND_RADIUS * VIEWCUBE_BOUND_RADIUS) {
     return -1;
   }
 
-  int part_best = -1;
-  int part_index = 1;
-  /* Use 'SQUARE(HANDLE_SIZE)' if we want to be able to _not_ focus on one of the axis. */
-  float i_best_len_sq = FLT_MAX;
-  for (int i = 0; i < 3; i++) {
+  float best_depth = -FLT_MAX;
+  int best_part = -1;
+  for (int axis = 0; axis < 3; axis++) {
     for (int is_pos = 0; is_pos < 2; is_pos++) {
-      const float co[2] = {
-          gz->matrix_offset[i][0] * (is_pos ? 1 : -1),
-          gz->matrix_offset[i][1] * (is_pos ? 1 : -1),
-      };
-
-      bool ok = true;
-
-      /* Check if we're viewing on an axis,
-       * there is no point to clicking on the current axis so show the reverse. */
-      if (len_squared_v2(co) < 1e-6f && (gz->matrix_offset[i][2] > 0.0f) == is_pos) {
-        ok = false;
+      float vertices[4][3];
+      float quad[4][2];
+      viewcube_main_face_vertices(axis, is_pos != 0, vertices);
+      for (int i = 0; i < 4; i++) {
+        viewcube_project_point(gz, vertices[i], quad[i]);
       }
 
-      if (ok) {
-        const float len_axis_sq = len_squared_v2v2(co, point_local);
-        if (len_axis_sq < i_best_len_sq) {
-          part_best = part_index;
-          i_best_len_sq = len_axis_sq;
-        }
+      const float depth = gz->matrix_offset[axis][2] * (is_pos ? 1.0f : -1.0f);
+      if (depth > best_depth && viewcube_point_in_quad(point_local, quad)) {
+        best_depth = depth;
+        best_part = axis * 2 + is_pos + 1;
       }
-      part_index += 1;
     }
   }
 
-  if (part_best != -1) {
-    return part_best;
+  int bevel_index = 0;
+  for (int axis_a = 0; axis_a < 3; axis_a++) {
+    for (int axis_b = axis_a + 1; axis_b < 3; axis_b++) {
+      for (int sign_a = -1; sign_a <= 1; sign_a += 2) {
+        for (int sign_b = -1; sign_b <= 1; sign_b += 2) {
+          float vertices[4][3];
+          float quad[4][2];
+          viewcube_bevel_vertices(axis_a, axis_b, sign_a, sign_b, vertices);
+          float depth = 0.0f;
+          for (int i = 0; i < 4; i++) {
+            viewcube_project_point(gz, vertices[i], quad[i]);
+            depth += vertices[i][0] * gz->matrix_offset[0][2] +
+                     vertices[i][1] * gz->matrix_offset[1][2] +
+                     vertices[i][2] * gz->matrix_offset[2][2];
+          }
+          depth *= 0.25f;
+          if (depth > best_depth && viewcube_point_in_quad(point_local, quad)) {
+            best_depth = depth;
+            best_part = bevel_index + 7;
+          }
+          bevel_index++;
+        }
+      }
+    }
   }
-
-  /* The 'gz->scale_final' is already applied when projecting. */
-  if (len_sq < 1.0f) {
-    return 0;
-  }
-
-  return -1;
+  return best_part;
 }
 
 static int gizmo_axis_cursor_get(wmGizmo * /*gz*/)
@@ -349,7 +430,7 @@ static int gizmo_axis_cursor_get(wmGizmo * /*gz*/)
 static bool gizmo_axis_screen_bounds_get(const bContext *C, wmGizmo *gz, rcti *r_bounding_box)
 {
   ScrArea *area = CTX_wm_area(C);
-  const float rad = WIDGET_RADIUS;
+  const float rad = WIDGET_RADIUS * VIEWCUBE_BOUND_RADIUS;
   r_bounding_box->xmin = gz->matrix_basis[3][0] + area->totrct.xmin - rad;
   r_bounding_box->ymin = gz->matrix_basis[3][1] + area->totrct.ymin - rad;
   r_bounding_box->xmax = gz->matrix_basis[3][0] + area->totrct.xmin + rad;

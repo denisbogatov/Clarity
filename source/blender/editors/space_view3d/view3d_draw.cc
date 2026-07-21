@@ -7,6 +7,7 @@
  */
 
 #include <cmath>
+#include <cstring>
 #include <fmt/format.h>
 
 #include "BLI_listbase.h"
@@ -1425,11 +1426,7 @@ static float4 get_low_fps_color()
   return alert_rgb;
 }
 
-static void draw_stats_fps(const Scene *scene,
-                           View3D *v3d,
-                           const int xoffset,
-                           int *yoffset,
-                           const int line_height)
+static float update_viewport_redraw_fps(const Scene *scene, View3D *v3d)
 {
   /* Keep the timestamp small so a runtime-only float retains sub-millisecond precision. */
   const float now = float(fmod(BLI_time_now_seconds(), 1000.0));
@@ -1454,21 +1451,58 @@ static void draw_stats_fps(const Scene *scene,
     fps = playback_state.fps_average;
   }
 
-  *yoffset -= line_height;
+  return fps;
+}
+
+static void draw_corner_stat(const char *label,
+                             const char *value,
+                             const int right,
+                             const int y)
+{
   const int font_id = BLF_default();
   const float label_color[4] = {0.15f, 1.0f, 0.15f, 1.0f};
   const float value_color[4] = {1.0f, 1.0f, 0.15f, 1.0f};
-  BLF_color4fv(font_id, label_color);
-  BLF_draw_default(xoffset, *yoffset, 0.0f, IFACE_("FPS:"), 4);
+  const float label_width = BLF_width(font_id, label, strlen(label));
+  const float value_width = BLF_width(font_id, value, strlen(value));
+  const int x = right - int(label_width + value_width + (0.3f * U.widget_unit));
 
-  char printable[32];
-  SNPRINTF_UTF8(printable, "%.1f", fps);
+  BLF_color4fv(font_id, label_color);
+  BLF_draw_default(x, y, 0.0f, label, strlen(label));
   BLF_color4fv(font_id, value_color);
-  BLF_draw_default(xoffset + int(5.5f * U.widget_unit),
-                   *yoffset,
+  BLF_draw_default(x + int(label_width + (0.3f * U.widget_unit)),
+                   y,
                    0.0f,
-                   printable,
-                   sizeof(printable));
+                   value,
+                   strlen(value));
+}
+
+static void draw_viewport_corner_stats(Main *bmain,
+                                       const Scene *scene,
+                                       ViewLayer *view_layer,
+                                       View3D *v3d,
+                                       const rcti *rect)
+{
+  BKE_view_layer_synced_ensure(*bmain, scene, view_layer);
+
+  int selected_objects = 0;
+  for (const Base &base : *BKE_view_layer_object_bases_get(view_layer)) {
+    if (BASE_SELECTED(v3d, &base)) {
+      selected_objects++;
+    }
+  }
+
+  char selected_value[32];
+  SNPRINTF_UTF8(selected_value, "%d", selected_objects);
+  char fps_value[32];
+  SNPRINTF_UTF8(fps_value, "%.1f", update_viewport_redraw_fps(scene, v3d));
+
+  const int right = rect->xmax - int(0.5f * U.widget_unit);
+  const int selected_right = right - int(4.5f * U.widget_unit);
+  draw_corner_stat(IFACE_("Selected:"),
+                   selected_value,
+                   selected_right,
+                   rect->ymax - VIEW3D_OVERLAY_LINEHEIGHT);
+  draw_corner_stat(IFACE_("FPS:"), fps_value, right, rect->ymin + int(0.5f * U.widget_unit));
 }
 
 static void draw_performance_stats(Depsgraph *depsgraph,
@@ -1530,7 +1564,6 @@ void view3d_draw_region_info(const bContext *C, ARegion *region)
   RegionView3D *rv3d = static_cast<RegionView3D *>(region->regiondata);
   View3D *v3d = CTX_wm_view3d(C);
   Scene *scene = CTX_data_scene(C);
-  wmWindowManager *wm = CTX_wm_manager(C);
   Main *bmain = CTX_data_main(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
   Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
@@ -1614,13 +1647,12 @@ void view3d_draw_region_info(const bContext *C, ARegion *region)
                       region->runtime->quadview_index == bke::ARegionQuadviewIndex::TopLeft);
 
     if ((v3d->overlay.flag & V3D_OVERLAY_HIDE_TEXT) == 0) {
-      if ((U.uiflag & USER_SHOW_FPS) && ED_screen_animation_no_scrub(wm) && region_ok &&
-          (v3d->overlay.flag & V3D_OVERLAY_STATS) == 0)
-      {
-        ED_scene_draw_fps(scene, xoffset, &yoffset);
+      if (region_ok) {
+        draw_viewport_corner_stats(bmain, scene, view_layer, v3d, rect);
         BLF_color4fv(font_id, text_color);
       }
-      else if (U.uiflag & USER_SHOW_VIEWPORTNAME) {
+
+      if (U.uiflag & USER_SHOW_VIEWPORTNAME) {
         draw_viewport_name(region, v3d, xoffset, &yoffset);
       }
 
@@ -1655,7 +1687,6 @@ void view3d_draw_region_info(const bContext *C, ARegion *region)
                          xoffset,
                          &yoffset,
                          VIEW3D_OVERLAY_LINEHEIGHT);
-      draw_stats_fps(scene, v3d, xoffset, &yoffset, VIEW3D_OVERLAY_LINEHEIGHT);
     }
 
     /* Set the size back to the default hard-coded size. Otherwise anyone drawing after this,
