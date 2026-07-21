@@ -124,7 +124,7 @@ VertOut vertex_main(VertIn vert_in)
 
   vert_out.final_color.a *= (occluded) ? alpha : 1.0f;
 
-#if !defined(FACE)
+#if !defined(FACE) && !defined(EDGE)
   /* Facing based color blend */
   float3 view_normal = normalize(drw_normal_object_to_view(vert_in.lN) + 1e-4f);
   float3 view_vec = (drw_view().winmat[3][3] == 0.0f) ? normalize(view_pos) :

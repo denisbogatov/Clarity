@@ -321,6 +321,11 @@ struct OpaqueOut {
     /* For matcaps, save front facing in alpha channel. */
     frag_out.material.a = float(facing);
   }
+
+  if (!facing) {
+    /* Use a value outside the packed material range as a marker for the deferred resolve pass. */
+    frag_out.material.a = 256.0f;
+  }
 }
 
 struct TransparentOut {
@@ -334,6 +339,7 @@ struct TransparentOut {
                                    [[resource_table]] draw::View &views,
                                    [[frag_coord]] const float4 frag_co,
                                    [[in]] const VertOut &v_out,
+                                   [[front_facing]] const bool facing,
                                    [[out]] TransparentOut &frag_out)
 {
   const ViewMatrices view = views.get(0);
@@ -358,6 +364,10 @@ struct TransparentOut {
   }
   else if (srt.lighting_mode == WORKBENCH_LIGHTING_FLAT) [[static_branch]] {
     shaded_color = color;
+  }
+
+  if (!facing) {
+    shaded_color = float3(0.0f);
   }
 
   shaded_color *= get_shadow(world, N, srt.force_shadowing);

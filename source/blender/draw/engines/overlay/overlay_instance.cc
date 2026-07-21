@@ -671,7 +671,9 @@ void Instance::object_sync(ObjectRef &ob_ref, Manager &manager)
     motion_paths.object_sync(manager, ob_ref, resources, state);
     origins.object_sync(manager, ob_ref, resources, state);
 
-    if (object_is_selected(ob_ref) && !in_edit_paint_mode) {
+    const bool selected_mesh_wire = ob_ref.object->type == OB_MESH &&
+                                    ob_ref.object->dt >= OB_WIRE;
+    if (object_is_selected(ob_ref) && !in_edit_paint_mode && !selected_mesh_wire) {
       outline.object_sync(manager, ob_ref, resources, state);
     }
   }

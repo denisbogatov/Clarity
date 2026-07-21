@@ -9,7 +9,7 @@
 SHADER_LIBRARY_CREATE_INFO(overlay_edit_mesh_common)
 
 #define COMPONENT_SELECTED_COLOR float4(1.0f, 0.0f, 0.0f, 1.0f)
-#define COMPONENT_ACTIVE_COLOR float4(1.0f, 0.25f, 0.25f, 1.0f)
+#define COMPONENT_ACTIVE_COLOR COMPONENT_SELECTED_COLOR
 
 bool EDIT_MESH_vertex_only_select_mode()
 {
@@ -34,7 +34,7 @@ float4 EDIT_MESH_edge_color_outer(uint edge_flag, uint /*face_flag*/, float crea
 
 float4 EDIT_MESH_edge_color_inner(uint edge_flag)
 {
-  float4 color = theme.colors.wire_edit;
+  float4 color = float4(1.0f);
   color = ((edge_flag & EDGE_SELECTED) != 0u && EDIT_MESH_show_edge_selection()) ?
               COMPONENT_SELECTED_COLOR :
               color;
@@ -50,7 +50,7 @@ float4 EDIT_MESH_edge_vertex_color(uint vertex_flag)
   /* Edge color in vertex selection mode. */
   bool edge_selected = (vertex_flag & (VERT_ACTIVE | VERT_SELECTED)) != 0u;
   edge_selected = edge_selected && !EDIT_MESH_vertex_only_select_mode();
-  float4 color = (edge_selected) ? COMPONENT_SELECTED_COLOR : theme.colors.wire_edit;
+  float4 color = (edge_selected) ? COMPONENT_SELECTED_COLOR : float4(1.0f);
   color.a = 1.0f;
   return color;
 }
@@ -91,9 +91,7 @@ float4 EDIT_MESH_face_color(uint face_flag)
   }
   else {
     /* Don't always fill 'theme.colors.face'. */
-    color.a = (select_face || face_selected || face_active || face_freestyle || face_retopo) ?
-                  color.a :
-                  0.0f;
+    color.a = (face_selected || face_active || face_freestyle || face_retopo) ? color.a : 0.0f;
   }
   return color;
 }

@@ -153,6 +153,10 @@ void main()
     wire_color_get(rim_col, wire_col);
   }
 
+  if (flag_test(drw_object_infos().flag, OBJECT_SELECTED) && use_coloring) {
+    rim_col = wire_col = float3(0.0f, 1.0f, 0.5f);
+  }
+
 #if defined(POINTS)
   final_color = float4(wire_col * wire_opacity, wire_opacity);
   final_color_inner = float4(rim_col * wire_opacity, wire_opacity);

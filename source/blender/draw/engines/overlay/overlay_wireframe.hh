@@ -129,8 +129,13 @@ class Wireframe : Overlay {
       return;
     }
 
-    const bool all_edges = (ob_ref.object->dtx & OB_DRAW_ALL_EDGES) != 0;
-    const bool show_surface_wire = show_wire_ || (ob_ref.object->dtx & OB_DRAWWIRE) ||
+    const bool selected_object_mesh = ob_ref.object->type == OB_MESH &&
+                                      (ob_ref.object->base_flag & BASE_SELECTED) &&
+                                      !in_edit_paint_mode;
+    const bool all_edges = selected_object_mesh ||
+                           (ob_ref.object->dtx & OB_DRAW_ALL_EDGES) != 0;
+    const bool show_surface_wire = selected_object_mesh || show_wire_ ||
+                                   (ob_ref.object->dtx & OB_DRAWWIRE) ||
                                    (ob_ref.object->dt == OB_WIRE);
 
     ColoringPass &coloring = in_edit_paint_mode ? non_colored : colored;
