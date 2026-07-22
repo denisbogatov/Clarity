@@ -3952,44 +3952,6 @@ static void outliner_draw_tree(ui::Block *block,
   }
 }
 
-static void outliner_back(ARegion *region)
-{
-  int ystart;
-
-  ystart = int(region->v2d.tot.ymax);
-  ystart = UI_UNIT_Y * (ystart / (UI_UNIT_Y)) - OL_Y_OFFSET;
-
-  GPUVertFormat *format = immVertexFormat();
-  uint pos = GPU_vertformat_attr_add(format, "pos", gpu::VertAttrType::SFLOAT_32_32);
-
-  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
-
-  float col_alternating[4];
-  ui::theme::get_color_4fv(TH_ROW_ALTERNATE, col_alternating);
-  immUniformThemeColorBlend(TH_BACK, TH_ROW_ALTERNATE, col_alternating[3]);
-
-  const float x1 = 0.0f, x2 = region->v2d.cur.xmax;
-  float y1 = ystart, y2;
-  int tot = int(floor(ystart - region->v2d.cur.ymin + 2 * UI_UNIT_Y)) / (2 * UI_UNIT_Y);
-
-  if (tot > 0) {
-    immBegin(GPU_PRIM_TRIS, 6 * tot);
-    while (tot--) {
-      y1 -= 2 * UI_UNIT_Y;
-      y2 = y1 + UI_UNIT_Y;
-      immVertex2f(pos, x1, y1);
-      immVertex2f(pos, x2, y1);
-      immVertex2f(pos, x2, y2);
-
-      immVertex2f(pos, x1, y1);
-      immVertex2f(pos, x2, y2);
-      immVertex2f(pos, x1, y2);
-    }
-    immEnd();
-  }
-  immUnbindProgram();
-}
-
 static int outliner_data_api_buttons_start_x(int max_tree_width)
 {
   return max_ii(OL_RNA_COLX, max_tree_width + OL_RNA_COL_SPACEX);
@@ -4085,9 +4047,8 @@ void draw_outliner(const bContext *C, bool do_rebuild)
   const bool use_mode_column = outliner_shows_mode_column(*space_outliner);
   const bool use_warning_column = outliner_has_element_warnings(*space_outliner);
 
-  /* Draw outliner stuff (background, hierarchy lines and names). */
+  /* Draw outliner hierarchy lines and names. */
   const float right_column_width = outliner_right_columns_width(space_outliner);
-  outliner_back(region);
   block = block_begin(C, region, __func__, ui::EmbossType::Emboss);
   outliner_draw_tree(block,
                      tvc,

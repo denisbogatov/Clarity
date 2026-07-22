@@ -33,6 +33,7 @@
 #include "WM_types.hh"
 
 #include "DNA_scene_types.h"
+#include "DNA_userdef_types.h"
 
 #include "UI_resources.hh"
 #include "UI_view2d.hh"
@@ -91,6 +92,12 @@ static void outliner_main_region_init(wmWindowManager *wm, ARegion *region)
 static void outliner_main_region_draw(const bContext *C, ARegion *region)
 {
   View2D *v2d = &region->v2d;
+
+  /* Keep the Outliner background consistent with the Maya-style workspace. */
+  uchar *background = ui::theme::theme_get()->space_outliner.back;
+  background[0] = 55;
+  background[1] = 55;
+  background[2] = 55;
 
 #ifdef USE_OUTLINER_DRAW_CLAMPS_SCROLL_HACK
   const rctf v2d_cur_prev = v2d->cur;

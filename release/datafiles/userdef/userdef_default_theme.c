@@ -487,7 +487,7 @@ const bTheme U_theme_default = {
     .info_operator_text = RGBA(0xffffffff),
   },
   .space_action = {
-    .back = RGBA(0x30303000),
+    .back = RGBA(0x34343400),
     .title = RGBA(0xeeeeeeff),
     .text = RGBA(0xa6a6a6ff),
     .text_hi = RGBA(0xffffffff),
@@ -495,7 +495,7 @@ const bTheme U_theme_default = {
     .header_text = RGBA(0xeeeeeeff),
     .header_text_hi = RGBA(0xffffffff),
     .shade1 = RGBA(0xc0c0c000),
-    .grid = RGBA(0x161616ff),
+    .grid = RGBA(0x262626ff),
     .anim_interpolation_linear = RGBA(0x94e575cc),
     .anim_interpolation_constant = RGBA(0xe59c7bcc),
     .anim_interpolation_other = RGBA(0x5dbabeb3),
@@ -631,7 +631,7 @@ const bTheme U_theme_default = {
     .line_numbers = RGBA(0x777777ff),
   },
   .space_outliner = {
-    .back = RGBA(0x28282800),
+    .back = RGBA(0x37373700),
     .title = RGBA(0xffffffff),
     .text = RGBA(0xc3c3c3ff),
     .text_hi = RGBA(0xffffffff),

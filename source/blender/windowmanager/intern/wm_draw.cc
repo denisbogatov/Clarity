@@ -28,6 +28,7 @@
 #include "BLI_math_vector.h"
 #include "BLI_math_vector_types.hh"
 #include "BLI_rect.h"
+#include "BLI_time.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_context.hh"
@@ -1639,6 +1640,40 @@ void WM_paint_cursor_tag_redraw(wmWindow *win, ARegion * /*region*/)
   }
 }
 
+static void wm_draw_frame_rate_limit_apply()
+{
+  static double last_draw_time = 0.0;
+
+  const double time_now = BLI_time_now_seconds();
+  if (U.viewport_fps_limit > 0 && last_draw_time > 0.0) {
+    const double target_frame_time = 1.0 / double(U.viewport_fps_limit);
+    const double remaining_time = target_frame_time - (time_now - last_draw_time);
+    if (remaining_time > 0.0) {
+      BLI_time_sleep_precise_us(int(remaining_time * 1000000.0));
+    }
+  }
+
+  last_draw_time = BLI_time_now_seconds();
+}
+
+static void wm_draw_vsync_update(wmWindowManager *wm)
+{
+  static int applied_vsync = -1;
+  const int requested_vsync = U.viewport_vsync ? 1 : 0;
+  if (requested_vsync == applied_vsync) {
+    return;
+  }
+
+  GPU_backend_vsync_set_override(requested_vsync);
+  for (wmWindow &win : wm->windows) {
+    if (win.runtime->ghostwin) {
+      wm_window_make_drawable(wm, &win);
+      wm_window_set_swap_interval(&win, requested_vsync);
+    }
+  }
+  applied_vsync = requested_vsync;
+}
+
 void wm_draw_update(bContext *C)
 {
   PRF_scope(ProfileCategory::Draw);
@@ -1663,6 +1698,9 @@ void wm_draw_update(bContext *C)
   wm_window_clear_drawable(wm);
 #endif
 
+  wm_draw_vsync_update(wm);
+
+  bool frame_rate_limit_applied = false;
   for (wmWindow &win : wm->windows) {
 #ifdef WIN32
     const GHOST_IWindow *ghost_window = static_cast<GHOST_IWindow *>(win.runtime->ghostwin);
@@ -1678,6 +1716,10 @@ void wm_draw_update(bContext *C)
     CTX_wm_window_set(C, &win);
 
     if (wm_draw_update_test_window(bmain, C, &win)) {
+      if (!frame_rate_limit_applied) {
+        wm_draw_frame_rate_limit_apply();
+        frame_rate_limit_applied = true;
+      }
       PRF_frame_mark_start("Window Drawing"_ustr);
       /* Sets context window+screen. */
       wm_window_make_drawable(wm, &win);

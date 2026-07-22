@@ -27,6 +27,7 @@ struct Object;
 struct ViewRender;
 struct SmoothView3DStore;
 struct SpaceLink;
+struct ViewLayer;
 struct bGPdata;
 struct wmTimer;
 
@@ -719,6 +720,11 @@ struct View3D_Runtime {
   /* Smoothed redraw rate displayed by the viewport statistics HUD. */
   float stats_last_redraw_time = 0.0f;
   float stats_redraw_fps = 0.0f;
+
+  /* Cached visible object selection count for the corner statistics HUD. */
+  ViewLayer *stats_selected_view_layer = nullptr;
+  unsigned int stats_selected_visibility_state = 0;
+  int stats_selected_objects = 0;
 };
 
 /** 3D ViewPort Struct. */

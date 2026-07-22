@@ -1484,15 +1484,26 @@ static void draw_viewport_corner_stats(Main *bmain,
 {
   BKE_view_layer_synced_ensure(*bmain, scene, view_layer);
 
-  int selected_objects = 0;
-  for (const Base &base : *BKE_view_layer_object_bases_get(view_layer)) {
-    if (BASE_SELECTED(v3d, &base)) {
-      selected_objects++;
+  const uint visibility_state = (uint(v3d->local_view_uid) << 16) |
+                                ((v3d->flag & V3D_LOCAL_COLLECTIONS) ?
+                                     uint(v3d->local_collections_uid) :
+                                     0);
+  if (v3d->runtime.stats_selected_view_layer != view_layer ||
+      v3d->runtime.stats_selected_visibility_state != visibility_state)
+  {
+    int selected_objects = 0;
+    for (const Base &base : *BKE_view_layer_object_bases_get(view_layer)) {
+      if (BASE_SELECTED(v3d, &base)) {
+        selected_objects++;
+      }
     }
+    v3d->runtime.stats_selected_objects = selected_objects;
+    v3d->runtime.stats_selected_view_layer = view_layer;
+    v3d->runtime.stats_selected_visibility_state = visibility_state;
   }
 
   char selected_value[32];
-  SNPRINTF_UTF8(selected_value, "%d", selected_objects);
+  SNPRINTF_UTF8(selected_value, "%d", v3d->runtime.stats_selected_objects);
   char fps_value[32];
   SNPRINTF_UTF8(fps_value, "%.1f", update_viewport_redraw_fps(scene, v3d));
 

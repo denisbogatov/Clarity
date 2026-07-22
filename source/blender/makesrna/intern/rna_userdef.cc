@@ -195,6 +195,15 @@ static const EnumPropertyItem rna_enum_userdef_viewport_aa_items[] = {
     {0, nullptr, 0, nullptr, nullptr},
 };
 
+static const EnumPropertyItem rna_enum_userdef_viewport_fps_limit_items[] = {
+    {60, "FPS_60", 0, "60 FPS", "Limit viewport redraws to 60 frames per second"},
+    {120, "FPS_120", 0, "120 FPS", "Limit viewport redraws to 120 frames per second"},
+    {144, "FPS_144", 0, "144 FPS", "Limit viewport redraws to 144 frames per second"},
+    {240, "FPS_240", 0, "240 FPS", "Limit viewport redraws to 240 frames per second"},
+    {0, "UNLIMITED", 0, "Unlimited", "Do not limit the viewport redraw rate"},
+    {0, nullptr, 0, nullptr, nullptr},
+};
+
 static const EnumPropertyItem rna_enum_key_insert_channels[] = {
     {USER_ANIM_KEY_CHANNEL_LOCATION, "LOCATION", 0, "Location", ""},
     {USER_ANIM_KEY_CHANNEL_ROTATION, "ROTATION", 0, "Rotation", ""},
@@ -6237,6 +6246,20 @@ static void rna_def_userdef_system(BlenderRNA *brna)
       prop, "Viewport Anti-Aliasing", "Method of anti-aliasing in 3d viewport");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+  prop = RNA_def_property(srna, "viewport_fps_limit", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, nullptr, "viewport_fps_limit");
+  RNA_def_property_enum_items(prop, rna_enum_userdef_viewport_fps_limit_items);
+  RNA_def_property_ui_text(
+      prop, "Viewport Frame Rate", "Maximum viewport redraw rate; use Unlimited for no limit");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+  prop = RNA_def_property(srna, "use_viewport_vsync", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, nullptr, "viewport_vsync", 1);
+  RNA_def_property_ui_text(
+      prop, "VSync", "Synchronize viewport redraws to the monitor refresh rate");
+  RNA_def_property_update(prop, 0, "rna_userdef_gpu_update");
 
   prop = RNA_def_property(srna, "solid_lights", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_collection_sdna(prop, nullptr, "light_param", "");

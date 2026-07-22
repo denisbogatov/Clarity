@@ -12,6 +12,7 @@
 #include "DNA_action_types.h"
 #include "DNA_collection_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_userdef_types.h"
 
 #include "DNA_screen_types.h"
 #include "MEM_guardedalloc.h"
@@ -215,6 +216,16 @@ static void action_main_region_draw(const bContext *C, ARegion *region)
   short marker_flag = 0;
 
   const int min_height = UI_ANIM_MINY;
+
+  if (saction->mode == SACTCONT_TIMELINE) {
+    ThemeSpace &theme_space = ui::theme::theme_get()->space_action;
+    theme_space.back[0] = 52;
+    theme_space.back[1] = 52;
+    theme_space.back[2] = 52;
+    theme_space.grid[0] = 38;
+    theme_space.grid[1] = 38;
+    theme_space.grid[2] = 38;
+  }
 
   /* scrollers */
   if (region->winy >= UI_ANIM_MINY) {

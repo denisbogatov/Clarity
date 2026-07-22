@@ -285,7 +285,11 @@ static void view3d_free(SpaceLink *sl)
 }
 
 /* spacetype; init callback */
-static void view3d_init(wmWindowManager * /*wm*/, ScrArea * /*area*/) {}
+static void view3d_init(wmWindowManager * /*wm*/, ScrArea *area)
+{
+  View3D *v3d = static_cast<View3D *>(area->spacedata.first);
+  v3d->runtime.stats_selected_view_layer = nullptr;
+}
 
 static void view3d_exit(wmWindowManager * /*wm*/, ScrArea *area)
 {
@@ -602,6 +606,7 @@ static void view3d_main_region_listener(const wmRegionListenerParams *params)
       switch (wmn->data) {
         case ND_SCENEBROWSE:
         case ND_LAYER_CONTENT:
+          v3d->runtime.stats_selected_view_layer = nullptr;
           ED_region_tag_redraw(region);
           WM_gizmomap_tag_refresh(gzmap);
           if (v3d->localvd && v3d->localvd->runtime.flag & V3D_RUNTIME_LOCAL_MAYBE_EMPTY) {
@@ -609,6 +614,7 @@ static void view3d_main_region_listener(const wmRegionListenerParams *params)
           }
           break;
         case ND_LAYER:
+          v3d->runtime.stats_selected_view_layer = nullptr;
           if (wmn->reference) {
             BKE_screen_view3d_sync(v3d, static_cast<Scene *>(wmn->reference));
           }
@@ -617,10 +623,11 @@ static void view3d_main_region_listener(const wmRegionListenerParams *params)
           break;
         case ND_OB_ACTIVE:
         case ND_OB_SELECT:
+        case ND_OB_VISIBLE:
+          v3d->runtime.stats_selected_view_layer = nullptr;
           [[fallthrough]];
         case ND_FRAME:
         case ND_TRANSFORM:
-        case ND_OB_VISIBLE:
         case ND_RENDER_OPTIONS:
         case ND_MARKERS:
         case ND_MODE:
@@ -832,6 +839,7 @@ static void view3d_main_region_listener(const wmRegionListenerParams *params)
           ED_region_tag_redraw(region);
           break;
         case ND_LAYER:
+          v3d->runtime.stats_selected_view_layer = nullptr;
           ED_region_tag_redraw(region);
           break;
       }
