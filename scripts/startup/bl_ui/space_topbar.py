@@ -3,7 +3,11 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import bpy
-from bpy.types import Header, Menu, Panel
+import json
+import os
+import uuid
+from bpy.props import IntProperty, StringProperty
+from bpy.types import Header, Menu, Operator, Panel
 
 from bpy.app.translations import (
     pgettext_iface as iface_,
@@ -59,6 +63,830 @@ class TOPBAR_HT_upper_bar(Header):
             new="scene.view_layer_add",
             unlink="scene.view_layer_remove",
         )
+
+
+_MAYA_SHELF_TABS = (
+    "Poly Modeling",
+    "Curves",
+    "Surfaces",
+    "Sculpting",
+    "Rigging",
+    "Animation",
+    "Rendering",
+    "FX",
+    "Motion Graphics",
+    "XGen",
+    "Arnold",
+    "Custom",
+)
+
+_MAYA_SHELF_ITEMS = {
+    "Poly Modeling": (
+        ("select_box", "Box Select", 'RESTRICT_SELECT_OFF'),
+        ("move", "Move", 'ORIENTATION_GLOBAL'),
+        ("rotate", "Rotate", 'DRIVER_ROTATIONAL_DIFFERENCE'),
+        ("scale", "Scale", 'FULLSCREEN_ENTER'),
+        None,
+        ("plane", "Add Plane", 'MESH_PLANE'),
+        ("cube", "Add Cube", 'MESH_CUBE'),
+        ("sphere", "Add UV Sphere", 'MESH_UVSPHERE'),
+        ("cylinder", "Add Cylinder", 'MESH_CYLINDER'),
+        ("cone", "Add Cone", 'MESH_CONE'),
+        ("torus", "Add Torus", 'MESH_TORUS'),
+        None,
+        ("edit_mode", "Toggle Edit Mode", 'EDITMODE_HLT'),
+        ("extrude", "Extrude", 'MOD_SOLIDIFY'),
+        ("inset", "Inset Faces", 'FACESEL'),
+        ("bevel", "Bevel", 'MOD_BEVEL'),
+        ("loop_cut", "Loop Cut", 'MOD_MULTIRES'),
+        None,
+        ("mirror", "Mirror Modifier", 'MOD_MIRROR'),
+        ("array", "Array Modifier", 'MOD_ARRAY'),
+        ("subsurf", "Subdivision Surface", 'MOD_SUBSURF'),
+    ),
+    "Curves": (
+        ("bezier", "Add Bezier Curve", 'CURVE_BEZCURVE'),
+        ("bezier_circle", "Add Bezier Circle", 'CURVE_BEZCIRCLE'),
+        ("nurbs", "Add NURBS Curve", 'CURVE_NCURVE'),
+        ("nurbs_circle", "Add NURBS Circle", 'CURVE_NCIRCLE'),
+        ("path", "Add Path", 'CURVE_PATH'),
+        None,
+        ("move", "Move", 'ORIENTATION_GLOBAL'),
+        ("rotate", "Rotate", 'DRIVER_ROTATIONAL_DIFFERENCE'),
+        ("scale", "Scale", 'FULLSCREEN_ENTER'),
+        ("edit_mode", "Toggle Edit Mode", 'EDITMODE_HLT'),
+        ("extrude", "Extrude", 'MOD_SOLIDIFY'),
+        ("bevel", "Bevel", 'MOD_BEVEL'),
+    ),
+    "Sculpting": (
+        ("sculpt_mode", "Sculpt Mode", 'SCULPTMODE_HLT'),
+        ("sculpt_draw", "Draw Brush", 'BRUSH_DATA'),
+        ("sculpt_smooth", "Smooth Brush", 'SMOOTHCURVE'),
+        ("sculpt_grab", "Grab Brush", 'HAND'),
+        None,
+        ("subsurf", "Subdivision Surface", 'MOD_SUBSURF'),
+        ("multires", "Multiresolution Modifier", 'MOD_MULTIRES'),
+    ),
+    "Rigging": (
+        ("armature", "Add Armature", 'ARMATURE_DATA'),
+        ("edit_mode", "Toggle Edit Mode", 'EDITMODE_HLT'),
+        ("pose_mode", "Pose Mode", 'POSE_HLT'),
+        None,
+        ("parent", "Parent", 'CONSTRAINT_BONE'),
+        ("clear_parent", "Clear Parent", 'UNLINKED'),
+        ("constraint", "Add Copy Transforms Constraint", 'CONSTRAINT'),
+    ),
+    "Animation": (
+        ("keyframe", "Insert LocRotScale Keyframe", 'KEY_HLT'),
+        ("delete_keyframe", "Delete Keyframe", 'KEY_DEHLT'),
+        None,
+        ("first_frame", "Jump to First Frame", 'REW'),
+        ("play", "Play Animation", 'PLAY'),
+        ("last_frame", "Jump to Last Frame", 'FF'),
+        None,
+        ("graph_editor", "Graph Editor", 'GRAPH'),
+        ("dope_sheet", "Dope Sheet", 'ACTION'),
+        ("nla_editor", "NLA Editor", 'NLA'),
+    ),
+    "Rendering": (
+        ("camera", "Add Camera", 'CAMERA_DATA'),
+        ("point_light", "Add Point Light", 'LIGHT'),
+        ("area_light", "Add Area Light", 'LIGHT_AREA'),
+        ("sun_light", "Add Sun", 'LIGHT_SUN'),
+        None,
+        ("material", "New Material", 'MATERIAL'),
+        ("render", "Render Image", 'RENDER_STILL'),
+        ("render_animation", "Render Animation", 'RENDER_ANIMATION'),
+    ),
+    "FX": (
+        ("quick_smoke", "Quick Smoke", 'MOD_FLUIDSIM'),
+        ("quick_fur", "Quick Fur", 'PARTICLES'),
+        ("explode", "Explode Modifier", 'MOD_EXPLODE'),
+        None,
+        ("wind", "Add Wind Force", 'FORCE_WIND'),
+        ("turbulence", "Add Turbulence Force", 'FORCE_TURBULENCE'),
+    ),
+    "Custom": (
+        ("save", "Save File", 'FILE_TICK'),
+        ("preferences", "Preferences", 'PREFERENCES'),
+        None,
+        ("cube", "Add Cube", 'MESH_CUBE'),
+        ("material", "New Material", 'MATERIAL'),
+        ("render", "Render Image", 'RENDER_STILL'),
+    ),
+}
+
+_MAYA_SHELF_ITEMS["Surfaces"] = _MAYA_SHELF_ITEMS["Curves"]
+_MAYA_SHELF_ITEMS["Motion Graphics"] = _MAYA_SHELF_ITEMS["Animation"]
+_MAYA_SHELF_ITEMS["XGen"] = _MAYA_SHELF_ITEMS["FX"]
+_MAYA_SHELF_ITEMS["Arnold"] = _MAYA_SHELF_ITEMS["Rendering"]
+
+_maya_shelf_config_cache = None
+_maya_shelf_save_timer_pending = False
+_maya_shelf_drag_state = None
+_maya_shelf_previews = None
+
+_MAYA_SHELF_LEFT_MARGIN = 4.0
+_MAYA_SHELF_BUTTON_SIZE = 24.0
+_MAYA_SHELF_SLOT_WIDTH = 27.0
+
+
+def _maya_shelf_marker_icon():
+    global _maya_shelf_previews
+    if _maya_shelf_previews is None:
+        import bpy.utils.previews
+
+        _maya_shelf_previews = bpy.utils.previews.new()
+        filepath = os.path.join(
+            os.path.dirname(__file__),
+            "assets",
+            "maya_shelf_drop.svg",
+        )
+        preview = _maya_shelf_previews.load("maya_shelf_drop_marker", filepath, 'IMAGE')
+        # Load the tiny SVG before the first drag frame is drawn.
+        _ = preview.icon_size
+    return _maya_shelf_previews["maya_shelf_drop_marker"].icon_id
+
+
+def _maya_shelf_config_path():
+    config_dir = bpy.utils.user_resource('CONFIG', create=True)
+    return os.path.join(config_dir, "maya_shelf.json")
+
+
+def _maya_shelf_default_config():
+    tabs = []
+    for tab_name in _MAYA_SHELF_TABS:
+        source_items = [item for item in _MAYA_SHELF_ITEMS.get(tab_name, ()) if item is not None]
+        split = (len(source_items) + 1) // 2
+        items = []
+        for index, (action, label, icon) in enumerate(source_items):
+            items.append({
+                "id": uuid.uuid4().hex,
+                "label": label,
+                "icon": icon,
+                "action": action,
+                "operator": "",
+                "row": 0 if index < split else 1,
+            })
+        tabs.append({"name": tab_name, "items": items})
+    return {"active": "Poly Modeling", "tabs": tabs}
+
+
+def _maya_shelf_config():
+    global _maya_shelf_config_cache
+    if _maya_shelf_config_cache is not None:
+        return _maya_shelf_config_cache
+    try:
+        with open(_maya_shelf_config_path(), "r", encoding="utf-8") as handle:
+            config = json.load(handle)
+        if not config.get("tabs"):
+            raise ValueError("Shelf has no tabs")
+        _maya_shelf_config_cache = config
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        _maya_shelf_config_cache = _maya_shelf_default_config()
+    return _maya_shelf_config_cache
+
+
+def _maya_shelf_save():
+    path = _maya_shelf_config_path()
+    temp_path = path + ".tmp"
+    with open(temp_path, "w", encoding="utf-8") as handle:
+        json.dump(_maya_shelf_config(), handle, ensure_ascii=False, indent=2)
+    os.replace(temp_path, path)
+
+
+def _maya_shelf_save_deferred():
+    global _maya_shelf_save_timer_pending
+    if _maya_shelf_save_timer_pending:
+        return
+    _maya_shelf_save_timer_pending = True
+
+    def save_after_redraw():
+        global _maya_shelf_save_timer_pending
+        _maya_shelf_save_timer_pending = False
+        _maya_shelf_save()
+        return None
+
+    bpy.app.timers.register(save_after_redraw, first_interval=0.25)
+
+
+def _maya_shelf_active_tab():
+    config = _maya_shelf_config()
+    active = config.get("active")
+    tab = next((tab for tab in config["tabs"] if tab["name"] == active), None)
+    if tab is None:
+        tab = config["tabs"][0]
+        config["active"] = tab["name"]
+    return tab
+
+
+def _maya_shelf_redraw(context):
+    area = getattr(context, "area", None)
+    if area is not None and area.type == 'TOPBAR':
+        area.tag_redraw()
+
+    # Regular screen areas do not contain global Top Bar areas. Keep this fallback for
+    # non-global/custom screens, while the context area above handles the normal case.
+    for window in context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type == 'TOPBAR':
+                area.tag_redraw()
+
+
+def _maya_shelf_reorder(item_id, target_row, target_index):
+    tab = _maya_shelf_active_tab()
+    item = next((item for item in tab["items"] if item["id"] == item_id), None)
+    if item is None:
+        return False
+    rows = {
+        0: [candidate for candidate in tab["items"] if candidate is not item and candidate.get("row", 0) == 0],
+        1: [candidate for candidate in tab["items"] if candidate is not item and candidate.get("row", 0) == 1],
+    }
+    item["row"] = target_row
+    rows[target_row].insert(min(max(target_index, 0), len(rows[target_row])), item)
+    tab["items"] = rows[0] + rows[1]
+    return True
+
+
+class TOPBAR_OT_maya_shelf_tab(Operator):
+    bl_idname = "topbar.maya_shelf_tab"
+    bl_label = "Maya Shelf Tab"
+    bl_options = {'INTERNAL'}
+
+    tab: StringProperty()
+
+    def execute(self, context):
+        config = _maya_shelf_config()
+        if any(tab["name"] == self.tab for tab in config["tabs"]):
+            config["active"] = self.tab
+            _maya_shelf_save_deferred()
+        _maya_shelf_redraw(context)
+        return {'FINISHED'}
+
+
+class TOPBAR_OT_maya_shelf_tab_add(Operator):
+    bl_idname = "topbar.maya_shelf_tab_add"
+    bl_label = "Add Shelf Tab"
+
+    name: StringProperty(name="Name", default="New Shelf")
+
+    def invoke(self, context, _event):
+        return context.window_manager.invoke_props_dialog(self, width=320)
+
+    def execute(self, context):
+        name = self.name.strip()
+        config = _maya_shelf_config()
+        if not name or any(tab["name"] == name for tab in config["tabs"]):
+            self.report({'WARNING'}, "Enter a unique shelf name")
+            return {'CANCELLED'}
+        config["tabs"].append({"name": name, "items": []})
+        config["active"] = name
+        _maya_shelf_save()
+        _maya_shelf_redraw(context)
+        return {'FINISHED'}
+
+
+class TOPBAR_OT_maya_shelf_tab_rename(Operator):
+    bl_idname = "topbar.maya_shelf_tab_rename"
+    bl_label = "Rename Shelf Tab"
+
+    name: StringProperty(name="Name")
+
+    def invoke(self, context, _event):
+        self.name = _maya_shelf_active_tab()["name"]
+        return context.window_manager.invoke_props_dialog(self, width=320)
+
+    def execute(self, context):
+        name = self.name.strip()
+        config = _maya_shelf_config()
+        tab = _maya_shelf_active_tab()
+        if not name or any(item is not tab and item["name"] == name for item in config["tabs"]):
+            self.report({'WARNING'}, "Enter a unique shelf name")
+            return {'CANCELLED'}
+        tab["name"] = name
+        config["active"] = name
+        _maya_shelf_save()
+        _maya_shelf_redraw(context)
+        return {'FINISHED'}
+
+
+class TOPBAR_OT_maya_shelf_tab_remove(Operator):
+    bl_idname = "topbar.maya_shelf_tab_remove"
+    bl_label = "Remove Shelf Tab"
+
+    def execute(self, context):
+        config = _maya_shelf_config()
+        if len(config["tabs"]) == 1:
+            self.report({'WARNING'}, "At least one shelf tab is required")
+            return {'CANCELLED'}
+        tab = _maya_shelf_active_tab()
+        config["tabs"].remove(tab)
+        config["active"] = config["tabs"][0]["name"]
+        _maya_shelf_save()
+        _maya_shelf_redraw(context)
+        return {'FINISHED'}
+
+
+class TOPBAR_OT_maya_shelf_item_add(Operator):
+    bl_idname = "topbar.maya_shelf_item_add"
+    bl_label = "Add Shelf Icon"
+
+    label: StringProperty(name="Tooltip", default="New Command")
+    operator_id: StringProperty(name="Operator", default="mesh.primitive_cube_add")
+    icon: StringProperty(name="Icon", default="MESH_CUBE")
+    row: IntProperty(name="Row", default=0, min=0, max=1)
+
+    def invoke(self, context, _event):
+        return context.window_manager.invoke_props_dialog(self, width=380)
+
+    def draw(self, _context):
+        layout = self.layout
+        layout.prop(self, "label")
+        layout.prop(self, "operator_id")
+        layout.prop(self, "icon")
+        layout.prop(self, "row")
+
+    def execute(self, context):
+        try:
+            module, name = self.operator_id.strip().split(".", 1)
+            getattr(getattr(bpy.ops, module), name)
+        except (ValueError, AttributeError):
+            self.report({'WARNING'}, "Unknown Blender operator")
+            return {'CANCELLED'}
+
+        icon_names = {
+            item.identifier
+            for item in bpy.types.UILayout.bl_rna.functions["operator"].parameters["icon"].enum_items
+        }
+        icon = self.icon.strip().upper()
+        if icon not in icon_names:
+            self.report({'WARNING'}, "Unknown Blender icon")
+            return {'CANCELLED'}
+
+        _maya_shelf_active_tab()["items"].append({
+            "id": uuid.uuid4().hex,
+            "label": self.label.strip() or self.operator_id,
+            "icon": icon,
+            "action": "",
+            "operator": self.operator_id.strip(),
+            "row": self.row,
+        })
+        _maya_shelf_save()
+        _maya_shelf_redraw(context)
+        return {'FINISHED'}
+
+
+class TOPBAR_OT_maya_shelf_item_remove_id(Operator):
+    bl_idname = "topbar.maya_shelf_item_remove_id"
+    bl_label = "Remove from Shelf"
+    bl_options = {'UNDO'}
+
+    item_id: StringProperty()
+
+    def execute(self, context):
+        tab = _maya_shelf_active_tab()
+        item = next((item for item in tab["items"] if item["id"] == self.item_id), None)
+        if item is None:
+            return {'CANCELLED'}
+        tab["items"].remove(item)
+        _maya_shelf_save()
+        _maya_shelf_redraw(context)
+        return {'FINISHED'}
+
+
+class TOPBAR_OT_maya_shelf_context_menu(Operator):
+    bl_idname = "topbar.maya_shelf_context_menu"
+    bl_label = "Shelf Context Menu"
+    bl_options = {'INTERNAL'}
+
+    item_id: StringProperty(options={'SKIP_SAVE'})
+    row: IntProperty(default=0, min=0, max=1, options={'SKIP_SAVE'})
+
+    def invoke(self, context, _event):
+        context.window_manager.popup_menu(self.draw_menu, title="Shelf")
+        return {'FINISHED'}
+
+    def draw_menu(self, menu, _context):
+        layout = menu.layout
+        layout.operator_context = 'INVOKE_DEFAULT'
+        props = layout.operator(
+            "topbar.maya_shelf_item_add",
+            text="Add Shelf Icon",
+            icon='ADD',
+        )
+        props.row = self.row
+
+        if self.item_id:
+            layout.separator()
+            props = layout.operator(
+                "topbar.maya_shelf_item_remove_id",
+                text="Remove from Shelf",
+                icon='TRASH',
+            )
+            props.item_id = self.item_id
+
+
+class TOPBAR_OT_maya_shelf_drag(Operator):
+    bl_idname = "topbar.maya_shelf_drag"
+    bl_label = "Move Shelf Icon"
+    bl_options = {'INTERNAL'}
+
+    item_id: StringProperty()
+
+    @classmethod
+    def poll(cls, context):
+        return (
+            context.area is not None and
+            context.area.type == 'TOPBAR' and
+            context.region is not None and
+            context.region.type in {'WINDOW', 'FOOTER'}
+        )
+
+    @staticmethod
+    def _source_row_and_index(context, event):
+        region = context.region
+        if region is None or region.type not in {'WINDOW', 'FOOTER'}:
+            return None, None
+
+        ui_scale = getattr(context.preferences.system, "ui_scale", 1.0)
+        left_margin = _MAYA_SHELF_LEFT_MARGIN * ui_scale
+        button_width = _MAYA_SHELF_BUTTON_SIZE * ui_scale
+        slot_width = _MAYA_SHELF_SLOT_WIDTH * ui_scale
+        mouse_region_x = event.mouse_x - region.x
+        if mouse_region_x < left_margin:
+            return None, None
+
+        row = 0 if region.type == 'FOOTER' else 1
+        relative_x = mouse_region_x - left_margin
+        index = int(((relative_x - button_width * 0.5) / slot_width) + 0.5)
+        items = [
+            item
+            for item in _maya_shelf_active_tab()["items"]
+            if item.get("row", 0) == row
+        ]
+        if not items or index < 0 or index > len(items):
+            return None, None
+        if index == len(items):
+            index -= 1
+        return row, index
+
+    def _drop_row_and_index(self, context, event):
+        if not self._region_bounds:
+            return None, None
+
+        row, bounds = min(
+            self._region_bounds.items(),
+            key=lambda item: abs(event.mouse_y - (item[1][1] + item[1][3] * 0.5)),
+        )
+        icon_band_min = min(item[1] for item in self._region_bounds.values())
+        icon_band_max = max(item[1] + item[3] for item in self._region_bounds.values())
+        if not icon_band_min <= event.mouse_y < icon_band_max:
+            return None, None
+
+        mouse_region_x = event.mouse_x - bounds[0]
+        ui_scale = getattr(context.preferences.system, "ui_scale", 1.0)
+        left_margin = _MAYA_SHELF_LEFT_MARGIN * ui_scale
+        slot_width = _MAYA_SHELF_SLOT_WIDTH * ui_scale
+        index = max(0, int((mouse_region_x - left_margin + slot_width * 0.5) / slot_width))
+        item_count = sum(
+            1
+            for item in _maya_shelf_active_tab()["items"]
+            if item["id"] != self.item_id and item.get("row", 0) == row
+        )
+        return row, min(index, item_count)
+
+    def _preview_begin(self, context):
+        global _maya_shelf_drag_state
+        self._preview_active = True
+        _maya_shelf_drag_state = {
+            "source_row": self._source_row,
+            "source_index": self._source_index,
+            "target_row": self._target_row,
+            "target_index": self._target_index,
+        }
+
+    def _preview_update(self):
+        if _maya_shelf_drag_state is not None:
+            _maya_shelf_drag_state["target_row"] = self._target_row
+            _maya_shelf_drag_state["target_index"] = self._target_index
+
+    def _preview_end(self, context):
+        global _maya_shelf_drag_state
+        if not getattr(self, "_preview_active", False):
+            return
+        self._preview_active = False
+        _maya_shelf_drag_state = None
+
+    def invoke(self, context, event):
+        tab = _maya_shelf_active_tab()
+        source_item = next(
+            (item for item in tab["items"] if item["id"] == self.item_id),
+            None,
+        )
+        if source_item is not None:
+            row = source_item.get("row", 0)
+            items = [
+                item for item in tab["items"]
+                if item.get("row", 0) == row
+            ]
+            index = items.index(source_item)
+        else:
+            row, index = self._source_row_and_index(context, event)
+            if row is None:
+                return {'CANCELLED'}
+            items = [
+                item for item in tab["items"]
+                if item.get("row", 0) == row
+            ]
+            if index >= len(items):
+                return {'CANCELLED'}
+            self.item_id = items[index]["id"]
+
+        self._source_row = row
+        self._source_index = index
+        self._target_row = row
+        self._target_index = index
+        self._region_bounds = {
+            0 if region.type == 'FOOTER' else 1: (
+                region.x,
+                region.y,
+                region.width,
+                region.height,
+            )
+            for region in context.area.regions
+            if region.type in {'WINDOW', 'FOOTER'}
+        }
+        _maya_shelf_config()["selected"] = self.item_id
+        self._preview_begin(context)
+        context.window_manager.modal_handler_add(self)
+        _maya_shelf_redraw(context)
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        if event.type == 'MOUSEMOVE':
+            row, index = self._drop_row_and_index(context, event)
+            if row is not None and (row, index) != (self._target_row, self._target_index):
+                self._target_row = row
+                self._target_index = index
+                self._preview_update()
+                _maya_shelf_redraw(context)
+            return {'RUNNING_MODAL', 'PASS_THROUGH'}
+
+        if event.type == 'MIDDLEMOUSE' and event.value == 'RELEASE':
+            row, index = self._drop_row_and_index(context, event)
+            if row is None:
+                row, index = self._target_row, self._target_index
+            _maya_shelf_reorder(self.item_id, row, index)
+            _maya_shelf_config()["selected"] = ""
+            self._preview_end(context)
+            _maya_shelf_save()
+            _maya_shelf_redraw(context)
+            return {'FINISHED', 'PASS_THROUGH'}
+
+        if event.type in {'ESC', 'RIGHTMOUSE'}:
+            _maya_shelf_config()["selected"] = ""
+            self._preview_end(context)
+            _maya_shelf_redraw(context)
+            return {'CANCELLED'}
+        return {'RUNNING_MODAL'}
+
+    def cancel(self, context):
+        _maya_shelf_config()["selected"] = ""
+        self._preview_end(context)
+        _maya_shelf_redraw(context)
+
+
+class TOPBAR_OT_maya_shelf_action(Operator):
+    bl_idname = "topbar.maya_shelf_action"
+    bl_label = "Maya Shelf Action"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    action: StringProperty()
+    operator_id: StringProperty()
+    item_id: StringProperty()
+    tooltip: StringProperty(options={'SKIP_SAVE'})
+
+    @classmethod
+    def description(cls, _context, properties):
+        return properties.tooltip
+
+    def execute(self, context):
+        area = next((area for area in context.screen.areas if area.type == 'VIEW_3D'), None)
+        if area is None:
+            self.report({'WARNING'}, "No 3D View available")
+            return {'CANCELLED'}
+        region = next((region for region in area.regions if region.type == 'WINDOW'), None)
+        override = {
+            "window": context.window,
+            "screen": context.screen,
+            "area": area,
+            "region": region,
+            "space_data": area.spaces.active,
+        }
+
+        tool_actions = {
+            "select_box": "builtin.select_box",
+            "move": "builtin.move",
+            "rotate": "builtin.rotate",
+            "scale": "builtin.scale",
+            "sculpt_draw": "builtin_brush.Draw",
+            "sculpt_smooth": "builtin_brush.Smooth",
+            "sculpt_grab": "builtin_brush.Grab",
+        }
+        operators = {
+            "plane": ("mesh.primitive_plane_add", {}),
+            "cube": ("mesh.primitive_cube_add", {}),
+            "sphere": ("mesh.primitive_uv_sphere_add", {}),
+            "cylinder": ("mesh.primitive_cylinder_add", {}),
+            "cone": ("mesh.primitive_cone_add", {}),
+            "torus": ("mesh.primitive_torus_add", {}),
+            "bezier": ("curve.primitive_bezier_curve_add", {}),
+            "bezier_circle": ("curve.primitive_bezier_circle_add", {}),
+            "nurbs": ("curve.primitive_nurbs_curve_add", {}),
+            "nurbs_circle": ("curve.primitive_nurbs_circle_add", {}),
+            "path": ("curve.primitive_nurbs_path_add", {}),
+            "edit_mode": ("object.editmode_toggle", {}),
+            "pose_mode": ("object.posemode_toggle", {}),
+            "sculpt_mode": ("object.mode_set", {"mode": 'SCULPT'}),
+            "extrude": ("mesh.extrude_region_move", {}),
+            "inset": ("mesh.inset", {}),
+            "bevel": ("mesh.bevel", {}),
+            "loop_cut": ("mesh.loopcut_slide", {}),
+            "mirror": ("object.modifier_add", {"type": 'MIRROR'}),
+            "array": ("object.modifier_add", {"type": 'ARRAY'}),
+            "subsurf": ("object.modifier_add", {"type": 'SUBSURF'}),
+            "multires": ("object.modifier_add", {"type": 'MULTIRES'}),
+            "armature": ("object.armature_add", {}),
+            "parent": ("object.parent_set", {"type": 'OBJECT'}),
+            "clear_parent": ("object.parent_clear", {"type": 'CLEAR_KEEP_TRANSFORM'}),
+            "constraint": ("object.constraint_add", {"type": 'COPY_TRANSFORMS'}),
+            "keyframe": ("anim.keyframe_insert_menu", {"type": 'LocRotScale'}),
+            "delete_keyframe": ("anim.keyframe_delete_v3d", {}),
+            "first_frame": ("screen.frame_jump", {"end": False}),
+            "play": ("screen.animation_play", {}),
+            "last_frame": ("screen.frame_jump", {"end": True}),
+            "camera": ("object.camera_add", {}),
+            "point_light": ("object.light_add", {"type": 'POINT'}),
+            "area_light": ("object.light_add", {"type": 'AREA'}),
+            "sun_light": ("object.light_add", {"type": 'SUN'}),
+            "render": ("render.render", {}),
+            "render_animation": ("render.render", {"animation": True}),
+            "quick_smoke": ("object.quick_smoke", {}),
+            "quick_fur": ("object.quick_fur", {}),
+            "explode": ("object.modifier_add", {"type": 'EXPLODE'}),
+            "wind": ("object.effector_add", {"type": 'WIND'}),
+            "turbulence": ("object.effector_add", {"type": 'TURBULENCE'}),
+            "save": ("wm.save_mainfile", {}),
+            "preferences": ("screen.userpref_show", {}),
+        }
+
+        try:
+            with context.temp_override(**override):
+                if self.action in tool_actions:
+                    bpy.ops.wm.tool_set_by_id(name=tool_actions[self.action])
+                elif self.action == "material":
+                    obj = context.active_object
+                    if obj is None:
+                        raise RuntimeError("Select an object first")
+                    material = bpy.data.materials.new(name="Material")
+                    obj.data.materials.append(material)
+                elif self.action in {"graph_editor", "dope_sheet", "nla_editor"}:
+                    area.type = {
+                        "graph_editor": 'GRAPH_EDITOR',
+                        "dope_sheet": 'DOPESHEET_EDITOR',
+                        "nla_editor": 'NLA_EDITOR',
+                    }[self.action]
+                elif self.operator_id:
+                    module, name = self.operator_id.split(".", 1)
+                    getattr(getattr(bpy.ops, module), name)()
+                else:
+                    idname, properties = operators[self.action]
+                    module, name = idname.split(".", 1)
+                    getattr(getattr(bpy.ops, module), name)(**properties)
+        except Exception as ex:
+            self.report({'WARNING'}, str(ex))
+            return {'CANCELLED'}
+        return {'FINISHED'}
+
+
+class WM_MT_button_context(Menu):
+    bl_label = "Button Context Menu"
+
+    def draw(self, context):
+        button_operator = getattr(context, "button_operator", None)
+        item_id = getattr(button_operator, "item_id", "") if button_operator else ""
+        if item_id:
+            item = next(
+                (
+                    item for item in _maya_shelf_active_tab()["items"]
+                    if item["id"] == item_id
+                ),
+                None,
+            )
+            self.layout.separator()
+            props = self.layout.operator(
+                "topbar.maya_shelf_item_add",
+                text="Add Shelf Icon",
+                icon='ADD',
+            )
+            props.row = item.get("row", 0) if item else 0
+            props = self.layout.operator(
+                "topbar.maya_shelf_item_remove_id",
+                text="Remove from Shelf",
+                icon='TRASH',
+            )
+            props.item_id = item_id
+
+
+class TOPBAR_HT_maya_shelf_tabs(Header):
+    bl_space_type = 'TOPBAR'
+    bl_region_type = 'TOOL_HEADER'
+
+    def draw(self, context):
+        config = _maya_shelf_config()
+        active = _maya_shelf_active_tab()["name"]
+        row = self.layout.row(align=True)
+        for tab in config["tabs"]:
+            props = row.operator(
+                "topbar.maya_shelf_tab",
+                text=tab["name"],
+                depress=(tab["name"] == active),
+            )
+            props.tab = tab["name"]
+        row.separator(type='LINE')
+        row.operator("topbar.maya_shelf_tab_add", text="", icon='ADD')
+        row.operator("topbar.maya_shelf_tab_rename", text="", icon='GREASEPENCIL')
+        row.operator("topbar.maya_shelf_tab_remove", text="", icon='X')
+
+
+def _maya_shelf_draw_icon_row(layout, row_index):
+    config = _maya_shelf_config()
+    tab = _maya_shelf_active_tab()
+    selected = config.get("selected", "")
+    row = layout.row(align=True)
+    row.scale_x = 1.2
+    row.scale_y = 1.2
+
+    items = [
+        item
+        for item in tab["items"]
+        if item.get("row", 0) == row_index
+    ]
+    marker_index = None
+    if (
+        _maya_shelf_drag_state is not None and
+        _maya_shelf_drag_state["target_row"] == row_index
+    ):
+        marker_index = _maya_shelf_drag_state["target_index"]
+        if (
+            _maya_shelf_drag_state["source_row"] == row_index and
+            _maya_shelf_drag_state["source_index"] < marker_index
+        ):
+            marker_index += 1
+        marker_index = min(max(marker_index, 0), len(items))
+
+    def draw_marker():
+        marker = row.row(align=True)
+        marker.ui_units_x = 0.55
+        marker.label(text="", icon_value=_maya_shelf_marker_icon())
+
+    for index, item in enumerate(items):
+        if marker_index == index:
+            draw_marker()
+        button = row.row(align=True)
+        button.context_string_set("maya_shelf_item_id", item["id"])
+        props = button.operator(
+            "topbar.maya_shelf_action",
+            text="",
+            icon=item["icon"],
+            emboss=True,
+            depress=(item["id"] == selected),
+        )
+        props.action = item.get("action", "")
+        props.operator_id = item.get("operator", "")
+        props.item_id = item["id"]
+        props.tooltip = item.get("label", "Shelf Command")
+        # 24 px square button + a compact spacer at UI scale.
+        row.separator(factor=0.4)
+
+    if marker_index == len(items):
+        draw_marker()
+
+
+class TOPBAR_HT_maya_shelf_upper(Header):
+    bl_space_type = 'TOPBAR'
+    bl_region_type = 'FOOTER'
+
+    def draw(self, _context):
+        _maya_shelf_draw_icon_row(self.layout, 0)
+
+
+class TOPBAR_HT_maya_shelf_lower(Header):
+    bl_space_type = 'TOPBAR'
+    bl_region_type = 'WINDOW'
+
+    def draw(self, _context):
+        _maya_shelf_draw_icon_row(self.layout, 1)
 
 
 class TOPBAR_PT_tool_settings_extra(Panel):
@@ -864,6 +1692,19 @@ class TOPBAR_PT_grease_pencil_layers(Panel):
 
 classes = (
     TOPBAR_HT_upper_bar,
+    TOPBAR_OT_maya_shelf_tab,
+    TOPBAR_OT_maya_shelf_tab_add,
+    TOPBAR_OT_maya_shelf_tab_rename,
+    TOPBAR_OT_maya_shelf_tab_remove,
+    TOPBAR_OT_maya_shelf_item_add,
+    TOPBAR_OT_maya_shelf_item_remove_id,
+    TOPBAR_OT_maya_shelf_context_menu,
+    TOPBAR_OT_maya_shelf_drag,
+    TOPBAR_OT_maya_shelf_action,
+    WM_MT_button_context,
+    TOPBAR_HT_maya_shelf_tabs,
+    TOPBAR_HT_maya_shelf_upper,
+    TOPBAR_HT_maya_shelf_lower,
     TOPBAR_MT_file_context_menu,
     TOPBAR_MT_workspace_menu,
     TOPBAR_MT_editor_menus,

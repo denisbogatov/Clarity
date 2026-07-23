@@ -7,6 +7,7 @@
  */
 
 #include <cstring>
+#include <optional>
 
 #include "MEM_guardedalloc.h"
 
@@ -58,6 +59,20 @@ static SpaceLink *topbar_create(const ScrArea * /*area*/, const Scene * /*scene*
   region->regiontype = RGN_TYPE_HEADER;
   region->alignment = RGN_ALIGN_RIGHT | RGN_SPLIT_PREV;
 
+  /* Maya-style shelf tabs. */
+  region = BKE_area_region_new();
+  BLI_addtail(&stopbar->regionbase, region);
+  region->regiontype = RGN_TYPE_TOOL_HEADER;
+  region->alignment = RGN_ALIGN_TOP;
+  region->flag |= RGN_FLAG_NO_USER_RESIZE;
+
+  /* Upper shelf row. */
+  region = BKE_area_region_new();
+  BLI_addtail(&stopbar->regionbase, region);
+  region->regiontype = RGN_TYPE_FOOTER;
+  region->alignment = RGN_ALIGN_TOP;
+  region->flag |= RGN_FLAG_NO_USER_RESIZE;
+
   /* main regions */
   region = BKE_area_region_new();
   BLI_addtail(&stopbar->regionbase, region);
@@ -81,20 +96,93 @@ static SpaceLink *topbar_duplicate(SpaceLink *sl)
   return reinterpret_cast<SpaceLink *>(stopbarn);
 }
 
-/* add handlers, stuff you only do once or on area/region changes */
-static void topbar_main_region_init(wmWindowManager *wm, ARegion *region)
+static int topbar_shelf_region_event_handler(bContext *C,
+                                             const wmEvent *event,
+                                             void * /*user_data*/)
 {
-  wmKeyMap *keymap;
-
-  /* force delayed view2d_region_reinit call */
-  if (ELEM(RGN_ALIGN_ENUM_FROM_MASK(region->alignment), RGN_ALIGN_RIGHT)) {
-    region->flag |= RGN_FLAG_DYNAMIC_SIZE;
+  if (!ELEM(event->type, MIDDLEMOUSE, RIGHTMOUSE) || event->val != KM_PRESS) {
+    return WM_UI_HANDLER_CONTINUE;
   }
-  ui::view2d_region_reinit(&region->v2d, ui::V2D_COMMONVIEW_HEADER, region->winx, region->winy);
 
-  keymap = WM_keymap_ensure(
-      wm->runtime->defaultconf, "View2D Buttons List", SPACE_EMPTY, RGN_TYPE_WINDOW);
-  WM_event_add_keymap_handler(&region->runtime->handlers, keymap);
+  ARegion *region = CTX_wm_region(C);
+  if (region == nullptr) {
+    return WM_UI_HANDLER_CONTINUE;
+  }
+
+  ui::Button *button = region ? ui::but_find_mouse_over(region, event) : nullptr;
+  std::optional<StringRefNull> item_id;
+  if (button != nullptr) {
+    item_id = ui::button_context_string_get(button, "maya_shelf_item_id");
+  }
+
+  if (event->type == RIGHTMOUSE) {
+    wmOperatorType *ot = WM_operatortype_find("TOPBAR_OT_maya_shelf_context_menu", false);
+    if (ot == nullptr) {
+      return WM_UI_HANDLER_CONTINUE;
+    }
+
+    PointerRNA properties = WM_operator_properties_create_ptr(ot);
+    RNA_int_set(
+        &properties, "row", region->regiontype == RGN_TYPE_FOOTER ? 0 : 1);
+    if (item_id) {
+      RNA_string_set(&properties, "item_id", item_id->c_str());
+    }
+    const wmOperatorStatus status = WM_operator_name_call_ptr(
+        C, ot, wm::OpCallContext::InvokeDefault, &properties, event);
+    WM_operator_properties_free(&properties);
+    return (status & (OPERATOR_FINISHED | OPERATOR_RUNNING_MODAL | OPERATOR_INTERFACE)) ?
+               WM_UI_HANDLER_BREAK :
+               WM_UI_HANDLER_CONTINUE;
+  }
+
+  if (!item_id) {
+    return WM_UI_HANDLER_CONTINUE;
+  }
+
+  wmOperatorType *ot = WM_operatortype_find("TOPBAR_OT_maya_shelf_drag", false);
+  if (ot == nullptr) {
+    return WM_UI_HANDLER_CONTINUE;
+  }
+
+  PointerRNA properties = WM_operator_properties_create_ptr(ot);
+  RNA_string_set(&properties, "item_id", item_id->c_str());
+  const wmOperatorStatus status = WM_operator_name_call_ptr(
+      C, ot, wm::OpCallContext::InvokeDefault, &properties, event);
+  WM_operator_properties_free(&properties);
+  return (status & OPERATOR_RUNNING_MODAL) ? WM_UI_HANDLER_BREAK : WM_UI_HANDLER_CONTINUE;
+}
+
+/* add handlers, stuff you only do once or on area/region changes */
+static void topbar_shelf_region_init(wmWindowManager * /*wm*/, ARegion *region)
+{
+  ED_region_header_init(region);
+  WM_event_remove_ui_handler(&region->runtime->handlers,
+                             topbar_shelf_region_event_handler,
+                             nullptr,
+                             nullptr,
+                             false);
+  WM_event_add_ui_handler(nullptr,
+                          &region->runtime->handlers,
+                          topbar_shelf_region_event_handler,
+                          nullptr,
+                          nullptr,
+                          eWM_EventHandlerFlag(0));
+}
+
+static void topbar_shelf_lower_region_layout(const bContext *C, ARegion *region)
+{
+  ED_region_header_layout(C, region);
+
+  const int bottom_padding = int(4.0f * UI_SCALE_FAC + 0.5f);
+  const int offset_y = bottom_padding -
+                       ui::blocklist_min_y_get(&region->runtime->uiblocks);
+  if (offset_y <= 0) {
+    return;
+  }
+
+  for (ui::Block &block : region->runtime->uiblocks) {
+    ui::block_translate(&block, 0, offset_y);
+  }
 }
 
 static void topbar_operatortypes() {}
@@ -305,12 +393,39 @@ void ED_spacetype_topbar()
   /* regions: main window */
   art = MEM_new_zeroed<ARegionType>("spacetype topbar main region");
   art->regionid = RGN_TYPE_WINDOW;
-  art->init = topbar_main_region_init;
-  art->layout = ED_region_header_layout;
+  art->init = topbar_shelf_region_init;
+  art->layout = topbar_shelf_lower_region_layout;
   art->draw = ED_region_header_draw;
   art->listener = topbar_main_region_listener;
   art->prefsizex = UI_UNIT_X * 5; /* Mainly to avoid glitches */
-  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_HEADER;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_HEADER;
+
+  BLI_addhead(&st->regiontypes, art);
+
+  /* regions: shelf tabs */
+  art = MEM_new_zeroed<ARegionType>("spacetype topbar shelf tabs region");
+  art->regionid = RGN_TYPE_TOOL_HEADER;
+  art->prefsizey = HEADERY;
+  art->prefsizex = UI_UNIT_X * 5;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_HEADER;
+  art->listener = topbar_header_listener;
+  art->message_subscribe = topbar_header_region_message_subscribe;
+  art->init = topbar_header_region_init;
+  art->layout = ED_region_header_layout;
+  art->draw = ED_region_header_draw;
+
+  BLI_addhead(&st->regiontypes, art);
+
+  /* regions: upper shelf row */
+  art = MEM_new_zeroed<ARegionType>("spacetype topbar shelf footer region");
+  art->regionid = RGN_TYPE_FOOTER;
+  art->prefsizey = HEADERY;
+  art->prefsizex = UI_UNIT_X * 5;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FOOTER;
+  art->listener = topbar_main_region_listener;
+  art->init = topbar_shelf_region_init;
+  art->layout = ED_region_header_layout;
+  art->draw = ED_region_header_draw;
 
   BLI_addhead(&st->regiontypes, art);
 

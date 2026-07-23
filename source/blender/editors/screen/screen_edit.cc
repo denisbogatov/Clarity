@@ -1225,18 +1225,18 @@ static void screen_area_set_geometry_rect(ScrArea *area, const rcti *rect)
   area->v4->vec.y = rect->ymin;
 }
 
-static void screen_global_area_refresh(wmWindow *win,
-                                       bScreen *screen,
-                                       const eSpace_Type space_type,
-                                       GlobalAreaAlign align,
-                                       const rcti *rect,
-                                       const short height_cur,
-                                       const short height_min,
-                                       const short height_max)
+static ScrArea *screen_global_area_refresh(wmWindow *win,
+                                          bScreen *screen,
+                                          const eSpace_Type space_type,
+                                          GlobalAreaAlign align,
+                                          const rcti *rect,
+                                          const short height_cur,
+                                          const short height_min,
+                                          const short height_max)
 {
   /* Full-screens shouldn't have global areas. Don't touch them. */
   if (screen->state == SCREENFULL) {
-    return;
+    return nullptr;
   }
 
   ScrArea *area = nullptr;
@@ -1266,6 +1266,7 @@ static void screen_global_area_refresh(wmWindow *win,
     area->global->cur_fixed_height = height_cur;
     screen->do_refresh = true;
   }
+  return area;
 }
 
 static int screen_global_header_size()
@@ -1273,9 +1274,33 @@ static int screen_global_header_size()
   return int(ceilf(ED_area_headersize() / UI_SCALE_FAC));
 }
 
+static void screen_global_topbar_shelf_regions_ensure(ScrArea *area)
+{
+  ARegion *main_region = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
+  if (main_region == nullptr) {
+    return;
+  }
+
+  const auto ensure_region = [&](const eRegion_Type region_type,
+                                 const eRegion_Alignment alignment) {
+    ARegion *region = BKE_area_find_region_type(area, region_type);
+    if (region == nullptr) {
+      region = BKE_area_region_new();
+      BLI_insertlinkbefore(&area->regionbase, main_region, region);
+    }
+    region->regiontype = region_type;
+    region->alignment = alignment;
+    region->flag &= ~(RGN_FLAG_HIDDEN | RGN_FLAG_HIDDEN_BY_USER | RGN_FLAG_TOO_SMALL);
+    region->flag |= RGN_FLAG_NO_USER_RESIZE;
+  };
+
+  ensure_region(RGN_TYPE_TOOL_HEADER, RGN_ALIGN_TOP);
+  ensure_region(RGN_TYPE_FOOTER, RGN_ALIGN_TOP);
+}
+
 static void screen_global_topbar_area_refresh(wmWindow *win, bScreen *screen)
 {
-  const short size = screen_global_header_size();
+  const short size = screen_global_header_size() * 4 + 4;
   rcti rect;
 
   /* Use content rect to account for CSD, converted to inclusive bounds for area geometry. */
@@ -1284,8 +1309,11 @@ static void screen_global_topbar_area_refresh(wmWindow *win, bScreen *screen)
   rect.ymin = (rect.ymax - 1) - size;
   rect.ymax -= 1;
 
-  screen_global_area_refresh(
+  ScrArea *area = screen_global_area_refresh(
       win, screen, SPACE_TOPBAR, GLOBAL_AREA_ALIGN_TOP, &rect, size, size, size);
+  if (area != nullptr) {
+    screen_global_topbar_shelf_regions_ensure(area);
+  }
 }
 
 static void screen_global_statusbar_area_refresh(wmWindow *win, bScreen *screen)
