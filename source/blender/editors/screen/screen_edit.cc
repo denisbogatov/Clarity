@@ -1294,13 +1294,15 @@ static void screen_global_topbar_shelf_regions_ensure(ScrArea *area)
     region->flag |= RGN_FLAG_NO_USER_RESIZE;
   };
 
-  ensure_region(RGN_TYPE_TOOL_HEADER, RGN_ALIGN_TOP);
+  if (ARegion *region = BKE_area_find_region_type(area, RGN_TYPE_TOOL_HEADER)) {
+    region->flag |= RGN_FLAG_HIDDEN | RGN_FLAG_NO_USER_RESIZE;
+  }
   ensure_region(RGN_TYPE_FOOTER, RGN_ALIGN_TOP);
 }
 
 static void screen_global_topbar_area_refresh(wmWindow *win, bScreen *screen)
 {
-  const short size = screen_global_header_size() * 4 + 4;
+  const short size = screen_global_header_size() * 3 + 4;
   rcti rect;
 
   /* Use content rect to account for CSD, converted to inclusive bounds for area geometry. */

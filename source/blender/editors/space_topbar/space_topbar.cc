@@ -59,13 +59,6 @@ static SpaceLink *topbar_create(const ScrArea * /*area*/, const Scene * /*scene*
   region->regiontype = RGN_TYPE_HEADER;
   region->alignment = RGN_ALIGN_RIGHT | RGN_SPLIT_PREV;
 
-  /* Maya-style shelf tabs. */
-  region = BKE_area_region_new();
-  BLI_addtail(&stopbar->regionbase, region);
-  region->regiontype = RGN_TYPE_TOOL_HEADER;
-  region->alignment = RGN_ALIGN_TOP;
-  region->flag |= RGN_FLAG_NO_USER_RESIZE;
-
   /* Upper shelf row. */
   region = BKE_area_region_new();
   BLI_addtail(&stopbar->regionbase, region);

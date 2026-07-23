@@ -66,7 +66,13 @@ class TOPBAR_HT_upper_bar(Header):
 
 
 _MAYA_SHELF_TABS = (
+    "Modeling",
+    "Custom",
+)
+
+_MAYA_SHELF_LEGACY_TABS = {
     "Poly Modeling",
+    "Modeling",
     "Curves",
     "Surfaces",
     "Sculpting",
@@ -78,10 +84,10 @@ _MAYA_SHELF_TABS = (
     "XGen",
     "Arnold",
     "Custom",
-)
+}
 
 _MAYA_SHELF_ITEMS = {
-    "Poly Modeling": (
+    "Modeling": (
         ("select_box", "Box Select", 'RESTRICT_SELECT_OFF'),
         ("move", "Move", 'ORIENTATION_GLOBAL'),
         ("rotate", "Rotate", 'DRIVER_ROTATIONAL_DIFFERENCE'),
@@ -189,23 +195,29 @@ _maya_shelf_previews = None
 _MAYA_SHELF_LEFT_MARGIN = 4.0
 _MAYA_SHELF_BUTTON_SIZE = 24.0
 _MAYA_SHELF_SLOT_WIDTH = 27.0
+_MAYA_SHELF_SEPARATOR_WIDTH = 13.2
 
 
-def _maya_shelf_marker_icon():
+def _maya_shelf_preview_icon(name, filename):
     global _maya_shelf_previews
     if _maya_shelf_previews is None:
         import bpy.utils.previews
 
         _maya_shelf_previews = bpy.utils.previews.new()
+    if name not in _maya_shelf_previews:
         filepath = os.path.join(
             os.path.dirname(__file__),
             "assets",
-            "maya_shelf_drop.svg",
+            filename,
         )
-        preview = _maya_shelf_previews.load("maya_shelf_drop_marker", filepath, 'IMAGE')
-        # Load the tiny SVG before the first drag frame is drawn.
+        preview = _maya_shelf_previews.load(name, filepath, 'IMAGE')
+        # Load the tiny SVG before the first frame using it is drawn.
         _ = preview.icon_size
-    return _maya_shelf_previews["maya_shelf_drop_marker"].icon_id
+    return _maya_shelf_previews[name].icon_id
+
+
+def _maya_shelf_marker_icon():
+    return _maya_shelf_preview_icon("maya_shelf_drop_marker", "maya_shelf_drop.svg")
 
 
 def _maya_shelf_config_path():
@@ -228,22 +240,58 @@ def _maya_shelf_default_config():
                 "operator": "",
                 "row": 0 if index < split else 1,
             })
-        tabs.append({"name": tab_name, "items": items})
-    return {"active": "Poly Modeling", "tabs": tabs}
+        tabs.append({"name": tab_name, "items": items, "separators": []})
+    return {"version": 2, "active": "Modeling", "tabs": tabs}
 
 
 def _maya_shelf_config():
     global _maya_shelf_config_cache
     if _maya_shelf_config_cache is not None:
         return _maya_shelf_config_cache
+    save_migrated_config = False
     try:
         with open(_maya_shelf_config_path(), "r", encoding="utf-8") as handle:
             config = json.load(handle)
         if not config.get("tabs"):
             raise ValueError("Shelf has no tabs")
+        if config.get("version", 1) < 2:
+            modeling = next(
+                (
+                    tab for tab in config["tabs"]
+                    if tab["name"] in {"Modeling", "Poly Modeling"}
+                ),
+                None,
+            )
+            custom = next(
+                (tab for tab in config["tabs"] if tab["name"] == "Custom"),
+                None,
+            )
+            if modeling is None:
+                modeling = _maya_shelf_default_config()["tabs"][0]
+            modeling["name"] = "Modeling"
+            if custom is None:
+                custom = {"name": "Custom", "items": [], "separators": []}
+            user_tabs = [
+                tab for tab in config["tabs"]
+                if tab["name"] not in _MAYA_SHELF_LEGACY_TABS
+            ]
+            retained_tabs = [modeling, custom] + user_tabs
+            for tab in retained_tabs:
+                for separator in tab.setdefault("separators", []):
+                    separator.setdefault("row", 0)
+            config["tabs"] = retained_tabs
+            config["active"] = (
+                config.get("active")
+                if config.get("active") in {"Modeling", "Custom"}
+                else "Modeling"
+            )
+            config["version"] = 2
+            save_migrated_config = True
         _maya_shelf_config_cache = config
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         _maya_shelf_config_cache = _maya_shelf_default_config()
+    if save_migrated_config:
+        _maya_shelf_save()
     return _maya_shelf_config_cache
 
 
@@ -298,12 +346,28 @@ def _maya_shelf_reorder(item_id, target_row, target_index):
     item = next((item for item in tab["items"] if item["id"] == item_id), None)
     if item is None:
         return False
+    source_row = item.get("row", 0)
+    source_items = [
+        candidate for candidate in tab["items"]
+        if candidate.get("row", 0) == source_row
+    ]
+    source_index = source_items.index(item)
     rows = {
         0: [candidate for candidate in tab["items"] if candidate is not item and candidate.get("row", 0) == 0],
         1: [candidate for candidate in tab["items"] if candidate is not item and candidate.get("row", 0) == 1],
     }
+    target_index = min(max(target_index, 0), len(rows[target_row]))
+    separators = tab.setdefault("separators", [])
+    for separator in separators:
+        column = separator.get("column", 0)
+        if separator.get("row", 0) == source_row and source_index < column:
+            separator["column"] = column - 1
+    for separator in separators:
+        column = separator.get("column", 0)
+        if separator.get("row", 0) == target_row and target_index <= column:
+            separator["column"] = column + 1
     item["row"] = target_row
-    rows[target_row].insert(min(max(target_index, 0), len(rows[target_row])), item)
+    rows[target_row].insert(target_index, item)
     tab["items"] = rows[0] + rows[1]
     return True
 
@@ -339,7 +403,7 @@ class TOPBAR_OT_maya_shelf_tab_add(Operator):
         if not name or any(tab["name"] == name for tab in config["tabs"]):
             self.report({'WARNING'}, "Enter a unique shelf name")
             return {'CANCELLED'}
-        config["tabs"].append({"name": name, "items": []})
+        config["tabs"].append({"name": name, "items": [], "separators": []})
         config["active"] = name
         _maya_shelf_save()
         _maya_shelf_redraw(context)
@@ -445,10 +509,55 @@ class TOPBAR_OT_maya_shelf_item_remove_id(Operator):
 
     def execute(self, context):
         tab = _maya_shelf_active_tab()
+        separator = next(
+            (
+                separator for separator in tab.setdefault("separators", [])
+                if separator["id"] == self.item_id
+            ),
+            None,
+        )
+        if separator is not None:
+            tab["separators"].remove(separator)
+            _maya_shelf_save()
+            _maya_shelf_redraw(context)
+            return {'FINISHED'}
+
         item = next((item for item in tab["items"] if item["id"] == self.item_id), None)
         if item is None:
             return {'CANCELLED'}
         tab["items"].remove(item)
+        _maya_shelf_save()
+        _maya_shelf_redraw(context)
+        return {'FINISHED'}
+
+
+class TOPBAR_OT_maya_shelf_separator_add(Operator):
+    bl_idname = "topbar.maya_shelf_separator_add"
+    bl_label = "Add Shelf Separator"
+    bl_options = {'UNDO'}
+
+    column: IntProperty(default=-1, min=-1, options={'SKIP_SAVE'})
+    row: IntProperty(default=0, min=0, max=1, options={'SKIP_SAVE'})
+
+    def execute(self, context):
+        tab = _maya_shelf_active_tab()
+        row_lengths = [
+            sum(1 for item in tab["items"] if item.get("row", 0) == row)
+            for row in (0, 1)
+        ]
+        column = self.column if self.column >= 0 else row_lengths[self.row]
+        separators = tab.setdefault("separators", [])
+        separators.append({
+            "id": uuid.uuid4().hex,
+            "column": column,
+            "row": self.row,
+        })
+        separators.sort(
+            key=lambda separator: (
+                separator.get("row", 0),
+                separator.get("column", 0),
+            )
+        )
         _maya_shelf_save()
         _maya_shelf_redraw(context)
         return {'FINISHED'}
@@ -469,6 +578,46 @@ class TOPBAR_OT_maya_shelf_context_menu(Operator):
     def draw_menu(self, menu, _context):
         layout = menu.layout
         layout.operator_context = 'INVOKE_DEFAULT'
+        tab = _maya_shelf_active_tab()
+        item = next(
+            (item for item in tab["items"] if item["id"] == self.item_id),
+            None,
+        )
+        separator = next(
+            (
+                separator for separator in tab.setdefault("separators", [])
+                if separator["id"] == self.item_id
+            ),
+            None,
+        )
+        if not self.item_id:
+            config = _maya_shelf_config()
+            layout.label(text="Shelf Tabs")
+            for shelf_tab in config["tabs"]:
+                props = layout.operator(
+                    "topbar.maya_shelf_tab",
+                    text=shelf_tab["name"],
+                    icon='CHECKMARK' if shelf_tab is tab else 'BLANK1',
+                )
+                props.tab = shelf_tab["name"]
+            layout.separator()
+            layout.operator(
+                "topbar.maya_shelf_tab_add",
+                text="Add Shelf Tab",
+                icon='ADD',
+            )
+            layout.operator(
+                "topbar.maya_shelf_tab_rename",
+                text="Rename Active Tab",
+                icon='GREASEPENCIL',
+            )
+            layout.operator(
+                "topbar.maya_shelf_tab_remove",
+                text="Remove Active Tab",
+                icon='X',
+            )
+            layout.separator()
+
         props = layout.operator(
             "topbar.maya_shelf_item_add",
             text="Add Shelf Icon",
@@ -476,11 +625,32 @@ class TOPBAR_OT_maya_shelf_context_menu(Operator):
         )
         props.row = self.row
 
+        if item is not None:
+            row_items = [
+                candidate for candidate in tab["items"]
+                if candidate.get("row", 0) == item.get("row", 0)
+            ]
+            separator_column = row_items.index(item) + 1
+        elif separator is not None:
+            separator_column = separator.get("column", 0) + 1
+        else:
+            separator_column = sum(
+                1 for candidate in tab["items"]
+                if candidate.get("row", 0) == self.row
+            )
+        props = layout.operator(
+            "topbar.maya_shelf_separator_add",
+            text="Add Separator",
+            icon='SPLIT_VERTICAL',
+        )
+        props.column = separator_column
+        props.row = separator.get("row", self.row) if separator is not None else self.row
+
         if self.item_id:
             layout.separator()
             props = layout.operator(
                 "topbar.maya_shelf_item_remove_id",
-                text="Remove from Shelf",
+                text="Remove Separator" if separator is not None else "Remove from Shelf",
                 icon='TRASH',
             )
             props.item_id = self.item_id
@@ -547,11 +717,33 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
         ui_scale = getattr(context.preferences.system, "ui_scale", 1.0)
         left_margin = _MAYA_SHELF_LEFT_MARGIN * ui_scale
         slot_width = _MAYA_SHELF_SLOT_WIDTH * ui_scale
-        index = max(0, int((mouse_region_x - left_margin + slot_width * 0.5) / slot_width))
+        separator_width = _MAYA_SHELF_SEPARATOR_WIDTH * ui_scale
+        relative_x = mouse_region_x - left_margin
+        separator_offset = 0.0
+        for separator in sorted(
+            (
+                separator
+                for separator in _maya_shelf_active_tab().setdefault("separators", [])
+                if separator.get("row", 0) == row
+            ),
+            key=lambda candidate: candidate.get("column", 0),
+        ):
+            separator_x = (
+                separator.get("column", 0) * slot_width +
+                separator_offset
+            )
+            if relative_x < separator_x + separator_width * 0.5:
+                break
+            separator_offset += separator_width
+        relative_x -= separator_offset
+        index = max(0, int((relative_x + slot_width * 0.5) / slot_width))
         item_count = sum(
             1
             for item in _maya_shelf_active_tab()["items"]
-            if item["id"] != self.item_id and item.get("row", 0) == row
+            if (
+                (self._drag_separator or item["id"] != self.item_id) and
+                item.get("row", 0) == row
+            )
         )
         return row, min(index, item_count)
 
@@ -559,6 +751,7 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
         global _maya_shelf_drag_state
         self._preview_active = True
         _maya_shelf_drag_state = {
+            "kind": "separator" if self._drag_separator else "icon",
             "source_row": self._source_row,
             "source_index": self._source_index,
             "target_row": self._target_row,
@@ -579,28 +772,40 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
 
     def invoke(self, context, event):
         tab = _maya_shelf_active_tab()
-        source_item = next(
-            (item for item in tab["items"] if item["id"] == self.item_id),
+        source_separator = next(
+            (
+                separator for separator in tab.setdefault("separators", [])
+                if separator["id"] == self.item_id
+            ),
             None,
         )
-        if source_item is not None:
-            row = source_item.get("row", 0)
-            items = [
-                item for item in tab["items"]
-                if item.get("row", 0) == row
-            ]
-            index = items.index(source_item)
+        self._drag_separator = source_separator is not None
+        if source_separator is not None:
+            row = source_separator.get("row", 0)
+            index = max(source_separator.get("column", 0), 0)
         else:
-            row, index = self._source_row_and_index(context, event)
-            if row is None:
-                return {'CANCELLED'}
-            items = [
-                item for item in tab["items"]
-                if item.get("row", 0) == row
-            ]
-            if index >= len(items):
-                return {'CANCELLED'}
-            self.item_id = items[index]["id"]
+            source_item = next(
+                (item for item in tab["items"] if item["id"] == self.item_id),
+                None,
+            )
+            if source_item is not None:
+                row = source_item.get("row", 0)
+                items = [
+                    item for item in tab["items"]
+                    if item.get("row", 0) == row
+                ]
+                index = items.index(source_item)
+            else:
+                row, index = self._source_row_and_index(context, event)
+                if row is None:
+                    return {'CANCELLED'}
+                items = [
+                    item for item in tab["items"]
+                    if item.get("row", 0) == row
+                ]
+                if index >= len(items):
+                    return {'CANCELLED'}
+                self.item_id = items[index]["id"]
 
         self._source_row = row
         self._source_index = index
@@ -636,7 +841,26 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
             row, index = self._drop_row_and_index(context, event)
             if row is None:
                 row, index = self._target_row, self._target_index
-            _maya_shelf_reorder(self.item_id, row, index)
+            if self._drag_separator:
+                tab = _maya_shelf_active_tab()
+                separator = next(
+                    (
+                        separator for separator in tab.setdefault("separators", [])
+                        if separator["id"] == self.item_id
+                    ),
+                    None,
+                )
+                if separator is not None:
+                    separator["column"] = index
+                    separator["row"] = row
+                    tab["separators"].sort(
+                        key=lambda candidate: (
+                            candidate.get("row", 0),
+                            candidate.get("column", 0),
+                        )
+                    )
+            else:
+                _maya_shelf_reorder(self.item_id, row, index)
             _maya_shelf_config()["selected"] = ""
             self._preview_end(context)
             _maya_shelf_save()
@@ -671,6 +895,11 @@ class TOPBAR_OT_maya_shelf_action(Operator):
         return properties.tooltip
 
     def execute(self, context):
+        if any(
+            separator["id"] == self.item_id
+            for separator in _maya_shelf_active_tab().setdefault("separators", [])
+        ):
+            return {'CANCELLED'}
         area = next((area for area in context.screen.areas if area.type == 'VIEW_3D'), None)
         if area is None:
             self.report({'WARNING'}, "No 3D View available")
@@ -776,10 +1005,18 @@ class WM_MT_button_context(Menu):
         button_operator = getattr(context, "button_operator", None)
         item_id = getattr(button_operator, "item_id", "") if button_operator else ""
         if item_id:
+            tab = _maya_shelf_active_tab()
             item = next(
                 (
-                    item for item in _maya_shelf_active_tab()["items"]
+                    item for item in tab["items"]
                     if item["id"] == item_id
+                ),
+                None,
+            )
+            separator = next(
+                (
+                    separator for separator in tab.setdefault("separators", [])
+                    if separator["id"] == item_id
                 ),
                 None,
             )
@@ -791,32 +1028,26 @@ class WM_MT_button_context(Menu):
             )
             props.row = item.get("row", 0) if item else 0
             props = self.layout.operator(
+                "topbar.maya_shelf_separator_add",
+                text="Add Separator",
+                icon='SPLIT_VERTICAL',
+            )
+            if item is not None:
+                row_items = [
+                    candidate for candidate in tab["items"]
+                    if candidate.get("row", 0) == item.get("row", 0)
+                ]
+                props.column = row_items.index(item) + 1
+                props.row = item.get("row", 0)
+            elif separator is not None:
+                props.column = separator.get("column", 0) + 1
+                props.row = separator.get("row", 0)
+            props = self.layout.operator(
                 "topbar.maya_shelf_item_remove_id",
-                text="Remove from Shelf",
+                text="Remove Separator" if separator is not None else "Remove from Shelf",
                 icon='TRASH',
             )
             props.item_id = item_id
-
-
-class TOPBAR_HT_maya_shelf_tabs(Header):
-    bl_space_type = 'TOPBAR'
-    bl_region_type = 'TOOL_HEADER'
-
-    def draw(self, context):
-        config = _maya_shelf_config()
-        active = _maya_shelf_active_tab()["name"]
-        row = self.layout.row(align=True)
-        for tab in config["tabs"]:
-            props = row.operator(
-                "topbar.maya_shelf_tab",
-                text=tab["name"],
-                depress=(tab["name"] == active),
-            )
-            props.tab = tab["name"]
-        row.separator(type='LINE')
-        row.operator("topbar.maya_shelf_tab_add", text="", icon='ADD')
-        row.operator("topbar.maya_shelf_tab_rename", text="", icon='GREASEPENCIL')
-        row.operator("topbar.maya_shelf_tab_remove", text="", icon='X')
 
 
 def _maya_shelf_draw_icon_row(layout, row_index):
@@ -832,6 +1063,12 @@ def _maya_shelf_draw_icon_row(layout, row_index):
         for item in tab["items"]
         if item.get("row", 0) == row_index
     ]
+    separators_by_column = {}
+    for separator in tab.setdefault("separators", []):
+        if separator.get("row", 0) != row_index:
+            continue
+        column = max(separator.get("column", 0), 0)
+        separators_by_column.setdefault(column, []).append(separator)
     marker_index = None
     if (
         _maya_shelf_drag_state is not None and
@@ -839,6 +1076,7 @@ def _maya_shelf_draw_icon_row(layout, row_index):
     ):
         marker_index = _maya_shelf_drag_state["target_index"]
         if (
+            _maya_shelf_drag_state.get("kind") != "separator" and
             _maya_shelf_drag_state["source_row"] == row_index and
             _maya_shelf_drag_state["source_index"] < marker_index
         ):
@@ -850,27 +1088,49 @@ def _maya_shelf_draw_icon_row(layout, row_index):
         marker.ui_units_x = 0.55
         marker.label(text="", icon_value=_maya_shelf_marker_icon())
 
-    for index, item in enumerate(items):
-        if marker_index == index:
-            draw_marker()
-        button = row.row(align=True)
-        button.context_string_set("maya_shelf_item_id", item["id"])
-        props = button.operator(
+    def draw_separator(separator):
+        divider = row.row(align=True)
+        divider.ui_units_x = 0.55
+        divider.context_string_set("maya_shelf_item_id", separator["id"])
+        props = divider.operator(
             "topbar.maya_shelf_action",
-            text="",
-            icon=item["icon"],
-            emboss=True,
-            depress=(item["id"] == selected),
+            text="|",
+            emboss=False,
         )
-        props.action = item.get("action", "")
-        props.operator_id = item.get("operator", "")
-        props.item_id = item["id"]
-        props.tooltip = item.get("label", "Shelf Command")
-        # 24 px square button + a compact spacer at UI scale.
-        row.separator(factor=0.4)
+        props.item_id = separator["id"]
+        props.tooltip = "Shelf Separator"
 
-    if marker_index == len(items):
-        draw_marker()
+    last_column = max(
+        len(items),
+        max(separators_by_column, default=-1),
+        marker_index if marker_index is not None else -1,
+    )
+    for column in range(last_column + 1):
+        if marker_index == column:
+            draw_marker()
+        for separator in separators_by_column.get(column, ()):
+            draw_separator(separator)
+        if column < len(items):
+            item = items[column]
+            button = row.row(align=True)
+            button.context_string_set("maya_shelf_item_id", item["id"])
+            props = button.operator(
+                "topbar.maya_shelf_action",
+                text="",
+                icon=item["icon"],
+                emboss=True,
+                depress=(item["id"] == selected),
+            )
+            props.action = item.get("action", "")
+            props.operator_id = item.get("operator", "")
+            props.item_id = item["id"]
+            props.tooltip = item.get("label", "Shelf Command")
+            # 24 px square button + a compact spacer at UI scale.
+            row.separator(factor=0.4)
+        elif column < last_column:
+            placeholder = row.row(align=True)
+            placeholder.ui_units_x = _MAYA_SHELF_SLOT_WIDTH / 20.0
+            placeholder.label(text="")
 
 
 class TOPBAR_HT_maya_shelf_upper(Header):
@@ -1698,11 +1958,11 @@ classes = (
     TOPBAR_OT_maya_shelf_tab_remove,
     TOPBAR_OT_maya_shelf_item_add,
     TOPBAR_OT_maya_shelf_item_remove_id,
+    TOPBAR_OT_maya_shelf_separator_add,
     TOPBAR_OT_maya_shelf_context_menu,
     TOPBAR_OT_maya_shelf_drag,
     TOPBAR_OT_maya_shelf_action,
     WM_MT_button_context,
-    TOPBAR_HT_maya_shelf_tabs,
     TOPBAR_HT_maya_shelf_upper,
     TOPBAR_HT_maya_shelf_lower,
     TOPBAR_MT_file_context_menu,
