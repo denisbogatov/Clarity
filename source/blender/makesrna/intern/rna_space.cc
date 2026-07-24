@@ -178,6 +178,11 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      ICON_SPREADSHEET,
      "Spreadsheet",
      "Explore geometry data in a table"},
+    {SPACE_SHELF,
+     "SHELF",
+     ICON_ASSET_MANAGER,
+     "Shelf",
+     "Customizable adaptive shelf of actions and scripts"},
     {SPACE_USERPREF,
      "PREFERENCES",
      ICON_PREFERENCES,
@@ -793,6 +798,8 @@ static StructRNA *rna_Space_refine(PointerRNA *ptr)
       return RNA_SpaceClipEditor;
     case SPACE_SPREADSHEET:
       return RNA_SpaceSpreadsheet;
+    case SPACE_SHELF:
+      return RNA_SpaceShelf;
 
       /* Currently no type info. */
     case SPACE_SCRIPT:
@@ -9520,6 +9527,18 @@ static void rna_def_space_spreadsheet(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, nullptr);
 }
 
+static void rna_def_space_shelf(BlenderRNA *brna)
+{
+  StructRNA *srna = RNA_def_struct(brna, "SpaceShelf", "Space");
+  RNA_def_struct_sdna(srna, "SpaceTopBar");
+  RNA_def_struct_ui_text(srna, "Shelf Space", "Customizable adaptive shelf editor");
+
+  PropertyRNA *prop = RNA_def_property(srna, "shelf_id", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, nullptr, "shelf_id");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "Shelf ID", "Persistent identifier of this shelf editor");
+}
+
 void RNA_def_space(BlenderRNA *brna)
 {
   rna_def_space(brna);
@@ -9548,6 +9567,7 @@ void RNA_def_space(BlenderRNA *brna)
   rna_def_space_node(brna);
   rna_def_space_clip(brna);
   rna_def_space_spreadsheet(brna);
+  rna_def_space_shelf(brna);
 }
 
 }  // namespace blender

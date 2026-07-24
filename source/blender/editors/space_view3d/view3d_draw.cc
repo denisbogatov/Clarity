@@ -838,19 +838,21 @@ float ED_view3d_grid_view_scale(const Scene *scene,
 static void draw_view_axis(RegionView3D *rv3d, const rcti *rect)
 {
   const float k = U.rvisize * UI_SCALE_FAC; /* axis size */
-  /* axis alpha offset (rvibright has range 0-10) */
-  const int bright = -20 * (10 - U.rvibright);
 
   /* Axis center in screen coordinates.
    *
-   * - Unit size offset so small text doesn't draw outside the screen
-   * - Extra X offset because of the panel expander.
+   * Leave enough room for axis tips and labels at the lower-left viewport corner.
    */
-  const float startx = rect->xmax - (k + UI_UNIT_X * 1.5);
-  const float starty = rect->ymax - (k + UI_UNIT_Y);
+  const float startx = rect->xmin + k + UI_UNIT_X * 0.5f;
+  const float starty = rect->ymin + k + UI_UNIT_Y * 0.5f;
 
   float axis_pos[3][2];
   float axis_col[3][4];
+  const float maya_axis_col[3][3] = {
+      {1.0f, 0.0f, 0.0f},
+      {0.0f, 1.0f, 0.0f},
+      {0.0f, 0.0f, 1.0f},
+  };
 
   int axis_order[3] = {0, 1, 2};
   axis_sort_v3(rv3d->viewinv[2], axis_order);
@@ -865,13 +867,13 @@ static void draw_view_axis(RegionView3D *rv3d, const rcti *rect)
     axis_pos[i][0] = startx + vec[0] * k;
     axis_pos[i][1] = starty + vec[1] * k;
 
-    /* get color of each axis */
-    ui::theme::get_color_shade_3fv(TH_AXIS_X + i, bright, axis_col[i]); /* rgb */
+    /* Maya-style world-axis colors: X red, Y green, Z blue. */
+    copy_v3_v3(axis_col[i], maya_axis_col[i]);
     axis_col[i][3] = hypotf(vec[0], vec[1]);                            /* alpha */
   }
 
   /* draw axis lines */
-  GPU_line_width(2.0f);
+  GPU_line_width(1.0f);
   GPU_line_smooth(true);
   GPU_blend(GPU_BLEND_ALPHA);
 
@@ -1623,7 +1625,7 @@ void view3d_draw_region_info(const bContext *C, ARegion *region)
   else {
     switch (eUserpref_MiniAxisType(U.mini_axis_type)) {
       case USER_MINI_AXIS_TYPE_GIZMO:
-        /* The gizmo handles its own drawing. */
+        draw_view_axis(rv3d, rect);
         break;
       case USER_MINI_AXIS_TYPE_MINIMAL:
         if (region->alignment != RGN_ALIGN_QSPLIT ||

@@ -6,13 +6,17 @@
  * \ingroup sptopbar
  */
 
+#include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <optional>
 
 #include "MEM_guardedalloc.h"
 
 #include "BLI_listbase.h"
+#include "BLI_math_color.h"
 #include "BLI_string_utf8.h"
+#include "BLI_uuid.h"
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.hh"
@@ -20,6 +24,8 @@
 #include "BKE_context.hh"
 #include "BKE_screen.hh"
 #include "BKE_undo_system.hh"
+
+#include "DNA_windowmanager_types.h"
 
 #include "ED_screen.hh"
 #include "ED_space_api.hh"
@@ -74,11 +80,38 @@ static SpaceLink *topbar_create(const ScrArea * /*area*/, const Scene * /*scene*
   return reinterpret_cast<SpaceLink *>(stopbar);
 }
 
+static SpaceLink *shelf_create(const ScrArea * /*area*/, const Scene * /*scene*/)
+{
+  SpaceTopBar *shelf = MEM_new<SpaceTopBar>("init shelf");
+  shelf->spacetype = SPACE_SHELF;
+  BLI_uuid_format(shelf->shelf_id, BLI_uuid_generate_random());
+
+  ARegion *region = BKE_area_region_new();
+  BLI_addtail(&shelf->regionbase, region);
+  region->regiontype = RGN_TYPE_HEADER;
+  region->alignment = RGN_ALIGN_TOP;
+
+  region = BKE_area_region_new();
+  BLI_addtail(&shelf->regionbase, region);
+  region->regiontype = RGN_TYPE_WINDOW;
+
+  return reinterpret_cast<SpaceLink *>(shelf);
+}
+
 /* Doesn't free the space-link itself. */
 static void topbar_free(SpaceLink * /*sl*/) {}
 
 /* spacetype; init callback */
-static void topbar_init(wmWindowManager * /*wm*/, ScrArea * /*area*/) {}
+static void topbar_init(wmWindowManager * /*wm*/, ScrArea *area)
+{
+  if (area->spacetype != SPACE_SHELF) {
+    return;
+  }
+  SpaceTopBar *shelf = static_cast<SpaceTopBar *>(area->spacedata.first);
+  if (shelf != nullptr && shelf->shelf_id[0] == '\0') {
+    BLI_uuid_format(shelf->shelf_id, BLI_uuid_generate_random());
+  }
+}
 
 static SpaceLink *topbar_duplicate(SpaceLink *sl)
 {
@@ -115,8 +148,12 @@ static int topbar_shelf_region_event_handler(bContext *C,
     }
 
     PointerRNA properties = WM_operator_properties_create_ptr(ot);
-    RNA_int_set(
-        &properties, "row", region->regiontype == RGN_TYPE_FOOTER ? 0 : 1);
+    const ScrArea *area = CTX_wm_area(C);
+    RNA_int_set(&properties,
+                "row",
+                area && area->spacetype == SPACE_SHELF ?
+                    0 :
+                    (region->regiontype == RGN_TYPE_FOOTER ? 0 : 1));
     if (item_id) {
       RNA_string_set(&properties, "item_id", item_id->c_str());
     }
@@ -162,23 +199,107 @@ static void topbar_shelf_region_init(wmWindowManager * /*wm*/, ARegion *region)
                           eWM_EventHandlerFlag(0));
 }
 
-static void topbar_shelf_lower_region_layout(const bContext *C, ARegion *region)
+static void shelf_main_region_init(wmWindowManager *wm, ARegion *region)
+{
+  region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_VERTICAL_HIDE;
+  ED_region_panels_init(wm, region);
+  WM_event_add_ui_handler(nullptr,
+                          &region->runtime->handlers,
+                          topbar_shelf_region_event_handler,
+                          nullptr,
+                          nullptr,
+                          eWM_EventHandlerFlag(0));
+}
+
+static bool topbar_shelf_color_parse(const std::optional<StringRefNull> &value, uchar color[4])
+{
+  if (!value) {
+    return false;
+  }
+  float rgba[4];
+  if (std::sscanf(value->c_str(), "%f,%f,%f,%f", &rgba[0], &rgba[1], &rgba[2], &rgba[3]) !=
+      4)
+  {
+    return false;
+  }
+  rgba_float_to_uchar(color, rgba);
+  color[3] = std::max(color[3], uchar(1));
+  return true;
+}
+
+static void topbar_shelf_button_colors_apply(ui::Button *button, void * /*user_data*/)
+{
+  uchar color[4];
+  if (topbar_shelf_color_parse(
+          ui::button_context_string_get(button, "maya_shelf_icon_color"), color))
+  {
+    ui::button_color_set(button, color);
+  }
+  if (topbar_shelf_color_parse(
+          ui::button_context_string_get(button, "maya_shelf_background_color"), color))
+  {
+    ui::button_background_color_set(button, color);
+  }
+}
+
+static void topbar_shelf_region_layout(const bContext *C, ARegion *region)
 {
   ED_region_header_layout(C, region);
 
   const int bottom_padding = int(4.0f * UI_SCALE_FAC + 0.5f);
   const int offset_y = bottom_padding -
                        ui::blocklist_min_y_get(&region->runtime->uiblocks);
-  if (offset_y <= 0) {
-    return;
+  if (offset_y > 0) {
+    for (ui::Block &block : region->runtime->uiblocks) {
+      ui::block_translate(&block, 0, offset_y);
+    }
   }
-
-  for (ui::Block &block : region->runtime->uiblocks) {
-    ui::block_translate(&block, 0, offset_y);
-  }
+  ui::blocklist_buttons_foreach(
+      &region->runtime->uiblocks, topbar_shelf_button_colors_apply, nullptr);
 }
 
-static void topbar_operatortypes() {}
+static void topbar_shelf_region_draw(const bContext *C, ARegion *region)
+{
+  ui::theme::bThemeState theme_state;
+  ui::theme::theme_store(&theme_state);
+  ui::theme::theme_set(SPACE_OUTLINER, RGN_TYPE_WINDOW);
+  ED_region_header_draw(C, region);
+  ui::theme::theme_restore(&theme_state);
+}
+
+static void shelf_main_region_layout(const bContext *C, ARegion *region)
+{
+  ED_region_panels_layout(C, region);
+  ui::blocklist_buttons_foreach(
+      &region->runtime->uiblocks, topbar_shelf_button_colors_apply, nullptr);
+}
+
+static wmOperatorStatus shelf_global_redraw_exec(bContext *C, wmOperator * /*op*/)
+{
+  wmWindow *window = CTX_wm_window(C);
+  if (window != nullptr) {
+    for (ScrArea &area : window->global_areas.areabase) {
+      if (area.spacetype == SPACE_TOPBAR) {
+        ED_area_tag_redraw(&area);
+      }
+    }
+  }
+  return OPERATOR_FINISHED;
+}
+
+static void TOPBAR_OT_shelf_global_redraw(wmOperatorType *ot)
+{
+  ot->name = "Redraw Global Shelf";
+  ot->idname = "TOPBAR_OT_shelf_global_redraw";
+  ot->description = "Redraw the global Top Bar shelf immediately";
+  ot->exec = shelf_global_redraw_exec;
+  ot->flag = OPTYPE_INTERNAL;
+}
+
+static void topbar_operatortypes()
+{
+  WM_operatortype_append(TOPBAR_OT_shelf_global_redraw);
+}
 
 static void topbar_keymap(wmKeyConfig * /*keyconf*/) {}
 
@@ -387,8 +508,8 @@ void ED_spacetype_topbar()
   art = MEM_new_zeroed<ARegionType>("spacetype topbar main region");
   art->regionid = RGN_TYPE_WINDOW;
   art->init = topbar_shelf_region_init;
-  art->layout = topbar_shelf_lower_region_layout;
-  art->draw = ED_region_header_draw;
+  art->layout = topbar_shelf_region_layout;
+  art->draw = topbar_shelf_region_draw;
   art->listener = topbar_main_region_listener;
   art->prefsizex = UI_UNIT_X * 5; /* Mainly to avoid glitches */
   art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_HEADER;
@@ -412,13 +533,13 @@ void ED_spacetype_topbar()
   /* regions: upper shelf row */
   art = MEM_new_zeroed<ARegionType>("spacetype topbar shelf footer region");
   art->regionid = RGN_TYPE_FOOTER;
-  art->prefsizey = HEADERY;
+  art->prefsizey = HEADERY + 9;
   art->prefsizex = UI_UNIT_X * 5;
   art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FOOTER;
   art->listener = topbar_main_region_listener;
   art->init = topbar_shelf_region_init;
   art->layout = ED_region_header_layout;
-  art->draw = ED_region_header_draw;
+  art->draw = topbar_shelf_region_draw;
 
   BLI_addhead(&st->regiontypes, art);
 
@@ -438,6 +559,45 @@ void ED_spacetype_topbar()
 
   recent_files_menu_register();
   undo_history_menu_register();
+
+  BKE_spacetype_register(std::move(st));
+}
+
+void ED_spacetype_shelf()
+{
+  std::unique_ptr<SpaceType> st = std::make_unique<SpaceType>();
+
+  st->spaceid = SPACE_SHELF;
+  STRNCPY_UTF8(st->name, "Shelf");
+  st->create = shelf_create;
+  st->free = topbar_free;
+  st->init = topbar_init;
+  st->duplicate = topbar_duplicate;
+  st->operatortypes = nullptr;
+  st->keymap = topbar_keymap;
+  st->blend_write = topbar_space_blend_write;
+
+  ARegionType *art = MEM_new_zeroed<ARegionType>("spacetype shelf main region");
+  art->regionid = RGN_TYPE_WINDOW;
+  art->init = shelf_main_region_init;
+  art->layout = shelf_main_region_layout;
+  art->draw = ED_region_panels_draw;
+  art->listener = topbar_main_region_listener;
+  art->prefsizex = UI_UNIT_X * 5;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_HEADER;
+  BLI_addhead(&st->regiontypes, art);
+
+  art = MEM_new_zeroed<ARegionType>("spacetype shelf header region");
+  art->regionid = RGN_TYPE_HEADER;
+  art->prefsizey = HEADERY;
+  art->prefsizex = UI_UNIT_X * 5;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_HEADER;
+  art->listener = topbar_header_listener;
+  art->message_subscribe = topbar_header_region_message_subscribe;
+  art->init = topbar_header_region_init;
+  art->layout = ED_region_header_layout;
+  art->draw = ED_region_header_draw;
+  BLI_addhead(&st->regiontypes, art);
 
   BKE_spacetype_register(std::move(st));
 }

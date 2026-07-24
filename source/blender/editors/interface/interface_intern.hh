@@ -226,6 +226,9 @@ struct Button : NonMovable {
    */
   uchar col[4] = {0};
 
+  /** Optional background color override for regular buttons. */
+  uchar background_col[4] = {0};
+
   std::string str;
 
   std::string drawstr;

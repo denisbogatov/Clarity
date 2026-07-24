@@ -1642,6 +1642,9 @@ static void region_rect_recursive(
   }
   else if (region->regiontype == RGN_TYPE_FOOTER) {
     prefsizey = ED_area_footersize();
+    if (area->spacetype == SPACE_TOPBAR) {
+      prefsizey += int(9.0f * UI_SCALE_FAC + 0.5f);
+    }
   }
   else if (region->regiontype == RGN_TYPE_SCRUBBING) {
     prefsizey = 0.9f * ED_area_footersize();

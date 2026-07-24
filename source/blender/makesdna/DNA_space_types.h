@@ -19,6 +19,7 @@
 #include "DNA_node_types.h"      /* for bNodeInstanceKey */
 #include "DNA_outliner_types.h"  /* for TreeStoreElem */
 #include "DNA_space_enums.h"
+#include "DNA_uuid_types.h"
 /* Hum ... Not really nice... but needed for spacebuts. */
 #include "DNA_vec_defaults.h"
 #include "DNA_view2d_types.h"
@@ -1074,6 +1075,10 @@ struct SpaceTopBar {
   char link_flag = 0;
   char _pad0[6] = {};
   /* End 'SpaceLink' header. */
+
+  /** Persistent identity for independent Shelf editor configurations. */
+  char shelf_id[UUID_STRING_SIZE] = {};
+  char _pad1[3] = {};
 };
 
 /** \} */

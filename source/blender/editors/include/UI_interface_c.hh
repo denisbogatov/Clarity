@@ -1203,6 +1203,10 @@ void block_flag_enable(Block *block, int flag);
 void block_flag_disable(Block *block, int flag);
 void block_translate(Block *block, float x, float y);
 
+using ButtonForeachFunc = void (*)(Button *button, void *user_data);
+void blocklist_buttons_foreach(
+    ListBaseT<Block> *block_list, ButtonForeachFunc callback, void *user_data);
+
 int button_return_value_get(Button *but);
 
 Button *button_active_drop_name_button(const bContext *C);
@@ -1233,6 +1237,7 @@ void button_type_set_menu_from_pulldown(Button *but);
  * special case of ButtonType::Label without icon this is used as text color.
  */
 void button_color_set(Button *but, const uchar color[4]);
+void button_background_color_set(Button *but, const uchar color[4]);
 
 bool button_is_color_gamma(Button &but);
 const ColorManagedDisplay *button_cm_display_get(Button &but);

@@ -1339,6 +1339,9 @@ static void widget_draw_icon(
     const Button *but, BIFIconID icon, float alpha, const rcti *rect, const uchar mono_color[4])
 {
   if (but->flag & BUT_ICON_PREVIEW) {
+    if (but->col[3] != 0) {
+      alpha *= float(but->col[3]) / 255.0f;
+    }
     GPU_blend(GPU_BLEND_ALPHA);
     widget_draw_preview_icon(icon,
                              alpha,
@@ -5508,6 +5511,30 @@ static WidgetType *popover_widget_type(Button *but, rcti *rect)
 /** \name Public API
  * \{ */
 
+static bool shelf_button_context_color_get(Button *but, const char *key, uchar color[4])
+{
+  const std::optional<StringRefNull> value = button_context_string_get(but, key);
+  if (!value) {
+    return false;
+  }
+
+  float rgba[4];
+  const char *cursor = value->c_str();
+  for (int index = 0; index < 4; index++) {
+    char *end = nullptr;
+    rgba[index] = std::strtof(cursor, &end);
+    if (end == cursor || (index < 3 && *end != ',') || (index == 3 && *end != '\0')) {
+      return false;
+    }
+    cursor = end + 1;
+  }
+  rgba_float_to_uchar(color, rgba);
+  /* Zero alpha is the legacy sentinel for no override. Use the smallest visible
+   * alpha so an explicitly transparent shelf color remains effectively transparent. */
+  color[3] = std::max(color[3], uchar(1));
+  return true;
+}
+
 void draw_button(const bContext *C, ARegion *region, uiStyle *style, Button *but, rcti *rect)
 {
   bTheme *btheme = theme::theme_get();
@@ -5811,6 +5838,9 @@ void draw_button(const bContext *C, ARegion *region, uiStyle *style, Button *but
   state.but_flag = but->flag;
   state.but_drawflag = but->drawflag;
   state.emboss = but->emboss;
+  if (button_context_string_get(but, "maya_shelf_separator")) {
+    state.but_flag &= ~UI_HOVER;
+  }
   state.draw_as_link = button_draw_as_link(but);
 
   /* Override selected flag for drawing. */
@@ -5851,7 +5881,23 @@ void draw_button(const bContext *C, ARegion *region, uiStyle *style, Button *but
   }
 
   const float zoom = 1.0f / but->block->aspect;
+  uchar context_color[4];
+  if (shelf_button_context_color_get(but, "maya_shelf_icon_color", context_color)) {
+    copy_v4_v4_uchar(but->col, context_color);
+  }
+  if (shelf_button_context_color_get(but, "maya_shelf_background_color", context_color)) {
+    copy_v4_v4_uchar(but->background_col, context_color);
+  }
   wt->state(wt, &state, but->emboss);
+  const std::optional<StringRefNull> drag_source = button_context_string_get(
+      but, "maya_shelf_drag_source");
+  if (drag_source && *drag_source == "1") {
+    const uchar drag_outline[4] = {42, 132, 255, 255};
+    copy_v4_v4_uchar(wt->wcol.outline, drag_outline);
+  }
+  if (but->background_col[3] != 0) {
+    copy_v4_v4_uchar(wt->wcol.inner, but->background_col);
+  }
   if (wt->custom) {
     wt->custom(but, &wt->wcol, rect, &state, roundboxalign, zoom);
   }

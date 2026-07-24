@@ -5696,6 +5696,22 @@ void button_color_set(Button *but, const uchar color[4])
   copy_v4_v4_uchar(but->col, color);
 }
 
+void button_background_color_set(Button *but, const uchar color[4])
+{
+  copy_v4_v4_uchar(but->background_col, color);
+}
+
+void blocklist_buttons_foreach(ListBaseT<Block> *block_list,
+                               ButtonForeachFunc callback,
+                               void *user_data)
+{
+  for (Block &block : *block_list) {
+    for (Button &button : block.buttons()) {
+      callback(&button, user_data);
+    }
+  }
+}
+
 const ColorManagedDisplay *button_cm_display_get(Button &but)
 {
   return block_cm_display_get(but.block);

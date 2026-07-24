@@ -1302,7 +1302,7 @@ static void screen_global_topbar_shelf_regions_ensure(ScrArea *area)
 
 static void screen_global_topbar_area_refresh(wmWindow *win, bScreen *screen)
 {
-  const short size = screen_global_header_size() * 3 + 4;
+  const short size = screen_global_header_size() * 3 + 19;
   rcti rect;
 
   /* Use content rect to account for CSD, converted to inclusive bounds for area geometry. */
