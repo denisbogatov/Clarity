@@ -61,7 +61,6 @@
 
 #include "ED_curves.hh"
 #include "ED_grease_pencil.hh"
-#include "ED_maya.hh"
 #include "ED_mesh.hh"
 #include "ED_object.hh"
 #include "ED_object_vgroup.hh"
@@ -143,28 +142,6 @@ struct TransformProperties {
   TransformMedian ve_median, median;
   bool tag_for_update;
 };
-
-struct TransformPanelSelectionCache {
-  uint64_t draw_serial = 0;
-  const wmWindow *window = nullptr;
-  const Object *object = nullptr;
-  TransformMedian median = {};
-  int tot = 0;
-  int totedgedata = 0;
-  int totcurvedata = 0;
-  int totlattdata = 0;
-  int totcurvebweight = 0;
-  int total_curve_points_data = 0;
-  bool has_meshdata = false;
-  bool has_skinradius = false;
-  PointerRNA data_ptr = {};
-};
-
-static TransformPanelSelectionCache &transform_panel_selection_cache()
-{
-  static TransformPanelSelectionCache cache;
-  return cache;
-}
 
 #define TRANSFORM_MEDIAN_ARRAY_LEN (sizeof(TransformMedian) / sizeof(float))
 
@@ -334,8 +311,6 @@ static TransformProperties *v3d_transform_props_ensure(View3D *v3d)
 {
   if (v3d->runtime.properties_storage == nullptr) {
     TransformProperties *tfp = MEM_new<TransformProperties>("TransformProperties");
-    /* Construct C++ structures in otherwise zero initialized struct. */
-    new (tfp) TransformProperties();
 
     v3d->runtime.properties_storage = tfp;
     v3d->runtime.properties_storage_free = [](void *properties_storage) {
@@ -732,24 +707,7 @@ static void v3d_editvertex_buts(
   std::fill_n(reinterpret_cast<float *>(&median_basis), TRANSFORM_MEDIAN_ARRAY_LEN, 0.0f);
   tot = totedgedata = totcurvedata = totlattdata = totcurvebweight = 0;
 
-  TransformPanelSelectionCache &cache = transform_panel_selection_cache();
-  const uint64_t draw_serial = block ? ED_maya_transform_panel_cache_serial(C) : 0;
-  const bool cache_hit = draw_serial != 0 && cache.draw_serial == draw_serial &&
-                         cache.window == CTX_wm_window(C) && cache.object == ob;
-
-  if (cache_hit) {
-    median_basis = cache.median;
-    tot = cache.tot;
-    totedgedata = cache.totedgedata;
-    totcurvedata = cache.totcurvedata;
-    totlattdata = cache.totlattdata;
-    totcurvebweight = cache.totcurvebweight;
-    total_curve_points_data = cache.total_curve_points_data;
-    has_meshdata = cache.has_meshdata;
-    has_skinradius = cache.has_skinradius;
-    data_ptr = cache.data_ptr;
-  }
-  else if (ob->type == OB_MESH) {
+  if (ob->type == OB_MESH) {
     TransformMedian_Mesh *median = &median_basis.mesh;
     Mesh *mesh = id_cast<Mesh *>(ob->data);
     BMEditMesh *em = mesh->runtime->edit_mesh.get();
@@ -946,22 +904,6 @@ static void v3d_editvertex_buts(
     tot = status.total;
     total_curve_points_data = status.total_curve_points;
     totcurvebweight = status.total_nurbs_weights;
-  }
-
-  if (!cache_hit && draw_serial != 0) {
-    cache.draw_serial = draw_serial;
-    cache.window = CTX_wm_window(C);
-    cache.object = ob;
-    cache.median = median_basis;
-    cache.tot = tot;
-    cache.totedgedata = totedgedata;
-    cache.totcurvedata = totcurvedata;
-    cache.totlattdata = totlattdata;
-    cache.totcurvebweight = totcurvebweight;
-    cache.total_curve_points_data = total_curve_points_data;
-    cache.has_meshdata = has_meshdata;
-    cache.has_skinradius = has_skinradius;
-    cache.data_ptr = data_ptr;
   }
 
   /* Location, X/Y/Z */

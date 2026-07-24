@@ -1059,14 +1059,10 @@ def _maya_shelf_save_deferred():
     if _maya_shelf_save_timer_pending:
         return
     _maya_shelf_save_timer_pending = True
-
-    def save_after_redraw():
-        global _maya_shelf_save_timer_pending
-        _maya_shelf_save_timer_pending = False
+    try:
         _maya_shelf_save()
-        return None
-
-    bpy.app.timers.register(save_after_redraw, first_interval=0.25)
+    finally:
+        _maya_shelf_save_timer_pending = False
 
 
 def _maya_shelf_active_tab(context=None):

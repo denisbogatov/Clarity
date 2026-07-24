@@ -376,28 +376,6 @@ void ED_maya_transform_end(const bContext *C)
   }
 }
 
-static uint64_t &maya_transform_panel_draw_serial()
-{
-  static uint64_t draw_serial = 0;
-  return draw_serial;
-}
-
-void ED_maya_transform_panel_cache_tick(const bContext *C)
-{
-  UNUSED_VARS(C);
-  uint64_t &draw_serial = maya_transform_panel_draw_serial();
-  draw_serial++;
-  if (draw_serial == 0) {
-    draw_serial++;
-  }
-}
-
-uint64_t ED_maya_transform_panel_cache_serial(const bContext *C)
-{
-  UNUSED_VARS(C);
-  return maya_transform_panel_draw_serial();
-}
-
 void ED_maya_navigation_debug_stage_sample(
     const bContext *C,
     const ed::maya::MayaNavigationDebugStage stage,

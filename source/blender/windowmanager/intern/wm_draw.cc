@@ -1962,7 +1962,6 @@ void wm_draw_update(bContext *C)
       }
 
       const double window_draw_start = maya_debug ? BLI_time_now_seconds() : 0.0;
-      ED_maya_transform_panel_cache_tick(C);
       wm_draw_window(C, &win);
       if (maya_debug) {
         ED_maya_navigation_debug_stage_sample(

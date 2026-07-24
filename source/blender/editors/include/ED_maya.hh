@@ -70,8 +70,6 @@ bool ED_maya_navigation_debug_active(const bContext *C);
 void ED_maya_transform_begin(
     const bContext *C, const char *operator_id, int context_mode, int mesh_select_mode);
 void ED_maya_transform_end(const bContext *C);
-void ED_maya_transform_panel_cache_tick(const bContext *C);
-uint64_t ED_maya_transform_panel_cache_serial(const bContext *C);
 void ED_maya_navigation_debug_stage_sample(
     const bContext *C,
     ed::maya::MayaNavigationDebugStage stage,
