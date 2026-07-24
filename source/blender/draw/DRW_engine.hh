@@ -146,6 +146,19 @@ void DRW_submission_end();
 
 void DRW_gpu_context_create();
 void DRW_gpu_context_destroy();
+
+struct DRWGPUContextEnableTiming {
+  double draw_lock_ms = 0.0;
+  double shared_lock_ms = 0.0;
+  double render_begin_ms = 0.0;
+  double system_activate_ms = 0.0;
+  double context_activate_ms = 0.0;
+  double frame_begin_ms = 0.0;
+};
+
+void DRW_gpu_context_enable_timing_set(bool enabled);
+bool DRW_gpu_context_enable_timing_get(DRWGPUContextEnableTiming &r_timing);
+
 /**
  * Binds the draw GPU context to the active thread.
  * In background mode, this will create the draw GPU context on first call.

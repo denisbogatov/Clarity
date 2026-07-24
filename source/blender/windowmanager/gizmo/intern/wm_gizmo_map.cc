@@ -14,6 +14,7 @@
 #include "BLI_math_vector.h"
 #include "BLI_math_vector_types.hh"
 #include "BLI_rect.h"
+#include "BLI_time.h"
 #include "BLI_vector.hh"
 
 #include "BKE_context.hh"
@@ -21,6 +22,7 @@
 #include "BKE_main.hh"
 #include "BKE_screen.hh"
 
+#include "ED_maya.hh"
 #include "ED_screen.hh"
 #include "ED_select_utils.hh"
 #include "ED_view3d.hh"
@@ -517,11 +519,26 @@ void WM_gizmomap_draw(wmGizmoMap *gzmap,
     return;
   }
 
+  const bool maya_debug = ED_maya_navigation_debug_active(C);
+  const double draw_start = maya_debug ? BLI_time_now_seconds() : 0.0;
   ListBaseT<wmGizmo> draw_gizmos = {nullptr};
 
   gizmomap_prepare_drawing(gzmap, C, &draw_gizmos, drawstep);
   gizmos_draw_list(gzmap, C, &draw_gizmos);
   BLI_assert(draw_gizmos.is_empty());
+
+  if (maya_debug && ELEM(drawstep, WM_GIZMOMAP_DRAWSTEP_3D, WM_GIZMOMAP_DRAWSTEP_2D)) {
+    ED_maya_navigation_debug_stage_sample(
+        C,
+        drawstep == WM_GIZMOMAP_DRAWSTEP_3D ?
+            ed::maya::MayaNavigationDebugStage::Gizmo3D :
+            ed::maya::MayaNavigationDebugStage::Gizmo2D,
+        (BLI_time_now_seconds() - draw_start) * 1000.0,
+        0.0,
+        0.0,
+        -1,
+        -1);
+  }
 }
 
 static void gizmo_draw_select_3d_loop(const bContext *C,

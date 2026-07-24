@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import bpy
+import os
 from bpy.types import (
     Header,
     Menu,
@@ -697,6 +698,15 @@ def draw_topbar_grease_pencil_layer_panel(context, layout):
         text=node_name,
         icon=icon,
     )
+
+
+class ITEM_HT_header(Header):
+    bl_space_type = 'ITEM'
+
+    def draw(self, _context):
+        layout = self.layout
+        layout.template_header()
+        layout.label(text="Item")
 
 
 class VIEW3D_HT_header(Header):
@@ -6387,6 +6397,7 @@ class VIEW3D_PT_view3d_properties(Panel):
         subcol = col.column()
         subcol.active = bool(view.region_3d.view_perspective != 'CAMERA' or view.region_quadviews)
         subcol.prop(view, "lens", text="Focal Length")
+        subcol.prop(view, "angle_of_view", text="Angle of View", slider=True)
 
         subcol = col.column(align=True)
         subcol.prop(view, "clip_start", text="Clip Start")
@@ -6451,6 +6462,67 @@ class VIEW3D_PT_view3d_lock(Panel):
         col.prop(view.region_3d, "lock_rotation", text="Rotation")
 
 
+def _maya_navigation_debug_log_path():
+    return os.path.join(bpy.app.tempdir, "maya_navigation_trace.log")
+
+
+def _maya_navigation_debug_update(window_manager, _context):
+    if not window_manager.maya_navigation_debug:
+        return
+    try:
+        os.remove(_maya_navigation_debug_log_path())
+    except FileNotFoundError:
+        pass
+
+
+def register_props():
+    from bpy.props import BoolProperty, EnumProperty
+
+    bpy.types.WindowManager.maya_navigation_debug = BoolProperty(
+        name="Navigation Debug Log",
+        description="Record Maya navigation stalls without writing to disk during interaction",
+        default=False,
+        update=_maya_navigation_debug_update,
+    )
+    bpy.types.WindowManager.maya_navigation_fps_limit = EnumProperty(
+        name="Navigation FPS",
+        description="Limit Maya navigation redraws to avoid blocking the GPU swap-chain",
+        items=(
+            ('60', "60 FPS", "Best for 60 Hz displays"),
+            ('120', "120 FPS", "Fast response with stable GPU frame pacing"),
+            ('144', "144 FPS", "For high refresh-rate displays"),
+            ('240', "240 FPS", "For very high refresh-rate displays"),
+        ),
+        default='120',
+    )
+
+
+def unregister_props():
+    del bpy.types.WindowManager.maya_navigation_fps_limit
+    del bpy.types.WindowManager.maya_navigation_debug
+
+
+class VIEW3D_PT_maya_navigation_debug(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "View"
+    bl_label = "Maya Navigation Debug"
+    bl_parent_id = "VIEW3D_PT_view3d_properties"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        window_manager = context.window_manager
+
+        layout.prop(window_manager, "maya_navigation_fps_limit")
+        layout.prop(window_manager, "maya_navigation_debug")
+        if window_manager.maya_navigation_debug:
+            layout.label(text="Captures events, viewport, gizmos and GPU swap")
+            row = layout.row(align=True)
+            row.label(text="maya_navigation_trace.log", icon='TEXT')
+            row.operator("wm.path_open", text="", icon='FILE_FOLDER').filepath = bpy.app.tempdir
+
+
 class VIEW3D_PT_view3d_cursor(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -6461,16 +6533,21 @@ class VIEW3D_PT_view3d_cursor(Panel):
         layout = self.layout
 
         cursor = context.scene.cursor
+        overlay = context.space_data.overlay
 
-        layout.column().prop(cursor, "location", text="Location")
+        layout.prop(overlay, "show_cursor", text="Show 3D Cursor")
+
+        column = layout.column()
+        column.active = overlay.show_cursor
+        column.prop(cursor, "location", text="Location")
         rotation_mode = cursor.rotation_mode
         if rotation_mode == 'QUATERNION':
-            layout.column().prop(cursor, "rotation_quaternion", text="Rotation")
+            column.prop(cursor, "rotation_quaternion", text="Rotation")
         elif rotation_mode == 'AXIS_ANGLE':
-            layout.column().prop(cursor, "rotation_axis_angle", text="Rotation")
+            column.prop(cursor, "rotation_axis_angle", text="Rotation")
         else:
-            layout.column().prop(cursor, "rotation_euler", text="Rotation")
-        layout.prop(cursor, "rotation_mode", text="")
+            column.prop(cursor, "rotation_euler", text="Rotation")
+        column.prop(cursor, "rotation_mode", text="")
 
 
 class VIEW3D_PT_collections(Panel):
@@ -9268,6 +9345,7 @@ class VIEW3D_AST_brush_gpencil_weight(AssetShelfHiddenByDefault, View3DAssetShel
 
 
 classes = (
+    ITEM_HT_header,
     VIEW3D_HT_header,
     VIEW3D_HT_tool_header,
     VIEW3D_MT_editor_menus,
@@ -9461,6 +9539,7 @@ classes = (
     VIEW3D_PT_active_tool_duplicate,
     VIEW3D_PT_view3d_properties,
     VIEW3D_PT_view3d_lock,
+    VIEW3D_PT_maya_navigation_debug,
     VIEW3D_PT_view3d_cursor,
     VIEW3D_PT_collections,
     VIEW3D_PT_object_type_visibility,

@@ -19,6 +19,7 @@
 #include "BLI_listbase.h"
 #include "BLI_rect.h"
 #include "BLI_string.h"
+#include "BLI_time.h"
 #include "BLI_vector.hh"
 
 #include "BKE_context.hh"
@@ -33,6 +34,7 @@
 #include "WM_types.hh"
 #include "wm_event_system.hh"
 
+#include "ED_maya.hh"
 #include "ED_screen.hh"
 #include "ED_undo.hh"
 
@@ -1286,7 +1288,15 @@ void WM_gizmo_group_refresh(const bContext *C, wmGizmoGroup *gzgroup)
   }
 
   if (gzgt->refresh) {
+    const bool maya_debug = ED_maya_navigation_debug_active(C);
+    const double refresh_start = maya_debug ? BLI_time_now_seconds() : 0.0;
     gzgt->refresh(C, gzgroup);
+    if (maya_debug) {
+      ED_maya_navigation_debug_stage_sample(
+          C,
+          ed::maya::MayaNavigationDebugStage::GizmoRefresh,
+          (BLI_time_now_seconds() - refresh_start) * 1000.0);
+    }
   }
 }
 

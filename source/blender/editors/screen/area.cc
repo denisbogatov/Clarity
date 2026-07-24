@@ -326,18 +326,20 @@ static void region_draw_azones(ScrArea *area, ARegion *region)
   GPU_blend(GPU_BLEND_NONE);
 }
 
-static void region_draw_status_text(ScrArea * /*area*/, ARegion *region)
+static void region_draw_status_text(ScrArea * /*area*/, ARegion *region, const bool overlay)
 {
   float header_color[4];
   ui::theme::get_color_4fv(TH_HEADER, header_color);
 
-  /* Clear the region from the buffer. */
-  GPU_clear_color(0.0f, 0.0f, 0.0f, 0.0f);
+  if (!overlay) {
+    /* Clear the region from the buffer. */
+    GPU_clear_color(0.0f, 0.0f, 0.0f, 0.0f);
 
-  /* Fill with header color when the region is not overlapped. */
-  if (!region->overlap) {
-    const rctf rect = {0.0f, float(region->winx), 0.0f, float(region->winy)};
-    ui::draw_roundbox_3fv_alpha(&rect, true, 0.0f, header_color, 1.0f);
+    /* Fill with header color when the region is not overlapped. */
+    if (!region->overlap) {
+      const rctf rect = {0.0f, float(region->winx), 0.0f, float(region->winy)};
+      ui::draw_roundbox_3fv_alpha(&rect, true, 0.0f, header_color, 1.0f);
+    }
   }
 
   const int fontid = BLF_set_default();
@@ -355,7 +357,7 @@ static void region_draw_status_text(ScrArea * /*area*/, ARegion *region)
   const float y2 = region->winy - (4.0f * UI_SCALE_FAC);
   /* Ensure header_color is not too transparent. */
   header_color[3] = std::max(header_color[3], 0.6f);
-  if (region->overlap) {
+  if (overlay || region->overlap) {
     /* Draw a background behind the text for extra contrast. */
     draw_roundbox_corner_set(ui::CNR_ALL);
     const rctf rect = {x1, x2, y1, y2};
@@ -509,9 +511,16 @@ void ED_region_do_draw(bContext *C, ARegion *region)
     ui::theme::frame_buffer_clear(TH_EDITOR_BORDER);
     return;
   }
-  /* optional header info instead? */
+  /* Optional header status, overlaid for View3D transforms so tool controls remain visible. */
   if (region->runtime->headerstr) {
-    region_draw_status_text(area, region);
+    const bool status_overlay =
+        area && area->spacetype == SPACE_VIEW3D &&
+        region->regiontype == RGN_TYPE_TOOL_HEADER &&
+        (G.moving & (G_TRANSFORM_OBJ | G_TRANSFORM_EDIT));
+    if (status_overlay && at->draw) {
+      at->draw(C, region);
+    }
+    region_draw_status_text(area, region, status_overlay);
   }
   else if (at->draw) {
     at->draw(C, region);
@@ -867,7 +876,6 @@ void ED_area_status_text(ScrArea *area, const char *str)
   if (area == nullptr) {
     return;
   }
-
   ARegion *ar = nullptr;
 
   for (ARegion &region : area->regionbase) {

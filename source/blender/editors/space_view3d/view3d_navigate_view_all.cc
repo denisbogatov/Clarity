@@ -26,6 +26,7 @@
 #include "ED_mesh.hh"
 #include "ED_particle.hh"
 #include "ED_screen.hh"
+#include "ED_view3d_navigation.hh"
 
 #include "WM_api.hh"
 #include "WM_message.hh"
@@ -518,21 +519,25 @@ void VIEW3D_OT_view_all(wmOperatorType *ot)
  * Move & Zoom the view to fit selected contents.
  * \{ */
 
-static wmOperatorStatus viewselected_exec(bContext *C, wmOperator *op)
+bool ed::view3d::navigation_frame_selected(bContext *C,
+                                           const bool use_all_regions,
+                                           const int smooth_viewtx)
 {
+  if (!view3d_zoom_or_dolly_poll(C)) {
+    return false;
+  }
+
   ScrArea *area = CTX_wm_area(C);
   ARegion *region = CTX_wm_region(C);
   View3D *v3d = CTX_wm_view3d(C);
   bool do_zoom = true;
-  const bool use_all_regions = RNA_boolean_get(op->ptr, "use_all_regions");
-  const int smooth_viewtx = WM_operator_smooth_viewtx_get(op);
 
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   const std::optional<Bounds<float3>> bounds = view3d_calc_minmax_selected(
       depsgraph, area, region, use_all_regions, true, &do_zoom);
 
   if (!bounds.has_value()) {
-    return OPERATOR_FINISHED;
+    return false;
   }
 
   const float3 &min = bounds.value().min;
@@ -546,8 +551,16 @@ static wmOperatorStatus viewselected_exec(bContext *C, wmOperator *op)
     view3d_from_minmax(C, v3d, region, min, max, do_zoom, smooth_viewtx);
   }
 
-  ED_view3d_smooth_view_undo_end(C, area, op->type->name, false);
+  ED_view3d_smooth_view_undo_end(C, area, "Frame Selected", false);
 
+  return true;
+}
+
+static wmOperatorStatus viewselected_exec(bContext *C, wmOperator *op)
+{
+  const bool use_all_regions = RNA_boolean_get(op->ptr, "use_all_regions");
+  const int smooth_viewtx = WM_operator_smooth_viewtx_get(op);
+  ed::view3d::navigation_frame_selected(C, use_all_regions, smooth_viewtx);
   return OPERATOR_FINISHED;
 }
 

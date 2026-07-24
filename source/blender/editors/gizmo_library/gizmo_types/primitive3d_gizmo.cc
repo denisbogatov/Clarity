@@ -181,6 +181,24 @@ static void gizmo_primitive_draw_intern(wmGizmo *gz, const bool select, const bo
 
   WM_gizmo_calc_matrix_final(gz, matrix_final);
 
+  if (gz_prim->draw_style == ED_GIZMO_PRIMITIVE_STYLE_CUBE) {
+    GPU_matrix_push();
+    GPU_matrix_mul(matrix_final);
+
+    const float center[3] = {0.0f, 0.0f, 0.0f};
+    const float size = select ? 1.35f : 1.0f;
+    const float aspect[3] = {size, size, size};
+    const uint pos = GPU_vertformat_attr_add(
+        immVertexFormat(), "pos", gpu::VertAttrType::SFLOAT_32_32_32);
+    immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+    immUniformColor4fv(color_outer);
+    imm_draw_cube_fill_3d(pos, center, aspect);
+    immUnbindProgram();
+
+    GPU_matrix_pop();
+    return;
+  }
+
   GPU_blend(GPU_BLEND_ALPHA);
   GPU_matrix_push();
   GPU_matrix_mul(matrix_final);
@@ -268,6 +286,7 @@ static void GIZMO_GT_primitive_3d(wmGizmoType *gzt)
       {ED_GIZMO_PRIMITIVE_STYLE_PLANE, "PLANE", 0, "Plane", ""},
       {ED_GIZMO_PRIMITIVE_STYLE_CIRCLE, "CIRCLE", 0, "Circle", ""},
       {ED_GIZMO_PRIMITIVE_STYLE_ANNULUS, "ANNULUS", 0, "Annulus", ""},
+      {ED_GIZMO_PRIMITIVE_STYLE_CUBE, "CUBE", 0, "Cube", ""},
       {0, nullptr, 0, nullptr, nullptr},
   };
 

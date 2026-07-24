@@ -724,6 +724,9 @@ static void drawLine(
 
   if (t->spacetype == SPACE_VIEW3D) {
     View3D *v3d = static_cast<View3D *>(t->view);
+    if (v3d->gizmo_flag & V3D_GIZMO_HIDE_TOOL) {
+      return;
+    }
 
     copy_v3_v3(v3, dir);
     mul_v3_fl(v3, v3d->clip_end);

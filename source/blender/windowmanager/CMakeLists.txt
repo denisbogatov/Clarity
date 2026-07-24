@@ -100,6 +100,7 @@ set(LIB
   PRIVATE bf::dna
   PRIVATE bf::draw
   bf_editor_screen
+  bf_editor_maya
   bf_editor_undo
   PRIVATE bf::gpu
   PRIVATE bf::imbuf

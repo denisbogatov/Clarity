@@ -261,6 +261,7 @@ static void resize_transform_matrix_fn(TransInfo *t, float mat_xform[4][4])
 static void initResize(TransInfo *t, wmOperator *op)
 {
   float mouse_dir_constraint[3];
+  float mouse_sensitivity = 1.0f;
   if (op) {
     PropertyRNA *prop = RNA_struct_find_property(op->ptr, "mouse_dir_constraint");
     if (prop) {
@@ -269,6 +270,10 @@ static void initResize(TransInfo *t, wmOperator *op)
     else {
       /* Resize is expected to have this property. */
       BLI_assert(!STREQ(op->idname, "TRANSFORM_OT_resize"));
+    }
+    prop = RNA_struct_find_property(op->ptr, "mouse_sensitivity");
+    if (prop) {
+      mouse_sensitivity = RNA_property_float_get(op->ptr, prop);
     }
   }
   else {
@@ -283,6 +288,9 @@ static void initResize(TransInfo *t, wmOperator *op)
 
   if (is_zero_v3(mouse_dir_constraint)) {
     initMouseInputMode(t, &t->mouse, only_location ? INPUT_ERROR_DASH : INPUT_SPRING_FLIP);
+    if (!only_location) {
+      t->mouse.factor /= max_ff(mouse_sensitivity, 0.01f);
+    }
   }
   else {
     int mval_start[2], mval_end[2];

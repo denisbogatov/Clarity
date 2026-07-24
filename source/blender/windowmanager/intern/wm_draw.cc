@@ -23,6 +23,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DRW_engine.hh"
+
 #include "BLI_listbase.h"
 #include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
@@ -32,6 +34,7 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_context.hh"
+#include "BKE_global.hh"
 #include "BKE_image.hh"
 #include "BKE_layer.hh"
 #include "BKE_scene.hh"
@@ -42,6 +45,7 @@
 #include "GHOST_Rect.hh"
 #include "GHOST_Types.hh"
 
+#include "ED_maya.hh"
 #include "ED_node.hh"
 #include "ED_screen.hh"
 #include "ED_view3d.hh"
@@ -615,6 +619,8 @@ static const char *wm_area_name(const ScrArea *area)
     SPACE_NAME(SPACE_TOPBAR);
     SPACE_NAME(SPACE_STATUSBAR);
     SPACE_NAME(SPACE_SPREADSHEET);
+    SPACE_NAME(SPACE_SHELF);
+    SPACE_NAME(SPACE_ITEM);
   }
 #undef SPACE_NAME
 
@@ -779,14 +785,42 @@ static void wm_draw_region_buffer_create(Scene *scene,
   }
 }
 
-static void wm_draw_region_bind(ARegion *region, int view)
+static void wm_draw_region_bind(bContext *C, ARegion *region, int view)
 {
   if (!region->runtime->draw_buffer) {
     return;
   }
 
   if (region->runtime->draw_buffer->viewport) {
+    const bool maya_debug = C != nullptr && ED_maya_navigation_debug_active(C);
+    if (maya_debug) {
+      DRW_gpu_context_enable_timing_set(true);
+    }
     GPU_viewport_bind(region->runtime->draw_buffer->viewport, view, &region->winrct);
+    if (maya_debug) {
+      DRWGPUContextEnableTiming timing;
+      if (DRW_gpu_context_enable_timing_get(timing)) {
+        ED_maya_navigation_debug_stage_sample(
+            C, ed::maya::MayaNavigationDebugStage::GPUContextDrawLock, timing.draw_lock_ms);
+        ED_maya_navigation_debug_stage_sample(
+            C, ed::maya::MayaNavigationDebugStage::GPUContextSharedLock, timing.shared_lock_ms);
+        ED_maya_navigation_debug_stage_sample(
+            C, ed::maya::MayaNavigationDebugStage::GPUContextRenderBegin, timing.render_begin_ms);
+        ED_maya_navigation_debug_stage_sample(C,
+                                              ed::maya::MayaNavigationDebugStage::
+                                                  GPUContextSystemActivate,
+                                              timing.system_activate_ms);
+        ED_maya_navigation_debug_stage_sample(C,
+                                              ed::maya::MayaNavigationDebugStage::
+                                                  GPUContextActivate,
+                                              timing.context_activate_ms);
+        ED_maya_navigation_debug_stage_sample(
+            C, ed::maya::MayaNavigationDebugStage::GPUContextFrameBegin, timing.frame_begin_ms);
+      }
+    }
+    if (maya_debug) {
+      DRW_gpu_context_enable_timing_set(false);
+    }
   }
   else {
     GPU_offscreen_bind(region->runtime->draw_buffer->offscreen, false);
@@ -968,12 +1002,39 @@ GPUViewport *WM_draw_region_get_bound_viewport(ARegion *region)
   return viewport;
 }
 
+static void wm_draw_region_do_draw(bContext *C, ScrArea *area, ARegion *region)
+{
+  const bool maya_debug = ED_maya_navigation_debug_active(C);
+  const bool debug_view3d = area != nullptr && area->spacetype == SPACE_VIEW3D &&
+                            region->regiontype == RGN_TYPE_WINDOW &&
+                            maya_debug;
+  const double draw_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+
+  ED_region_do_draw(C, region);
+
+  if (maya_debug) {
+    const View3D *v3d = debug_view3d ?
+                            static_cast<const View3D *>(area->spacedata.first) :
+                            nullptr;
+    ED_maya_navigation_debug_stage_sample(
+        C,
+        ed::maya::MayaNavigationDebugStage::RegionDraw,
+        (BLI_time_now_seconds() - draw_start) * 1000.0,
+        v3d ? double(v3d->runtime.last_sync_time) * 1000.0 : 0.0,
+        v3d ? double(v3d->runtime.last_submission_time) * 1000.0 : 0.0,
+        area ? area->spacetype : -1,
+        region->regiontype);
+  }
+}
+
 static void wm_draw_area_offscreen(bContext *C, wmWindow *win, ScrArea *area, bool stereo)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
   Main *bmain = CTX_data_main(C);
 
   CTX_wm_area_set(C, area);
+  const bool maya_debug = ED_maya_navigation_debug_active(C);
+  const double area_start = maya_debug ? BLI_time_now_seconds() : 0.0;
   GPU_debug_group_begin(wm_area_name(area));
 
   /* Compute UI layouts for dynamically size regions. */
@@ -988,21 +1049,61 @@ static void wm_draw_area_offscreen(bContext *C, wmWindow *win, ScrArea *area, bo
                                    (region.flag & RGN_FLAG_TOO_SMALL) &&
                                    !(region.flag & RGN_FLAG_HIDDEN);
 
+    const bool preserve_topbar_header =
+        (G.moving & (G_TRANSFORM_OBJ | G_TRANSFORM_EDIT)) &&
+        area->spacetype == SPACE_TOPBAR && region.regiontype == RGN_TYPE_HEADER &&
+        !BLI_listbase_is_empty(&region.runtime->uiblocks);
+    if (preserve_topbar_header) {
+      region.runtime->do_draw = 0;
+      continue;
+    }
+
     if ((region.runtime->visible || ignore_visibility) && region.runtime->do_draw &&
         region.runtime->type && region.runtime->type->layout)
     {
       CTX_wm_region_set(C, &region);
+      const double layout_start = maya_debug ? BLI_time_now_seconds() : 0.0;
       ED_region_do_layout(C, &region);
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::AreaLayout,
+            (BLI_time_now_seconds() - layout_start) * 1000.0,
+            0.0,
+            0.0,
+            area->spacetype,
+            region.regiontype);
+      }
       CTX_wm_region_set(C, nullptr);
     }
   }
 
+  const double region_sizes_start = maya_debug ? BLI_time_now_seconds() : 0.0;
   ED_area_update_region_sizes(wm, win, area);
+  if (maya_debug) {
+    ED_maya_navigation_debug_stage_sample(
+        C,
+        ed::maya::MayaNavigationDebugStage::AreaRegionSizes,
+        (BLI_time_now_seconds() - region_sizes_start) * 1000.0,
+        0.0,
+        0.0,
+        area->spacetype);
+  }
 
   if (area->flag & AREA_FLAG_ACTIVE_TOOL_UPDATE) {
     if ((1 << area->spacetype) & WM_TOOLSYSTEM_SPACE_MASK) {
+      const double tool_system_start = maya_debug ? BLI_time_now_seconds() : 0.0;
       WM_toolsystem_update_from_context(
           C, CTX_wm_workspace(C), CTX_data_scene(C), CTX_data_view_layer(C), area);
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::ToolSystemUpdate,
+            (BLI_time_now_seconds() - tool_system_start) * 1000.0,
+            0.0,
+            0.0,
+            area->spacetype);
+      }
     }
     area->flag &= ~AREA_FLAG_ACTIVE_TOOL_UPDATE;
   }
@@ -1020,7 +1121,18 @@ static void wm_draw_area_offscreen(bContext *C, wmWindow *win, ScrArea *area, bo
 
     if (stereo && wm_draw_region_stereo_set(bmain, area, &region, STEREO_LEFT_ID)) {
       Scene *scene = WM_window_get_active_scene(win);
+      const double buffer_create_start = maya_debug ? BLI_time_now_seconds() : 0.0;
       wm_draw_region_buffer_create(scene, &region, true, use_viewport);
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::RegionBufferCreate,
+            (BLI_time_now_seconds() - buffer_create_start) * 1000.0,
+            0.0,
+            0.0,
+            area->spacetype,
+            region.regiontype);
+      }
 
       for (int view = 0; view < 2; view++) {
         eStereoViews sview;
@@ -1032,9 +1144,31 @@ static void wm_draw_area_offscreen(bContext *C, wmWindow *win, ScrArea *area, bo
           wm_draw_region_stereo_set(bmain, area, &region, sview);
         }
 
-        wm_draw_region_bind(&region, view);
-        ED_region_do_draw(C, &region);
+        const double bind_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+        wm_draw_region_bind(C, &region, view);
+        if (maya_debug) {
+          ED_maya_navigation_debug_stage_sample(
+              C,
+              ed::maya::MayaNavigationDebugStage::RegionBind,
+              (BLI_time_now_seconds() - bind_start) * 1000.0,
+              0.0,
+              0.0,
+              area->spacetype,
+              region.regiontype);
+        }
+        wm_draw_region_do_draw(C, area, &region);
+        const double unbind_start = maya_debug ? BLI_time_now_seconds() : 0.0;
         wm_draw_region_unbind(&region);
+        if (maya_debug) {
+          ED_maya_navigation_debug_stage_sample(
+              C,
+              ed::maya::MayaNavigationDebugStage::RegionUnbind,
+              (BLI_time_now_seconds() - unbind_start) * 1000.0,
+              0.0,
+              0.0,
+              area->spacetype,
+              region.regiontype);
+        }
       }
       if (use_viewport) {
         GPUViewport *viewport = region.runtime->draw_buffer->viewport;
@@ -1044,10 +1178,43 @@ static void wm_draw_area_offscreen(bContext *C, wmWindow *win, ScrArea *area, bo
     else {
       wm_draw_region_stereo_set(bmain, area, &region, STEREO_LEFT_ID);
       Scene *scene = WM_window_get_active_scene(win);
+      const double buffer_create_start = maya_debug ? BLI_time_now_seconds() : 0.0;
       wm_draw_region_buffer_create(scene, &region, false, use_viewport);
-      wm_draw_region_bind(&region, 0);
-      ED_region_do_draw(C, &region);
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::RegionBufferCreate,
+            (BLI_time_now_seconds() - buffer_create_start) * 1000.0,
+            0.0,
+            0.0,
+            area->spacetype,
+            region.regiontype);
+      }
+      const double bind_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+      wm_draw_region_bind(C, &region, 0);
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::RegionBind,
+            (BLI_time_now_seconds() - bind_start) * 1000.0,
+            0.0,
+            0.0,
+            area->spacetype,
+            region.regiontype);
+      }
+      wm_draw_region_do_draw(C, area, &region);
+      const double unbind_start = maya_debug ? BLI_time_now_seconds() : 0.0;
       wm_draw_region_unbind(&region);
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::RegionUnbind,
+            (BLI_time_now_seconds() - unbind_start) * 1000.0,
+            0.0,
+            0.0,
+            area->spacetype,
+            region.regiontype);
+      }
     }
 
     GPU_debug_group_end();
@@ -1059,6 +1226,15 @@ static void wm_draw_area_offscreen(bContext *C, wmWindow *win, ScrArea *area, bo
   CTX_wm_area_set(C, nullptr);
 
   GPU_debug_group_end();
+  if (maya_debug) {
+    ED_maya_navigation_debug_stage_sample(
+        C,
+        ed::maya::MayaNavigationDebugStage::AreaTotal,
+        (BLI_time_now_seconds() - area_start) * 1000.0,
+        0.0,
+        0.0,
+        area->spacetype);
+  }
 }
 
 static void wm_draw_window_offscreen(bContext *C, wmWindow *win, bool stereo)
@@ -1097,9 +1273,9 @@ static void wm_draw_window_offscreen(bContext *C, wmWindow *win, bool stereo)
 
     Scene *scene = WM_window_get_active_scene(win);
     wm_draw_region_buffer_create(scene, &region, false, false);
-    wm_draw_region_bind(&region, 0);
+    wm_draw_region_bind(C, &region, 0);
     GPU_clear_color(0.0f, 0.0f, 0.0f, 0.0f);
-    ED_region_do_draw(C, &region);
+    wm_draw_region_do_draw(C, nullptr, &region);
     wm_draw_region_unbind(&region);
 
     GPU_debug_group_end();
@@ -1237,6 +1413,7 @@ static void wm_draw_window_onscreen(bContext *C, wmWindow *win, int view)
 static void wm_draw_window(bContext *C, wmWindow *win)
 {
   PRF_scope(ProfileCategory::Draw);
+  const bool maya_debug = ED_maya_navigation_debug_active(C);
   GPU_context_begin_frame(static_cast<GPUContext *>(win->runtime->gpuctx));
 
   bScreen *screen = WM_window_get_active_screen(win);
@@ -1251,9 +1428,17 @@ static void wm_draw_window(bContext *C, wmWindow *win)
 
   /* Draw area regions into their own frame-buffer. This way we can redraw
    * the areas that need it, and blit the rest from existing frame-buffers. */
+  const double offscreen_start = maya_debug ? BLI_time_now_seconds() : 0.0;
   wm_draw_window_offscreen(C, win, stereo);
+  if (maya_debug) {
+    ED_maya_navigation_debug_stage_sample(
+        C,
+        ed::maya::MayaNavigationDebugStage::WindowOffscreen,
+        (BLI_time_now_seconds() - offscreen_start) * 1000.0);
+  }
 
   /* Now we draw into the window frame-buffer, in full window coordinates. */
+  const double onscreen_start = maya_debug ? BLI_time_now_seconds() : 0.0;
   if (!stereo) {
     /* Regular mono drawing. */
     wm_draw_window_onscreen(C, win, -1);
@@ -1318,6 +1503,12 @@ static void wm_draw_window(bContext *C, wmWindow *win)
       /* Still draw something in case of allocation failure. */
       wm_draw_window_onscreen(C, win, 0);
     }
+  }
+  if (maya_debug) {
+    ED_maya_navigation_debug_stage_sample(
+        C,
+        ed::maya::MayaNavigationDebugStage::WindowOnscreen,
+        (BLI_time_now_seconds() - onscreen_start) * 1000.0);
   }
 
   screen->do_draw = false;
@@ -1640,13 +1831,13 @@ void WM_paint_cursor_tag_redraw(wmWindow *win, ARegion * /*region*/)
   }
 }
 
-static void wm_draw_frame_rate_limit_apply()
+static void wm_draw_frame_rate_limit_apply(const int frame_rate_limit)
 {
   static double last_draw_time = 0.0;
 
   const double time_now = BLI_time_now_seconds();
-  if (U.viewport_fps_limit > 0 && last_draw_time > 0.0) {
-    const double target_frame_time = 1.0 / double(U.viewport_fps_limit);
+  if (frame_rate_limit > 0 && last_draw_time > 0.0) {
+    const double target_frame_time = 1.0 / double(frame_rate_limit);
     const double remaining_time = target_frame_time - (time_now - last_draw_time);
     if (remaining_time > 0.0) {
       BLI_time_sleep_precise_us(int(remaining_time * 1000000.0));
@@ -1716,22 +1907,91 @@ void wm_draw_update(bContext *C)
     CTX_wm_window_set(C, &win);
 
     if (wm_draw_update_test_window(bmain, C, &win)) {
+      const bool maya_debug = ED_maya_navigation_debug_active(C);
+      const double frame_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C, ed::maya::MayaNavigationDebugStage::FrameBegin, 0.0);
+      }
       if (!frame_rate_limit_applied) {
-        wm_draw_frame_rate_limit_apply();
+        const double frame_limit_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+        int frame_rate_limit = U.viewport_fps_limit;
+        const int maya_frame_rate_limit = ED_maya_interaction_frame_rate_limit(C);
+        if (maya_frame_rate_limit > 0 &&
+            (frame_rate_limit == 0 || maya_frame_rate_limit < frame_rate_limit))
+        {
+          frame_rate_limit = maya_frame_rate_limit;
+        }
+        wm_draw_frame_rate_limit_apply(frame_rate_limit);
+        if (maya_debug) {
+          ED_maya_navigation_debug_stage_sample(
+              C,
+              ed::maya::MayaNavigationDebugStage::FrameRateLimit,
+              (BLI_time_now_seconds() - frame_limit_start) * 1000.0);
+        }
         frame_rate_limit_applied = true;
       }
       PRF_frame_mark_start("Window Drawing"_ustr);
       /* Sets context window+screen. */
+      const double make_drawable_start = maya_debug ? BLI_time_now_seconds() : 0.0;
       wm_window_make_drawable(wm, &win);
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::MakeDrawable,
+            (BLI_time_now_seconds() - make_drawable_start) * 1000.0);
+      }
+
+      const double swap_acquire_start = maya_debug ? BLI_time_now_seconds() : 0.0;
       wm_window_swap_buffer_acquire(&win);
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::SwapAcquire,
+            (BLI_time_now_seconds() - swap_acquire_start) * 1000.0);
+      }
 
       /* Notifiers for screen redraw. */
+      const double screen_update_start = maya_debug ? BLI_time_now_seconds() : 0.0;
       ED_screen_ensure_updated(C, wm, &win);
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::ScreenUpdate,
+            (BLI_time_now_seconds() - screen_update_start) * 1000.0);
+      }
 
+      const double window_draw_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+      ED_maya_transform_panel_cache_tick(C);
       wm_draw_window(C, &win);
-      wm_draw_update_clear_window(C, &win);
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::WindowDraw,
+            (BLI_time_now_seconds() - window_draw_start) * 1000.0);
+      }
 
+      const double draw_clear_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+      wm_draw_update_clear_window(C, &win);
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::DrawFlagClear,
+            (BLI_time_now_seconds() - draw_clear_start) * 1000.0);
+      }
+
+      const double swap_release_start = maya_debug ? BLI_time_now_seconds() : 0.0;
       wm_window_swap_buffer_release(&win);
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::SwapRelease,
+            (BLI_time_now_seconds() - swap_release_start) * 1000.0);
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::FrameTotal,
+            (BLI_time_now_seconds() - frame_start) * 1000.0);
+      }
       PRF_frame_mark_end("Window Drawing"_ustr);
     }
   }
@@ -1777,7 +2037,7 @@ void wm_draw_region_test(bContext *C, ScrArea *area, ARegion *region)
   wmWindow *win = CTX_wm_window(C);
   Scene *scene = WM_window_get_active_scene(win);
   wm_draw_region_buffer_create(scene, region, false, use_viewport);
-  wm_draw_region_bind(region, 0);
+  wm_draw_region_bind(C, region, 0);
   ED_region_do_draw(C, region);
   wm_draw_region_unbind(region);
   region->runtime->do_draw = 0;
@@ -1816,7 +2076,7 @@ void WM_draw_region_viewport_ensure(Scene *scene, ARegion *region, short space_t
 
 void WM_draw_region_viewport_bind(ARegion *region)
 {
-  wm_draw_region_bind(region, 0);
+  wm_draw_region_bind(nullptr, region, 0);
 }
 
 void WM_draw_region_viewport_unbind(ARegion *region)

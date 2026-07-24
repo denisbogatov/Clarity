@@ -786,7 +786,7 @@ struct View3D {
   eView3D_Flag2 flag2 = V3D_SHOW_RECONSTRUCTION | V3D_SHOW_ANNOTATION | V3D_SHOW_VIEWER |
                         V3D_SHOW_CAMERA_GUIDES | V3D_SHOW_CAMERA_PASSEPARTOUT;
 
-  float lens = 50.0f, grid = 1.0f;
+  float lens = 35.0f, grid = 1.0f;
   float clip_start = 0.01f, clip_end = 1000.0f;
   float xr_vignette_aperture = 0;
   DNA_DEPRECATED float ofs[2] = {};

@@ -41,6 +41,7 @@ set(SRC
   view3d_header.cc
   view3d_iterators.cc
   view3d_navigate.cc
+  view3d_navigation_bridge.cc
   view3d_navigate_fly.cc
   view3d_navigate_smoothview.cc
   view3d_navigate_view_all.cc

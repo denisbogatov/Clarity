@@ -13,6 +13,7 @@
 #include "DNA_scene_types.h"
 
 #include "BLI_math_vector.h"
+#include "BLI_time.h"
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.hh"
@@ -37,6 +38,7 @@
 #include "UI_resources.hh"
 
 #include "ED_screen.hh"
+#include "ED_maya.hh"
 /** For #USE_LOOPSLIDE_HACK only. */
 #include "ED_mesh.hh"
 
@@ -411,6 +413,8 @@ static int transformops_data(bContext *C, wmOperator *op, const wmEvent *event)
 
 static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
+  const bool maya_debug = ED_maya_navigation_debug_active(C);
+  const double modal_start = maya_debug ? BLI_time_now_seconds() : 0.0;
   wmOperatorStatus exit_code = OPERATOR_PASS_THROUGH;
 
   TransInfo *t = static_cast<TransInfo *>(op->customdata);
@@ -429,7 +433,14 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
   /* XXX insert keys are called here, and require context. */
   t->context = C;
 
+  const double event_start = maya_debug ? BLI_time_now_seconds() : 0.0;
   exit_code = transformEvent(t, op, event);
+  if (maya_debug) {
+    ED_maya_navigation_debug_stage_sample(
+        C,
+        ed::maya::MayaNavigationDebugStage::TransformEvent,
+        (BLI_time_now_seconds() - event_start) * 1000.0);
+  }
   t->context = nullptr;
 
   /* Allow navigation while transforming. */
@@ -452,6 +463,12 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
         /* Navigation is running. */
 
         /* Do not update transform while navigating. This can be distracting. */
+        if (maya_debug) {
+          ED_maya_navigation_debug_stage_sample(
+              C,
+              ed::maya::MayaNavigationDebugStage::TransformModalTotal,
+              (BLI_time_now_seconds() - modal_start) * 1000.0);
+        }
         return OPERATOR_RUNNING_MODAL;
       }
 
@@ -473,7 +490,8 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
 
   exit_code |= transformEnd(C, t);
 
-  if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
+  const bool is_finished = (exit_code & OPERATOR_RUNNING_MODAL) == 0;
+  if (is_finished) {
     transformops_exit(C, op);
     exit_code &= ~OPERATOR_PASS_THROUGH; /* Preventively remove pass-through. */
   }
@@ -500,6 +518,16 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
     }
   }
 
+  if (maya_debug) {
+    ED_maya_navigation_debug_stage_sample(
+        C,
+        ed::maya::MayaNavigationDebugStage::TransformModalTotal,
+        (BLI_time_now_seconds() - modal_start) * 1000.0);
+  }
+  if (is_finished) {
+    ED_maya_transform_end(C);
+  }
+
   return exit_code;
 }
 
@@ -510,6 +538,7 @@ static void transform_cancel(bContext *C, wmOperator *op)
   t->state = TRANS_CANCEL;
   transformEnd(C, t);
   transformops_exit(C, op);
+  ED_maya_transform_end(C);
 }
 
 static wmOperatorStatus transform_exec(bContext *C, wmOperator *op)
@@ -530,6 +559,7 @@ static wmOperatorStatus transform_exec(bContext *C, wmOperator *op)
   transformEnd(C, t);
 
   transformops_exit(C, op);
+  ED_maya_transform_end(C);
 
   WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, nullptr);
 
@@ -542,6 +572,12 @@ static wmOperatorStatus transform_invoke(bContext *C, wmOperator *op, const wmEv
     G.moving = 0;
     return OPERATOR_CANCELLED;
   }
+
+  const Scene *scene = CTX_data_scene(C);
+  ED_maya_transform_begin(C,
+                          op->type->idname,
+                          int(CTX_data_mode_enum(C)),
+                          scene && scene->toolsettings ? scene->toolsettings->selectmode : 0);
 
   /* When modal, allow 'value' to set initial offset. */
   if ((event == nullptr) && RNA_struct_property_is_set(op->ptr, "value")) {
@@ -904,6 +940,17 @@ static void TRANSFORM_OT_resize(wmOperatorType *ot)
                               "",
                               -FLT_MAX,
                               FLT_MAX);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+
+  prop = RNA_def_float(ot->srna,
+                       "mouse_sensitivity",
+                       1.0f,
+                       0.01f,
+                       10.0f,
+                       "Mouse Sensitivity",
+                       "Scale mouse input sensitivity",
+                       0.01f,
+                       10.0f);
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 
   WM_operatortype_props_advanced_begin(ot);

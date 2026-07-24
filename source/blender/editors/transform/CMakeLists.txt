@@ -117,6 +117,7 @@ set(LIB
   PRIVATE bf::bmesh
   PRIVATE bf::depsgraph
   PRIVATE bf::dna
+  bf_editor_maya
   bf_editor_mask
   PRIVATE bf::gpu
   PRIVATE bf::imbuf

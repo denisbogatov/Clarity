@@ -10,6 +10,7 @@
 #include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
 #include "BLI_rect.h"
+#include "BLI_time.h"
 
 #include "BKE_context.hh"
 #include "BKE_editmesh.hh"
@@ -23,6 +24,7 @@
 
 #include "ED_clip.hh"
 #include "ED_image.hh"
+#include "ED_maya.hh"
 #include "ED_screen.hh"
 #include "ED_space_api.hh"
 #include "ED_uvedit.hh"
@@ -2248,12 +2250,21 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
 void transformApply(bContext *C, TransInfo *t)
 {
+  const bool maya_debug = ED_maya_navigation_debug_active(C);
+  const double apply_start = maya_debug ? BLI_time_now_seconds() : 0.0;
   t->context = C;
 
   if (t->redraw == TREDRAW_HARD) {
     selectConstraint(t);
     if (t->mode_info) {
+      const double geometry_start = maya_debug ? BLI_time_now_seconds() : 0.0;
       t->mode_info->transform_fn(t); /* Calls #recalc_data(). */
+      if (maya_debug) {
+        ED_maya_navigation_debug_stage_sample(
+            C,
+            ed::maya::MayaNavigationDebugStage::GeometryUpdate,
+            (BLI_time_now_seconds() - geometry_start) * 1000.0);
+      }
     }
   }
 
@@ -2269,6 +2280,12 @@ void transformApply(bContext *C, TransInfo *t)
   }
 
   t->context = nullptr;
+  if (maya_debug) {
+    ED_maya_navigation_debug_stage_sample(
+        C,
+        ed::maya::MayaNavigationDebugStage::TransformApply,
+        (BLI_time_now_seconds() - apply_start) * 1000.0);
+  }
 }
 
 wmOperatorStatus transformEnd(bContext *C, TransInfo *t)

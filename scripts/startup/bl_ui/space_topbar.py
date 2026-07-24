@@ -595,6 +595,8 @@ _maya_shelf_active_scope = "TOPBAR"
 _maya_shelf_save_timer_pending = False
 _maya_shelf_drag_state = None
 _maya_shelf_previews = None
+_maya_shelf_layout_revision = 0
+_maya_shelf_row_cache = {}
 
 _MAYA_SHELF_LEFT_MARGIN = 4.0
 _MAYA_SHELF_BUTTON_SIZE = 20.0
@@ -876,8 +878,9 @@ def _maya_shelf_config_clone(source):
     return config
 
 
-def _maya_shelf_legacy_scope_key(context):
-    area = getattr(context, "area", None)
+def _maya_shelf_layout_scope_key(context, area=None):
+    if area is None:
+        area = getattr(context, "area", None)
     screen = getattr(context, "screen", None)
     workspace = getattr(context, "workspace", None)
     area_index = 0
@@ -897,15 +900,19 @@ def _maya_shelf_legacy_scope_key(context):
     )
 
 
+def _maya_shelf_uuid_scope_key(context):
+    area = getattr(context, "area", None)
+    if area is None or area.type != 'SHELF':
+        return None
+    shelf_id = getattr(getattr(context, "space_data", None), "shelf_id", "")
+    return "SHELF:" + shelf_id if shelf_id else None
+
+
 def _maya_shelf_scope_key(context):
     area = getattr(context, "area", None) if context is not None else None
     if area is None or area.type != 'SHELF':
         return "TOPBAR"
-
-    shelf_id = getattr(getattr(context, "space_data", None), "shelf_id", "")
-    if shelf_id:
-        return "SHELF:" + shelf_id
-    return _maya_shelf_legacy_scope_key(context)
+    return _maya_shelf_layout_scope_key(context, area)
 
 
 def _maya_shelf_config(context=None):
@@ -913,8 +920,8 @@ def _maya_shelf_config(context=None):
     global _maya_shelf_config_cache
     if context is not None:
         _maya_shelf_active_scope = _maya_shelf_scope_key(context)
-    legacy_scope = (
-        _maya_shelf_legacy_scope_key(context)
+    uuid_scope = (
+        _maya_shelf_uuid_scope_key(context)
         if context is not None and getattr(context, "area", None) is not None and
         context.area.type == 'SHELF'
         else None
@@ -923,9 +930,10 @@ def _maya_shelf_config(context=None):
         shelves = _maya_shelf_config_cache["shelves"]
         if (
             _maya_shelf_active_scope not in shelves and
-            legacy_scope in shelves
+            uuid_scope in shelves
         ):
-            shelves[_maya_shelf_active_scope] = shelves.pop(legacy_scope)
+            shelves[_maya_shelf_active_scope] = shelves.pop(uuid_scope)
+            _maya_shelf_save_deferred()
         if _maya_shelf_active_scope not in shelves:
             source = shelves.get("TOPBAR")
             shelves[_maya_shelf_active_scope] = (
@@ -1021,9 +1029,10 @@ def _maya_shelf_config(context=None):
     shelves = _maya_shelf_config_cache["shelves"]
     if (
         _maya_shelf_active_scope not in shelves and
-        legacy_scope in shelves
+        uuid_scope in shelves
     ):
-        shelves[_maya_shelf_active_scope] = shelves.pop(legacy_scope)
+        shelves[_maya_shelf_active_scope] = shelves.pop(uuid_scope)
+        _maya_shelf_save_deferred()
     if _maya_shelf_active_scope not in shelves:
         source = shelves.get("TOPBAR")
         shelves[_maya_shelf_active_scope] = (
@@ -1087,12 +1096,15 @@ def _maya_shelf_active_tab_for_scope(scope):
     return tab
 
 
-def _maya_shelf_area_scope(area):
-    shelf_id = getattr(area.spaces.active, "shelf_id", "")
-    return "SHELF:" + shelf_id if shelf_id else ""
+def _maya_shelf_area_scope(context, area):
+    return _maya_shelf_layout_scope_key(context, area)
 
 
 def _maya_shelf_redraw(context):
+    global _maya_shelf_layout_revision
+    _maya_shelf_layout_revision += 1
+    _maya_shelf_row_cache.clear()
+
     area = getattr(context, "area", None)
     if area is not None and area.type in {'TOPBAR', 'SHELF'}:
         area.tag_redraw()
@@ -2018,7 +2030,7 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
                 not region.y <= event.mouse_y < region.y + region.height
             ):
                 continue
-            scope = _maya_shelf_area_scope(area)
+            scope = _maya_shelf_area_scope(context, area)
             if not scope:
                 continue
             tab = _maya_shelf_active_tab_for_scope(scope)
@@ -2979,6 +2991,37 @@ class WM_MT_button_context(Menu):
             props.item_id = item_id
 
 
+def _maya_shelf_row_data(tab, row_index):
+    cache_key = (
+        _maya_shelf_active_scope,
+        id(tab),
+        row_index,
+        _maya_shelf_layout_revision,
+    )
+    cached = _maya_shelf_row_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    items = tuple(
+        item
+        for item in tab["items"]
+        if item.get("row", 0) == row_index
+    )
+    separators_by_column = {}
+    for separator in tab.setdefault("separators", []):
+        if separator.get("row", 0) != row_index:
+            continue
+        column = max(separator.get("column", 0), 0)
+        separators_by_column.setdefault(column, []).append(separator)
+    separators_by_column = {
+        column: tuple(separators)
+        for column, separators in separators_by_column.items()
+    }
+    cached = (items, separators_by_column)
+    _maya_shelf_row_cache[cache_key] = cached
+    return cached
+
+
 def _maya_shelf_draw_icon_row(layout, row_index, context):
     config = _maya_shelf_config(context)
     tab = _maya_shelf_active_tab()
@@ -2988,17 +3031,7 @@ def _maya_shelf_draw_icon_row(layout, row_index, context):
     row.scale_x = 1.2
     row.scale_y = 1.0
 
-    items = [
-        item
-        for item in tab["items"]
-        if item.get("row", 0) == row_index
-    ]
-    separators_by_column = {}
-    for separator in tab.setdefault("separators", []):
-        if separator.get("row", 0) != row_index:
-            continue
-        column = max(separator.get("column", 0), 0)
-        separators_by_column.setdefault(column, []).append(separator)
+    items, separators_by_column = _maya_shelf_row_data(tab, row_index)
     marker_index = None
     marker_after_end_separator = False
     if (
@@ -3349,7 +3382,7 @@ class TOPBAR_MT_editor_menus(Menu):
         if getattr(context.area, "show_menus", False):
             layout.menu("TOPBAR_MT_blender", text="", icon='BLENDER')
         else:
-            layout.menu("TOPBAR_MT_blender", text="Blender")
+            layout.menu("TOPBAR_MT_blender", text="Maya 2.0")
 
         layout.menu("TOPBAR_MT_file")
         layout.menu("TOPBAR_MT_edit")
@@ -3361,7 +3394,7 @@ class TOPBAR_MT_editor_menus(Menu):
 
 
 class TOPBAR_MT_blender(Menu):
-    bl_label = "Blender"
+    bl_label = "Maya 2.0"
 
     def draw(self, _context):
         layout = self.layout

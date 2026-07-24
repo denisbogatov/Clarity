@@ -1181,8 +1181,9 @@ enum eSpace_Type : char {
   SPACE_STATUSBAR = 22,
   SPACE_SPREADSHEET = 23,
   SPACE_SHELF = 24,
+  SPACE_ITEM = 25,
 
-#define SPACE_TYPE_NUM (SPACE_SHELF + 1)
+#define SPACE_TYPE_NUM (SPACE_ITEM + 1)
 };
 
 /* use for function args */

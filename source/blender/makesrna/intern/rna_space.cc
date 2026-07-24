@@ -183,6 +183,11 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      ICON_ASSET_MANAGER,
      "Shelf",
      "Customizable adaptive shelf of actions and scripts"},
+    {SPACE_ITEM,
+     "ITEM",
+     ICON_OBJECT_DATA,
+     "Item",
+     "Persistent transform properties for the active selection"},
     {SPACE_USERPREF,
      "PREFERENCES",
      ICON_PREFERENCES,
@@ -800,6 +805,8 @@ static StructRNA *rna_Space_refine(PointerRNA *ptr)
       return RNA_SpaceSpreadsheet;
     case SPACE_SHELF:
       return RNA_SpaceShelf;
+    case SPACE_ITEM:
+      return RNA_SpaceView3D;
 
       /* Currently no type info. */
     case SPACE_SCRIPT:
@@ -1208,6 +1215,18 @@ static void rna_SpaceView3D_camera_update(Main *bmain, Scene *scene, PointerRNA 
     scene->camera = v3d->camera;
     WM_windows_scene_data_sync(&wm->windows, scene);
   }
+}
+
+static float rna_SpaceView3D_angle_of_view_get(PointerRNA *ptr)
+{
+  const View3D *v3d = static_cast<const View3D *>(ptr->data);
+  return focallength_to_fov(v3d->lens, 36.0f);
+}
+
+static void rna_SpaceView3D_angle_of_view_set(PointerRNA *ptr, const float value)
+{
+  View3D *v3d = static_cast<View3D *>(ptr->data);
+  v3d->lens = fov_to_focallength(value, 36.0f);
 }
 
 static void rna_SpaceView3D_use_local_camera_set(PointerRNA *ptr, bool value)
@@ -5736,6 +5755,18 @@ static void rna_def_space_view3d(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, nullptr, "lens");
   RNA_def_property_ui_text(prop, "Lens", "Viewport lens angle");
   RNA_def_property_range(prop, 1.0f, 250.0f);
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+
+  prop = RNA_def_property(srna, "angle_of_view", PROP_FLOAT, PROP_ANGLE);
+  RNA_def_property_range(prop, DEG2RAD(0.367), DEG2RAD(172.847));
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_ui_text(
+      prop, "Angle of View", "Horizontal viewport field of view for a 36 mm film aperture");
+  RNA_def_property_float_funcs(prop,
+                               "rna_SpaceView3D_angle_of_view_get",
+                               "rna_SpaceView3D_angle_of_view_set",
+                               nullptr);
+  RNA_def_property_float_default(prop, DEG2RAD(54.43));
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
 
   prop = RNA_def_property(srna, "clip_start", PROP_FLOAT, PROP_DISTANCE);

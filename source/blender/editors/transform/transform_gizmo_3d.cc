@@ -154,6 +154,7 @@ struct GizmoGroup {
   int twtype_init;
   int twtype_prev;
   int use_twtype_refresh;
+  bool use_maya_center_style;
 
   /* Only for view orientation. */
   struct {
@@ -324,11 +325,12 @@ static bool gizmo_is_axis_visible(const RegionView3D *rv3d,
 
 static void gizmo_get_axis_color(const int axis_idx,
                                  const float idot[3],
+                                 const bool use_maya_palette,
                                  float r_col[4],
                                  float r_col_hi[4])
 {
   /* Alpha values for normal/highlighted states. */
-  const float alpha = 0.6f;
+  const float alpha = use_maya_palette ? 1.0f : 0.6f;
   const float alpha_hi = 1.0f;
   float alpha_fac;
 
@@ -364,34 +366,58 @@ static void gizmo_get_axis_color(const int axis_idx,
     case MAN_AXIS_SCALE_X:
     case MAN_AXIS_TRANS_YZ:
     case MAN_AXIS_SCALE_YZ:
-      ui::theme::get_color_4fv(TH_AXIS_X, r_col);
+      if (use_maya_palette) {
+        ARRAY_SET_ITEMS(r_col, 1.0f, 0.0f, 0.0f, 1.0f);
+      }
+      else {
+        ui::theme::get_color_4fv(TH_AXIS_X, r_col);
+      }
       break;
     case MAN_AXIS_TRANS_Y:
     case MAN_AXIS_ROT_Y:
     case MAN_AXIS_SCALE_Y:
     case MAN_AXIS_TRANS_ZX:
     case MAN_AXIS_SCALE_ZX:
-      ui::theme::get_color_4fv(TH_AXIS_Y, r_col);
+      if (use_maya_palette) {
+        ARRAY_SET_ITEMS(r_col, 0.0f, 1.0f, 0.0f, 1.0f);
+      }
+      else {
+        ui::theme::get_color_4fv(TH_AXIS_Y, r_col);
+      }
       break;
     case MAN_AXIS_TRANS_Z:
     case MAN_AXIS_ROT_Z:
     case MAN_AXIS_SCALE_Z:
     case MAN_AXIS_TRANS_XY:
     case MAN_AXIS_SCALE_XY:
-      ui::theme::get_color_4fv(TH_AXIS_Z, r_col);
+      if (use_maya_palette) {
+        ARRAY_SET_ITEMS(r_col, 0.0f, 0.0f, 1.0f, 1.0f);
+      }
+      else {
+        ui::theme::get_color_4fv(TH_AXIS_Z, r_col);
+      }
       break;
     case MAN_AXIS_TRANS_C:
     case MAN_AXIS_ROT_C:
     case MAN_AXIS_SCALE_C:
     case MAN_AXIS_ROT_T:
-      ui::theme::get_color_4fv(TH_GIZMO_VIEW_ALIGN, r_col);
+      if (use_maya_palette) {
+        ARRAY_SET_ITEMS(r_col, 1.0f, 1.0f, 0.0f, 1.0f);
+      }
+      else {
+        ui::theme::get_color_4fv(TH_GIZMO_VIEW_ALIGN, r_col);
+      }
       break;
   }
 
-  copy_v4_v4(r_col_hi, r_col);
-
   r_col[3] = alpha * alpha_fac;
-  r_col_hi[3] = alpha_hi * alpha_fac;
+  if (use_maya_palette) {
+    ARRAY_SET_ITEMS(r_col_hi, 1.0f, 1.0f, 0.0f, alpha_hi * alpha_fac);
+  }
+  else {
+    copy_v4_v4(r_col_hi, r_col);
+    r_col_hi[3] = alpha_hi * alpha_fac;
+  }
 }
 
 static void gizmo_get_axis_constraint(const int axis_idx, bool r_axis[3])
@@ -1857,7 +1883,12 @@ static void WIDGETGROUP_gizmo_setup(const bContext *C, wmGizmoGroup *gzgroup)
     const bToolRef *tref = area->runtime.tool;
 
     ggd->twtype = 0;
-    if (tref && STREQ(tref->idname, "builtin.move")) {
+    if (gzgroup->type == g_GGT_xform_gizmo_context) {
+      ggd->twtype = V3D_GIZMO_SHOW_OBJECT_TRANSLATE | V3D_GIZMO_SHOW_OBJECT_ROTATE |
+                    V3D_GIZMO_SHOW_OBJECT_SCALE;
+      ggd->use_twtype_refresh = true;
+    }
+    else if (tref && STREQ(tref->idname, "builtin.move")) {
       ggd->twtype |= V3D_GIZMO_SHOW_OBJECT_TRANSLATE;
     }
     else if (tref && STREQ(tref->idname, "builtin.rotate")) {
@@ -1966,6 +1997,29 @@ static void gizmogroup_refresh_from_matrix(wmGizmoGroup *gzgroup,
   MAN_ITER_AXES_END;
 }
 
+static void gizmogroup_apply_maya_center_style(GizmoGroup *ggd, const bool use_maya_style)
+{
+  wmGizmo *translate_center = ggd->gizmos[MAN_AXIS_TRANS_C];
+  RNA_enum_set(translate_center->ptr,
+               "draw_style",
+               use_maya_style ? ED_GIZMO_PRIMITIVE_STYLE_PLANE :
+                                ED_GIZMO_PRIMITIVE_STYLE_CIRCLE);
+  RNA_boolean_set(translate_center->ptr, "draw_inner", false);
+
+  wmGizmo *scale_center = ggd->gizmos[MAN_AXIS_SCALE_C];
+  RNA_enum_set(scale_center->ptr,
+               "draw_style",
+               use_maya_style ? ED_GIZMO_PRIMITIVE_STYLE_CUBE :
+                                ED_GIZMO_PRIMITIVE_STYLE_ANNULUS);
+  RNA_boolean_set(scale_center->ptr, "draw_inner", false);
+  WM_gizmo_set_scale(scale_center, use_maya_style ? 0.065f : 0.2f);
+  if (wmGizmoOpElem *gzop = WM_gizmo_operator_get(scale_center, 0)) {
+    RNA_float_set(&gzop->ptr, "mouse_sensitivity", use_maya_style ? 0.2f : 1.0f);
+  }
+
+  ggd->use_maya_center_style = use_maya_style;
+}
+
 static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
 {
   if (WM_gizmo_group_is_modal(gzgroup)) {
@@ -1980,6 +2034,10 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
   RegionView3D *rv3d = static_cast<RegionView3D *>(region->regiondata);
   TransformBounds tbounds;
 
+  if (rv3d->rflag & RV3D_NAVIGATING) {
+    return;
+  }
+
   if (ggd->use_twtype_refresh) {
     ggd->twtype = v3d->gizmo_show_object & ggd->twtype_init;
     if (ggd->twtype != ggd->twtype_prev) {
@@ -1987,6 +2045,10 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
       gizmogroup_init_properties_from_twtype(gzgroup);
     }
   }
+
+  const bool use_maya_style = gzgroup->type == g_GGT_xform_gizmo_context &&
+                              (v3d->gizmo_flag & V3D_GIZMO_HIDE_TOOL);
+  gizmogroup_apply_maya_center_style(ggd, use_maya_style);
 
   const int orient_index = BKE_scene_orientation_get_index_from_flag(scene, ggd->twtype_init);
 
@@ -2027,10 +2089,25 @@ static void gizmogroup_hide_all(GizmoGroup *ggd)
 static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgroup)
 {
   GizmoGroup *ggd = static_cast<GizmoGroup *>(gzgroup->customdata);
-  // ScrArea *area = CTX_wm_area(C);
+  ScrArea *area = CTX_wm_area(C);
   ARegion *region = CTX_wm_region(C);
-  // View3D *v3d =static_cast< View3D *> (area->spacedata.first);
+  View3D *v3d = static_cast<View3D *>(area->spacedata.first);
   RegionView3D *rv3d = static_cast<RegionView3D *>(region->regiondata);
+
+  if ((rv3d->rflag & RV3D_NAVIGATING) == 0 && ggd->use_twtype_refresh) {
+    const int twtype = v3d->gizmo_show_object & ggd->twtype_init;
+    if (ggd->twtype != twtype) {
+      ggd->twtype = twtype;
+      ggd->twtype_prev = twtype;
+      gizmogroup_init_properties_from_twtype(gzgroup);
+      gizmogroup_apply_maya_center_style(ggd, ggd->use_maya_center_style);
+    }
+  }
+
+  const bool use_maya_palette = ggd->use_maya_center_style;
+  if (use_maya_palette) {
+    WM_gizmo_set_scale(ggd->gizmos[MAN_AXIS_SCALE_C], 0.065f);
+  }
   float viewinv_m3[3][3];
   copy_m3_m4(viewinv_m3, rv3d->viewinv);
   float idot[3];
@@ -2070,15 +2147,22 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
       switch (axis_idx) {
         case MAN_AXIS_TRANS_C:
         case MAN_AXIS_ROT_C:
-        case MAN_AXIS_SCALE_C:
         case MAN_AXIS_ROT_T:
           WM_gizmo_set_matrix_rotation_from_z_axis(axis, rv3d->viewinv[2]);
+          break;
+        case MAN_AXIS_SCALE_C:
+          if (use_maya_palette) {
+            copy_m4_m4(axis->matrix_basis, rv3d->twmat);
+          }
+          else {
+            WM_gizmo_set_matrix_rotation_from_z_axis(axis, rv3d->viewinv[2]);
+          }
           break;
       }
     }
 
     float color[4], color_hi[4];
-    gizmo_get_axis_color(axis_idx, idot, color, color_hi);
+    gizmo_get_axis_color(axis_idx, idot, use_maya_palette, color, color_hi);
     WM_gizmo_set_color(axis, color);
     WM_gizmo_set_color_highlight(axis, color_hi);
   }
@@ -2123,6 +2207,9 @@ static void gizmo_3d_draw_invoke(wmGizmoGroup *gzgroup,
   }
 
   gizmo_3d_setup_draw_modal(axis_active, axis_idx_active, ggd->twtype);
+  if (axis_idx_active == MAN_AXIS_SCALE_C && ggd->use_maya_center_style) {
+    RNA_enum_set(axis_active->ptr, "draw_style", ED_GIZMO_PRIMITIVE_STYLE_CUBE);
+  }
 
   if (axis_active_type == MAN_AXES_TRANSLATE) {
     /* Arrows are used for visual reference, so keep all visible. */
@@ -2240,7 +2327,6 @@ static bool WIDGETGROUP_gizmo_poll_context(const bContext *C, wmGizmoGroupType *
   if (!WIDGETGROUP_gizmo_poll_generic(v3d)) {
     return false;
   }
-
   const bToolRef *tref = area->runtime.tool;
   if (v3d->gizmo_flag & V3D_GIZMO_HIDE_CONTEXT) {
     return false;
@@ -2251,8 +2337,10 @@ static bool WIDGETGROUP_gizmo_poll_context(const bContext *C, wmGizmoGroupType *
     return false;
   }
 
-  /* Don't show if the tool has a gizmo. */
-  if (tref && tref->runtime && tref->runtime->gizmo_group[0]) {
+  /* A hidden tool gizmo allows the persistent context gizmo to take over. */
+  if ((v3d->gizmo_flag & V3D_GIZMO_HIDE_TOOL) == 0 && tref && tref->runtime &&
+      tref->runtime->gizmo_group[0])
+  {
     return false;
   }
   return true;

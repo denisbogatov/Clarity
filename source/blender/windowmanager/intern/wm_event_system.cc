@@ -35,6 +35,7 @@
 #include "BLI_math_vector.h"
 #include "BLI_string.h"
 #include "BLI_string_utf8.h"
+#include "BLI_time.h"
 #include "BLI_timer.h"
 
 #include "BKE_context.hh"
@@ -59,6 +60,7 @@
 #include "ED_geometry.hh"
 #include "ED_info.hh"
 #include "ED_markers.hh"
+#include "ED_maya.hh"
 #include "ED_render.hh"
 #include "ED_screen.hh"
 #include "ED_undo.hh"
@@ -487,6 +489,8 @@ static bool wm_notifier_is_clear(const wmNotifier *note)
 
 void wm_event_do_depsgraph(bContext *C, bool is_after_open_file)
 {
+  const bool maya_debug = ED_maya_navigation_debug_active(C);
+  const double depsgraph_start = maya_debug ? BLI_time_now_seconds() : 0.0;
   const Main *bmain = CTX_data_main(C);
   wmWindowManager *wm = CTX_wm_manager(C);
   /* The whole idea of locked interface is to prevent viewport and whatever thread from
@@ -540,6 +544,12 @@ void wm_event_do_depsgraph(bContext *C, bool is_after_open_file)
   }
 
   wm_surfaces_do_depsgraph(C);
+  if (maya_debug) {
+    ED_maya_navigation_debug_stage_sample(
+        C,
+        ed::maya::MayaNavigationDebugStage::DepsgraphUpdate,
+        (BLI_time_now_seconds() - depsgraph_start) * 1000.0);
+  }
 }
 
 void wm_event_do_refresh_wm_and_depsgraph(bContext *C)
@@ -4365,6 +4375,13 @@ void wm_event_do_handlers(bContext *C)
 
       /* Check dragging, creates new event or frees, adds draw tag. */
       action |= wm_event_drag_and_drop_test(wm, &win, event);
+
+      if ((action & WM_HANDLER_BREAK) == 0) {
+        const ed::maya::MayaDispatchResult maya_result = ED_maya_event_dispatch(C, event);
+        if (maya_result != ed::maya::MayaDispatchResult::PassThrough) {
+          action |= WM_HANDLER_BREAK;
+        }
+      }
 
       if ((action & WM_HANDLER_BREAK) == 0) {
         /* NOTE: setting sub-window active should be done here,

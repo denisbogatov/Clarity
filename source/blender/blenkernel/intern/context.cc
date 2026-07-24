@@ -1003,7 +1003,7 @@ ReportList *CTX_wm_reports(const bContext *C)
 View3D *CTX_wm_view3d(const bContext *C)
 {
   ScrArea *area = CTX_wm_area(C);
-  if (area && area->spacetype == SPACE_VIEW3D) {
+  if (area && ELEM(area->spacetype, SPACE_VIEW3D, SPACE_ITEM)) {
     return static_cast<View3D *>(area->spacedata.first);
   }
   return nullptr;

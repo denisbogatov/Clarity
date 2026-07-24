@@ -61,6 +61,7 @@
 
 #include "ED_curves.hh"
 #include "ED_grease_pencil.hh"
+#include "ED_maya.hh"
 #include "ED_mesh.hh"
 #include "ED_object.hh"
 #include "ED_object_vgroup.hh"
@@ -142,6 +143,28 @@ struct TransformProperties {
   TransformMedian ve_median, median;
   bool tag_for_update;
 };
+
+struct TransformPanelSelectionCache {
+  uint64_t draw_serial = 0;
+  const wmWindow *window = nullptr;
+  const Object *object = nullptr;
+  TransformMedian median = {};
+  int tot = 0;
+  int totedgedata = 0;
+  int totcurvedata = 0;
+  int totlattdata = 0;
+  int totcurvebweight = 0;
+  int total_curve_points_data = 0;
+  bool has_meshdata = false;
+  bool has_skinradius = false;
+  PointerRNA data_ptr = {};
+};
+
+static TransformPanelSelectionCache &transform_panel_selection_cache()
+{
+  static TransformPanelSelectionCache cache;
+  return cache;
+}
 
 #define TRANSFORM_MEDIAN_ARRAY_LEN (sizeof(TransformMedian) / sizeof(float))
 
@@ -704,12 +727,29 @@ static void v3d_editvertex_buts(
   int total_curve_points_data = 0;
   bool has_meshdata = false;
   bool has_skinradius = false;
-  PointerRNA data_ptr;
+  PointerRNA data_ptr{};
 
   std::fill_n(reinterpret_cast<float *>(&median_basis), TRANSFORM_MEDIAN_ARRAY_LEN, 0.0f);
   tot = totedgedata = totcurvedata = totlattdata = totcurvebweight = 0;
 
-  if (ob->type == OB_MESH) {
+  TransformPanelSelectionCache &cache = transform_panel_selection_cache();
+  const uint64_t draw_serial = block ? ED_maya_transform_panel_cache_serial(C) : 0;
+  const bool cache_hit = draw_serial != 0 && cache.draw_serial == draw_serial &&
+                         cache.window == CTX_wm_window(C) && cache.object == ob;
+
+  if (cache_hit) {
+    median_basis = cache.median;
+    tot = cache.tot;
+    totedgedata = cache.totedgedata;
+    totcurvedata = cache.totcurvedata;
+    totlattdata = cache.totlattdata;
+    totcurvebweight = cache.totcurvebweight;
+    total_curve_points_data = cache.total_curve_points_data;
+    has_meshdata = cache.has_meshdata;
+    has_skinradius = cache.has_skinradius;
+    data_ptr = cache.data_ptr;
+  }
+  else if (ob->type == OB_MESH) {
     TransformMedian_Mesh *median = &median_basis.mesh;
     Mesh *mesh = id_cast<Mesh *>(ob->data);
     BMEditMesh *em = mesh->runtime->edit_mesh.get();
@@ -908,25 +948,28 @@ static void v3d_editvertex_buts(
     totcurvebweight = status.total_nurbs_weights;
   }
 
-  if (tot == 0) {
-    uiDefBut(block,
-             ui::ButtonType::Label,
-             IFACE_("Nothing selected"),
-             0,
-             130,
-             200,
-             20,
-             nullptr,
-             0,
-             0,
-             "");
-    return;
+  if (!cache_hit && draw_serial != 0) {
+    cache.draw_serial = draw_serial;
+    cache.window = CTX_wm_window(C);
+    cache.object = ob;
+    cache.median = median_basis;
+    cache.tot = tot;
+    cache.totedgedata = totedgedata;
+    cache.totcurvedata = totcurvedata;
+    cache.totlattdata = totlattdata;
+    cache.totcurvebweight = totcurvebweight;
+    cache.total_curve_points_data = total_curve_points_data;
+    cache.has_meshdata = has_meshdata;
+    cache.has_skinradius = has_skinradius;
+    cache.data_ptr = data_ptr;
   }
 
   /* Location, X/Y/Z */
-  mul_v3_fl(median_basis.generic.location, 1.0f / float(tot));
-  if (v3d->flag & V3D_GLOBAL_STATS) {
-    mul_m4_v3(ob->object_to_world().ptr(), median_basis.generic.location);
+  if (tot != 0) {
+    mul_v3_fl(median_basis.generic.location, 1.0f / float(tot));
+    if (v3d->flag & V3D_GLOBAL_STATS) {
+      mul_m4_v3(ob->object_to_world().ptr(), median_basis.generic.location);
+    }
   }
 
   if (has_meshdata) {
@@ -1014,6 +1057,9 @@ static void v3d_editvertex_buts(
     button_number_step_size_set(but, 10);
     button_number_precision_set(but, RNA_TRANSLATION_PREC_DEFAULT);
     button_unit_type_set(but, PROP_UNIT_LENGTH);
+    if (tot == 0) {
+      button_flag_enable(but, ui::BUT_DISABLED);
+    }
     but = uiDefButV(block,
                     ui::ButtonType::Num,
                     IFACE_("Y:"),
@@ -1029,6 +1075,9 @@ static void v3d_editvertex_buts(
     button_number_step_size_set(but, 10);
     button_number_precision_set(but, RNA_TRANSLATION_PREC_DEFAULT);
     button_unit_type_set(but, PROP_UNIT_LENGTH);
+    if (tot == 0) {
+      button_flag_enable(but, ui::BUT_DISABLED);
+    }
     but = uiDefButV(block,
                     ui::ButtonType::Num,
                     IFACE_("Z:"),
@@ -1044,8 +1093,11 @@ static void v3d_editvertex_buts(
     button_number_step_size_set(but, 10);
     button_number_precision_set(but, RNA_TRANSLATION_PREC_DEFAULT);
     button_unit_type_set(but, PROP_UNIT_LENGTH);
+    if (tot == 0) {
+      button_flag_enable(but, ui::BUT_DISABLED);
+    }
 
-    if (totcurvebweight == tot) {
+    if (tot != 0 && totcurvebweight == tot) {
       float &weight = ELEM(ob->type, OB_CURVES, OB_GREASE_PENCIL) ?
                           tfp->ve_median.curves.nurbs_weight :
                           tfp->ve_median.curve.b_weight;
@@ -2220,6 +2272,79 @@ static bool view3d_panel_transform_poll(const bContext *C, PanelType * /*pt*/)
   return (BKE_view_layer_active_base_get(view_layer) != nullptr);
 }
 
+static bool item_panel_transform_poll(const bContext * /*C*/, PanelType * /*pt*/)
+{
+  return true;
+}
+
+static void item_panel_transform_empty_draw(ui::Layout &layout, View3D *v3d)
+{
+  TransformProperties *tfp = v3d_transform_props_ensure(v3d);
+  zero_v3(tfp->ve_median.generic.location);
+  zero_v3(tfp->median.generic.location);
+  copy_v3_fl(tfp->ob_scale_orig, 1.0f);
+  zero_v3(tfp->ob_dims);
+
+  ui::Block *block = layout.absolute().block();
+  const int butw = 200;
+  const int buth = 20 * UI_SCALE_FAC;
+  int yi = 360;
+
+  uiDefBut(block,
+           ui::ButtonType::Label,
+           IFACE_("No active selection"),
+           0,
+           yi -= buth,
+           butw,
+           buth,
+           nullptr,
+           0,
+           0,
+           "");
+
+  const char *axis_labels[3] = {IFACE_("X:"), IFACE_("Y:"), IFACE_("Z:")};
+  auto draw_vector = [&](const char *label,
+                         float values[3],
+                         const PropertyUnit unit,
+                         const float min,
+                         const float max) {
+    uiDefBut(block,
+             ui::ButtonType::Label,
+             label,
+             0,
+             yi -= buth,
+             butw,
+             buth,
+             nullptr,
+             0,
+             0,
+             "");
+    for (int axis = 0; axis < 3; axis++) {
+      ui::Button *but = uiDefButV(block,
+                                 ui::ButtonType::Num,
+                                 axis_labels[axis],
+                                 0,
+                                 yi -= buth,
+                                 butw,
+                                 buth,
+                                 &values[axis],
+                                 min,
+                                 max,
+                                 "");
+      button_number_precision_set(but, RNA_TRANSLATION_PREC_DEFAULT);
+      button_unit_type_set(but, unit);
+      button_flag_enable(but, ui::BUT_DISABLED);
+    }
+  };
+
+  draw_vector(
+      IFACE_("Location:"), tfp->ve_median.generic.location, PROP_UNIT_LENGTH, -FLT_MAX, FLT_MAX);
+  draw_vector(
+      IFACE_("Rotation:"), tfp->median.generic.location, PROP_UNIT_ROTATION, -FLT_MAX, FLT_MAX);
+  draw_vector(IFACE_("Scale:"), tfp->ob_scale_orig, PROP_UNIT_NONE, -FLT_MAX, FLT_MAX);
+  draw_vector(IFACE_("Dimensions:"), tfp->ob_dims, PROP_UNIT_LENGTH, 0.0f, FLT_MAX);
+}
+
 static void view3d_panel_transform(const bContext *C, Panel *panel)
 {
   ui::Block *block;
@@ -2228,6 +2353,13 @@ static void view3d_panel_transform(const bContext *C, Panel *panel)
   ViewLayer *view_layer = CTX_data_view_layer(C);
   BKE_view_layer_synced_ensure(*bmain, scene, view_layer);
   Object *ob = BKE_view_layer_active_object_get(view_layer);
+  if (ob == nullptr) {
+    View3D *v3d = CTX_wm_view3d(C);
+    if (v3d != nullptr) {
+      item_panel_transform_empty_draw(*panel->layout, v3d);
+    }
+    return;
+  }
   Object *obedit = OBEDIT_FROM_OBACT(ob);
 
   block = panel->layout->block();
@@ -2981,6 +3113,35 @@ void view3d_buttons_register(ARegionType *art)
   STRNCPY_UTF8(pt->idname, "VIEW3D_PT_curves");
   STRNCPY_UTF8(pt->label, N_("Curve Data")); /* XXX C panels unavailable through RNA bpy.types! */
   STRNCPY_UTF8(pt->category, "Item");
+  STRNCPY_UTF8(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+  pt->draw = view3d_panel_curve_data;
+  pt->poll = view3d_panel_curve_data_poll;
+  BLI_addtail(&art->paneltypes, pt);
+}
+
+void view3d_item_buttons_register(ARegionType *art)
+{
+  PanelType *pt;
+
+  pt = MEM_new_zeroed<PanelType>("spacetype item panel transform");
+  STRNCPY_UTF8(pt->idname, "ITEM_PT_transform");
+  STRNCPY_UTF8(pt->label, N_("Transform"));
+  STRNCPY_UTF8(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+  pt->draw = view3d_panel_transform;
+  pt->poll = item_panel_transform_poll;
+  BLI_addtail(&art->paneltypes, pt);
+
+  pt = MEM_new_zeroed<PanelType>("spacetype item panel vgroup");
+  STRNCPY_UTF8(pt->idname, "ITEM_PT_vgroup");
+  STRNCPY_UTF8(pt->label, N_("Vertex Weights"));
+  STRNCPY_UTF8(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+  pt->draw = view3d_panel_vgroup;
+  pt->poll = view3d_panel_vgroup_poll;
+  BLI_addtail(&art->paneltypes, pt);
+
+  pt = MEM_new_zeroed<PanelType>("spacetype item panel curves");
+  STRNCPY_UTF8(pt->idname, "ITEM_PT_curves");
+  STRNCPY_UTF8(pt->label, N_("Curve Data"));
   STRNCPY_UTF8(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
   pt->draw = view3d_panel_curve_data;
   pt->poll = view3d_panel_curve_data_poll;

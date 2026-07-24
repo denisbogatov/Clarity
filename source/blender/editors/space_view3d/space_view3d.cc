@@ -260,6 +260,23 @@ static SpaceLink *view3d_create(const ScrArea * /*area*/, const Scene *scene)
   return reinterpret_cast<SpaceLink *>(v3d);
 }
 
+static SpaceLink *item_create(const ScrArea * /*area*/, const Scene * /*scene*/)
+{
+  View3D *v3d = MEM_new<View3D>(__func__);
+  v3d->spacetype = SPACE_ITEM;
+
+  ARegion *region = BKE_area_region_new();
+  BLI_addtail(&v3d->regionbase, region);
+  region->regiontype = RGN_TYPE_HEADER;
+  region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
+
+  region = BKE_area_region_new();
+  BLI_addtail(&v3d->regionbase, region);
+  region->regiontype = RGN_TYPE_WINDOW;
+
+  return reinterpret_cast<SpaceLink *>(v3d);
+}
+
 /* Doesn't free the space-link itself. */
 static void view3d_free(SpaceLink *sl)
 {
@@ -1597,6 +1614,20 @@ static void view3d_space_blend_write(BlendWriter *writer, SpaceLink *sl)
   BKE_viewer_path_blend_write(writer, &v3d->viewer_path);
 }
 
+static void item_space_blend_read_data(BlendDataReader *reader, SpaceLink *sl)
+{
+  View3D *v3d = reinterpret_cast<View3D *>(sl);
+  v3d->runtime = View3D_Runtime{};
+  BLO_read_struct(reader, RegionView3D, &v3d->localvd);
+
+  if (v3d->shading.type == OB_RENDER) {
+    v3d->shading.type = OB_SOLID;
+  }
+  v3d->shading.prev_type = OB_SOLID;
+  BKE_screen_view3d_shading_blend_read_data(reader, &v3d->shading);
+  BKE_viewer_path_blend_read_data(reader, &v3d->viewer_path);
+}
+
 void ED_spacetype_view3d()
 {
   using namespace blender::ed;
@@ -1731,6 +1762,49 @@ void ED_spacetype_view3d()
   WM_menutype_add(MEM_new<MenuType>(__func__, ed::geometry::node_group_operator_assets_menu()));
   WM_menutype_add(
       MEM_new<MenuType>(__func__, ed::geometry::node_group_operator_assets_menu_unassigned()));
+
+  BKE_spacetype_register(std::move(st));
+}
+
+void ED_spacetype_item()
+{
+  std::unique_ptr<SpaceType> st = std::make_unique<SpaceType>();
+  st->spaceid = SPACE_ITEM;
+  STRNCPY_UTF8(st->name, "Item");
+  st->create = item_create;
+  st->free = view3d_free;
+  st->init = view3d_init;
+  st->duplicate = view3d_duplicate;
+  st->listener = space_view3d_listener;
+  st->id_remap = view3d_id_remap;
+  st->foreach_id = view3d_foreach_id;
+  st->blend_read_data = item_space_blend_read_data;
+  st->blend_write = view3d_space_blend_write;
+
+  ARegionType *art = MEM_new_zeroed<ARegionType>("spacetype item main region");
+  art->regionid = RGN_TYPE_WINDOW;
+  art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FRAMES;
+  art->listener = view3d_buttons_region_listener;
+  art->message_subscribe = ED_area_do_mgs_subscribe_for_tool_ui;
+  art->init = view3d_buttons_region_init;
+  art->snap_size = ED_region_generic_panel_region_snap_size;
+  art->layout = ED_region_panels_layout;
+  art->draw = ED_region_panels_draw;
+  view3d_item_buttons_register(art);
+  BLI_addhead(&st->regiontypes, art);
+
+  art = MEM_new_zeroed<ARegionType>("spacetype item header region");
+  art->regionid = RGN_TYPE_HEADER;
+  art->prefsizey = HEADERY;
+  art->prefsizex = UI_UNIT_X * 5;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_HEADER;
+  art->listener = view3d_header_region_listener;
+  art->message_subscribe = view3d_header_region_message_subscribe;
+  art->init = view3d_header_region_init;
+  art->layout = ED_region_header_layout;
+  art->draw = ED_region_header_draw;
+  BLI_addhead(&st->regiontypes, art);
 
   BKE_spacetype_register(std::move(st));
 }

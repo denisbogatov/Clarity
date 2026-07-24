@@ -3524,7 +3524,7 @@ class WM_MT_splash_about(Menu):
         del _ghost_backend, ghost_backend
 
         col.separator(factor=2.0)
-        col.label(text="Blender is free software")
+        col.label(text="Maya 2.0 is free software")
         col.label(text="Licensed under the GNU General Public License")
 
         col = split.column(align=True)

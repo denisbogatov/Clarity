@@ -8,6 +8,8 @@
 
 #include "BKE_global.hh"
 
+#include "BLI_time.h"
+
 #include "GPU_capabilities.hh"
 #include "GPU_context.hh"
 #include "GPU_state.hh"
@@ -22,6 +24,26 @@
 #include "wm_window.hh"
 
 namespace blender {
+
+static thread_local bool gpu_context_enable_timing_enabled = false;
+static thread_local bool gpu_context_enable_timing_valid = false;
+static thread_local DRWGPUContextEnableTiming gpu_context_enable_timing;
+
+void DRW_gpu_context_enable_timing_set(const bool enabled)
+{
+  gpu_context_enable_timing_enabled = enabled;
+  gpu_context_enable_timing_valid = false;
+  gpu_context_enable_timing = {};
+}
+
+bool DRW_gpu_context_enable_timing_get(DRWGPUContextEnableTiming &r_timing)
+{
+  if (!gpu_context_enable_timing_valid) {
+    return false;
+  }
+  r_timing = gpu_context_enable_timing;
+  return true;
+}
 
 /* -------------------------------------------------------------------- */
 /** \name Submission critical section
@@ -112,17 +134,46 @@ class ContextShared {
 
   void enable()
   {
+    const bool timing_enabled = gpu_context_enable_timing_enabled;
+    double stage_start = timing_enabled ? BLI_time_now_seconds() : 0.0;
     DRW_lock_start();
+    if (timing_enabled) {
+      gpu_context_enable_timing.draw_lock_ms = (BLI_time_now_seconds() - stage_start) * 1000.0;
+      stage_start = BLI_time_now_seconds();
+    }
     /* IMPORTANT: We don't support immediate mode in render mode!
      * This shall remain in effect until immediate mode supports
      * multiple threads. */
     BLI_ticket_mutex_lock(mutex_);
+    if (timing_enabled) {
+      gpu_context_enable_timing.shared_lock_ms = (BLI_time_now_seconds() - stage_start) * 1000.0;
+      stage_start = BLI_time_now_seconds();
+    }
 
     GPU_render_begin();
+    if (timing_enabled) {
+      gpu_context_enable_timing.render_begin_ms = (BLI_time_now_seconds() - stage_start) * 1000.0;
+      stage_start = BLI_time_now_seconds();
+    }
 
     WM_system_gpu_context_activate(system_gpu_context_);
+    if (timing_enabled) {
+      gpu_context_enable_timing.system_activate_ms =
+          (BLI_time_now_seconds() - stage_start) * 1000.0;
+      stage_start = BLI_time_now_seconds();
+    }
     GPU_context_active_set(blender_gpu_context_);
+    if (timing_enabled) {
+      gpu_context_enable_timing.context_activate_ms =
+          (BLI_time_now_seconds() - stage_start) * 1000.0;
+      stage_start = BLI_time_now_seconds();
+    }
     GPU_context_begin_frame(blender_gpu_context_);
+    if (timing_enabled) {
+      gpu_context_enable_timing.frame_begin_ms =
+          (BLI_time_now_seconds() - stage_start) * 1000.0;
+      gpu_context_enable_timing_valid = true;
+    }
   }
 
   bool is_enabled()

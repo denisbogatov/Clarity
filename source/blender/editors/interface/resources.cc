@@ -183,6 +183,7 @@ const uchar *get_color_ptr(bTheme *btheme, int spacetype, int colorid)
           ts = &btheme->space_spreadsheet;
           break;
         case SPACE_SHELF:
+        case SPACE_ITEM:
           ts = &btheme->space_outliner;
           break;
         default:

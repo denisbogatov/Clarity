@@ -205,6 +205,8 @@ static void blo_update_defaults_screen(bScreen *screen,
     }
     else if (area.spacetype == SPACE_VIEW3D) {
       View3D *v3d = static_cast<View3D *>(area.spacedata.first);
+      /* Match Maya's default 54.43 degree horizontal angle of view. */
+      v3d->lens = 35.0f;
       /* Screen space cavity by default for faster performance. */
       v3d->shading.cavity_type = V3D_SHADING_CAVITY_CURVATURE;
       v3d->shading.flag |= V3D_SHADING_SPECULAR_HIGHLIGHT;
