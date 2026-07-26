@@ -1635,6 +1635,13 @@ def km_view3d(params):
         ])
 
     items.extend([
+        # Maya viewport display.
+        ("view3d.maya_object_xray", {"type": 'TWO', "value": 'PRESS', "ctrl": True}, None),
+        ("view3d.toggle_xray", {"type": 'THREE', "value": 'PRESS', "ctrl": True}, None),
+        ("view3d.maya_face_centers_toggle",
+         {"type": 'Z', "value": 'PRESS', "ctrl": True, "shift": True}, None),
+        ("view3d.maya_wireframe_on_shaded_toggle",
+         {"type": 'FIVE', "value": 'PRESS', "alt": True}, None),
         # Visibility.
         ("view3d.localview", {"type": 'NUMPAD_SLASH', "value": 'PRESS'}, None),
         ("view3d.localview", {"type": 'SLASH', "value": 'PRESS'}, None),
@@ -4523,6 +4530,10 @@ def km_object_mode(params):
     )
 
     items.extend([
+        ("view3d.maya_object_xray", {"type": 'TWO', "value": 'PRESS', "ctrl": True}, None),
+        ("view3d.toggle_xray", {"type": 'THREE', "value": 'PRESS', "ctrl": True}, None),
+        ("object.transform_apply", {"type": 'F', "value": 'PRESS', "alt": True, "shift": True},
+         {"properties": [("location", True), ("rotation", True), ("scale", True)]}),
         *_template_items_proportional_editing(
             params, connected=False, toggle_data_path="tool_settings.use_proportional_edit_objects"),
         *_template_items_select_actions(params, "object.select_all"),
@@ -5531,13 +5542,28 @@ def km_edit_mesh(params):
     )
 
     items.extend([
+        ("view3d.maya_object_xray", {"type": 'TWO', "value": 'PRESS', "ctrl": True}, None),
+        ("view3d.toggle_xray", {"type": 'THREE', "value": 'PRESS', "ctrl": True}, None),
+        ("view3d.maya_face_centers_toggle",
+         {"type": 'Z', "value": 'PRESS', "ctrl": True, "shift": True}, None),
+        # Maya modeling.
+        ("mesh.remove_doubles", {"type": 'L', "value": 'PRESS', "ctrl": True}, None),
+        op_tool_cycle("builtin.poly_build", {"type": 'K', "value": 'PRESS', "ctrl": True}),
+        ("mesh.merge", {"type": 'L', "value": 'PRESS', "ctrl": True, "shift": True},
+         {"properties": [("type", 'COLLAPSE')]}),
+        ("mesh.merge", {"type": 'V', "value": 'PRESS', "ctrl": True, "shift": True},
+         {"properties": [("type", 'CENTER')]}),
+        ("view3d.maya_bridge_or_fill", {"type": 'B', "value": 'PRESS', "ctrl": True, "shift": True}, None),
+        ("mesh.flip_normals", {"type": 'I', "value": 'PRESS', "ctrl": True, "alt": True}, None),
+        ("view3d.edit_mesh_extrude_move_normal",
+         {"type": 'E', "value": 'PRESS', "ctrl": True, "alt": True}, None),
         # Transform Actions.
         *_template_items_transform_actions(params, use_bend=True, use_mirror=True, use_tosphere=True, use_shear=True),
         ("transform.skin_resize", {"type": 'A', "value": 'PRESS', "ctrl": True}, None),
 
         # Tools.
         op_tool_optional(
-            ("mesh.loopcut_slide", {"type": 'R', "value": 'PRESS', "ctrl": True},
+            ("mesh.loopcut_slide", {"type": 'J', "value": 'PRESS', "ctrl": True},
              {"properties": [("TRANSFORM_OT_edge_slide", [("release_confirm", False)],)]}),
             (op_tool_cycle, "builtin.loop_cut"), params),
         op_tool_optional(

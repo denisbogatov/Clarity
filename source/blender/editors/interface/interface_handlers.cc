@@ -11393,8 +11393,11 @@ float block_calc_pie_segment(Block *block, const float event_xy[2])
   sub_v2_v2v2(seg2, event_xy, seg1);
 
   const float len = normalize_v2_v2(block->pie_data->pie_dir, seg2);
+  const float pie_threshold = block->pie_data->threshold > 0.0f ?
+                                  block->pie_data->threshold :
+                                  U.pie_menu_threshold;
 
-  if (len < U.pie_menu_threshold * UI_SCALE_FAC) {
+  if (len < pie_threshold * UI_SCALE_FAC) {
     block->pie_data->flags |= PIE_INVALID_DIR;
   }
   else {
@@ -12483,8 +12486,11 @@ static int pie_handler(bContext *C, const wmEvent *event, PopupBlockHandle *menu
         else {
           Button *but = region_find_active_but(menu->region);
 
+          const float pie_threshold = block->pie_data->threshold > 0.0f ?
+                                          block->pie_data->threshold :
+                                          U.pie_menu_threshold;
           if (but && (U.pie_menu_confirm > 0) &&
-              (dist >= UI_SCALE_FAC * (U.pie_menu_threshold + U.pie_menu_confirm)))
+              (dist >= UI_SCALE_FAC * (pie_threshold + U.pie_menu_confirm)))
           {
             return but_pie_menu_apply(C, menu, but, true);
           }
@@ -12509,8 +12515,11 @@ static int pie_handler(bContext *C, const wmEvent *event, PopupBlockHandle *menu
 
             /* here instead, we use the offset location to account for the initial
              * direction timeout */
+            const float pie_threshold = block->pie_data->threshold > 0.0f ?
+                                            block->pie_data->threshold :
+                                            U.pie_menu_threshold;
             if ((U.pie_menu_confirm > 0) &&
-                (dist >= UI_SCALE_FAC * (U.pie_menu_threshold + U.pie_menu_confirm)))
+                (dist >= UI_SCALE_FAC * (pie_threshold + U.pie_menu_confirm)))
             {
               block->pie_data->flags |= PIE_GESTURE_END_WAIT;
               copy_v2_v2(block->pie_data->last_pos, event_xy);

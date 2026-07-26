@@ -67,14 +67,175 @@ std::optional<ed::maya::MayaInputAction> ED_maya_input_translate(
       action.phase = ed::maya::MayaActionPhase::Begin;
     }
   }
-  else if (event.type == EVT_F8KEY && event.val == KM_PRESS) {
-    action.id = ed::maya::MayaActionID::DebugDrag;
+  else if (event.type == EVT_F8KEY && event.val == KM_PRESS && !action.shift && !action.ctrl &&
+           !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::ToggleObjectComponent;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == EVT_F7KEY && event.val == KM_PRESS && !action.shift && !action.ctrl &&
+           !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::ComponentMulti;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == EVT_F9KEY && event.val == KM_PRESS && action.alt && !action.shift &&
+           !action.ctrl)
+  {
+    action.id = ed::maya::MayaActionID::ComponentVertexFace;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (ELEM(event.type, EVT_F9KEY, EVT_F10KEY, EVT_F11KEY, EVT_F12KEY) &&
+           event.val == KM_PRESS && !action.shift && !action.ctrl && !action.alt)
+  {
+    if (event.type == EVT_F9KEY) {
+      action.id = ed::maya::MayaActionID::ComponentVertex;
+    }
+    else if (event.type == EVT_F10KEY) {
+      action.id = ed::maya::MayaActionID::ComponentEdge;
+    }
+    else if (event.type == EVT_F11KEY) {
+      action.id = ed::maya::MayaActionID::ComponentFace;
+    }
+    else {
+      action.id = ed::maya::MayaActionID::ComponentUV;
+    }
     action.phase = ed::maya::MayaActionPhase::Begin;
   }
   else if (event.type == EVT_FKEY && event.val == KM_PRESS && !action.shift && !action.ctrl &&
            !action.alt)
   {
     action.id = ed::maya::MayaActionID::FrameSelected;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == EVT_DKEY && ELEM(event.val, KM_PRESS, KM_RELEASE) &&
+           (event.val == KM_RELEASE || (!action.shift && !action.ctrl && !action.alt)))
+  {
+    action.id = event.val == KM_PRESS ? ed::maya::MayaActionID::EditPivotKeyPressed :
+                                       ed::maya::MayaActionID::EditPivotKeyReleased;
+    action.phase = event.val == KM_PRESS ? ed::maya::MayaActionPhase::Begin :
+                                          ed::maya::MayaActionPhase::End;
+  }
+  else if (event.type == EVT_INSERTKEY && event.val == KM_PRESS &&
+           (event.flag & WM_EVENT_IS_REPEAT) == 0 && !action.shift && !action.ctrl &&
+           !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::TogglePersistentPivot;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == WINDEACTIVATE) {
+    action.id = ed::maya::MayaActionID::FocusLost;
+    action.phase = ed::maya::MayaActionPhase::Cancel;
+  }
+  else if (ELEM(event.type, EVT_XKEY, EVT_CKEY, EVT_VKEY) &&
+           ELEM(event.val, KM_PRESS, KM_RELEASE) &&
+           (event.val == KM_RELEASE || (!action.shift && !action.ctrl && !action.alt)))
+  {
+    if (event.type == EVT_XKEY) {
+      action.id = ed::maya::MayaActionID::TemporaryGridSnap;
+    }
+    else if (event.type == EVT_CKEY) {
+      action.id = ed::maya::MayaActionID::TemporaryCurveSnap;
+    }
+    else {
+      action.id = ed::maya::MayaActionID::TemporaryPointSnap;
+    }
+    action.phase = event.val == KM_PRESS ? ed::maya::MayaActionPhase::Begin :
+                                          ed::maya::MayaActionPhase::End;
+  }
+  else if (event.type == EVT_JKEY && ELEM(event.val, KM_PRESS, KM_RELEASE) &&
+           !action.ctrl && !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::TemporaryStepSnap;
+    action.phase = event.val == KM_PRESS ? ed::maya::MayaActionPhase::Begin :
+                                          ed::maya::MayaActionPhase::End;
+  }
+  else if (event.type == EVT_JKEY && event.val == KM_PRESS && action.ctrl && !action.shift &&
+           !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::Connect;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == EVT_BKEY && event.val == KM_PRESS && action.ctrl && action.shift &&
+           !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::BridgeOrFill;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == EVT_TWOKEY && event.val == KM_PRESS && action.ctrl && !action.shift &&
+           !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::ObjectXRay;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == EVT_ZKEY && event.val == KM_PRESS && action.ctrl && action.shift &&
+           !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::FaceCenters;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == EVT_FIVEKEY && event.val == KM_PRESS && action.alt && !action.shift &&
+           !action.ctrl)
+  {
+    action.id = ed::maya::MayaActionID::WireframeOnShaded;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == RIGHTMOUSE && event.val == KM_PRESS && !action.shift && !action.ctrl &&
+           !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::ComponentMarkingMenu;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == LEFTMOUSE && event.val == KM_DBL_CLICK && !action.alt) {
+    /* Shift alone selects the partial path. Ctrl+Shift is reserved for additive full-loop
+     * selection, so it must not be consumed by the partial-path gesture. */
+    action.id = action.shift && !action.ctrl ? ed::maya::MayaActionID::SelectPath :
+                                              ed::maya::MayaActionID::SelectLoop;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == LEFTMOUSE && event.val == KM_CLICK_DRAG && !action.alt) {
+    action.id = ed::maya::MayaActionID::SelectMarquee;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == LEFTMOUSE && event.val == KM_CLICK && !action.alt) {
+    if (action.ctrl && action.shift) {
+      action.id = ed::maya::MayaActionID::SelectAdd;
+    }
+    else if (action.ctrl) {
+      action.id = ed::maya::MayaActionID::SelectRemove;
+    }
+    else if (action.shift) {
+      action.id = ed::maya::MayaActionID::SelectToggle;
+    }
+    else {
+      action.id = ed::maya::MayaActionID::SelectPrimary;
+    }
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == EVT_PERIODKEY && event.val == KM_PRESS && action.shift && !action.ctrl &&
+           !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::SelectGrow;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == EVT_COMMAKEY && event.val == KM_PRESS && action.shift && !action.ctrl &&
+           !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::SelectShrink;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (ELEM(event.type, EVT_ONEKEY, EVT_TWOKEY, EVT_THREEKEY) && event.val == KM_PRESS &&
+           !action.shift && !action.ctrl && !action.alt)
+  {
+    if (event.type == EVT_ONEKEY) {
+      action.id = ed::maya::MayaActionID::SubdivisionPreviewOff;
+    }
+    else if (event.type == EVT_TWOKEY) {
+      action.id = ed::maya::MayaActionID::SubdivisionPreviewOn;
+    }
+    else {
+      action.id = ed::maya::MayaActionID::SubdivisionPreviewSurface;
+    }
     action.phase = ed::maya::MayaActionPhase::Begin;
   }
   else if (ELEM(event.type, EVT_QKEY, EVT_WKEY, EVT_EKEY, EVT_RKEY))

@@ -58,6 +58,7 @@ void VIEW3D_OT_render_border(wmOperatorType *ot);
 void VIEW3D_OT_clear_render_border(wmOperatorType *ot);
 void VIEW3D_OT_toggle_shading(wmOperatorType *ot);
 void VIEW3D_OT_toggle_xray(wmOperatorType *ot);
+void VIEW3D_OT_toggle_maya_ao(wmOperatorType *ot);
 
 /* `view3d_draw.cc` */
 
@@ -110,6 +111,8 @@ void VIEW3D_OT_camera_to_view_selected(wmOperatorType *ot);
 void VIEW3D_OT_object_as_camera(wmOperatorType *ot);
 void VIEW3D_OT_localview(wmOperatorType *ot);
 void VIEW3D_OT_localview_remove_from(wmOperatorType *ot);
+void VIEW3D_OT_maya_face_centers_toggle(wmOperatorType *ot);
+void VIEW3D_OT_maya_wireframe_on_shaded_toggle(wmOperatorType *ot);
 
 /**
  * \param rect: optional for picking (can be NULL).

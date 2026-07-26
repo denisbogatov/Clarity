@@ -52,8 +52,86 @@
 #include "view3d_navigate.hh"
 
 #include "DNA_camera_types.h"
+#include "DNA_object_types.h"
+#include "DNA_view3d_types.h"
 
 namespace blender {
+
+/* -------------------------------------------------------------------- */
+/** \name Maya Face Centers Operator
+ * \{ */
+
+static bool view3d_maya_face_centers_poll(bContext *C)
+{
+  const Object *active_object = CTX_data_active_object(C);
+  return CTX_wm_view3d(C) != nullptr && active_object != nullptr &&
+         active_object->type == OB_MESH;
+}
+
+static wmOperatorStatus view3d_maya_face_centers_exec(bContext *C, wmOperator * /*op*/)
+{
+  Object *active_object = DEG_get_original(CTX_data_active_object(C));
+  const bool enabled = (active_object->dtx & OB_DRAW_FACE_CENTERS) == 0;
+
+  View3D *v3d = CTX_wm_view3d(C);
+  SET_FLAG_FROM_TEST(v3d->overlay.edit_flag, enabled, V3D_OVERLAY_EDIT_FACE_DOT);
+
+  CTX_DATA_BEGIN (C, Object *, object, selected_objects) {
+    if (object->type != OB_MESH) {
+      continue;
+    }
+    Object *object_orig = DEG_get_original(object);
+    SET_FLAG_FROM_TEST(object_orig->dtx, enabled, OB_DRAW_FACE_CENTERS);
+  }
+  CTX_DATA_END;
+
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+  return OPERATOR_FINISHED;
+}
+
+void VIEW3D_OT_maya_face_centers_toggle(wmOperatorType *ot)
+{
+  ot->name = "Face Centers";
+  ot->description = "Toggle polygon center points for selected mesh objects";
+  ot->idname = "VIEW3D_OT_maya_face_centers_toggle";
+
+  ot->exec = view3d_maya_face_centers_exec;
+  ot->poll = view3d_maya_face_centers_poll;
+  ot->flag = OPTYPE_REGISTER;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Maya Wireframe on Shaded Operator
+ * \{ */
+
+static bool view3d_maya_wireframe_on_shaded_poll(bContext *C)
+{
+  return CTX_wm_view3d(C) != nullptr;
+}
+
+static wmOperatorStatus view3d_maya_wireframe_on_shaded_exec(bContext *C,
+                                                              wmOperator * /*op*/)
+{
+  View3D *v3d = CTX_wm_view3d(C);
+  v3d->overlay.flag ^= V3D_OVERLAY_WIREFRAMES;
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+  return OPERATOR_FINISHED;
+}
+
+void VIEW3D_OT_maya_wireframe_on_shaded_toggle(wmOperatorType *ot)
+{
+  ot->name = "Wireframe on Shaded";
+  ot->description = "Toggle wireframes on shaded objects in the viewport";
+  ot->idname = "VIEW3D_OT_maya_wireframe_on_shaded_toggle";
+
+  ot->exec = view3d_maya_wireframe_on_shaded_exec;
+  ot->poll = view3d_maya_wireframe_on_shaded_poll;
+  ot->flag = OPTYPE_REGISTER;
+}
+
+/** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Camera to View Operator

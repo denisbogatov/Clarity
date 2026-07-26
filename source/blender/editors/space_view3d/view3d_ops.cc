@@ -216,6 +216,8 @@ void view3d_operatortypes()
   WM_operatortype_append(VIEW3D_OT_view_center_pick);
   WM_operatortype_append(VIEW3D_OT_view_center_camera);
   WM_operatortype_append(VIEW3D_OT_view_center_lock);
+  WM_operatortype_append(VIEW3D_OT_maya_face_centers_toggle);
+  WM_operatortype_append(VIEW3D_OT_maya_wireframe_on_shaded_toggle);
   WM_operatortype_append(VIEW3D_OT_select);
   WM_operatortype_append(VIEW3D_OT_select_box);
   WM_operatortype_append(VIEW3D_OT_clip_border);
@@ -253,6 +255,7 @@ void view3d_operatortypes()
 
   WM_operatortype_append(VIEW3D_OT_toggle_shading);
   WM_operatortype_append(VIEW3D_OT_toggle_xray);
+  WM_operatortype_append(VIEW3D_OT_toggle_maya_ao);
   WM_operatortype_append(VIEW3D_OT_toggle_matcap_flip);
 
   WM_operatortype_append(VIEW3D_OT_ruler_add);

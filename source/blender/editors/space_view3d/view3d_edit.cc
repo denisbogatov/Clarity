@@ -1273,4 +1273,60 @@ void VIEW3D_OT_toggle_xray(wmOperatorType *ot)
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
+/** \name Toggle Maya-style Ambient Occlusion
+ * \{ */
+
+static wmOperatorStatus toggle_maya_ao_exec(bContext *C, wmOperator * /*op*/)
+{
+  View3D *v3d = CTX_wm_view3d(C);
+  ScrArea *area = CTX_wm_area(C);
+  Scene *scene = CTX_data_scene(C);
+
+  const bool cavity_enabled = v3d->shading.flag & V3D_SHADING_CAVITY;
+  const bool ao_enabled = cavity_enabled &&
+                          ELEM(v3d->shading.cavity_type,
+                               V3D_SHADING_CAVITY_SSAO,
+                               V3D_SHADING_CAVITY_BOTH);
+  if (ao_enabled) {
+    if (v3d->shading.cavity_type == V3D_SHADING_CAVITY_BOTH) {
+      v3d->shading.cavity_type = V3D_SHADING_CAVITY_CURVATURE;
+    }
+    else {
+      v3d->shading.flag &= ~V3D_SHADING_CAVITY;
+    }
+  }
+  else {
+    v3d->shading.flag |= V3D_SHADING_CAVITY;
+    v3d->shading.cavity_type = cavity_enabled ? V3D_SHADING_CAVITY_BOTH :
+                                                  V3D_SHADING_CAVITY_SSAO;
+    v3d->shading.cavity_ridge_factor = 0.0f;
+    if (v3d->shading.cavity_valley_factor == 0.0f) {
+      v3d->shading.cavity_valley_factor = 1.0f;
+    }
+
+    /* Convert the legacy world-space default to Maya's 16 pixel SSAO radius. */
+    if (scene->display.matcap_ssao_distance < 1.0f) {
+      scene->display.matcap_ssao_distance = 16.0f;
+    }
+  }
+
+  ED_area_tag_redraw(area);
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D | NS_VIEW3D_SHADING, v3d);
+
+  return OPERATOR_FINISHED;
+}
+
+void VIEW3D_OT_toggle_maya_ao(wmOperatorType *ot)
+{
+  ot->name = "Toggle Ambient Occlusion";
+  ot->idname = "VIEW3D_OT_toggle_maya_ao";
+  ot->description = "Toggle Maya-style screen-space ambient occlusion";
+
+  ot->exec = toggle_maya_ao_exec;
+  ot->poll = ED_operator_view3d_active;
+}
+
+/** \} */
+
 }  // namespace blender

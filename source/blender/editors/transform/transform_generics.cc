@@ -35,6 +35,7 @@
 
 #include "ED_clip.hh"
 #include "ED_image.hh"
+#include "ED_maya.hh"
 #include "ED_object.hh"
 #include "ED_screen.hh"
 #include "ED_space_api.hh"
@@ -155,7 +156,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
   t->flag = eTFlag(0);
 
-  if (obact && !(t->options & (CTX_CURSOR | CTX_TEXTURE_SPACE)) &&
+  if (obact && !(t->options & (CTX_CURSOR | CTX_TEXTURE_SPACE | CTX_MAYA_PIVOT)) &&
       ELEM(object_mode, OB_MODE_EDIT, OB_MODE_EDIT_GPENCIL_LEGACY))
   {
     t->obedit_type = obact->type;
@@ -164,7 +165,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
     t->obedit_type = -1;
   }
 
-  if (t->options & CTX_CURSOR) {
+  if (t->options & (CTX_CURSOR | CTX_MAYA_PIVOT)) {
     /* Cursor should always use the drag start as the combination of click-drag to place & move
      * doesn't work well if the click location isn't used when transforming. */
     t->flag |= T_EVENT_DRAG_START;
@@ -343,6 +344,13 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
     RNA_property_float_get_array(op->ptr, prop, t->center_global);
     mul_v3_v3(t->center_global, t->aspect);
     t->flag |= T_OVERRIDE_CENTER;
+  }
+  if ((t->flag & T_OVERRIDE_CENTER) == 0) {
+    float maya_pivot_matrix[4][4];
+    if (ED_maya_pivot_custom_matrix_get(C, maya_pivot_matrix)) {
+      copy_v3_v3(t->center_global, maya_pivot_matrix[3]);
+      t->flag |= T_OVERRIDE_CENTER;
+    }
   }
 
   t->view = t_view_get(t);
@@ -1107,7 +1115,7 @@ bool calculateCenterActive(TransInfo *t, bool select_only, float r_center[3])
   }
   /* The cursor has no active object concept. Return false so the "active" center isn't used
    * in contexts where it doesn't make sense ("Active Snap Base" for e.g.), See: #151283. */
-  if (t->options & CTX_CURSOR) {
+  if (t->options & (CTX_CURSOR | CTX_MAYA_PIVOT)) {
     return false;
   }
 

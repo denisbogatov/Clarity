@@ -30,9 +30,11 @@
 #include "WM_api.hh"
 
 #include "ED_image.hh"
+#include "ED_maya.hh"
 #include "ED_node.hh"
 #include "ED_transform_snap_object_context.hh"
 #include "ED_uvedit.hh"
+#include "ED_view3d.hh"
 
 #include "UI_resources.hh"
 #include "UI_view2d.hh"
@@ -625,6 +627,11 @@ void resetSnapping(TransInfo *t)
   t->tsnap.source_type = SCE_SNAP_TO_NONE;
   t->tsnap.target_type = SCE_SNAP_TO_NONE;
   t->tsnap.mode = SCE_SNAP_TO_NONE;
+  t->tsnap.maya_mode_active = false;
+  t->tsnap.maya_curve_targets_only = false;
+  t->tsnap.maya_include_object_pivots = false;
+  t->tsnap.maya_view_plane = false;
+  t->tsnap.maya_mesh_center = false;
   t->tsnap.target_operation = SCE_SNAP_TARGET_ALL;
   t->tsnap.source_operation = SCE_SNAP_SOURCE_CLOSEST;
   t->tsnap.last = 0;
@@ -807,7 +814,9 @@ static eSnapTargetOP snap_target_select_from_spacetype_and_tool_settings(TransIn
     if (base_act && (base_act->object->mode & OB_MODE_PARTICLE_EDIT)) {
       /* Particles edit mode. */
     }
-    else if (t->options & (CTX_GPENCIL_STROKES | CTX_CURSOR | CTX_OBMODE_XFORM_OBDATA)) {
+    else if (t->options &
+             (CTX_GPENCIL_STROKES | CTX_CURSOR | CTX_MAYA_PIVOT | CTX_OBMODE_XFORM_OBDATA))
+    {
       /* In "Edit Strokes" mode,
        * snap tool can perform snap to selected or active objects (see #49632)
        * TODO: perform self snap in gpencil_strokes.
@@ -1177,6 +1186,11 @@ static void setSnappingCallback(TransInfo *t)
   }
 }
 
+void transform_snap_callbacks_update(TransInfo *t)
+{
+  setSnappingCallback(t);
+}
+
 void addSnapPoint(TransInfo *t)
 {
   if (t->tsnap.status & SNAP_TARGET_FOUND && ELEM(t->spacetype, SPACE_VIEW3D, SPACE_IMAGE)) {
@@ -1358,8 +1372,10 @@ static void snap_target_view3d_fn(TransInfo *t, float * /*vec*/)
     found = (snap_elem != SCE_SNAP_TO_NONE);
   }
   if ((found == false) && (t->tsnap.mode & SCE_SNAP_TO_VOLUME)) {
-    bool use_peel = (t->settings->snap_flag & SCE_SNAP_PEEL_OBJECT) != 0;
-    found = peelObjectsTransform(t, t->mval, use_peel, loc, no, nullptr);
+    const bool use_peel = t->tsnap.maya_mesh_center ||
+                          (t->settings->snap_flag & SCE_SNAP_PEEL_OBJECT) != 0;
+    found = peelObjectsTransform(
+        t, t->mval, use_peel, t->tsnap.maya_mesh_center, loc, no, nullptr);
 
     if (found) {
       snap_elem = SCE_SNAP_TO_VOLUME;
@@ -1642,6 +1658,8 @@ static eSnapMode snapObjectsTransform(
   snap_object_params.edit_mode_type = (t->flag & T_EDIT) != 0 ? SNAP_GEOM_EDIT : SNAP_GEOM_FINAL;
   snap_object_params.occlusion_test = SNAP_OCCLUSION_AS_SEEM;
   snap_object_params.use_backface_culling = (t->tsnap.flag & SCE_SNAP_BACKFACE_CULLING) != 0;
+  snap_object_params.curve_targets_only = t->tsnap.maya_curve_targets_only;
+  snap_object_params.include_object_pivots = t->tsnap.maya_include_object_pivots;
 
   float *prev_co = (t->tsnap.status & SNAP_SOURCE_FOUND) ? t->tsnap.snap_source : t->center_global;
   float *grid_co = nullptr, grid_co_stack[3];
@@ -1654,18 +1672,36 @@ static eSnapMode snapObjectsTransform(
     add_v3_v3(grid_co, t->center_global);
   }
 
-  return ed::transform::snap_object_project_view3d(t->tsnap.object_context,
-                                                   t->depsgraph,
-                                                   t->region,
-                                                   static_cast<const View3D *>(t->view),
-                                                   t->tsnap.mode,
-                                                   &snap_object_params,
-                                                   grid_co,
-                                                   mval,
-                                                   prev_co,
-                                                   dist_px,
-                                                   r_loc,
-                                                   r_no);
+  eSnapMode result = ed::transform::snap_object_project_view3d(t->tsnap.object_context,
+                                                               t->depsgraph,
+                                                               t->region,
+                                                               static_cast<const View3D *>(t->view),
+                                                               t->tsnap.mode,
+                                                               &snap_object_params,
+                                                               grid_co,
+                                                               mval,
+                                                               prev_co,
+                                                               dist_px,
+                                                               r_loc,
+                                                               r_no);
+  if (t->tsnap.maya_include_object_pivots && t->context != nullptr) {
+    float pivot_matrix[4][4];
+    float pivot_screen[2];
+    if (ED_maya_pivot_custom_matrix_get(t->context, pivot_matrix) &&
+        ED_view3d_project_float_global(
+            t->region, pivot_matrix[3], pivot_screen, V3D_PROJ_TEST_CLIP_DEFAULT) ==
+            V3D_PROJ_RET_OK)
+    {
+      const float pivot_dist_px = len_v2v2(mval, pivot_screen);
+      if (pivot_dist_px < *dist_px) {
+        *dist_px = pivot_dist_px;
+        copy_v3_v3(r_loc, pivot_matrix[3]);
+        zero_v3(r_no);
+        result = SCE_SNAP_TO_POINT;
+      }
+    }
+  }
+  return result;
 }
 
 /** \} */
@@ -1677,6 +1713,7 @@ static eSnapMode snapObjectsTransform(
 bool peelObjectsTransform(TransInfo *t,
                           const float mval[2],
                           const bool use_peel_object,
+                          const bool require_depth_pair,
                           /* Return args. */
                           float r_loc[3],
                           float r_no[3],
@@ -1734,21 +1771,27 @@ bool peelObjectsTransform(TransInfo *t,
       }
     }
 
-    mid_v3_v3v3(r_loc, hit_min->co, hit_max->co);
+    const bool found_pair = hit_max != nullptr && hit_max != hit_min;
+    if (found_pair || !require_depth_pair) {
+      if (hit_max == nullptr) {
+        hit_max = hit_min;
+      }
+      mid_v3_v3v3(r_loc, hit_min->co, hit_max->co);
 
-    if (r_thickness) {
-      *r_thickness = hit_max->depth - hit_min->depth;
+      if (r_thickness) {
+        *r_thickness = hit_max->depth - hit_min->depth;
+      }
+
+      /* XXX, is there a correct normal in this case ???, for now just z up. */
+      r_no[0] = 0.0;
+      r_no[1] = 0.0;
+      r_no[2] = 1.0;
     }
-
-    /* XXX, is there a correct normal in this case ???, for now just z up. */
-    r_no[0] = 0.0;
-    r_no[1] = 0.0;
-    r_no[2] = 1.0;
 
     for (SnapObjectHitDepth &link : depths_peel.items_mutable()) {
       MEM_delete(&link);
     }
-    return true;
+    return found_pair || !require_depth_pair;
   }
   return false;
 }

@@ -65,6 +65,7 @@
 #include "RNA_access.hh"
 
 #include "UI_interface.hh"
+#include "UI_interface_layout.hh"
 
 #include "BLO_read_write.hh"
 
@@ -79,6 +80,68 @@
 #include "view3d_navigate.hh"
 
 namespace blender {
+
+static bool view3d_maya_component_marking_menu_poll(const bContext *C, MenuType * /*mt*/)
+{
+  const ARegion *region = CTX_wm_region(C);
+  if (CTX_wm_view3d(C) == nullptr || region == nullptr || region->regiontype != RGN_TYPE_WINDOW) {
+    return false;
+  }
+
+  const Object *active_object = CTX_data_active_object(C);
+  return active_object == nullptr || active_object->mode == OB_MODE_OBJECT ||
+         (active_object->type == OB_MESH && (active_object->mode & OB_MODE_EDIT));
+}
+
+static void view3d_maya_component_mode_item(ui::Layout &layout,
+                                            const char *name,
+                                            const int component_mode,
+                                            const bool enabled)
+{
+  ui::Layout &item = layout.row(false);
+  item.enabled_set(enabled);
+  PointerRNA op_ptr = item.op("MAYA_OT_component_mode_set",
+                              name,
+                              ICON_NONE,
+                              wm::OpCallContext::ExecDefault,
+                              UI_ITEM_NONE);
+  RNA_enum_set(&op_ptr, "mode", component_mode);
+}
+
+static void view3d_maya_component_marking_menu_draw(const bContext *C, Menu *menu)
+{
+  const Object *active_object = CTX_data_active_object(C);
+  const bool component_modes_enabled = active_object != nullptr &&
+                                       active_object->type == OB_MESH &&
+                                       ELEM(active_object->mode, OB_MODE_OBJECT, OB_MODE_EDIT);
+  ui::Layout &pie = menu->layout->menu_pie();
+
+  /* Maya marking-menu order: left, right, bottom, top, top-left, top-right,
+   * bottom-left, bottom-right. */
+  view3d_maya_component_mode_item(pie, "Vertex", 1, component_modes_enabled);
+  view3d_maya_component_mode_item(pie, "Object Mode", 0, active_object != nullptr);
+  view3d_maya_component_mode_item(pie, "Face", 3, component_modes_enabled);
+  view3d_maya_component_mode_item(pie, "Edge", 2, component_modes_enabled);
+  pie.separator();
+  view3d_maya_component_mode_item(
+      pie, "UV (Experimental)", 4, component_modes_enabled);
+
+  view3d_maya_component_mode_item(
+      pie, "Vertex Face (Experimental)", 5, component_modes_enabled);
+  view3d_maya_component_mode_item(pie,
+                                  "Multi",
+                                  6,
+                                  component_modes_enabled);
+}
+
+static MenuType view3d_maya_component_marking_menu()
+{
+  MenuType type{};
+  STRNCPY_UTF8(type.idname, "VIEW3D_MT_maya_component_marking_menu");
+  type.poll = view3d_maya_component_marking_menu_poll;
+  type.draw = view3d_maya_component_marking_menu_draw;
+  return type;
+}
 
 /* ******************** manage regions ********************* */
 
@@ -277,6 +340,15 @@ static SpaceLink *item_create(const ScrArea * /*area*/, const Scene * /*scene*/)
   return reinterpret_cast<SpaceLink *>(v3d);
 }
 
+static void view3d_properties_storage_free(View3D *v3d)
+{
+  if (v3d->runtime.properties_storage && v3d->runtime.properties_storage_free) {
+    v3d->runtime.properties_storage_free(v3d->runtime.properties_storage);
+  }
+  v3d->runtime.properties_storage = nullptr;
+  v3d->runtime.properties_storage_free = nullptr;
+}
+
 /* Doesn't free the space-link itself. */
 static void view3d_free(SpaceLink *sl)
 {
@@ -288,10 +360,7 @@ static void view3d_free(SpaceLink *sl)
 
   ED_view3d_local_stats_free(vd);
 
-  if (vd->runtime.properties_storage_free) {
-    vd->runtime.properties_storage_free(vd->runtime.properties_storage);
-    vd->runtime.properties_storage_free = nullptr;
-  }
+  view3d_properties_storage_free(vd);
 
   if (vd->shading.prop) {
     IDP_FreeProperty(vd->shading.prop);
@@ -299,6 +368,12 @@ static void view3d_free(SpaceLink *sl)
   }
 
   BKE_viewer_path_clear(&vd->viewer_path);
+}
+
+static void item_free(SpaceLink *sl)
+{
+  View3D *v3d = reinterpret_cast<View3D *>(sl);
+  view3d_properties_storage_free(v3d);
 }
 
 /* spacetype; init callback */
@@ -343,6 +418,19 @@ static SpaceLink *view3d_duplicate(SpaceLink *sl)
 
   /* copy or clear inside new stuff */
 
+  return reinterpret_cast<SpaceLink *>(v3dn);
+}
+
+static SpaceLink *item_duplicate(SpaceLink *sl)
+{
+  View3D *v3dn = MEM_dupalloc(reinterpret_cast<View3D *>(sl));
+  v3dn->runtime = View3D_Runtime{};
+  v3dn->camera = nullptr;
+  v3dn->ob_center = nullptr;
+  v3dn->localvd = nullptr;
+  v3dn->gpd = nullptr;
+  v3dn->shading.prop = nullptr;
+  v3dn->viewer_path = {};
   return reinterpret_cast<SpaceLink *>(v3dn);
 }
 
@@ -1614,18 +1702,26 @@ static void view3d_space_blend_write(BlendWriter *writer, SpaceLink *sl)
   BKE_viewer_path_blend_write(writer, &v3d->viewer_path);
 }
 
-static void item_space_blend_read_data(BlendDataReader *reader, SpaceLink *sl)
+static void item_space_blend_read_data(BlendDataReader * /*reader*/, SpaceLink *sl)
 {
   View3D *v3d = reinterpret_cast<View3D *>(sl);
   v3d->runtime = View3D_Runtime{};
-  BLO_read_struct(reader, RegionView3D, &v3d->localvd);
-
-  if (v3d->shading.type == OB_RENDER) {
-    v3d->shading.type = OB_SOLID;
-  }
+  v3d->camera = nullptr;
+  v3d->ob_center = nullptr;
+  v3d->localvd = nullptr;
+  v3d->gpd = nullptr;
+  v3d->shading.prop = nullptr;
   v3d->shading.prev_type = OB_SOLID;
-  BKE_screen_view3d_shading_blend_read_data(reader, &v3d->shading);
-  BKE_viewer_path_blend_read_data(reader, &v3d->viewer_path);
+  v3d->viewer_path = {};
+}
+
+static void item_space_blend_write(BlendWriter *writer, SpaceLink *sl)
+{
+  View3D *v3d = reinterpret_cast<View3D *>(sl);
+  BLI_assert(v3d->localvd == nullptr);
+  BLI_assert(v3d->shading.prop == nullptr);
+  BLI_assert(BLI_listbase_is_empty(&v3d->viewer_path.path));
+  writer->write_struct(v3d);
 }
 
 void ED_spacetype_view3d()
@@ -1762,6 +1858,7 @@ void ED_spacetype_view3d()
   WM_menutype_add(MEM_new<MenuType>(__func__, ed::geometry::node_group_operator_assets_menu()));
   WM_menutype_add(
       MEM_new<MenuType>(__func__, ed::geometry::node_group_operator_assets_menu_unassigned()));
+  WM_menutype_add(MEM_new<MenuType>(__func__, view3d_maya_component_marking_menu()));
 
   BKE_spacetype_register(std::move(st));
 }
@@ -1772,14 +1869,12 @@ void ED_spacetype_item()
   st->spaceid = SPACE_ITEM;
   STRNCPY_UTF8(st->name, "Item");
   st->create = item_create;
-  st->free = view3d_free;
+  st->free = item_free;
   st->init = view3d_init;
-  st->duplicate = view3d_duplicate;
+  st->duplicate = item_duplicate;
   st->listener = space_view3d_listener;
-  st->id_remap = view3d_id_remap;
-  st->foreach_id = view3d_foreach_id;
   st->blend_read_data = item_space_blend_read_data;
-  st->blend_write = view3d_space_blend_write;
+  st->blend_write = item_space_blend_write;
 
   ARegionType *art = MEM_new_zeroed<ARegionType>("spacetype item main region");
   art->regionid = RGN_TYPE_WINDOW;

@@ -4681,8 +4681,8 @@ static void rna_def_space_view3d_shading(BlenderRNA *brna)
       {V3D_SHADING_CAVITY_SSAO,
        "WORLD",
        0,
-       "World",
-       "Cavity shading computed in world space, useful for larger-scale occlusion"},
+       "Ambient Occlusion",
+       "Maya-style ambient occlusion computed with a screen-space sampling radius"},
       {V3D_SHADING_CAVITY_CURVATURE,
        "SCREEN",
        0,
@@ -4799,11 +4799,12 @@ static void rna_def_space_view3d_shading(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D | NS_VIEW3D_SHADING, nullptr);
 
-  prop = RNA_def_property(srna, "cavity_valley_factor", PROP_FLOAT, PROP_FACTOR);
+  prop = RNA_def_property(srna, "cavity_valley_factor", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_sdna(prop, nullptr, "cavity_valley_factor");
-  RNA_def_property_ui_text(prop, "Cavity Valley", "Factor for the cavity valleys");
-  RNA_def_property_range(prop, 0.0f, 250.0f);
-  RNA_def_property_ui_range(prop, 0.00f, 2.5f, 1, 3);
+  RNA_def_property_ui_text(
+      prop, "Ambient Occlusion Amount", "Intensity of screen-space ambient occlusion");
+  RNA_def_property_range(prop, 0.0f, 3.0f);
+  RNA_def_property_ui_range(prop, 0.0f, 3.0f, 1, 2);
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D | NS_VIEW3D_SHADING, nullptr);
 

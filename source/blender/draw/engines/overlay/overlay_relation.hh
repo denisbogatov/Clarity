@@ -48,6 +48,13 @@ class Relations : Overlay {
     relations_buf_.clear();
   }
 
+  void point_add(const float3 &position, const float4 &color)
+  {
+    if (enabled_) {
+      points_buf_.append(position, color);
+    }
+  }
+
   void object_sync(Manager & /*manager*/,
                    const ObjectRef &ob_ref,
                    Resources &res,

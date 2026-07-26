@@ -188,6 +188,7 @@ def register():
 def unregister():
     from bpy.utils import unregister_class
 
+    space_topbar.unregister_runtime()
     properties_paint_common.unregister()
     space_view3d.unregister_props()
 

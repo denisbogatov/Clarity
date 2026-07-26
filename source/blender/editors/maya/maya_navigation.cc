@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <cstdio>
 
 #include "BLI_fileops.h"
@@ -25,6 +26,18 @@
 #include "BKE_appdir.hh"
 
 namespace blender::ed::maya {
+
+static constexpr int MAYA_TUMBLE_SCALE_NUMERATOR = 4;
+static constexpr int MAYA_TUMBLE_SCALE_DENOMINATOR = 5;
+
+static int maya_tumble_delta_scale(const int delta)
+{
+  const int magnitude = std::abs(delta);
+  const int scaled = (magnitude * MAYA_TUMBLE_SCALE_NUMERATOR +
+                      MAYA_TUMBLE_SCALE_DENOMINATOR / 2) /
+                     MAYA_TUMBLE_SCALE_DENOMINATOR;
+  return delta < 0 ? -scaled : scaled;
+}
 
 struct MayaNavigationDebugSample {
   uint64_t event_index;
@@ -114,6 +127,14 @@ static const char *debug_stage_name(const MayaNavigationDebugStage stage)
       return "gpu_context_activate";
     case MayaNavigationDebugStage::GPUContextFrameBegin:
       return "gpu_context_frame_begin";
+    case MayaNavigationDebugStage::ViewportRedrawState:
+      return "viewport_redraw_state";
+    case MayaNavigationDebugStage::ViewportBufferReset:
+      return "viewport_buffer_reset";
+    case MayaNavigationDebugStage::ViewportBufferMissing:
+      return "viewport_buffer_missing";
+    case MayaNavigationDebugStage::ViewportComposite:
+      return "viewport_composite";
     case MayaNavigationDebugStage::Count:
       break;
   }
@@ -240,8 +261,14 @@ struct MayaNavigationDebugState {
       return;
     }
 
+    const bool viewport_event = ELEM(stage,
+                                     MayaNavigationDebugStage::ViewportRedrawState,
+                                     MayaNavigationDebugStage::ViewportBufferReset,
+                                     MayaNavigationDebugStage::ViewportBufferMissing);
     const int stage_index = int(stage);
-    stage_max_ms[stage_index] = std::max(stage_max_ms[stage_index], duration_ms);
+    if (!viewport_event) {
+      stage_max_ms[stage_index] = std::max(stage_max_ms[stage_index], duration_ms);
+    }
     stage_samples.append({stage,
                           frame_index,
                           (BLI_time_now_seconds() - start_time) * 1000.0,
@@ -304,6 +331,11 @@ struct MayaNavigationDebugState {
       }
     }
     std::fputc('\n', file);
+    std::fputs("  VIEWPORT_CODES redraw_code=region_do_draw_flags "
+               "buffer_reset_bits=create:1,stereo:2,offscreen_size:4,format:8,"
+               "viewport_size:16 detail_a=width_or_partial_pixels "
+               "detail_b=height_or_buffer_present\n",
+               file);
 
     Set<uint64_t> slow_frames;
     for (const MayaNavigationDebugStageSample &sample : stage_samples) {
@@ -314,6 +346,26 @@ struct MayaNavigationDebugState {
       }
     }
     for (const MayaNavigationDebugStageSample &sample : stage_samples) {
+      const bool viewport_event = ELEM(sample.stage,
+                                       MayaNavigationDebugStage::ViewportRedrawState,
+                                       MayaNavigationDebugStage::ViewportBufferReset,
+                                       MayaNavigationDebugStage::ViewportBufferMissing);
+      if (viewport_event) {
+        std::fprintf(file,
+                     "  VIEWPORT_EVENT frame=%llu t_ms=%.3f stage=%s code=%.0f "
+                     "detail_a=%.0f detail_b=%.0f area=%s(%d) region=%s(%d)\n",
+                     static_cast<unsigned long long>(sample.frame_index),
+                     sample.elapsed_ms,
+                     debug_stage_name(sample.stage),
+                     sample.duration_ms,
+                     sample.detail_a_ms,
+                     sample.detail_b_ms,
+                     debug_area_name(sample.area_type),
+                     sample.area_type,
+                     debug_region_name(sample.region_type),
+                     sample.region_type);
+        continue;
+      }
       if (!slow_frames.contains(sample.frame_index) && sample.duration_ms < 4.0) {
         continue;
       }
@@ -380,7 +432,7 @@ std::unique_ptr<MayaNavigationSession> MayaNavigationSession::begin(
   params.mode = backend_mode_from_maya_mode(mode);
   params.mouse_xy = action.mouse;
   params.mouse_region_xy = action.mouse_region;
-  params.use_mouse_position = true;
+  params.use_mouse_position = mode != MayaNavigationMode::Dolly;
   params.invert_direction = mode == MayaNavigationMode::Dolly;
   params.orbit_around_selection = settings.auto_pivot_from_selection;
   params.pivot_policy = backend_pivot_from_maya_policy(settings.orbit_pivot);
@@ -466,14 +518,24 @@ MayaSessionResult MayaNavigationSession::handle_event(bContext *C,
       backend_->confirm(C);
       return MayaSessionResult::Finished;
     }
-    if (action.mouse.x == last_mouse_.x && action.mouse.y == last_mouse_.y) {
+    if (action.mouse_delta.x == 0 && action.mouse_delta.y == 0) {
       return MayaSessionResult::Running;
     }
-    last_mouse_ = action.mouse;
+
+    int2 navigation_mouse = action.mouse;
+    if (mode_ == MayaNavigationMode::Orbit) {
+      const int2 tumble_delta = action.mouse - last_mouse_;
+      navigation_mouse = last_mouse_ +
+                         int2(maya_tumble_delta_scale(tumble_delta.x),
+                              maya_tumble_delta_scale(tumble_delta.y));
+    }
+    else {
+      last_mouse_ = action.mouse;
+    }
 
     const double event_time = debug_ ? BLI_time_now_seconds() : 0.0;
     const blender::ed::view3d::NavigationResult navigation_result = backend_->update(
-        C, action.mouse, action.mouse_region);
+        C, navigation_mouse, action.mouse_region);
     if (debug_) {
       const double update_ms = (BLI_time_now_seconds() - event_time) * 1000.0;
       debug_->record(event_time, update_ms, action.mouse_delta);

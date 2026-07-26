@@ -12,6 +12,7 @@
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
+#include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
 #include "BLI_time.h"
 #include "BLI_utildefines.h"
@@ -44,6 +45,7 @@
 
 #include "transform.hh"
 #include "transform_convert.hh"
+#include "transform_snap.hh"
 
 namespace blender {
 
@@ -78,6 +80,149 @@ static const char OP_VERT_CREASE[] = "TRANSFORM_OT_vert_crease";
 static const char OP_EDGE_BWEIGHT[] = "TRANSFORM_OT_edge_bevelweight";
 static const char OP_SEQ_SLIDE[] = "TRANSFORM_OT_seq_slide";
 static const char OP_NORMAL_ROTATION[] = "TRANSFORM_OT_rotate_normal";
+
+static void transform_maya_pivot_update(const bContext *C, const TransInfo *t)
+{
+  if (t->mode != TFM_TRANSLATION) {
+    return;
+  }
+
+  float world_translation[3];
+  mul_v3_m3v3(world_translation, t->spacemtx, t->values_final);
+  ED_maya_transform_update(C, world_translation);
+}
+
+static void transform_maya_snap_apply(const bContext *C,
+                                      TransInfo *t,
+                                      wmOperator *op,
+                                      const bool restore_from_scene)
+{
+  if (restore_from_scene) {
+    transform_snap_reset_from_mode(t, op);
+  }
+
+  t->tsnap.maya_mode_active = false;
+  t->tsnap.maya_curve_targets_only = false;
+  t->tsnap.maya_include_object_pivots = false;
+  t->tsnap.maya_view_plane = false;
+  t->tsnap.maya_mesh_center = false;
+  if (!ED_maya_interaction_enabled(C)) {
+    return;
+  }
+
+  ed::maya::MayaSnapMode maya_snap_mode = ED_maya_snap_override_get(C);
+  if (maya_snap_mode == ed::maya::MayaSnapMode::None) {
+    maya_snap_mode = ED_maya_snap_mode_get(C);
+  }
+  if (maya_snap_mode == ed::maya::MayaSnapMode::None) {
+    return;
+  }
+  if (t->mode != TFM_TRANSLATION &&
+      !ELEM(maya_snap_mode,
+            ed::maya::MayaSnapMode::StepAbsolute,
+            ed::maya::MayaSnapMode::StepRelative))
+  {
+    return;
+  }
+  t->tsnap.maya_mode_active = true;
+  switch (maya_snap_mode) {
+    case ed::maya::MayaSnapMode::Grid:
+      t->tsnap.mode = SCE_SNAP_TO_GRID;
+      break;
+    case ed::maya::MayaSnapMode::Curve:
+      t->tsnap.mode = SCE_SNAP_TO_EDGE;
+      t->tsnap.maya_curve_targets_only = true;
+      break;
+    case ed::maya::MayaSnapMode::Point:
+      t->tsnap.mode = SCE_SNAP_TO_VERTEX;
+      t->tsnap.maya_include_object_pivots = true;
+      break;
+    case ed::maya::MayaSnapMode::ViewPlane:
+      t->tsnap.mode = SCE_SNAP_TO_NONE;
+      t->tsnap.maya_view_plane = true;
+      if (is_zero_v3(t->tsnap.maya_view_plane_normal)) {
+        normalize_v3_v3(t->tsnap.maya_view_plane_normal, t->viewinv[2]);
+      }
+      t->modifiers &= ~MOD_SNAP;
+      return;
+    case ed::maya::MayaSnapMode::MeshCenter:
+      t->tsnap.mode = SCE_SNAP_TO_VOLUME;
+      t->tsnap.maya_mesh_center = true;
+      break;
+    case ed::maya::MayaSnapMode::StepAbsolute:
+      t->tsnap.mode = SCE_SNAP_TO_INCREMENT;
+      if (t->mode == TFM_TRANSLATION &&
+          t->orient[t->orient_curr].type != V3D_ORIENT_GLOBAL)
+      {
+        t->tsnap.flag &= ~SCE_SNAP_ABS_GRID;
+      }
+      else {
+        t->tsnap.flag |= SCE_SNAP_ABS_GRID;
+      }
+      break;
+    case ed::maya::MayaSnapMode::StepRelative:
+      t->tsnap.mode = SCE_SNAP_TO_INCREMENT;
+      t->tsnap.flag &= ~SCE_SNAP_ABS_GRID;
+      break;
+    case ed::maya::MayaSnapMode::None:
+      BLI_assert_unreachable();
+      return;
+  }
+
+  if (!ELEM(maya_snap_mode,
+            ed::maya::MayaSnapMode::StepAbsolute,
+            ed::maya::MayaSnapMode::StepRelative))
+  {
+    t->tsnap.source_operation = SCE_SNAP_SOURCE_CENTER;
+  }
+  transform_snap_callbacks_update(t);
+  t->modifiers |= MOD_SNAP;
+}
+
+static bool transform_maya_snap_event(const bContext *C,
+                                      TransInfo *t,
+                                      wmOperator *op,
+                                      const wmEvent *event)
+{
+  if (!ED_maya_interaction_enabled(C)) {
+    if (t->tsnap.maya_mode_active) {
+      transform_maya_snap_apply(C, t, op, true);
+      t->redraw |= TREDRAW_HARD;
+    }
+    return false;
+  }
+  if (event->type == WINDEACTIVATE) {
+    transform_maya_snap_apply(C, t, op, true);
+    t->redraw |= TREDRAW_HARD;
+    return false;
+  }
+  if (!ELEM(event->type, EVT_XKEY, EVT_CKEY, EVT_VKEY, EVT_JKEY) ||
+      !ELEM(event->val, KM_PRESS, KM_RELEASE) ||
+      (event->val == KM_PRESS &&
+       (event->modifier & (KM_CTRL | KM_ALT | KM_OSKEY)) != 0) ||
+      (event->val == KM_PRESS && event->type != EVT_JKEY &&
+       (event->modifier & KM_SHIFT) != 0))
+  {
+    return false;
+  }
+
+  ed::maya::MayaSnapMode mode = ed::maya::MayaSnapMode::Grid;
+  if (event->type == EVT_CKEY) {
+    mode = ed::maya::MayaSnapMode::Curve;
+  }
+  else if (event->type == EVT_VKEY) {
+    mode = ed::maya::MayaSnapMode::Point;
+  }
+  else if (event->type == EVT_JKEY) {
+    mode = event->val == KM_RELEASE || (event->modifier & KM_SHIFT) == 0 ?
+               ed::maya::MayaSnapMode::StepAbsolute :
+               ed::maya::MayaSnapMode::StepRelative;
+  }
+  ED_maya_snap_override_set(C, mode, event->val == KM_PRESS);
+  transform_maya_snap_apply(C, t, op, true);
+  t->redraw |= TREDRAW_HARD;
+  return true;
+}
 
 static void TRANSFORM_OT_translate(wmOperatorType *ot);
 static void TRANSFORM_OT_rotate(wmOperatorType *ot);
@@ -413,6 +558,8 @@ static int transformops_data(bContext *C, wmOperator *op, const wmEvent *event)
 
 static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
+  ED_maya_pivot_event_pre_modal(C, event);
+
   const bool maya_debug = ED_maya_navigation_debug_active(C);
   const double modal_start = maya_debug ? BLI_time_now_seconds() : 0.0;
   wmOperatorStatus exit_code = OPERATOR_PASS_THROUGH;
@@ -434,7 +581,12 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
   t->context = C;
 
   const double event_start = maya_debug ? BLI_time_now_seconds() : 0.0;
-  exit_code = transformEvent(t, op, event);
+  if (transform_maya_snap_event(C, t, op, event)) {
+    exit_code = OPERATOR_RUNNING_MODAL;
+  }
+  else {
+    exit_code = transformEvent(t, op, event);
+  }
   if (maya_debug) {
     ED_maya_navigation_debug_stage_sample(
         C,
@@ -487,6 +639,7 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
   }
 
   transformApply(C, t);
+  transform_maya_pivot_update(C, t);
 
   exit_code |= transformEnd(C, t);
 
@@ -525,7 +678,7 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
         (BLI_time_now_seconds() - modal_start) * 1000.0);
   }
   if (is_finished) {
-    ED_maya_transform_end(C);
+    ED_maya_transform_end(C, (exit_code & OPERATOR_CANCELLED) != 0);
   }
 
   return exit_code;
@@ -538,7 +691,7 @@ static void transform_cancel(bContext *C, wmOperator *op)
   t->state = TRANS_CANCEL;
   transformEnd(C, t);
   transformops_exit(C, op);
-  ED_maya_transform_end(C);
+  ED_maya_transform_end(C, true);
 }
 
 static wmOperatorStatus transform_exec(bContext *C, wmOperator *op)
@@ -555,11 +708,12 @@ static wmOperatorStatus transform_exec(bContext *C, wmOperator *op)
   t->options |= CTX_AUTOCONFIRM;
 
   transformApply(C, t);
+  transform_maya_pivot_update(C, t);
 
   transformEnd(C, t);
 
   transformops_exit(C, op);
-  ED_maya_transform_end(C);
+  ED_maya_transform_end(C, false);
 
   WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, nullptr);
 
@@ -568,16 +722,23 @@ static wmOperatorStatus transform_exec(bContext *C, wmOperator *op)
 
 static wmOperatorStatus transform_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
+  const bool maya_shift_transform = ED_maya_shift_transform_prepare(C, op, event);
   if (!transformops_data(C, op, event)) {
+    if (maya_shift_transform) {
+      ED_maya_transform_end(C, true);
+    }
     G.moving = 0;
     return OPERATOR_CANCELLED;
   }
 
   const Scene *scene = CTX_data_scene(C);
+  TransInfo *t = static_cast<TransInfo *>(op->customdata);
+  transform_maya_snap_apply(C, t, op, false);
   ED_maya_transform_begin(C,
                           op->type->idname,
                           int(CTX_data_mode_enum(C)),
-                          scene && scene->toolsettings ? scene->toolsettings->selectmode : 0);
+                          scene && scene->toolsettings ? scene->toolsettings->selectmode : 0,
+                          (t->options & CTX_MAYA_PIVOT) != 0);
 
   /* When modal, allow 'value' to set initial offset. */
   if ((event == nullptr) && RNA_struct_property_is_set(op->ptr, "value")) {
@@ -588,12 +749,12 @@ static wmOperatorStatus transform_invoke(bContext *C, wmOperator *op, const wmEv
   WM_event_add_modal_handler(C, op);
 
   /* Use when modal input has some transformation to begin with. */
-  TransInfo *t = static_cast<TransInfo *>(op->customdata);
   if ((t->flag & T_NO_CURSOR_WRAP) == 0) {
     op->flag |= OP_IS_MODAL_GRAB_CURSOR; /* XXX maybe we want this with the gizmo only? */
   }
   if (UNLIKELY(!is_zero_v4(t->values_modal_offset))) {
     transformApply(C, t);
+    transform_maya_pivot_update(C, t);
   }
 
   return OPERATOR_RUNNING_MODAL;
@@ -815,6 +976,9 @@ void properties_register(wmOperatorType *ot, int flags)
   if (flags & P_CURSOR_EDIT) {
     prop = RNA_def_boolean(ot->srna, "cursor_transform", false, "Transform Cursor", "");
     RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+    prop = RNA_def_boolean(
+        ot->srna, "maya_pivot_transform", false, "Transform Maya Pivot", "");
+    RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
   }
 
   if ((flags & P_OPTIONS) && !(flags & P_NO_TEXSPACE)) {
@@ -953,6 +1117,13 @@ static void TRANSFORM_OT_resize(wmOperatorType *ot)
                        10.0f);
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 
+  prop = RNA_def_boolean(ot->srna,
+                         "use_maya_scale_behavior",
+                         false,
+                         "Maya Scale Behavior",
+                         "Project mouse input onto the active scale axis and stop at zero");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+
   WM_operatortype_props_advanced_begin(ot);
 
   properties_register(ot,
@@ -1008,7 +1179,8 @@ static void TRANSFORM_OT_trackball(wmOperatorType *ot)
 
   WM_operatortype_props_advanced_begin(ot);
 
-  properties_register(ot, P_PROPORTIONAL | P_MIRROR | P_SNAP | P_GPENCIL_EDIT | P_CENTER);
+  properties_register(
+      ot, P_PROPORTIONAL | P_MIRROR | P_SNAP | P_GPENCIL_EDIT | P_CURSOR_EDIT | P_CENTER);
 }
 
 static void TRANSFORM_OT_rotate(wmOperatorType *ot)
@@ -1034,7 +1206,7 @@ static void TRANSFORM_OT_rotate(wmOperatorType *ot)
 
   properties_register(ot,
                       P_ORIENT_AXIS | P_ORIENT_MATRIX | P_CONSTRAINT | P_PROPORTIONAL | P_MIRROR |
-                          P_GEO_SNAP | P_GPENCIL_EDIT | P_CENTER);
+                          P_GEO_SNAP | P_GPENCIL_EDIT | P_CURSOR_EDIT | P_CENTER);
 }
 
 static bool tilt_poll(bContext *C)
@@ -1558,6 +1730,91 @@ static void TRANSFORM_OT_from_gizmo(wmOperatorType *ot)
   ot->invoke = transform_from_gizmo_invoke;
 }
 
+enum eMayaSnapToggleMode {
+  MAYA_SNAP_TOGGLE_GRID = 0,
+  MAYA_SNAP_TOGGLE_CURVE,
+  MAYA_SNAP_TOGGLE_POINT,
+  MAYA_SNAP_TOGGLE_VIEW_PLANE,
+  MAYA_SNAP_TOGGLE_MESH_CENTER,
+};
+
+static const EnumPropertyItem maya_snap_toggle_mode_items[] = {
+    {MAYA_SNAP_TOGGLE_GRID, "GRID", ICON_SNAP_GRID, "Grid", "Snap the transform pivot to the grid"},
+    {MAYA_SNAP_TOGGLE_CURVE,
+     "CURVE",
+     ICON_SNAP_EDGE,
+     "Curve",
+     "Snap the transform pivot continuously along curves"},
+    {MAYA_SNAP_TOGGLE_POINT,
+     "POINT",
+     ICON_SNAP_VERTEX,
+     "Point",
+     "Snap the transform pivot to vertices, control points, and pivots"},
+    {MAYA_SNAP_TOGGLE_VIEW_PLANE,
+     "VIEW_PLANE",
+     ICON_SNAP_FACE,
+     "View Plane",
+     "Constrain free movement to the view plane captured at transform start"},
+    {MAYA_SNAP_TOGGLE_MESH_CENTER,
+     "MESH_CENTER",
+     ICON_SNAP_FACE_CENTER,
+     "Mesh Center",
+     "Snap midway between the front and back hits of the nearest mesh object"},
+    {0, nullptr, 0, nullptr, nullptr},
+};
+
+static ed::maya::MayaSnapMode maya_snap_toggle_mode_get(const int mode)
+{
+  switch (mode) {
+    case MAYA_SNAP_TOGGLE_GRID:
+      return ed::maya::MayaSnapMode::Grid;
+    case MAYA_SNAP_TOGGLE_CURVE:
+      return ed::maya::MayaSnapMode::Curve;
+    case MAYA_SNAP_TOGGLE_POINT:
+      return ed::maya::MayaSnapMode::Point;
+    case MAYA_SNAP_TOGGLE_VIEW_PLANE:
+      return ed::maya::MayaSnapMode::ViewPlane;
+    case MAYA_SNAP_TOGGLE_MESH_CENTER:
+      return ed::maya::MayaSnapMode::MeshCenter;
+  }
+  BLI_assert_unreachable();
+  return ed::maya::MayaSnapMode::None;
+}
+
+static bool maya_snap_toggle_poll(bContext *C)
+{
+  return ED_operator_view3d_active(C) && ED_maya_interaction_enabled(C);
+}
+
+static wmOperatorStatus maya_snap_toggle_exec(bContext *C, wmOperator *op)
+{
+  if (!ED_maya_interaction_enabled(C)) {
+    return OPERATOR_CANCELLED;
+  }
+
+  const ed::maya::MayaSnapMode mode = maya_snap_toggle_mode_get(
+      RNA_enum_get(op->ptr, "mode"));
+  const ed::maya::MayaSnapMode next_mode = ED_maya_snap_mode_get(C) == mode ?
+                                               ed::maya::MayaSnapMode::None :
+                                               mode;
+  ED_maya_snap_mode_set(C, next_mode);
+
+  return OPERATOR_FINISHED;
+}
+
+static void TRANSFORM_OT_maya_snap_toggle(wmOperatorType *ot)
+{
+  ot->name = "Toggle Maya Snap Mode";
+  ot->description = "Toggle a Maya-style transform snapping mode";
+  ot->idname = "TRANSFORM_OT_maya_snap_toggle";
+
+  ot->exec = maya_snap_toggle_exec;
+  ot->poll = maya_snap_toggle_poll;
+
+  RNA_def_enum(
+      ot->srna, "mode", maya_snap_toggle_mode_items, MAYA_SNAP_TOGGLE_POINT, "Mode", "");
+}
+
 void transform_operatortypes()
 {
   TransformModeItem *tmode;
@@ -1573,6 +1830,7 @@ void transform_operatortypes()
   WM_operatortype_append(TRANSFORM_OT_delete_orientation);
 
   WM_operatortype_append(TRANSFORM_OT_from_gizmo);
+  WM_operatortype_append(TRANSFORM_OT_maya_snap_toggle);
 }
 
 void keymap_transform(wmKeyConfig *keyconf)

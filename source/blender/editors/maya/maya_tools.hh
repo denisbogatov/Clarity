@@ -8,8 +8,27 @@
 
 #pragma once
 
-namespace blender::ed::maya {
+#include <cstdint>
 
-/* Shared tool contracts will live here once non-navigation tools gain a backend. */
+namespace blender {
 
-}  // namespace blender::ed::maya
+struct bContext;
+struct wmEvent;
+struct wmOperator;
+struct wmOperatorType;
+
+namespace ed::maya {
+
+enum class MayaDispatchResult : uint8_t;
+struct MayaInputAction;
+struct MayaWindowRuntime;
+
+void register_tool_operators();
+MayaDispatchResult selection_handle_action(bContext *C,
+                                            MayaWindowRuntime &runtime,
+                                            const MayaInputAction &action);
+bool shift_transform_prepare(bContext *C, wmOperator *op, const wmEvent *event);
+void shift_transform_end(bContext *C, MayaWindowRuntime &runtime, bool cancelled);
+
+}  // namespace ed::maya
+}  // namespace blender

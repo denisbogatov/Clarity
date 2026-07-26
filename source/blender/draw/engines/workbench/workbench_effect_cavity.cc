@@ -42,7 +42,8 @@ void CavityEffect::init(const SceneState &scene_state, SceneResources &resources
   world_buf.cavity_valley_factor = scene_state.shading.cavity_valley_factor;
   world_buf.cavity_ridge_factor = scene_state.shading.cavity_ridge_factor;
   world_buf.cavity_attenuation = scene_state.scene->display.matcap_ssao_attenuation;
-  world_buf.cavity_distance = scene_state.scene->display.matcap_ssao_distance;
+  const float ssao_radius = scene_state.scene->display.matcap_ssao_distance;
+  world_buf.cavity_distance = ssao_radius < 1.0f ? 16.0f : ssao_radius;
 
   world_buf.curvature_ridge = 0.5f /
                               max_ff(square_f(scene_state.shading.curvature_ridge_factor), 1e-4f);
@@ -73,6 +74,7 @@ void CavityEffect::load_samples_buf(int ssao_samples)
     /* This deliberately distribute more samples
      * at the center of the disk (and thus the shadow). */
     samples_buf[i].z = r;
+    samples_buf[i].w = expf(-2.0f * r * r);
   }
 
   samples_buf.push_update();

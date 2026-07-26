@@ -237,6 +237,9 @@ static void undosys_step_free_and_unlink(UndoStack *ustack, UndoStep *us)
   UNDO_NESTED_CHECK_BEGIN;
   us->type->step_free(us);
   UNDO_NESTED_CHECK_END;
+  if (us->user_data_free != nullptr) {
+    us->user_data_free(us->user_data);
+  }
 
   BLI_remlink(&ustack->steps, us);
   MEM_delete(us);

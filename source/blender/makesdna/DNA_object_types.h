@@ -180,7 +180,7 @@ enum eObject_DrawExtraFlag : short {
   OB_AXIS = 1 << 1,
   OB_TEXSPACE = 1 << 2,
   OB_DRAWNAME = 1 << 3,
-  /* OB_DRAWIMAGE = 1 << 4, */ /* UNUSED */
+  OB_DRAW_FACE_CENTERS = 1 << 4,
   /* for solid+wire display */
   OB_DRAWWIRE = 1 << 5,
   /* For overdrawing. */

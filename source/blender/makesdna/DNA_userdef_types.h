@@ -993,7 +993,7 @@ struct UserDef {
    * In most cases this should not be used directly it is an offset used to calculate `pixelsize`
    * which should be used to define the line width.
    */
-  int ui_line_width = 0;
+  int ui_line_width = 1;
   /** Runtime, full DPI divided by `pixelsize`. */
   int dpi = 0;
   /** Runtime multiplier to scale UI elements. Use macro UI_SCALE_FAC instead of this. */

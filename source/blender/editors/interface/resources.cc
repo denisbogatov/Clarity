@@ -77,6 +77,22 @@ namespace theme {
 /** \name Themes
  * \{ */
 
+static bool theme_id_is_scalar_value(const int colorid)
+{
+  return ELEM(colorid,
+              TH_BACKGROUND_TYPE,
+              TH_VERTEX_SIZE,
+              TH_OUTLINE_WIDTH,
+              TH_OBCENTER_DIA,
+              TH_EDGE_WIDTH,
+              TH_FACEDOT_SIZE,
+              TH_NODE_CURVING,
+              TH_NODE_GRID_LEVELS,
+              TH_HANDLE_VERTEX_SIZE,
+              TH_GP_VERTEX_SIZE,
+              TH_TRANSPARENT_CHECKER_SIZE);
+}
+
 const uchar *get_color_ptr(bTheme *btheme, int spacetype, int colorid)
 {
   ThemeSpace *ts = nullptr;
@@ -1133,6 +1149,22 @@ const uchar *get_color_ptr(bTheme *btheme, int spacetype, int colorid)
           break;
       }
     }
+  }
+
+  const bool is_viewport = spacetype == SPACE_VIEW3D &&
+                           ELEM(g_theme_state.regionid, RGN_TYPE_WINDOW, RGN_TYPE_PREVIEW);
+  if (!is_viewport && colorid >= 0 && colorid <= TH_FREESTYLE &&
+      !theme_id_is_scalar_value(colorid))
+  {
+    /* Give the interface one subtle brightness step without changing the actual 3D viewport. */
+    static thread_local uchar bright_colors[TH_FREESTYLE + 1][4];
+    uchar *bright = bright_colors[colorid];
+    for (int channel = 0; channel < 3; channel++) {
+      const int value = int(cp[channel]) + 8;
+      bright[channel] = uchar(value > 255 ? 255 : value);
+    }
+    bright[3] = cp[3];
+    return bright;
   }
 
   return static_cast<const uchar *>(cp);

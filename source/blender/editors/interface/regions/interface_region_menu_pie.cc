@@ -183,7 +183,10 @@ Layout *pie_menu_layout(PieMenu *pie)
   return pie->layout;
 }
 
-wmOperatorStatus pie_menu_invoke(bContext *C, const char *idname, const wmEvent *event)
+static wmOperatorStatus pie_menu_invoke_ex(bContext *C,
+                                           const char *idname,
+                                           const wmEvent *event,
+                                           const float threshold)
 {
   MenuType *mt = WM_menutype_find(idname, true);
 
@@ -199,6 +202,7 @@ wmOperatorStatus pie_menu_invoke(bContext *C, const char *idname, const wmEvent 
 
   PieMenu *pie = pie_menu_begin(
       C, CTX_IFACE_(mt->translation_context, mt->label), ICON_NONE, event);
+  pie->pie_block->pie_data->threshold = threshold;
   Layout *layout = pie_menu_layout(pie);
 
   menutype_draw(C, mt, layout);
@@ -206,6 +210,19 @@ wmOperatorStatus pie_menu_invoke(bContext *C, const char *idname, const wmEvent 
   pie_menu_end(C, pie);
 
   return OPERATOR_INTERFACE;
+}
+
+wmOperatorStatus pie_menu_invoke(bContext *C, const char *idname, const wmEvent *event)
+{
+  return pie_menu_invoke_ex(C, idname, event, 0.0f);
+}
+
+wmOperatorStatus pie_menu_invoke_with_threshold(bContext *C,
+                                                const char *idname,
+                                                const wmEvent *event,
+                                                const float threshold)
+{
+  return pie_menu_invoke_ex(C, idname, event, threshold);
 }
 
 /** \} */

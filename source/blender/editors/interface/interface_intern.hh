@@ -630,6 +630,8 @@ struct PieMenuData {
   float pie_center_spawned[2] = {};
   float last_pos[2] = {};
   double duration_gesture = 0.0;
+  /** Optional per-menu dead-zone radius in unscaled pixels. Zero uses the user preference. */
+  float threshold = 0.0f;
   int flags = 0;
   /** Initial event used to fire the pie menu, store here so we can query for release */
   short event_type = 0;

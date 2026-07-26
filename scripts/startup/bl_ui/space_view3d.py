@@ -764,28 +764,65 @@ class VIEW3D_HT_header(Header):
                         show_snap = True
 
         if show_snap:
-            snap_items = bpy.types.ToolSettings.bl_rna.properties["snap_elements"].enum_items
-            snap_elements = tool_settings.snap_elements
-            if len(snap_elements) == 1:
-                text = ""
-                for elem in snap_elements:
-                    icon = snap_items[elem].icon
-                    break
+            window_manager = context.window_manager
+            if window_manager.maya_interaction_enabled:
+                row = layout.row(align=True)
+                persistent_mode = window_manager.maya_snap_mode
+                temporary_mode = window_manager.maya_snap_temporary_mode
+                effective_mode = (
+                    temporary_mode if temporary_mode != 'NONE' else persistent_mode
+                )
+                maya_snap_buttons = (
+                    ('GRID', 'SNAP_GRID'),
+                    ('CURVE', 'SNAP_EDGE'),
+                    ('POINT', 'SNAP_VERTEX'),
+                    ('VIEW_PLANE', 'SNAP_FACE'),
+                    ('MESH_CENTER', 'SNAP_FACE_CENTER'),
+                )
+                for mode, icon in maya_snap_buttons:
+                    sub = row.row(align=True)
+                    sub.alert = temporary_mode == mode
+                    props = sub.operator(
+                        "transform.maya_snap_toggle",
+                        text="",
+                        icon=icon,
+                        depress=persistent_mode == mode,
+                    )
+                    props.mode = mode
+                if temporary_mode in {'STEP_ABSOLUTE', 'STEP_RELATIVE'}:
+                    row.label(
+                        text="J" if temporary_mode == 'STEP_ABSOLUTE' else "Shift J",
+                        icon='SNAP_INCREMENT',
+                    )
+                row.popover(
+                    panel="VIEW3D_PT_snapping",
+                    icon='SNAP_ON' if effective_mode != 'NONE' else 'SNAP_OFF',
+                    text="",
+                    translate=False,
+                )
             else:
-                text = iface_("Mix", i18n_contexts.editor_view3d)
-                icon = 'NONE'
-            del snap_items, snap_elements
+                snap_items = bpy.types.ToolSettings.bl_rna.properties["snap_elements"].enum_items
+                snap_elements = tool_settings.snap_elements
+                if len(snap_elements) == 1:
+                    text = ""
+                    for elem in snap_elements:
+                        icon = snap_items[elem].icon
+                        break
+                else:
+                    text = iface_("Mix", i18n_contexts.editor_view3d)
+                    icon = 'NONE'
+                del snap_items, snap_elements
 
-            row = layout.row(align=True)
-            row.prop(tool_settings, "use_snap", text="")
+                row = layout.row(align=True)
+                row.prop(tool_settings, "use_snap", text="")
 
-            sub = row.row(align=True)
-            sub.popover(
-                panel="VIEW3D_PT_snapping",
-                icon=icon,
-                text=text,
-                translate=False,
-            )
+                sub = row.row(align=True)
+                sub.popover(
+                    panel="VIEW3D_PT_snapping",
+                    icon=icon,
+                    text=text,
+                    translate=False,
+                )
 
         # Proportional editing
         if object_mode in {
@@ -1107,6 +1144,15 @@ class VIEW3D_HT_header(Header):
         row.active = (object_mode == 'EDIT') or (shading.type in {'WIREFRAME', 'SOLID'})
 
         _toggle_xray_operator(row, context, text="")
+
+        row = layout.row()
+        row.active = shading.type == 'SOLID'
+        row.operator(
+            "view3d.toggle_maya_ao",
+            text="",
+            icon='MATSPHERE',
+            depress=shading.show_cavity and shading.cavity_type in {'WORLD', 'BOTH'},
+        )
 
         row = layout.row(align=True)
         row.prop(shading, "type", text="", expand=True)
@@ -6476,29 +6522,17 @@ def _maya_navigation_debug_update(window_manager, _context):
 
 
 def register_props():
-    from bpy.props import BoolProperty, EnumProperty
+    from bpy.props import BoolProperty
 
     bpy.types.WindowManager.maya_navigation_debug = BoolProperty(
-        name="Navigation Debug Log",
-        description="Record Maya navigation stalls without writing to disk during interaction",
+        name="Viewport Performance Debug Log",
+        description="Record viewport performance stalls without writing to disk during interaction",
         default=False,
         update=_maya_navigation_debug_update,
-    )
-    bpy.types.WindowManager.maya_navigation_fps_limit = EnumProperty(
-        name="Navigation FPS",
-        description="Limit Maya navigation redraws to avoid blocking the GPU swap-chain",
-        items=(
-            ('60', "60 FPS", "Best for 60 Hz displays"),
-            ('120', "120 FPS", "Fast response with stable GPU frame pacing"),
-            ('144', "144 FPS", "For high refresh-rate displays"),
-            ('240', "240 FPS", "For very high refresh-rate displays"),
-        ),
-        default='120',
     )
 
 
 def unregister_props():
-    del bpy.types.WindowManager.maya_navigation_fps_limit
     del bpy.types.WindowManager.maya_navigation_debug
 
 
@@ -6506,7 +6540,7 @@ class VIEW3D_PT_maya_navigation_debug(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "View"
-    bl_label = "Maya Navigation Debug"
+    bl_label = "Viewport Performance Debug"
     bl_parent_id = "VIEW3D_PT_view3d_properties"
     bl_options = {'DEFAULT_CLOSED'}
 
@@ -6514,13 +6548,23 @@ class VIEW3D_PT_maya_navigation_debug(Panel):
         layout = self.layout
         window_manager = context.window_manager
 
-        layout.prop(window_manager, "maya_navigation_fps_limit")
         layout.prop(window_manager, "maya_navigation_debug")
         if window_manager.maya_navigation_debug:
-            layout.label(text="Captures events, viewport, gizmos and GPU swap")
+            layout.label(text="Captures redraw, buffer resets, gizmos and GPU swap")
             row = layout.row(align=True)
             row.label(text="maya_navigation_trace.log", icon='TEXT')
             row.operator("wm.path_open", text="", icon='FILE_FOLDER').filepath = bpy.app.tempdir
+
+
+class VIEW3D_PT_maya_interaction(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "View"
+    bl_label = "Maya Interaction"
+    bl_parent_id = "VIEW3D_PT_view3d_properties"
+
+    def draw(self, context):
+        self.layout.prop(context.window_manager, "maya_interaction_enabled", text="Enabled")
 
 
 class VIEW3D_PT_view3d_cursor(Panel):
@@ -6955,7 +6999,7 @@ class VIEW3D_PT_shading_options_shadow(Panel):
 
 
 class VIEW3D_PT_shading_options_ssao(Panel):
-    bl_label = "SSAO Settings"
+    bl_label = "Ambient Occlusion"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'HEADER'
 
@@ -6963,11 +7007,12 @@ class VIEW3D_PT_shading_options_ssao(Panel):
         layout = self.layout
         layout.use_property_split = True
         scene = context.scene
+        shading = VIEW3D_PT_shading.get_shading(context)
 
         col = layout.column(align=True)
-        col.prop(scene.display, "matcap_ssao_samples")
-        col.prop(scene.display, "matcap_ssao_distance")
-        col.prop(scene.display, "matcap_ssao_attenuation")
+        col.prop(shading, "cavity_valley_factor", text="Amount")
+        col.prop(scene.display, "matcap_ssao_distance", text="Radius")
+        col.prop(scene.display, "matcap_ssao_samples", text="Samples")
 
 
 class VIEW3D_PT_shading_cavity(Panel):
@@ -7004,16 +7049,12 @@ class VIEW3D_PT_shading_cavity(Panel):
 
         if shading.cavity_type in {'WORLD', 'BOTH'}:
             row = col.row()
-            row.label(text="World Space")
+            row.label(text="Ambient Occlusion")
             row.popover(
                 panel="VIEW3D_PT_shading_options_ssao",
                 icon='PREFERENCES',
                 text="",
             )
-
-            row = col.row()
-            row.prop(shading, "cavity_ridge_factor", text="Ridge")
-            row.prop(shading, "cavity_valley_factor", text="Valley")
 
         if shading.cavity_type in {'SCREEN', 'BOTH'}:
             col.label(text="Screen Space")
@@ -9539,6 +9580,7 @@ classes = (
     VIEW3D_PT_active_tool_duplicate,
     VIEW3D_PT_view3d_properties,
     VIEW3D_PT_view3d_lock,
+    VIEW3D_PT_maya_interaction,
     VIEW3D_PT_maya_navigation_debug,
     VIEW3D_PT_view3d_cursor,
     VIEW3D_PT_collections,

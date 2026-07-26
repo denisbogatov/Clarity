@@ -59,6 +59,12 @@ struct WindowManagerRuntime {
   /** Indicates whether modified images should be saved when saving the blend file. */
   char save_modified_images_when_file_is_saved = true;
 
+  /** Non-persistent Maya interaction and snapping state. */
+  bool maya_interaction_enabled = true;
+  uint64_t maya_interaction_revision = 0;
+  uint8_t maya_snap_mode = 0;
+  uint8_t maya_snap_temporary_mode = 0;
+
   /**
    * Indicates the main loop (#WM_main()) to stop processing the event queue and move to the next
    * step. The Remaining events will then be processed during the next iteration of the loop.

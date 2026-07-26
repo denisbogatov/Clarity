@@ -77,7 +77,7 @@ void transform_view_vector_calc(const TransInfo *t, const float focus[3], float 
 
 bool transdata_check_local_islands(TransInfo *t, short around)
 {
-  if (t->options & (CTX_CURSOR | CTX_TEXTURE_SPACE)) {
+  if (t->options & (CTX_CURSOR | CTX_TEXTURE_SPACE | CTX_MAYA_PIVOT)) {
     return false;
   }
   return ((around == V3D_AROUND_LOCAL_ORIGINS) &&
@@ -1987,6 +1987,12 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
   /* Added initialize, for external calls to set stuff in TransInfo, like undo string. */
 
   t->state = TRANS_STARTING;
+
+  if ((prop = RNA_struct_find_property(op->ptr, "maya_pivot_transform")) &&
+      RNA_property_is_set(op->ptr, prop) && RNA_property_boolean_get(op->ptr, prop))
+  {
+    options |= CTX_MAYA_PIVOT;
+  }
 
   if ((prop = RNA_struct_find_property(op->ptr, "cursor_transform")) &&
       RNA_property_is_set(op->ptr, prop))

@@ -352,10 +352,6 @@ static void ApplySnapTranslation(TransInfo *t, float vec[3])
 }
 static void translate_snap_increment_init(const TransInfo *t)
 {
-  if (!(t->tsnap.flag & SCE_SNAP_ABS_GRID)) {
-    return;
-  }
-
   TranslateCustomData *custom_data = static_cast<TranslateCustomData *>(t->custom.mode.data);
   if (t->data_type == &TransConvertType_Cursor3D) {
     /* Use a fallback when transforming the cursor.
@@ -550,6 +546,11 @@ static void applyTranslation(TransInfo *t)
         copy_v3_v3(global_dir, incr_dir);
       }
     }
+  }
+
+  if (t->tsnap.maya_view_plane && (t->con.mode & CON_APPLY) == 0) {
+    project_plane_normalized_v3_v3v3(
+        global_dir, global_dir, t->tsnap.maya_view_plane_normal);
   }
 
   applyTranslationValue(t, global_dir);

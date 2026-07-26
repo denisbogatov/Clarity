@@ -49,6 +49,7 @@
 #include "ED_gizmo_utils.hh"
 #include "ED_gpencil_legacy.hh"
 #include "ED_grease_pencil.hh"
+#include "ED_maya.hh"
 #include "ED_object.hh"
 #include "ED_particle.hh"
 #include "ED_screen.hh"
@@ -1188,6 +1189,9 @@ static bool gizmo_3d_calc_pos(const bContext *C,
 
 void gizmo_prepare_mat(const bContext *C, RegionView3D *rv3d, const TransformBounds *tbounds)
 {
+  if (ED_maya_pivot_custom_matrix_get(C, rv3d->twmat)) {
+    return;
+  }
   Scene *scene = CTX_data_scene(C);
   gizmo_3d_calc_pos(C, scene, tbounds, scene->toolsettings->transform_pivot_point, rv3d->twmat[3]);
 }
@@ -2038,8 +2042,12 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
     return;
   }
 
+  const bool maya_edit_pivot =
+      ED_maya_pivot_edit_target_get(C) != ed::maya::MayaPivotEditTarget::None;
   if (ggd->use_twtype_refresh) {
-    ggd->twtype = v3d->gizmo_show_object & ggd->twtype_init;
+    ggd->twtype = maya_edit_pivot ?
+                      (V3D_GIZMO_SHOW_OBJECT_TRANSLATE | V3D_GIZMO_SHOW_OBJECT_ROTATE) :
+                      (v3d->gizmo_show_object & ggd->twtype_init);
     if (ggd->twtype != ggd->twtype_prev) {
       ggd->twtype_prev = ggd->twtype;
       gizmogroup_init_properties_from_twtype(gzgroup);
@@ -2060,8 +2068,14 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
     return;
   }
 
-  gizmo_3d_calc_pos(
-      C, scene, &tbounds, scene->toolsettings->transform_pivot_point, rv3d->twmat[3]);
+  float maya_pivot_matrix[4][4];
+  if (ED_maya_pivot_custom_matrix_get(C, maya_pivot_matrix)) {
+    copy_m4_m4(rv3d->twmat, maya_pivot_matrix);
+  }
+  else {
+    gizmo_3d_calc_pos(
+        C, scene, &tbounds, scene->toolsettings->transform_pivot_point, rv3d->twmat[3]);
+  }
 
   gizmogroup_refresh_from_matrix(gzgroup, rv3d->twmat, nullptr, false);
 }
@@ -2095,7 +2109,12 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
   RegionView3D *rv3d = static_cast<RegionView3D *>(region->regiondata);
 
   if ((rv3d->rflag & RV3D_NAVIGATING) == 0 && ggd->use_twtype_refresh) {
-    const int twtype = v3d->gizmo_show_object & ggd->twtype_init;
+    const bool maya_edit_pivot =
+        ED_maya_pivot_edit_target_get(C) != ed::maya::MayaPivotEditTarget::None;
+    const int twtype = maya_edit_pivot ?
+                           (V3D_GIZMO_SHOW_OBJECT_TRANSLATE |
+                            V3D_GIZMO_SHOW_OBJECT_ROTATE) :
+                           (v3d->gizmo_show_object & ggd->twtype_init);
     if (ggd->twtype != twtype) {
       ggd->twtype = twtype;
       ggd->twtype_prev = twtype;
@@ -2249,6 +2268,22 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
   const float mval[2] = {float(event->mval[0]), float(event->mval[1])};
   gizmo_3d_draw_invoke(gzgroup, CTX_wm_region(C), axis_idx, mval);
 
+  if (wmGizmoOpElem *gzop = WM_gizmo_operator_get(gz, 0)) {
+    if (PropertyRNA *prop_cursor_transform = RNA_struct_find_property(&gzop->ptr,
+                                                                      "cursor_transform"))
+    {
+      RNA_property_boolean_set(&gzop->ptr, prop_cursor_transform, false);
+    }
+    if (PropertyRNA *prop_maya_pivot_transform = RNA_struct_find_property(
+            &gzop->ptr, "maya_pivot_transform"))
+    {
+      const bool transform_maya_pivot = ED_maya_pivot_edit_target_get(C) ==
+                                        ed::maya::MayaPivotEditTarget::ComponentPivot;
+      RNA_property_boolean_set(
+          &gzop->ptr, prop_maya_pivot_transform, transform_maya_pivot);
+    }
+  }
+
   /* Support gizmo specific orientation. */
   if (gz != ggd->gizmos[MAN_AXIS_ROT_T]) {
     Scene *scene = CTX_data_scene(C);
@@ -2305,7 +2340,27 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
         }
         RNA_property_boolean_set_array(ptr, prop_constraint_axis, constraint);
       }
+
+      if (axis_type == MAN_AXES_SCALE) {
+        PropertyRNA *prop_mouse_dir = RNA_struct_find_property(ptr, "mouse_dir_constraint");
+        if (prop_mouse_dir) {
+          if (ggd->use_maya_center_style) {
+            const RegionView3D *rv3d = CTX_wm_region_view3d(C);
+            RNA_property_float_set_array(ptr, prop_mouse_dir, rv3d->twmat[axis]);
+          }
+          else {
+            const float direction[3] = {0.0f, 0.0f, 0.0f};
+            RNA_property_float_set_array(ptr, prop_mouse_dir, direction);
+          }
+        }
+        RNA_boolean_set(ptr, "use_maya_scale_behavior", ggd->use_maya_center_style);
+      }
     }
+  }
+
+  if (axis_idx == MAN_AXIS_SCALE_C) {
+    wmGizmoOpElem *gzop = WM_gizmo_operator_get(gz, 0);
+    RNA_boolean_set(&gzop->ptr, "use_maya_scale_behavior", ggd->use_maya_center_style);
   }
 }
 

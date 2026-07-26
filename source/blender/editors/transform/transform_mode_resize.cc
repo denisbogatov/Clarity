@@ -176,18 +176,24 @@ static void applyResize(TransInfo *t)
     copy_v3_v3(t->values_final, t->values);
   }
   else {
-    float ratio = t->values[0];
+    float ratio = t->mouse.clamp_to_positive ? max_ff(t->values[0], 0.0f) : t->values[0];
 
     copy_v3_fl(t->values_final, ratio);
     add_v3_v3(t->values_final, t->values_modal_offset);
 
     transform_snap_increment(t, t->values_final);
 
-    if (applyNumInput(&t->num, t->values_final)) {
+    const bool has_num_input = applyNumInput(&t->num, t->values_final);
+    if (has_num_input) {
       constraintNumInput(t, t->values_final);
     }
 
     transform_snap_mixed_apply(t, t->values_final);
+    if (t->mouse.clamp_to_positive && !has_num_input) {
+      for (int i = 0; i < 3; i++) {
+        t->values_final[i] = max_ff(t->values_final[i], 0.0f);
+      }
+    }
   }
 
   size_to_mat3(mat, t->values_final);
@@ -262,6 +268,7 @@ static void initResize(TransInfo *t, wmOperator *op)
 {
   float mouse_dir_constraint[3];
   float mouse_sensitivity = 1.0f;
+  bool use_maya_scale_behavior = false;
   if (op) {
     PropertyRNA *prop = RNA_struct_find_property(op->ptr, "mouse_dir_constraint");
     if (prop) {
@@ -274,6 +281,10 @@ static void initResize(TransInfo *t, wmOperator *op)
     prop = RNA_struct_find_property(op->ptr, "mouse_sensitivity");
     if (prop) {
       mouse_sensitivity = RNA_property_float_get(op->ptr, prop);
+    }
+    prop = RNA_struct_find_property(op->ptr, "use_maya_scale_behavior");
+    if (prop) {
+      use_maya_scale_behavior = RNA_property_boolean_get(op->ptr, prop);
     }
   }
   else {
@@ -320,6 +331,7 @@ static void initResize(TransInfo *t, wmOperator *op)
 
     initMouseInputMode(t, &t->mouse, only_location ? INPUT_ERROR_DASH : INPUT_CUSTOM_RATIO);
   }
+  t->mouse.clamp_to_positive = use_maya_scale_behavior && (t->flag & T_EDIT);
 
   t->num.val_flag[0] |= NUM_NULL_ONE;
   t->num.val_flag[1] |= NUM_NULL_ONE;

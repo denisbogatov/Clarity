@@ -273,6 +273,7 @@ void initMouseInput(
 {
   mi->factor = 0;
   mi->precision = precision;
+  mi->clamp_to_positive = false;
 
   mi->center = center;
 

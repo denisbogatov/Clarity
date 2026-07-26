@@ -104,10 +104,31 @@ using ed::uv::UVSyncSelectFromMesh;
 /** \name Public Utilities
  * \{ */
 
+static thread_local float select_dist_override_px = -1.0f;
+
 float ED_view3d_select_dist_px()
 {
-  return 75.0f * U.pixelsize;
+  const float distance = select_dist_override_px >= 0.0f ? select_dist_override_px : 75.0f;
+  return distance * U.pixelsize;
 }
+
+class ScopedSelectDistanceOverride {
+ private:
+  float previous_;
+
+ public:
+  explicit ScopedSelectDistanceOverride(const float distance) : previous_(select_dist_override_px)
+  {
+    if (distance >= 0.0f) {
+      select_dist_override_px = distance;
+    }
+  }
+
+  ~ScopedSelectDistanceOverride()
+  {
+    select_dist_override_px = previous_;
+  }
+};
 
 ViewContext ED_view3d_viewcontext_init(bContext *C, Depsgraph *depsgraph)
 {
@@ -3514,6 +3535,8 @@ static bool ed_grease_pencil_select_pick(bContext *C,
 
 static wmOperatorStatus view3d_select_exec(bContext *C, wmOperator *op)
 {
+  const ScopedSelectDistanceOverride select_distance(
+      RNA_float_get(op->ptr, "select_radius"));
   Scene *scene = CTX_data_scene(C);
   Object *obedit = CTX_data_edit_object(C);
   Object *obact = CTX_data_active_object(C);
@@ -3675,6 +3698,16 @@ void VIEW3D_OT_select(wmOperatorType *ot)
   prop = RNA_def_boolean(
       ot->srna, "object", false, "Object", "Use object selection (edit mode only)");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_float(ot->srna,
+                       "select_radius",
+                       -1.0f,
+                       -1.0f,
+                       FLT_MAX,
+                       "Select Radius",
+                       "Temporary selection radius in pixels; negative values use the global setting",
+                       -1.0f,
+                       100.0f);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 
   prop = RNA_def_int_vector(ot->srna,
                             "location",
@@ -4064,7 +4097,8 @@ static void do_mesh_box_select__doSelectFace(void *user_data,
 static bool do_mesh_box_select(const ViewContext *vc,
                                wmGenericUserData *wm_userdata,
                                const rcti *rect,
-                               const eSelectOp sel_op)
+                               const eSelectOp sel_op,
+                               const bool use_depth)
 {
   BoxSelectUserData data;
   ToolSettings *ts = vc->scene->toolsettings;
@@ -4087,7 +4121,7 @@ static bool do_mesh_box_select(const ViewContext *vc,
 
   GPU_matrix_set(vc->rv3d->viewmat);
 
-  const bool use_zbuf = !XRAY_FLAG_ENABLED(vc->v3d);
+  const bool use_zbuf = use_depth && !XRAY_FLAG_ENABLED(vc->v3d);
 
   EditSelectBuf_Cache *esel = static_cast<EditSelectBuf_Cache *>(wm_userdata->data);
   if (use_zbuf) {
@@ -4563,7 +4597,8 @@ static wmOperatorStatus view3d_box_select_exec(bContext *C, wmOperator *op)
       switch (vc.obedit->type) {
         case OB_MESH:
           vc.em = BKE_editmesh_from_object(vc.obedit);
-          changed = do_mesh_box_select(&vc, wm_userdata, &rect, sel_op);
+          changed = do_mesh_box_select(
+              &vc, wm_userdata, &rect, sel_op, RNA_boolean_get(op->ptr, "use_depth"));
           if (changed) {
             DEG_id_tag_update(vc.obedit->data, ID_RECALC_SELECT);
             WM_event_add_notifier(C, NC_GEOM | ND_SELECT, vc.obedit->data);
@@ -4697,6 +4732,9 @@ void VIEW3D_OT_select_box(wmOperatorType *ot)
   /* rna */
   WM_operator_properties_gesture_box(ot);
   WM_operator_properties_select_operation(ot);
+  PropertyRNA *prop = RNA_def_boolean(
+      ot->srna, "use_depth", true, "Use Depth", "Only select components visible from the camera");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 /** \} */

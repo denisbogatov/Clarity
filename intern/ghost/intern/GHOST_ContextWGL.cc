@@ -112,6 +112,11 @@ GHOST_TSuccess GHOST_ContextWGL::swapBufferRelease()
 GHOST_TSuccess GHOST_ContextWGL::setSwapInterval(int interval)
 {
   if (epoxy_has_wgl_extension(h_DC_, "WGL_EXT_swap_control")) {
+    if (interval == GHOST_kVSyncModeAuto &&
+        !epoxy_has_wgl_extension(h_DC_, "WGL_EXT_swap_control_tear"))
+    {
+      interval = GHOST_kVSyncModeOff;
+    }
     return WIN32_CHK(::wglSwapIntervalEXT(interval)) == TRUE ? GHOST_kSuccess : GHOST_kFailure;
   }
   else {

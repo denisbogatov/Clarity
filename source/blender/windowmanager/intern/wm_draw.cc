@@ -26,6 +26,7 @@
 #include "DRW_engine.hh"
 
 #include "BLI_listbase.h"
+#include "BLI_map.hh"
 #include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
 #include "BLI_math_vector_types.hh"
@@ -88,6 +89,26 @@ namespace blender {
 /* -------------------------------------------------------------------- */
 /** \name Internal Utilities
  * \{ */
+
+static Map<const wmWindow *, int> &wm_draw_cached_composite_windows()
+{
+  static Map<const wmWindow *, int> windows;
+  return windows;
+}
+
+static bool wm_draw_cached_composite_active(const wmWindow *win)
+{
+  Map<const wmWindow *, int> &windows = wm_draw_cached_composite_windows();
+  const int *winid = windows.lookup_ptr(win);
+  if (winid == nullptr) {
+    return false;
+  }
+  if (*winid != win->winid) {
+    windows.remove(win);
+    return false;
+  }
+  return true;
+}
 
 /**
  * Return true when the cursor is grabbed and wrapped within a region.
@@ -725,11 +746,20 @@ static gpu::TextureFormat get_hdr_framebuffer_format(const Scene *scene)
   return desired_format;
 }
 
+enum eWMDrawBufferResetReason {
+  WM_DRAW_BUFFER_RESET_CREATE = 1 << 0,
+  WM_DRAW_BUFFER_RESET_STEREO = 1 << 1,
+  WM_DRAW_BUFFER_RESET_OFFSCREEN_SIZE = 1 << 2,
+  WM_DRAW_BUFFER_RESET_FORMAT = 1 << 3,
+  WM_DRAW_BUFFER_RESET_VIEWPORT_SIZE = 1 << 4,
+};
+
 static void wm_draw_region_buffer_create(Scene *scene,
-                                         ARegion *region,
-                                         bool stereo,
-                                         bool use_viewport)
+                                          ARegion *region,
+                                          bool stereo,
+                                          bool use_viewport)
 {
+  int reset_reason = 0;
 
   /* Determine desired offscreen format depending on HDR availability. */
   gpu::TextureFormat desired_format = get_hdr_framebuffer_format(scene);
@@ -737,6 +767,7 @@ static void wm_draw_region_buffer_create(Scene *scene,
   if (region->runtime->draw_buffer) {
     if (region->runtime->draw_buffer->stereo != stereo) {
       /* Free draw buffer on stereo changes. */
+      reset_reason |= WM_DRAW_BUFFER_RESET_STEREO;
       wm_draw_region_buffer_free(region);
     }
     else {
@@ -746,12 +777,21 @@ static void wm_draw_region_buffer_create(Scene *scene,
                         GPU_offscreen_height(offscreen) != region->winy ||
                         GPU_offscreen_format(offscreen) != desired_format))
       {
+        if (GPU_offscreen_width(offscreen) != region->winx ||
+            GPU_offscreen_height(offscreen) != region->winy)
+        {
+          reset_reason |= WM_DRAW_BUFFER_RESET_OFFSCREEN_SIZE;
+        }
+        if (GPU_offscreen_format(offscreen) != desired_format) {
+          reset_reason |= WM_DRAW_BUFFER_RESET_FORMAT;
+        }
         wm_draw_region_buffer_free(region);
       }
     }
   }
 
   if (!region->runtime->draw_buffer) {
+    reset_reason |= WM_DRAW_BUFFER_RESET_CREATE;
     if (use_viewport) {
       /* Allocate viewport which includes an off-screen buffer with depth multi-sample, etc. */
       region->runtime->draw_buffer = MEM_new_zeroed<wmDrawBuffer>("wmDrawBuffer");
@@ -782,16 +822,55 @@ static void wm_draw_region_buffer_create(Scene *scene,
 
     region->runtime->draw_buffer->bound_view = -1;
     region->runtime->draw_buffer->stereo = stereo;
+    region->runtime->draw_buffer->diagnostic_reset_reason = reset_reason;
   }
 }
 
 static void wm_draw_region_bind(bContext *C, ARegion *region, int view)
 {
   if (!region->runtime->draw_buffer) {
+    static double last_missing_log_time = 0.0;
+    const double now = BLI_time_now_seconds();
+    if (C != nullptr && now - last_missing_log_time >= 0.5) {
+      ScrArea *area = CTX_wm_area(C);
+      if (area != nullptr && area->spacetype == SPACE_VIEW3D &&
+          region->regiontype == RGN_TYPE_WINDOW)
+      {
+        ED_maya_viewport_debug_event(C,
+                                     ed::maya::MayaNavigationDebugStage::ViewportBufferMissing,
+                                     WM_DRAW_BUFFER_RESET_CREATE,
+                                     region->winx,
+                                     region->winy,
+                                     area->spacetype,
+                                     region->regiontype);
+        last_missing_log_time = now;
+      }
+    }
     return;
   }
 
   if (region->runtime->draw_buffer->viewport) {
+    wmDrawBuffer *draw_buffer = region->runtime->draw_buffer;
+    const bool size_changed = draw_buffer->viewport_size[0] != region->winx ||
+                              draw_buffer->viewport_size[1] != region->winy;
+    if (C != nullptr && (size_changed || draw_buffer->diagnostic_reset_reason != 0)) {
+      ScrArea *area = CTX_wm_area(C);
+      ED_maya_viewport_debug_event(
+          C,
+          ed::maya::MayaNavigationDebugStage::ViewportBufferReset,
+          draw_buffer->diagnostic_reset_reason |
+              (size_changed ? WM_DRAW_BUFFER_RESET_VIEWPORT_SIZE : 0),
+          region->winx,
+          region->winy,
+          area ? area->spacetype : -1,
+          region->regiontype);
+    }
+    draw_buffer->viewport_size[0] = region->winx;
+    draw_buffer->viewport_size[1] = region->winy;
+    if (C != nullptr) {
+      draw_buffer->diagnostic_reset_reason = 0;
+    }
+
     const bool maya_debug = C != nullptr && ED_maya_navigation_debug_active(C);
     if (maya_debug) {
       DRW_gpu_context_enable_timing_set(true);
@@ -1116,6 +1195,22 @@ static void wm_draw_area_offscreen(bContext *C, wmWindow *win, ScrArea *area, bo
 
     CTX_wm_region_set(C, &region);
     bool use_viewport = WM_region_use_viewport(area, &region);
+    if (maya_debug && area->spacetype == SPACE_VIEW3D &&
+        region.regiontype == RGN_TYPE_WINDOW)
+    {
+      const double partial_pixels = (region.runtime->do_draw & RGN_DRAW_PARTIAL) ?
+                                        double(BLI_rcti_size_x(&region.runtime->drawrct)) *
+                                            double(BLI_rcti_size_y(&region.runtime->drawrct)) :
+                                        0.0;
+      ED_maya_navigation_debug_stage_sample(
+          C,
+          ed::maya::MayaNavigationDebugStage::ViewportRedrawState,
+          double(region.runtime->do_draw),
+          partial_pixels,
+          region.runtime->draw_buffer ? 1.0 : 0.0,
+          area->spacetype,
+          region.regiontype);
+    }
 
     GPU_debug_group_begin(use_viewport ? "Viewport" : "ARegion");
 
@@ -1285,10 +1380,14 @@ static void wm_draw_window_offscreen(bContext *C, wmWindow *win, bool stereo)
   }
 }
 
-static void wm_draw_window_onscreen(bContext *C, wmWindow *win, int view)
+static void wm_draw_window_onscreen(bContext *C,
+                                    wmWindow *win,
+                                    int view,
+                                    const bool cached_composite_only)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
   bScreen *screen = WM_window_get_active_screen(win);
+  const bool maya_debug = ED_maya_navigation_debug_active(C);
 
   /* Restore screen context after drawing. Especially important for when this is called for drawing
    * to an offscreen buffer (see #WM_window_pixels_read_from_offscreen()) from operators or other
@@ -1321,34 +1420,50 @@ static void wm_draw_window_onscreen(bContext *C, wmWindow *win, int view)
 
       if (region.overlap == false) {
         /* Blit from off-screen buffer. */
+        const bool debug_viewport = maya_debug && area->spacetype == SPACE_VIEW3D &&
+                                    region.regiontype == RGN_TYPE_WINDOW;
+        const double composite_start = debug_viewport ? BLI_time_now_seconds() : 0.0;
         wm_draw_region_blit(&region, view);
+        if (debug_viewport) {
+          ED_maya_navigation_debug_stage_sample(
+              C,
+              ed::maya::MayaNavigationDebugStage::ViewportComposite,
+              (BLI_time_now_seconds() - composite_start) * 1000.0,
+              region.runtime->draw_buffer ? 1.0 : 0.0,
+              double(view),
+              area->spacetype,
+              region.regiontype);
+        }
       }
     }
   }
 
-  /* Draw overlays and paint cursors. */
-  ED_screen_areas_iter (win, screen, area) {
-    for (ARegion &region : area->regionbase) {
-      if (!region.runtime->visible) {
-        continue;
-      }
-      const bool do_paint_cursor = (wm->runtime->paintcursors.first &&
-                                    &region == screen->active_region);
-      const bool do_draw_overlay = (region.runtime->type && region.runtime->type->draw_overlay);
-      if (!(do_paint_cursor || do_draw_overlay)) {
-        continue;
-      }
+  if (!cached_composite_only) {
+    /* Draw overlays and paint cursors. */
+    ED_screen_areas_iter (win, screen, area) {
+      for (ARegion &region : area->regionbase) {
+        if (!region.runtime->visible) {
+          continue;
+        }
+        const bool do_paint_cursor = (wm->runtime->paintcursors.first &&
+                                      &region == screen->active_region);
+        const bool do_draw_overlay = (region.runtime->type &&
+                                      region.runtime->type->draw_overlay);
+        if (!(do_paint_cursor || do_draw_overlay)) {
+          continue;
+        }
 
-      CTX_wm_area_set(C, area);
-      CTX_wm_region_set(C, &region);
-      if (do_draw_overlay) {
-        wm_region_draw_overlay(C, area, &region);
+        CTX_wm_area_set(C, area);
+        CTX_wm_region_set(C, &region);
+        if (do_draw_overlay) {
+          wm_region_draw_overlay(C, area, &region);
+        }
+        if (do_paint_cursor) {
+          wm_paintcursor_draw(C, area, &region);
+        }
+        CTX_wm_region_set(C, nullptr);
+        CTX_wm_area_set(C, nullptr);
       }
-      if (do_paint_cursor) {
-        wm_paintcursor_draw(C, area, &region);
-      }
-      CTX_wm_region_set(C, nullptr);
-      CTX_wm_area_set(C, nullptr);
     }
   }
   wmWindowViewport(win);
@@ -1372,7 +1487,9 @@ static void wm_draw_window_onscreen(bContext *C, wmWindow *win, int view)
   /* Needs zero offset here or it looks blurry. #128112. */
   wmWindowViewport_ex(win, 0.0f);
 
-  wm_draw_callbacks(win);
+  if (!cached_composite_only) {
+    wm_draw_callbacks(win);
+  }
   wmWindowViewport(win);
 
   /* Blend in floating regions (menus). */
@@ -1384,13 +1501,13 @@ static void wm_draw_window_onscreen(bContext *C, wmWindow *win, int view)
   }
 
   /* Always draw, not only when screen tagged. */
-  if (win->runtime->gesture.first) {
+  if (!cached_composite_only && win->runtime->gesture.first) {
     wm_gesture_draw(win);
     wmWindowViewport(win);
   }
 
   /* Needs pixel coords in screen. */
-  if (wm->runtime->drags.first) {
+  if (!cached_composite_only && wm->runtime->drags.first) {
     wm_drags_draw(C, win);
     wmWindowViewport(win);
   }
@@ -1414,6 +1531,7 @@ static void wm_draw_window(bContext *C, wmWindow *win)
 {
   PRF_scope(ProfileCategory::Draw);
   const bool maya_debug = ED_maya_navigation_debug_active(C);
+  const bool cached_composite_only = wm_draw_cached_composite_active(win);
   GPU_context_begin_frame(static_cast<GPUContext *>(win->runtime->gpuctx));
 
   bScreen *screen = WM_window_get_active_screen(win);
@@ -1421,7 +1539,7 @@ static void wm_draw_window(bContext *C, wmWindow *win)
 
 #ifdef WITH_GHOST_CSD
   /* Title bar. */
-  if (WM_window_is_csd(win)) {
+  if (!cached_composite_only && WM_window_is_csd(win)) {
     WM_window_csd_draw_titlebar(win);
   }
 #endif
@@ -1429,7 +1547,9 @@ static void wm_draw_window(bContext *C, wmWindow *win)
   /* Draw area regions into their own frame-buffer. This way we can redraw
    * the areas that need it, and blit the rest from existing frame-buffers. */
   const double offscreen_start = maya_debug ? BLI_time_now_seconds() : 0.0;
-  wm_draw_window_offscreen(C, win, stereo);
+  if (!cached_composite_only) {
+    wm_draw_window_offscreen(C, win, stereo);
+  }
   if (maya_debug) {
     ED_maya_navigation_debug_stage_sample(
         C,
@@ -1441,20 +1561,20 @@ static void wm_draw_window(bContext *C, wmWindow *win)
   const double onscreen_start = maya_debug ? BLI_time_now_seconds() : 0.0;
   if (!stereo) {
     /* Regular mono drawing. */
-    wm_draw_window_onscreen(C, win, -1);
+    wm_draw_window_onscreen(C, win, -1, cached_composite_only);
   }
   else if (win->stereo3d_format->display_mode == S3D_DISPLAY_PAGEFLIP) {
     /* For page-flip we simply draw to both back buffers. */
     GPU_backbuffer_bind(GPU_BACKBUFFER_RIGHT);
-    wm_draw_window_onscreen(C, win, 1);
+    wm_draw_window_onscreen(C, win, 1, cached_composite_only);
 
     GPU_backbuffer_bind(GPU_BACKBUFFER_LEFT);
-    wm_draw_window_onscreen(C, win, 0);
+    wm_draw_window_onscreen(C, win, 0, cached_composite_only);
   }
   else if (ELEM(win->stereo3d_format->display_mode, S3D_DISPLAY_ANAGLYPH, S3D_DISPLAY_INTERLACE)) {
     /* For anaglyph and interlace, we draw individual regions with
      * stereo frame-buffers using different shaders. */
-    wm_draw_window_onscreen(C, win, -1);
+    wm_draw_window_onscreen(C, win, -1, cached_composite_only);
   }
   else {
     /* Determine desired offscreen format depending on HDR availability. */
@@ -1480,7 +1600,7 @@ static void wm_draw_window(bContext *C, wmWindow *win)
       for (int view = 0; view < 2; view++) {
         /* Draw view into offscreen buffer. */
         GPU_offscreen_bind(offscreen, false);
-        wm_draw_window_onscreen(C, win, view);
+        wm_draw_window_onscreen(C, win, view, cached_composite_only);
         GPU_offscreen_unbind(offscreen, false);
 
         /* Draw offscreen buffer to screen. */
@@ -1501,7 +1621,7 @@ static void wm_draw_window(bContext *C, wmWindow *win)
     }
     else {
       /* Still draw something in case of allocation failure. */
-      wm_draw_window_onscreen(C, win, 0);
+      wm_draw_window_onscreen(C, win, 0, cached_composite_only);
     }
   }
   if (maya_debug) {
@@ -1654,7 +1774,7 @@ uint8_t *WM_window_pixels_read_from_offscreen(bContext *C, wmWindow *win, int r_
   const uint rect_len = win_size[0] * win_size[1];
   uint8_t *rect = MEM_new_array_uninitialized<uint8_t>(4 * rect_len, __func__);
   GPU_offscreen_bind(offscreen, false);
-  wm_draw_window_onscreen(C, win, -1);
+  wm_draw_window_onscreen(C, win, -1, false);
   GPU_offscreen_unbind(offscreen, false);
   GPU_offscreen_read_color(offscreen, GPU_DATA_UBYTE, rect);
   GPU_offscreen_free(offscreen);
@@ -1692,7 +1812,7 @@ bool WM_window_pixels_read_sample_from_offscreen(bContext *C,
 
   float rect_pixel[4];
   GPU_offscreen_bind(offscreen, false);
-  wm_draw_window_onscreen(C, win, -1);
+  wm_draw_window_onscreen(C, win, -1, false);
   GPU_offscreen_unbind(offscreen, false);
   GPU_offscreen_read_color_region(offscreen, GPU_DATA_FLOAT, pos[0], pos[1], 1, 1, rect_pixel);
   GPU_offscreen_free(offscreen);
@@ -1732,6 +1852,10 @@ bool WM_desktop_cursor_sample_read(float r_col[3])
 /* Quick test to prevent changing window drawable. */
 static bool wm_draw_update_test_window(Main *bmain, bContext *C, wmWindow *win)
 {
+  if (wm_draw_cached_composite_active(win)) {
+    return WM_window_get_active_screen(win)->do_draw;
+  }
+
   const wmWindowManager *wm = CTX_wm_manager(C);
   Scene *scene = WM_window_get_active_scene(win);
   ViewLayer *view_layer = WM_window_get_active_view_layer(win);
@@ -1849,8 +1973,8 @@ static void wm_draw_frame_rate_limit_apply(const int frame_rate_limit)
 
 static void wm_draw_vsync_update(wmWindowManager *wm)
 {
-  static int applied_vsync = -1;
-  const int requested_vsync = U.viewport_vsync ? 1 : 0;
+  static int applied_vsync = GHOST_kVSyncModeUnset;
+  const int requested_vsync = U.viewport_vsync ? GHOST_kVSyncModeOn : GHOST_kVSyncModeAuto;
   if (requested_vsync == applied_vsync) {
     return;
   }
@@ -1907,6 +2031,7 @@ void wm_draw_update(bContext *C)
     CTX_wm_window_set(C, &win);
 
     if (wm_draw_update_test_window(bmain, C, &win)) {
+      const bool cached_composite_only = wm_draw_cached_composite_active(&win);
       const bool maya_debug = ED_maya_navigation_debug_active(C);
       const double frame_start = maya_debug ? BLI_time_now_seconds() : 0.0;
       if (maya_debug) {
@@ -1953,7 +2078,9 @@ void wm_draw_update(bContext *C)
 
       /* Notifiers for screen redraw. */
       const double screen_update_start = maya_debug ? BLI_time_now_seconds() : 0.0;
-      ED_screen_ensure_updated(C, wm, &win);
+      if (!cached_composite_only) {
+        ED_screen_ensure_updated(C, wm, &win);
+      }
       if (maya_debug) {
         ED_maya_navigation_debug_stage_sample(
             C,
@@ -1971,7 +2098,9 @@ void wm_draw_update(bContext *C)
       }
 
       const double draw_clear_start = maya_debug ? BLI_time_now_seconds() : 0.0;
-      wm_draw_update_clear_window(C, &win);
+      if (!cached_composite_only) {
+        wm_draw_update_clear_window(C, &win);
+      }
       if (maya_debug) {
         ED_maya_navigation_debug_stage_sample(
             C,
@@ -2020,6 +2149,14 @@ void wm_draw_update(bContext *C)
 
 void wm_draw_region_clear(wmWindow *win, ARegion * /*region*/)
 {
+  wm_draw_cached_composite_windows().remove(win);
+  bScreen *screen = WM_window_get_active_screen(win);
+  screen->do_draw = true;
+}
+
+void wm_draw_region_cached_composite_tag(wmWindow *win)
+{
+  wm_draw_cached_composite_windows().add_overwrite(win, win->winid);
   bScreen *screen = WM_window_get_active_screen(win);
   screen->do_draw = true;
 }

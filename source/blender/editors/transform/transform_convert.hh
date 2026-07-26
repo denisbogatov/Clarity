@@ -256,6 +256,10 @@ extern TransConvertTypeInfo TransConvertType_CursorImage;
 extern TransConvertTypeInfo TransConvertType_CursorSequencer;
 extern TransConvertTypeInfo TransConvertType_Cursor3D;
 
+/* `transform_convert_maya_pivot.cc` */
+
+extern TransConvertTypeInfo TransConvertType_MayaPivot;
+
 /* `transform_convert_curve.cc` */
 
 extern TransConvertTypeInfo TransConvertType_Curve;

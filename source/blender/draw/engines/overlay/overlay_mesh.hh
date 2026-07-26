@@ -40,6 +40,12 @@ constexpr int overlay_edit_text = V3D_OVERLAY_EDIT_EDGE_LEN | V3D_OVERLAY_EDIT_F
                                   V3D_OVERLAY_EDIT_FACE_ANG | V3D_OVERLAY_EDIT_EDGE_ANG |
                                   V3D_OVERLAY_EDIT_INDICES;
 
+inline bool maya_face_centers_visible(const Object &object)
+{
+  const Object *object_orig = DEG_get_original(&object);
+  return object_orig != nullptr && (object_orig->dtx & OB_DRAW_FACE_CENTERS) != 0;
+}
+
 /**
  * Draw edit mesh overlays.
  */
@@ -111,8 +117,8 @@ class Meshes : Overlay {
     select_vert_ = (tsettings->selectmode & SCE_SELECT_VERTEX);
     select_edge_ = (tsettings->selectmode & SCE_SELECT_EDGE);
     select_face_ = (tsettings->selectmode & SCE_SELECT_FACE);
-    select_face_dots_ = ((edit_flag & V3D_OVERLAY_EDIT_FACE_DOT) || state.xray_flag_enabled) &
-                        select_face_;
+    select_face_dots_ = (edit_flag & V3D_OVERLAY_EDIT_FACE_DOT) ||
+                        (state.xray_flag_enabled && select_face_);
 
     show_retopology_ = (edit_flag & V3D_OVERLAY_EDIT_RETOPOLOGY) && !state.xray_enabled;
     show_mesh_analysis_ = (edit_flag & V3D_OVERLAY_EDIT_STATVIS);

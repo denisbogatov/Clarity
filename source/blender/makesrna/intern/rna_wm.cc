@@ -1567,6 +1567,36 @@ static bool rna_WindowManager_is_event_handling_break_get(PointerRNA *ptr)
   return wm->runtime->break_events_handling;
 }
 
+static bool rna_WindowManager_maya_interaction_enabled_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->maya_interaction_enabled;
+}
+
+static void rna_WindowManager_maya_interaction_enabled_set(PointerRNA *ptr, const bool value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  if (wm->runtime->maya_interaction_enabled != value) {
+    wm->runtime->maya_interaction_revision++;
+  }
+  wm->runtime->maya_interaction_enabled = value;
+  if (!value) {
+    wm->runtime->maya_snap_temporary_mode = 0;
+  }
+}
+
+static int rna_WindowManager_maya_snap_mode_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->maya_snap_mode;
+}
+
+static int rna_WindowManager_maya_snap_temporary_mode_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->maya_snap_temporary_mode;
+}
+
 static PointerRNA rna_WindowManager_xr_session_state_get(PointerRNA *ptr)
 {
   wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
@@ -2962,6 +2992,18 @@ static void rna_def_report(BlenderRNA *brna)
 
 static void rna_def_windowmanager(BlenderRNA *brna)
 {
+  static const EnumPropertyItem maya_snap_mode_items[] = {
+      {0, "NONE", 0, "None", "Use the standard Blender snapping state"},
+      {1, "GRID", 0, "Grid", "Snap the transform pivot to the grid"},
+      {2, "CURVE", 0, "Curve", "Snap continuously along curve geometry"},
+      {3, "POINT", 0, "Point", "Snap to points and transform pivots"},
+      {4, "VIEW_PLANE", 0, "View Plane", "Move on the view plane frozen at transform start"},
+      {5, "MESH_CENTER", 0, "Mesh Center", "Snap midway between the front and back mesh hits"},
+      {6, "STEP_ABSOLUTE", 0, "Absolute Step", "Snap to absolute increments"},
+      {7, "STEP_RELATIVE", 0, "Relative Step", "Snap to relative increments"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
   StructRNA *srna;
   PropertyRNA *prop;
 
@@ -3048,6 +3090,28 @@ static void rna_def_windowmanager(BlenderRNA *brna)
       prop,
       "Event Handling Break",
       "Remaining events in the queue are delayed until the next main loop iteration");
+
+  prop = RNA_def_property(srna, "maya_interaction_enabled", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_WindowManager_maya_interaction_enabled_get",
+                                 "rna_WindowManager_maya_interaction_enabled_set");
+  RNA_def_property_ui_text(
+      prop, "Maya Interaction", "Enable Maya-style viewport interaction and transform snapping");
+  RNA_def_property_update(prop, NC_WINDOW, nullptr);
+
+  prop = RNA_def_property(srna, "maya_snap_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_enum_items(prop, maya_snap_mode_items);
+  RNA_def_property_enum_funcs(prop, "rna_WindowManager_maya_snap_mode_get", nullptr, nullptr);
+  RNA_def_property_ui_text(prop, "Maya Snap Mode", "Persistent Maya snapping mode");
+
+  prop = RNA_def_property(srna, "maya_snap_temporary_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_enum_items(prop, maya_snap_mode_items);
+  RNA_def_property_enum_funcs(
+      prop, "rna_WindowManager_maya_snap_temporary_mode_get", nullptr, nullptr);
+  RNA_def_property_ui_text(
+      prop, "Temporary Maya Snap Mode", "Last pressed temporary Maya snapping override");
 
   RNA_api_wm(srna);
   RNA_api_asset_library_loading_status(srna);

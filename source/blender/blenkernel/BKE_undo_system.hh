@@ -77,6 +77,9 @@ struct UndoStep {
   UndoStep *next, *prev;
   char name[64];
   const UndoType *type;
+  /** Optional owner-managed payload whose lifetime is exactly the lifetime of this step. */
+  void *user_data;
+  void (*user_data_free)(void *user_data);
   /** Size in bytes of all data in step (not including the step). */
   size_t data_size;
   /** Users should never see this step (only use for internal consistency). */

@@ -12,6 +12,10 @@
 #include "BKE_bvhutils.hh"
 #include "BKE_mesh.hh"
 
+#include "DEG_depsgraph_query.hh"
+
+#include "DNA_object_types.h"
+
 #include "ED_transform_snap_object_context.hh"
 #include "ED_view3d.hh"
 
@@ -682,6 +686,13 @@ eSnapMode snap_object_mesh(SnapObjectContext *sctx,
 {
   eSnapMode elem = SCE_SNAP_TO_NONE;
   const Mesh *mesh_eval = reinterpret_cast<const Mesh *>(id);
+
+  const Object *object_orig = DEG_get_original(ob_eval);
+  if ((snap_to_flag & SCE_SNAP_TO_POINT) &&
+      (object_orig->dtx & OB_DRAW_FACE_CENTERS) != 0)
+  {
+    snap_to_flag |= SCE_SNAP_TO_FACE_MIDPOINT;
+  }
 
   if (snap_to_flag & (SNAP_TO_EDGE_ELEMENTS | SCE_SNAP_TO_POINT | SCE_SNAP_TO_FACE_MIDPOINT)) {
     elem = snapMesh(sctx, ob_eval, mesh_eval, obmat, skip_hidden, is_editmesh, snap_to_flag);

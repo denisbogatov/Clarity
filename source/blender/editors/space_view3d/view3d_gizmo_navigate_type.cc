@@ -50,7 +50,7 @@ namespace blender {
 #define VIEWCUBE_HALF_SIZE 0.68f
 #define VIEWCUBE_BEVEL_SIZE 0.10f
 #define VIEWCUBE_BOUND_RADIUS (VIEWCUBE_HALF_SIZE * 1.74f)
-#define VIEWCUBE_LINE_WIDTH ((U.gizmo_size_navigate_v3d / 55.0f) * U.pixelsize)
+#define VIEWCUBE_LINE_WIDTH ((U.gizmo_size_navigate_v3d / 65.0f) * UI_SCALE_FAC)
 /* Render labels at a higher internal resolution, then scale them onto each face. */
 #define VIEWCUBE_TEXT_SIZE (WIDGET_RADIUS * 0.60f)
 
@@ -148,7 +148,9 @@ static const char *viewcube_face_label(const int index)
   return IFACE_(labels[index]);
 }
 
-static void viewcube_face_text_matrix(const ViewCubeFace &face, float r_matrix[4][4])
+static void viewcube_face_text_matrix(const wmGizmo *gz,
+                                      const ViewCubeFace &face,
+                                      float r_matrix[4][4])
 {
   unit_m4(r_matrix);
   zero_v3(r_matrix[0]);
@@ -173,6 +175,18 @@ static void viewcube_face_text_matrix(const ViewCubeFace &face, float r_matrix[4
     r_matrix[0][0] = sign;
     r_matrix[1][1] = 1.0f;
     r_matrix[2][2] = sign;
+  }
+
+  /* Keep labels readable when a face rotates past a screen-space half turn. */
+  float screen_u[2];
+  float screen_v[2];
+  viewcube_project_point(gz, r_matrix[0], screen_u);
+  viewcube_project_point(gz, r_matrix[1], screen_v);
+  if (screen_u[0] < 0.0f ||
+      (fabsf(screen_u[0]) < 1e-5f && screen_v[1] < 0.0f))
+  {
+    negate_v3(r_matrix[0]);
+    negate_v3(r_matrix[1]);
   }
 }
 
@@ -335,7 +349,7 @@ static void gizmo_axis_draw(const bContext * /*C*/, wmGizmo *gz)
       const float label_scale = std::min((inner * 2.0f * 0.72f) / label_width,
                                          (inner * 2.0f * 0.42f) / label_height);
       float text_matrix[4][4];
-      viewcube_face_text_matrix(face, text_matrix);
+      viewcube_face_text_matrix(gz, face, text_matrix);
 
       GPU_matrix_push();
       GPU_matrix_translate_3fv(center);

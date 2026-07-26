@@ -604,6 +604,16 @@ _MAYA_SHELF_SLOT_WIDTH = 35.0
 _MAYA_SHELF_SEPARATOR_WIDTH = 13.2
 
 
+def unregister_runtime():
+    global _maya_shelf_previews
+    global _maya_shelf_drag_state
+    if _maya_shelf_previews is not None:
+        bpy.utils.previews.remove(_maya_shelf_previews)
+        _maya_shelf_previews = None
+    _maya_shelf_drag_state = None
+    _maya_shelf_row_cache.clear()
+
+
 def _maya_shelf_item_slot_width(_item):
     return _MAYA_SHELF_SLOT_WIDTH
 
@@ -1414,7 +1424,7 @@ class TOPBAR_OT_maya_shelf_item_add(Operator):
         _maya_shelf_config(context)
         _maya_shelf_action_list_fill(self, "cube")
         _maya_shelf_icon_list_fill(self, "MESH_CUBE")
-        return context.window_manager.invoke_props_dialog(self, width=440)
+        return context.window_manager.invoke_props_dialog(self, width=600)
 
     def draw(self, _context):
         layout = self.layout
@@ -1440,7 +1450,12 @@ class TOPBAR_OT_maya_shelf_item_add(Operator):
         else:
             layout.prop(self, "script_source")
             if self.script_source == 'INLINE':
-                layout.prop(self, "script_code")
+                layout.textbox(
+                    self,
+                    "script_code",
+                    initial_visible_lines=8,
+                    placeholder="Enter Python code stored in this shelf icon",
+                )
             elif self.script_source == 'TEXT':
                 layout.prop_search(self, "script_text", bpy.data, "texts")
             else:
@@ -1636,7 +1651,7 @@ class TOPBAR_OT_maya_shelf_item_edit(Operator):
         )
         self.icon_color = item.get("icon_color", (1.0, 1.0, 1.0, 1.0))
         self.short_text = item.get("short_text", "")
-        return context.window_manager.invoke_props_dialog(self, width=420)
+        return context.window_manager.invoke_props_dialog(self, width=600)
 
     def draw(self, _context):
         layout = self.layout
@@ -1662,7 +1677,12 @@ class TOPBAR_OT_maya_shelf_item_edit(Operator):
         elif self.command_type == 'PYTHON':
             layout.prop(self, "script_source")
             if self.script_source == 'INLINE':
-                layout.prop(self, "script_code")
+                layout.textbox(
+                    self,
+                    "script_code",
+                    initial_visible_lines=8,
+                    placeholder="Enter Python code stored in this shelf icon",
+                )
             elif self.script_source == 'TEXT':
                 layout.prop_search(self, "script_text", bpy.data, "texts")
             else:

@@ -918,8 +918,6 @@ eSnapMode snap_object_center(SnapObjectContext *sctx,
                              const float4x4 &obmat,
                              eSnapMode snap_to_flag)
 {
-  /* May extend later (for now just snaps to empty or camera center). */
-
   if (ob_eval->transflag & OB_DUPLI) {
     return SCE_SNAP_TO_NONE;
   }
@@ -941,6 +939,19 @@ eSnapMode snap_object_center(SnapObjectContext *sctx,
   return SCE_SNAP_TO_NONE;
 }
 
+static eSnapMode snap_object_center_if_enabled(SnapObjectContext *sctx,
+                                               const Object *ob_eval,
+                                               const float4x4 &obmat,
+                                               const eSnapMode fallback)
+{
+  if (!sctx->runtime.params.include_object_pivots) {
+    return fallback;
+  }
+  const eSnapMode center = snap_object_center(
+      sctx, ob_eval, obmat, sctx->runtime.snap_to_flag);
+  return center == SCE_SNAP_TO_NONE ? fallback : center;
+}
+
 /**
  * \note Duplicate args here are documented at #snapObjectsRay.
  */
@@ -951,9 +962,16 @@ static eSnapMode snap_obj_fn(SnapObjectContext *sctx,
                              bool is_object_active,
                              bool use_hide)
 {
+  if (sctx->runtime.params.curve_targets_only &&
+      ob_eval->type != OB_CURVES_LEGACY)
+  {
+    return SCE_SNAP_TO_NONE;
+  }
+
   if (ob_data == nullptr && (ob_eval->type == OB_MESH)) {
-    return snap_object_editmesh(
+    const eSnapMode retval = snap_object_editmesh(
         sctx, ob_eval, nullptr, obmat, sctx->runtime.snap_to_flag, use_hide);
+    return snap_object_center_if_enabled(sctx, ob_eval, obmat, retval);
   }
 
   if (ob_data == nullptr) {
@@ -974,7 +992,9 @@ static eSnapMode snap_obj_fn(SnapObjectContext *sctx,
        * #SNAP_GEOM_FINAL. */
       return SCE_SNAP_TO_NONE;
     }
-    return snap_object_mesh(sctx, ob_eval, ob_data, obmat, sctx->runtime.snap_to_flag, use_hide);
+    const eSnapMode retval = snap_object_mesh(
+        sctx, ob_eval, ob_data, obmat, sctx->runtime.snap_to_flag, use_hide);
+    return snap_object_center_if_enabled(sctx, ob_eval, obmat, retval);
   }
 
   eSnapMode retval = SCE_SNAP_TO_NONE;
@@ -1008,7 +1028,7 @@ static eSnapMode snap_obj_fn(SnapObjectContext *sctx,
       break;
   }
 
-  return retval;
+  return snap_object_center_if_enabled(sctx, ob_eval, obmat, retval);
 }
 
 /**

@@ -9,6 +9,9 @@
  */
 
 #include <cstring>
+#include <fstream>
+#include <optional>
+#include <string>
 
 #include "MEM_guardedalloc.h"
 
@@ -16,15 +19,21 @@
 #include "DNA_userdef_types.h"
 
 #include "BLI_listbase.h"
+#include "BLI_map.hh"
+#include "BLI_math_vector_types.hh"
+#include "BLI_path_utils.hh"
 #include "BLI_rect.h"
 #include "BLI_string_utf8.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_appdir.hh"
 #include "BKE_context.hh"
 #include "BKE_screen.hh"
 
 #include "WM_api.hh"
 #include "WM_types.hh"
+
+#include "wm_draw.hh"
 
 #include "UI_interface_layout.hh"
 #include "UI_view2d.hh"
@@ -93,7 +102,7 @@ static ARegion *area_find_region_by_type_and_index_hint(const ScrArea *area,
 }
 
 struct HudRegionData {
-  short regionid;
+  short regionid = -1;
   /**
    * The region index of this region type in the `area`.
    * When this cannot be resolved, use the first region of `regionid`.
@@ -102,8 +111,67 @@ struct HudRegionData {
    * if exiting quad-view in the 3D viewport after performing an operation for example.
    * so in this case use the first region.
    */
-  int region_index_hint;
+  int region_index_hint = -1;
+
+  std::string operator_idname;
+  int2 drag_xy = int2(0);
+  bool is_dragging = false;
+  bool position_changed = false;
 };
+
+struct HudPositionStorage {
+  Map<std::string, int2> operator_offsets;
+  bool is_loaded = false;
+};
+
+static std::optional<std::string> hud_position_file_path()
+{
+  const std::optional<std::string> config_dir = BKE_appdir_folder_id_create(BLENDER_USER_CONFIG,
+                                                                            nullptr);
+  if (!config_dir) {
+    return std::nullopt;
+  }
+
+  char filepath[FILE_MAX];
+  BLI_path_join(
+      filepath, sizeof(filepath), config_dir->c_str(), "maya-hud-positions.txt");
+  return std::string(filepath);
+}
+
+static HudPositionStorage &hud_position_storage()
+{
+  static HudPositionStorage storage;
+  if (storage.is_loaded) {
+    return storage;
+  }
+  storage.is_loaded = true;
+
+  const std::optional<std::string> path = hud_position_file_path();
+  if (!path) {
+    return storage;
+  }
+
+  std::ifstream file(*path);
+  std::string operator_idname;
+  int x, y;
+  while (file >> operator_idname >> x >> y) {
+    storage.operator_offsets.add_overwrite(operator_idname, int2(x, y));
+  }
+  return storage;
+}
+
+static void hud_position_storage_write()
+{
+  const std::optional<std::string> path = hud_position_file_path();
+  if (!path) {
+    return;
+  }
+
+  std::ofstream file(*path);
+  for (const auto item : hud_position_storage().operator_offsets.items()) {
+    file << item.key << '\t' << item.value.x << '\t' << item.value.y << '\n';
+  }
+}
 
 static bool last_redo_poll(const bContext *C, short region_type, int region_index_hint)
 {
@@ -135,6 +203,10 @@ static bool last_redo_poll(const bContext *C, short region_type, int region_inde
 
 static void hud_region_hide(ARegion *region)
 {
+  if (HudRegionData *hrd = static_cast<HudRegionData *>(region->regiondata)) {
+    hrd->is_dragging = false;
+    hrd->position_changed = false;
+  }
   region->flag |= RGN_FLAG_HIDDEN;
   /* Avoids setting 'AREA_FLAG_REGION_SIZE_UPDATE'
    * since other regions don't depend on this. */
@@ -204,6 +276,88 @@ static void hud_panels_register(ARegionType *art, int space_type, int region_typ
 /** \name Callbacks for Floating Region
  * \{ */
 
+static void hud_region_move_end(bContext *C, ARegion *region, HudRegionData *hrd)
+{
+  hrd->is_dragging = false;
+  if (hrd->position_changed && !hrd->operator_idname.empty()) {
+    hud_position_storage().operator_offsets.add_overwrite(
+        hrd->operator_idname, int2(region->runtime->offset_x, region->runtime->offset_y));
+    hud_position_storage_write();
+  }
+  hrd->position_changed = false;
+  if (wmWindow *win = CTX_wm_window(C)) {
+    WM_cursor_set(win, WM_CURSOR_DEFAULT);
+    /* Flush deferred editor redraws once after the cached drag has finished. */
+    wm_draw_region_clear(win, region);
+  }
+}
+
+static int hud_region_move_handler(bContext *C, const wmEvent *event, void *userdata)
+{
+  ARegion *region = static_cast<ARegion *>(userdata);
+  HudRegionData *hrd = static_cast<HudRegionData *>(region->regiondata);
+  if (hrd == nullptr || (region->flag & RGN_FLAG_HIDDEN)) {
+    return WM_UI_HANDLER_CONTINUE;
+  }
+
+  if (hrd->is_dragging) {
+    if (event->type == LEFTMOUSE && event->val == KM_RELEASE) {
+      hud_region_move_end(C, region, hrd);
+      return WM_UI_HANDLER_BREAK;
+    }
+    if (ISKEYBOARD(event->type) && event->val == KM_PRESS) {
+      /* Never let a missed mouse-release leave this handler swallowing tool hotkeys. */
+      hud_region_move_end(C, region, hrd);
+      return WM_UI_HANDLER_CONTINUE;
+    }
+    if (event->type == MOUSEMOVE) {
+      ScrArea *area = CTX_wm_area(C);
+      if (area == nullptr) {
+        return WM_UI_HANDLER_BREAK;
+      }
+      const rcti previous_rect = region->winrct;
+      ARegion *region_win = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
+      rcti moved_rect = region->winrct;
+      BLI_rcti_translate(
+          &moved_rect, event->xy[0] - hrd->drag_xy.x, event->xy[1] - hrd->drag_xy.y);
+      int clamp_offset[2];
+      BLI_rcti_clamp(
+          &moved_rect, region_win ? &region_win->winrct : &area->totrct, clamp_offset);
+
+      region->runtime->offset_x += moved_rect.xmin - region->winrct.xmin;
+      region->runtime->offset_y += moved_rect.ymin - region->winrct.ymin;
+      region->winrct = moved_rect;
+      ED_region_update_rect(region);
+
+      hrd->drag_xy = int2(event->xy);
+      hrd->position_changed |= !BLI_rcti_compare(&previous_rect, &moved_rect);
+
+      if (wmWindow *win = CTX_wm_window(C)) {
+        /* The panel pixels already live in a region buffer. Re-composite that cache at the new
+         * rectangle without evaluating the dependency graph, gizmos, layouts, or viewport. */
+        wm_draw_region_cached_composite_tag(win);
+      }
+      return WM_UI_HANDLER_BREAK;
+    }
+    return WM_UI_HANDLER_BREAK;
+  }
+
+  const int header_drag_xmin = region->winrct.xmin + UI_UNIT_X;
+  const int header_drag_ymin = region->winrct.ymax - UI_UNIT_Y;
+  if (event->type == LEFTMOUSE && event->val == KM_PRESS &&
+      event->xy[0] >= header_drag_xmin && event->xy[0] <= region->winrct.xmax &&
+      event->xy[1] >= header_drag_ymin && event->xy[1] <= region->winrct.ymax)
+  {
+    hrd->is_dragging = true;
+    hrd->position_changed = false;
+    hrd->drag_xy = int2(event->xy);
+    WM_cursor_set(CTX_wm_window(C), WM_CURSOR_MOVE);
+    return WM_UI_HANDLER_BREAK;
+  }
+
+  return WM_UI_HANDLER_CONTINUE;
+}
+
 static void hud_region_init(wmWindowManager *wm, ARegion *region)
 {
   ED_region_panels_init(wm, region);
@@ -213,6 +367,14 @@ static void hud_region_init(wmWindowManager *wm, ARegion *region)
   region->v2d.minzoom = 1.0f;
 
   region_handlers_add(&region->runtime->handlers);
+  WM_event_remove_ui_handler(
+      &region->runtime->handlers, hud_region_move_handler, nullptr, region, false);
+  WM_event_add_ui_handler(nullptr,
+                          &region->runtime->handlers,
+                          hud_region_move_handler,
+                          nullptr,
+                          region,
+                          eWM_EventHandlerFlag(0));
   region->flag |= RGN_FLAG_TEMP_REGIONDATA;
 }
 
@@ -412,7 +574,7 @@ void ED_area_type_hud_ensure(bContext *C, ScrArea *area)
   {
     HudRegionData *hrd = static_cast<HudRegionData *>(region->regiondata);
     if (hrd == nullptr) {
-      hrd = MEM_new_zeroed<HudRegionData>(__func__);
+      hrd = MEM_new<HudRegionData>(__func__);
       region->regiondata = hrd;
     }
     if (region_op) {
@@ -422,6 +584,29 @@ void ED_area_type_hud_ensure(bContext *C, ScrArea *area)
     else {
       hrd->regionid = -1;
       hrd->region_index_hint = -1;
+    }
+
+    wmOperator *op = WM_operator_last_redo(C);
+    const std::string operator_idname = (op && op->type) ? op->type->idname : "";
+    if (hrd->operator_idname != operator_idname) {
+      hrd->is_dragging = false;
+      hrd->position_changed = false;
+      hrd->operator_idname = operator_idname;
+
+      int2 default_offset(0);
+      ARegion *region_win = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
+      if (region_win) {
+        float x, y;
+        view2d_scroller_size_get(&region_win->v2d, true, &x, &y);
+        default_offset = int2(x, y);
+      }
+
+      const int2 *stored_offset = hud_position_storage().operator_offsets.lookup_ptr(
+          operator_idname);
+      const int2 offset = stored_offset ? *stored_offset : default_offset;
+      region->runtime->offset_x = offset.x;
+      region->runtime->offset_y = offset.y;
+      ED_area_tag_region_size_update(area, region);
     }
   }
 
@@ -433,16 +618,6 @@ void ED_area_type_hud_ensure(bContext *C, ScrArea *area)
 
   ED_region_floating_init(region);
   ED_region_tag_redraw(region);
-
-  /* We need to update/initialize the runtime offsets. */
-  ARegion *region_win = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
-  if (region_win) {
-    float x, y;
-
-    view2d_scroller_size_get(&region_win->v2d, true, &x, &y);
-    region->runtime->offset_x = x;
-    region->runtime->offset_y = y;
-  }
 
   /* Reset zoom level (not well supported). */
   rctf reset_rect = {};

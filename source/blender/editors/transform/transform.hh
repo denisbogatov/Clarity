@@ -122,6 +122,8 @@ enum eTContext {
   CTX_OBMODE_XFORM_SKIP_CHILDREN = (1 << 14),
   /** Enable edge scrolling in 2D views. */
   CTX_VIEW2D_EDGE_PAN = (1 << 15),
+  /** Transform the Maya custom pivot without touching scene cursor or selection data. */
+  CTX_MAYA_PIVOT = (1 << 16),
 };
 ENUM_OPERATORS(eTContext)
 
@@ -543,6 +545,17 @@ struct TransSnap {
   eSnapFlag flag;
   /* Method(s) used for snapping source to target. */
   eSnapMode mode;
+  /** True when the current snap state was overlaid by Maya snapping. */
+  bool maya_mode_active;
+  /** Restrict edge targets to continuous legacy curve geometry for Maya Curve Snap. */
+  bool maya_curve_targets_only;
+  /** Include object transform pivots as discrete Maya Point Snap targets. */
+  bool maya_include_object_pivots;
+  /** Constrain translation to the view plane captured when the mode became active. */
+  bool maya_view_plane;
+  float maya_view_plane_normal[3];
+  /** Use deterministic front/back depth pairing for Maya Mesh Center Snap. */
+  bool maya_mesh_center;
   /* Part of source to snap to target. */
   eSnapSourceOP source_operation;
   /* Determines which objects are possible target. */
@@ -616,6 +629,8 @@ struct MouseInput {
   float factor;
   float precision_factor;
   bool precision;
+  /** Prevent interactive scale input from crossing through zero. */
+  bool clamp_to_positive;
 
   /** Additional data, if needed by the particular function. */
   void *data;

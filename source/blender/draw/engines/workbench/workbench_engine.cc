@@ -267,6 +267,11 @@ class Instance : public DrawEngine {
                  const MaterialTexture *texture = nullptr,
                  bool show_missing_texture = false)
   {
+    if (ob_ref.object->dtx & OB_DRAWTRANSP) {
+      constexpr uint32_t alpha_mask = 0x00ff0000u;
+      constexpr uint32_t xray_alpha = 89u << 16;
+      material.packed_data = (material.packed_data & ~alpha_mask) | xray_alpha;
+    }
     resources_.material_buf.append(material);
     int material_index = resources_.material_buf.size() - 1;
 

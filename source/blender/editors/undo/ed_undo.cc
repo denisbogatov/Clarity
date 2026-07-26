@@ -33,6 +33,7 @@
 
 #include "ED_asset.hh"
 #include "ED_gpencil_legacy.hh"
+#include "ED_maya.hh"
 #include "ED_object.hh"
 #include "ED_outliner.hh"
 #include "ED_render.hh"
@@ -105,6 +106,7 @@ void ED_undo_push(bContext *C, const char *str)
      * otherwise allow it to be nullptr, see: #60934.
      * Otherwise it must never be nullptr, even when undo is disabled. */
     if (wm->runtime->undo_stack == nullptr) {
+      ED_maya_undo_step_clear(C);
       return;
     }
   }
@@ -123,6 +125,7 @@ void ED_undo_push(bContext *C, const char *str)
     steps = 1;
   }
   if (steps <= 0) {
+    ED_maya_undo_step_clear(C);
     return;
   }
 
@@ -148,6 +151,12 @@ void ED_undo_push(bContext *C, const char *str)
 
   if (push_retval & UNDO_PUSH_RET_OVERRIDE_CHANGED) {
     WM_main_add_notifier(NC_WM | ND_LIB_OVERRIDE_CHANGED, nullptr);
+  }
+  if (push_retval & UNDO_PUSH_RET_SUCCESS) {
+    ED_maya_undo_step_store(C);
+  }
+  else {
+    ED_maya_undo_step_clear(C);
   }
 }
 
@@ -248,6 +257,7 @@ static wmOperatorStatus ed_undo_step_direction(bContext *C,
   CLOG_INFO(&LOG, "Step direction=%s", (step == STEP_UNDO) ? "STEP_UNDO" : "STEP_REDO");
 
   wmWindowManager *wm = CTX_wm_manager(C);
+  const UndoStep *step_from = wm->runtime->undo_stack->step_active;
 
   ed_undo_step_pre(C, wm, step, reports);
 
@@ -258,6 +268,10 @@ static wmOperatorStatus ed_undo_step_direction(bContext *C,
     BKE_undosys_step_redo(wm->runtime->undo_stack, C);
   }
 
+  ED_maya_undo_steps_restore(C,
+                             step_from,
+                             wm->runtime->undo_stack->step_active,
+                             step == STEP_UNDO);
   ed_undo_step_post(C, wm, step, reports);
 
   return OPERATOR_FINISHED;
@@ -300,7 +314,12 @@ static int ed_undo_step_by_name(bContext *C, const char *undo_name, ReportList *
 
   ed_undo_step_pre(C, wm, undo_dir, reports);
 
+  const UndoStep *step_from = wm->runtime->undo_stack->step_active;
   BKE_undosys_step_load_data_ex(wm->runtime->undo_stack, C, undo_step_target, nullptr, true);
+  ED_maya_undo_steps_restore(C,
+                             step_from,
+                             wm->runtime->undo_stack->step_active,
+                             undo_dir == STEP_UNDO);
 
   ed_undo_step_post(C, wm, undo_dir, reports);
 
@@ -331,7 +350,12 @@ static int ed_undo_step_by_index(bContext *C, const int undo_index, ReportList *
 
   ed_undo_step_pre(C, wm, undo_dir, reports);
 
+  const UndoStep *step_from = wm->runtime->undo_stack->step_active;
   BKE_undosys_step_load_from_index(wm->runtime->undo_stack, C, undo_index);
+  ED_maya_undo_steps_restore(C,
+                             step_from,
+                             wm->runtime->undo_stack->step_active,
+                             undo_dir == STEP_UNDO);
 
   ed_undo_step_post(C, wm, undo_dir, reports);
 

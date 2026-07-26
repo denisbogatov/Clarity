@@ -43,6 +43,7 @@
 #include "BLT_translation.hh"
 
 #include "ED_armature.hh"
+#include "ED_maya.hh"
 
 #include "ANIM_armature.hh"
 #include "ANIM_bone_collections.hh"
@@ -776,6 +777,12 @@ short transform_orientation_matrix_get(bContext *C,
                                        const float custom[3][3],
                                        float r_spacemtx[3][3])
 {
+  float maya_pivot_matrix[4][4];
+  if (ED_maya_pivot_custom_matrix_get(C, maya_pivot_matrix)) {
+    copy_m3_m4(r_spacemtx, maya_pivot_matrix);
+    return V3D_ORIENT_CUSTOM_MATRIX;
+  }
+
   if (orient_index == V3D_ORIENT_CUSTOM_MATRIX) {
     copy_m3_m3(r_spacemtx, custom);
     return V3D_ORIENT_CUSTOM_MATRIX;

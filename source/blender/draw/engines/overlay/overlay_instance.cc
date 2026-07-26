@@ -265,6 +265,8 @@ void Resources::update_theme_settings(const DRWContext *ctx, const State &state)
   ui::theme::get_color_4fv(TH_VERTEX, gb.colors.vert);
   ui::theme::get_color_4fv(TH_VERTEX_SELECT, gb.colors.vert_select);
   ui::theme::get_color_4fv(TH_VERTEX_UNREFERENCED, gb.colors.vert_unreferenced);
+  /* Maya component display: cyan unselected vertices and polygon centers. */
+  gb.colors.vert = rgba_uchar_to_float(0x64, 0xDC, 0xFF, 0xFF);
   gb.colors.vert_missing_data = rgba_uchar_to_float(0xB0, 0x00, 0xB0, 0xFF);
   ui::theme::get_color_4fv(TH_EDITMESH_ACTIVE, gb.colors.edit_mesh_active);
   ui::theme::get_color_4fv(TH_EDGE_SELECT, gb.colors.edge_select);
@@ -407,6 +409,12 @@ void Resources::update_theme_settings(const DRWContext *ctx, const State &state)
   gb.sizes.vertex_gpencil = ui::theme::get_value_f(TH_GP_VERTEX_SIZE);
   gb.sizes.face_dot = ui::theme::get_value_f(TH_FACEDOT_SIZE);
   gb.sizes.edge = max_ff(1.0f, ui::theme::get_value_f(TH_EDGE_WIDTH)) / 2.0f;
+
+  if (state.ctx_mode == CTX_MODE_EDIT_MESH) {
+    /* Four-point component vertices and one-pixel edit edges at 1x display scale. */
+    gb.sizes.vert = 2.0f;
+    gb.sizes.edge = 0.5f;
+  }
 
   /* Pixel size. */
   {
@@ -620,6 +628,26 @@ void Instance::object_sync(ObjectRef &ob_ref, Manager &manager)
 
   if (!state.hide_overlays) {
     switch (ob_ref.object->type) {
+      case OB_MESH:
+        if (!in_edit_mode) {
+          if (maya_face_centers_visible(*ob_ref.object)) {
+            Mesh &mesh = DRW_object_get_data_for_drawing<Mesh>(*ob_ref.object);
+            const Span<float3> positions = mesh.vert_positions();
+            const OffsetIndices faces = mesh.faces();
+            const Span<int> corner_verts = mesh.corner_verts();
+            const float4x4 &object_to_world = ob_ref.object->object_to_world();
+            float4 center_color = resources.theme.colors.vert;
+            /* Negative alpha marks Maya face centers for the shared loose-point shader. */
+            center_color.w = -1.0f;
+
+            for (const int face : faces.index_range()) {
+              const float3 center = bke::mesh::face_center_calc(
+                  positions, corner_verts.slice(faces[face]));
+              layer.relations.point_add(math::transform_point(object_to_world, center), center_color);
+            }
+          }
+        }
+        break;
       case OB_EMPTY:
         layer.empties.object_sync(manager, ob_ref, resources, state);
         break;

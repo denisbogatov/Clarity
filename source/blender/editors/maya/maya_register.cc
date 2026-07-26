@@ -7,12 +7,22 @@
  */
 
 #include "maya_intern.hh"
+#include "maya_tools.hh"
 
 namespace blender::ed::maya {
 
 void register_types()
 {
-  /* Reserved for Maya interaction operators, key-maps, and gizmo groups. */
+  register_tool_operators();
 }
 
 }  // namespace blender::ed::maya
+
+namespace blender {
+
+void ED_operatortypes_maya()
+{
+  ed::maya::register_types();
+}
+
+}  // namespace blender

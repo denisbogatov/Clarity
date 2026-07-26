@@ -265,6 +265,156 @@ class VIEW3D_OT_transform_gizmo_set(Operator):
         return self.execute(context)
 
 
+class VIEW3D_OT_maya_object_xray(Operator):
+    """Toggle transparent X-Ray drawing for selected objects"""
+    bl_label = "Object X-Ray"
+    bl_idname = "view3d.maya_object_xray"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return bool(context.area and context.area.type == 'VIEW_3D' and context.active_object)
+
+    def execute(self, context):
+        active_object = context.active_object
+        enable = not active_object.show_transparent
+        objects = context.selected_objects or (active_object,)
+        for obj in objects:
+            obj.show_transparent = enable
+        return {'FINISHED'}
+
+
+class VIEW3D_OT_maya_bridge_or_fill(Operator):
+    """Bridge two selected edge loops, or fill a single selected boundary"""
+    bl_label = "Bridge or Fill"
+    bl_idname = "view3d.maya_bridge_or_fill"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH'
+
+    def execute(self, context):
+        import bmesh
+
+        bm = bmesh.from_edit_mesh(context.edit_object.data)
+        selected_edges = {edge for edge in bm.edges if edge.select and not edge.hide}
+        if not selected_edges:
+            self.report({'WARNING'}, "Select an edge boundary")
+            return {'CANCELLED'}
+
+        component_count = 0
+        remaining_edges = set(selected_edges)
+        while remaining_edges:
+            component_count += 1
+            pending = [remaining_edges.pop()]
+            while pending:
+                edge = pending.pop()
+                for vert in edge.verts:
+                    for connected_edge in vert.link_edges:
+                        if connected_edge in remaining_edges:
+                            remaining_edges.remove(connected_edge)
+                            pending.append(connected_edge)
+
+        if component_count == 2:
+            return bpy.ops.mesh.bridge_edge_loops()
+
+        boundary_edges = {
+            edge for edge in bm.edges if not edge.hide and len(edge.link_faces) == 1
+        }
+        boundary_seeds = selected_edges & boundary_edges
+        if boundary_seeds:
+            selected_edges = set(boundary_seeds)
+            pending = list(boundary_seeds)
+            while pending:
+                edge = pending.pop()
+                for vert in edge.verts:
+                    for connected_edge in vert.link_edges:
+                        if connected_edge in boundary_edges and connected_edge not in selected_edges:
+                            selected_edges.add(connected_edge)
+                            pending.append(connected_edge)
+
+            for edge in bm.edges:
+                edge.select = edge in selected_edges
+            for edge in selected_edges:
+                for vert in edge.verts:
+                    vert.select = True
+
+        return bpy.ops.mesh.edge_face_add()
+
+
+class VIEW3D_OT_maya_connect(Operator):
+    """Interactively insert and slide an edge loop"""
+    bl_label = "Loop Cut and Slide"
+    bl_idname = "view3d.maya_connect"
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH'
+
+    def execute(self, context):
+        return bpy.ops.mesh.loopcut_slide('INVOKE_REGION_WIN')
+
+    def invoke(self, context, _event):
+        return self.execute(context)
+
+
+def _maya_subdivision_preview_set(context, mode):
+    objects = [obj for obj in context.selected_objects if obj.type == 'MESH']
+    active_object = context.active_object
+    if active_object and active_object.type == 'MESH' and active_object not in objects:
+        objects.append(active_object)
+    if not objects:
+        return {'CANCELLED'}
+
+    enabled = mode != 0
+    for obj in objects:
+        modifiers = [modifier for modifier in obj.modifiers if modifier.type == 'SUBSURF']
+        if enabled and not modifiers:
+            modifier = obj.modifiers.new(name="Maya Smooth Preview", type='SUBSURF')
+            modifier.levels = 2
+            modifier.render_levels = 2
+            modifiers.append(modifier)
+        for modifier in modifiers:
+            modifier.show_viewport = enabled
+            if enabled:
+                modifier.show_in_editmode = True
+                modifier.show_on_cage = mode == 2
+                modifier.show_only_control_edges = True
+        obj.show_wire = mode == 1
+    return {'FINISHED'}
+
+
+class VIEW3D_OT_maya_subdivision_preview_off(Operator):
+    """Show the original control mesh without subdivision preview"""
+    bl_label = "Subdivision Preview Off"
+    bl_idname = "view3d.maya_subdivision_preview_off"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        return _maya_subdivision_preview_set(context, 0)
+
+
+class VIEW3D_OT_maya_subdivision_preview_on(Operator):
+    """Show subdivision preview together with the original control cage"""
+    bl_label = "Subdivision Preview with Cage"
+    bl_idname = "view3d.maya_subdivision_preview_on"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        return _maya_subdivision_preview_set(context, 1)
+
+
+class VIEW3D_OT_maya_subdivision_preview_surface(Operator):
+    """Show subdivision preview with the cage fitted to the smooth surface"""
+    bl_label = "Subdivision Preview Surface"
+    bl_idname = "view3d.maya_subdivision_preview_surface"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        return _maya_subdivision_preview_set(context, 2)
+
+
 class VIEW3D_FH_empty_image(FileHandler):
     bl_idname = "VIEW3D_FH_empty_image"
     bl_label = "Add empty image"
@@ -310,6 +460,12 @@ classes = (
     VIEW3D_OT_edit_mesh_extrude_shrink_fatten,
     VIEW3D_OT_edit_mesh_extrude_manifold_normal,
     VIEW3D_OT_transform_gizmo_set,
+    VIEW3D_OT_maya_object_xray,
+    VIEW3D_OT_maya_bridge_or_fill,
+    VIEW3D_OT_maya_connect,
+    VIEW3D_OT_maya_subdivision_preview_off,
+    VIEW3D_OT_maya_subdivision_preview_on,
+    VIEW3D_OT_maya_subdivision_preview_surface,
     VIEW3D_FH_camera_background_image,
     VIEW3D_FH_empty_image,
     VIEW3D_FH_vdb_volume,

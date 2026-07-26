@@ -8,6 +8,13 @@ FRAGMENT_SHADER_CREATE_INFO(overlay_extra_loose_point_base)
 
 void main()
 {
+  if (final_color.a < 0.0f) {
+    /* Maya face centers are solid square component markers. */
+    frag_color = float4(final_color.rgb, 1.0f);
+    line_output = float4(0.0f);
+    return;
+  }
+
   float2 centered = abs(gl_PointCoord - float2(0.5f));
   float dist = max(centered.x, centered.y);
 

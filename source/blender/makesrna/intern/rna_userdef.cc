@@ -6257,8 +6257,10 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "use_viewport_vsync", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, nullptr, "viewport_vsync", 1);
-  RNA_def_property_ui_text(
-      prop, "VSync", "Synchronize viewport redraws to the monitor refresh rate");
+  RNA_def_property_ui_text(prop,
+                           "VSync",
+                           "Synchronize viewport redraws to the monitor refresh rate; when disabled, "
+                           "use adaptive VSync if supported by the OpenGL driver");
   RNA_def_property_update(prop, 0, "rna_userdef_gpu_update");
 
   prop = RNA_def_property(srna, "solid_lights", PROP_COLLECTION, PROP_NONE);

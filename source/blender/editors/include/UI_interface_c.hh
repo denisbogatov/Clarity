@@ -979,6 +979,10 @@ void popover_once_clear(Popover *pup);
 struct PieMenu;
 
 wmOperatorStatus pie_menu_invoke(bContext *C, const char *idname, const wmEvent *event);
+wmOperatorStatus pie_menu_invoke_with_threshold(bContext *C,
+                                                const char *idname,
+                                                const wmEvent *event,
+                                                float threshold);
 
 PieMenu *pie_menu_begin(bContext *C, const char *title, int icon, const wmEvent *event)
     ATTR_NONNULL();

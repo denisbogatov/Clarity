@@ -21,6 +21,7 @@ namespace ed::transform {
 bool peelObjectsTransform(TransInfo *t,
                           const float mval[2],
                           bool use_peel_object,
+                          bool require_depth_pair,
                           /* Return args. */
                           float r_loc[3],
                           float r_no[3],
@@ -42,6 +43,7 @@ bool validSnap(const TransInfo *t);
 
 void transform_snap_grid_init(const TransInfo *t, float r_snap[3], float *r_snap_precision);
 void transform_snap_reset_from_mode(TransInfo *t, wmOperator *op);
+void transform_snap_callbacks_update(TransInfo *t);
 void initSnapping(TransInfo *t, wmOperator *op);
 void freeSnapping(TransInfo *t);
 void initSnapAngleIncrements(TransInfo *t);
