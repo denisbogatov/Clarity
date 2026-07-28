@@ -1044,9 +1044,19 @@ int calc_gizmo_stats(const bContext *C,
 
   reset_tw_center(tbounds);
 
+  /* The Maya pivot override owns #RegionView3D::twmat while it is active. */
+  float maya_pivot_matrix[4][4];
+  const bool maya_pivot_override = rv3d != nullptr &&
+                                   ED_maya_pivot_custom_matrix_get(
+                                       C, ed::maya::MayaPivotUsage::Display, maya_pivot_matrix);
+
   if (rv3d) {
-    /* Transform widget centroid/center. */
-    copy_m4_m3(rv3d->twmat, tbounds->axis);
+    /* Transform widget centroid/center. Not while a Maya pivot override is placing the
+     * manipulator: this runs on every gizmo statistics pass, and overwriting the matrix here made
+     * the pivot manipulator jump back to the selection centre on those frames. */
+    if (!maya_pivot_override) {
+      copy_m4_m3(rv3d->twmat, tbounds->axis);
+    }
     rv3d->twdrawflag = short(0xFFFF);
   }
 
@@ -1089,7 +1099,9 @@ int calc_gizmo_stats(const bContext *C,
 
   if (rv3d) {
     if (totsel == 0) {
-      unit_m4(rv3d->twmat);
+      if (!maya_pivot_override) {
+        unit_m4(rv3d->twmat);
+      }
       unit_m3(rv3d->tw_axis_matrix);
       zero_v3(rv3d->tw_axis_min);
       zero_v3(rv3d->tw_axis_max);
