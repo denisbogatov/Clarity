@@ -463,6 +463,121 @@ struct LightLinking {
   LightLinkingRuntime runtime;
 };
 
+enum eObjectTransformModel {
+  OBJECT_TRANSFORM_BLENDER = 0,
+  OBJECT_TRANSFORM_MAYA = 1,
+};
+
+enum eMayaRotationOrder : int16_t {
+  MAYA_ROT_ORDER_XYZ = 0,
+  MAYA_ROT_ORDER_YZX = 1,
+  MAYA_ROT_ORDER_ZXY = 2,
+  MAYA_ROT_ORDER_XZY = 3,
+  MAYA_ROT_ORDER_YXZ = 4,
+  MAYA_ROT_ORDER_ZYX = 5,
+};
+
+struct MayaObjectTransform {
+  double translation[3] = {};
+
+  double rotation[3] = {};
+  eMayaRotationOrder rotation_order = MAYA_ROT_ORDER_XYZ;
+  short rotation_interpolation = 0;
+  int _pad0 = 0;
+
+  /** Maya rotateAxis Euler channel, in radians and fixed XYZ order. */
+  double rotate_axis[3] = {};
+
+  double scale[3] = {1.0, 1.0, 1.0};
+  double shear[3] = {};
+
+  double rotate_pivot[3] = {};
+  double rotate_pivot_translate[3] = {};
+
+  double scale_pivot[3] = {};
+  double scale_pivot_translate[3] = {};
+
+  double offset_parent_matrix[4][4] = _DNA_DEFAULT_UNIT_M4;
+
+  char inherits_transform = 1;
+  char _pad[7] = {};
+};
+
+/**
+ * Optional pivot data used by the Maya interaction preset without changing the object's transform
+ * model. Positions and orientation are stored in object-local space.
+ */
+struct ObjectCustomPivot {
+  double rotate_pivot[3] = {};
+  double scale_pivot[3] = {};
+  double orientation[4] = {1.0, 0.0, 0.0, 0.0};
+
+  /**
+   * Rotate and scale pivots are validated independently: writing one of them from RNA must not
+   * make the other one active. Editing the pivot interactively validates both.
+   */
+  uint8_t rotate_pivot_valid = 0;
+  uint8_t scale_pivot_valid = 0;
+  uint8_t orientation_valid = 0;
+  uint8_t _pad[5] = {};
+};
+
+enum eMayaConstraintType : int16_t {
+  MAYA_CONSTRAINT_POINT = 0,
+  MAYA_CONSTRAINT_ORIENT = 1,
+  MAYA_CONSTRAINT_SCALE = 2,
+  MAYA_CONSTRAINT_PARENT = 3,
+  MAYA_CONSTRAINT_AIM = 4,
+};
+
+enum eMayaWorldUpType : int16_t {
+  MAYA_WORLD_UP_SCENE = 0,
+  MAYA_WORLD_UP_OBJECT = 1,
+  MAYA_WORLD_UP_OBJECT_ROTATION = 2,
+  MAYA_WORLD_UP_VECTOR = 3,
+  MAYA_WORLD_UP_NONE = 4,
+};
+
+struct MayaConstraintTarget {
+  MayaConstraintTarget *next = nullptr;
+  MayaConstraintTarget *prev = nullptr;
+  double weight = 1.0;
+  double translate_offset[3] = {};
+  double rotate_offset[3] = {};
+  double scale_offset[3] = {1.0, 1.0, 1.0};
+  struct Object *object = nullptr;
+  void *_pad = nullptr;
+};
+
+struct MayaAimConstraintSettings {
+  double aim_vector[3] = {1.0, 0.0, 0.0};
+  double up_vector[3] = {0.0, 1.0, 0.0};
+  double world_up_vector[3] = {0.0, 1.0, 0.0};
+  eMayaWorldUpType world_up_type = MAYA_WORLD_UP_VECTOR;
+  short _pad0 = 0;
+  int _pad1 = 0;
+  struct Object *world_up_object = nullptr;
+  void *_pad2 = nullptr;
+};
+
+struct MayaConstraint {
+  MayaConstraint *next = nullptr;
+  MayaConstraint *prev = nullptr;
+  char name[64] = "";
+  eMayaConstraintType type = MAYA_CONSTRAINT_POINT;
+  short flags = 0;
+  int _pad0 = 0;
+  ListBaseT<MayaConstraintTarget> targets = {nullptr, nullptr};
+  char enabled = 1;
+  char maintain_offset = 0;
+  char skip_translate[3] = {};
+  char skip_rotate[3] = {};
+  char skip_scale[3] = {};
+  char _pad1[5] = {};
+  double influence = 1.0;
+  MayaAimConstraintSettings aim;
+};
+
 struct Object {
 #ifdef __cplusplus
   DNA_DEFINE_CXX_METHODS(Object)
@@ -583,6 +698,12 @@ struct Object {
 
   /** Rotation mode - uses defines set out in DNA_action_types.h for PoseChannel rotations.... */
   short rotmode = ROT_MODE_EUL;
+  short transform_model = OBJECT_TRANSFORM_BLENDER;
+  int _pad_maya_transform = 0;
+  MayaObjectTransform *maya_transform = nullptr;
+  ListBaseT<MayaConstraint> maya_constraints = {nullptr, nullptr};
+  ObjectCustomPivot *custom_pivot = nullptr;
+  short _pad_custom_pivot = 0;
 
   /** Bounding box use for drawing. */
   eObject_BoundType boundtype = OB_BOUND_BOX;

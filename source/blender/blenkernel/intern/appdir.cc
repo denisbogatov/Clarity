@@ -695,7 +695,7 @@ bool BKE_appdir_folder_id_ex(const int folder_id,
       if (get_path_environment(path, path_maxncpy, subfolder, "BLENDER_USER_CONFIG")) {
         break;
       }
-      if (get_path_user(path, path_maxncpy, "config", subfolder)) {
+      if (get_path_user(path, path_maxncpy, "maya_fork_config", subfolder)) {
         break;
       }
       return false;
@@ -790,7 +790,8 @@ std::optional<std::string> BKE_appdir_folder_id_user_notest(const int folder_id,
       {
         break;
       }
-      get_path_user_ex(path, sizeof(path), "config", subfolder, version, check_is_dir);
+      get_path_user_ex(
+          path, sizeof(path), "maya_fork_config", subfolder, version, check_is_dir);
       break;
     case BLENDER_USER_SCRIPTS:
       if (get_path_environment_ex(

@@ -424,7 +424,8 @@ add_custom_command(
   COMMAND
     ${CMAKE_COMMAND} -E env ${PLATFORM_ENV_BUILD}
     "$<TARGET_FILE:makesrna>" ${CMAKE_SOURCE_DIR}/source/blender/makesdna/ ${CMAKE_CURRENT_BINARY_DIR}/ ${CMAKE_CURRENT_BINARY_DIR}/../
-  DEPENDS makesrna
+  # `makesrna` reads the DNA headers at run time as well, see the note in `makesdna/intern`.
+  DEPENDS makesrna ${SRC_DNA_INC}
 )
 
 # Build bf_rna

@@ -16,6 +16,7 @@
 #include "BLI_math_vector_types.hh"
 
 #include "DNA_customdata_types.h" /* #CustomData_MeshMasks. */
+#include "DNA_object_types.h"
 
 namespace blender {
 
@@ -30,10 +31,20 @@ namespace bke {
 
 struct GeometrySet;
 
+struct MayaObjectTransformRuntime {
+  MayaObjectTransform evaluated;
+  bool translation_driven[3] = {};
+  bool rotation_driven[3] = {};
+  bool scale_driven[3] = {};
+  bool valid = false;
+  uint64_t evaluation_version = 0;
+};
+
 struct ObjectRuntime {
   /** Final transformation matrices with constraints & animsys applied. */
   float4x4 object_to_world = float4x4::identity();
   float4x4 world_to_object = float4x4::identity();
+  MayaObjectTransformRuntime maya_transform;
 
   /**
    * The custom data layer mask that was last used

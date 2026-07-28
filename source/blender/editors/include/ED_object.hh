@@ -55,6 +55,14 @@ enum eObject_Partype : short;
 
 namespace ed::object {
 
+struct ObjectTransformRNAPaths {
+  StringRefNull translation;
+  StringRefNull rotation;
+  StringRefNull scale;
+};
+
+ObjectTransformRNAPaths transform_rna_paths_get(const Object &object);
+
 struct XFormObjectData;
 
 /* `object_edit.cc` */

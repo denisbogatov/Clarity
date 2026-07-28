@@ -10,6 +10,7 @@
 
 #include "DNA_screen_types.h"
 #include "DNA_space_enums.h"
+#include "DNA_userdef_types.h"
 
 #include "BLI_assert.h"
 #include "BLI_time.h"
@@ -37,8 +38,10 @@ bool ED_maya_interaction_enabled(const bContext *C)
 {
   const ScrArea *area = CTX_wm_area(C);
   const wmWindowManager *wm = CTX_wm_manager(C);
-  return area != nullptr && area->spacetype == SPACE_VIEW3D && wm != nullptr &&
-         wm->runtime != nullptr && wm->runtime->maya_interaction_enabled;
+  const bke::WindowManagerRuntime *wm_runtime = wm != nullptr ? wm->runtime : nullptr;
+  return area != nullptr && area->spacetype == SPACE_VIEW3D && wm_runtime != nullptr &&
+         U.interaction_preset == INTERACTION_PRESET_MAYA &&
+         wm_runtime->maya_interaction_enabled;
 }
 
 static ed::maya::MayaDispatchResult maya_dispatch_to_active_session(
@@ -78,23 +81,43 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     ed::maya::MayaWindowRuntime &runtime,
     const ed::maya::MayaInputAction &action)
 {
-  ed::maya::pivot_edit_validate(C, runtime);
+  const ed::maya::MayaDispatchResult pivot_click_result =
+      ed::maya::pivot_edit_click_handle_action(C, runtime, action);
+  if (pivot_click_result != ed::maya::MayaDispatchResult::PassThrough) {
+    return pivot_click_result;
+  }
 
   const ed::maya::MayaDispatchResult selection_result =
       ed::maya::selection_handle_action(C, runtime, action);
   if (selection_result != ed::maya::MayaDispatchResult::PassThrough) {
+    ed::maya::pivot_edit_selection_changed(C, runtime);
     return selection_result;
   }
 
   if (action.id == ed::maya::MayaActionID::EditPivotKeyPressed) {
-    return ed::maya::pivot_edit_key_press(C, runtime) ?
+    /* Edit Pivot is a toggle, like in Maya: one press turns the mode on and it stays on until the
+     * key is pressed again. Holding the key is not part of the model, so there is no momentary
+     * state that could survive a lost key release. */
+    if (action.source_event != nullptr &&
+        (action.source_event->flag & WM_EVENT_IS_REPEAT) != 0)
+    {
+      /* Keeping the key down must not flip the mode over and over. */
+      return ed::maya::MayaDispatchResult::Handled;
+    }
+    return ed::maya::pivot_edit_toggle_persistent(C, runtime) ?
                ed::maya::MayaDispatchResult::Handled :
                ed::maya::MayaDispatchResult::PassThrough;
   }
   if (action.id == ed::maya::MayaActionID::EditPivotKeyReleased) {
-    return ed::maya::pivot_edit_key_release(C, runtime) ?
-               ed::maya::MayaDispatchResult::Handled :
-               ed::maya::MayaDispatchResult::PassThrough;
+    /* Consumed so the release cannot reach a Blender keymap; the toggle already happened. */
+    return ed::maya::MayaDispatchResult::Handled;
+  }
+  if (action.id == ed::maya::MayaActionID::Cancel &&
+      runtime.pivot_edit.target != ed::maya::MayaPivotEditTarget::None)
+  {
+    /* Escape leaves Edit Pivot instead of falling through to unrelated cancel handling. */
+    ed::maya::pivot_edit_end(C, runtime);
+    return ed::maya::MayaDispatchResult::Handled;
   }
   if (action.id == ed::maya::MayaActionID::TogglePersistentPivot) {
     return ed::maya::pivot_edit_toggle_persistent(C, runtime) ?
@@ -102,7 +125,7 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
                ed::maya::MayaDispatchResult::PassThrough;
   }
   if (action.id == ed::maya::MayaActionID::FocusLost) {
-    ed::maya::pivot_edit_focus_lost(C, runtime);
+    ed::maya::pivot_edit_input_reset(C, runtime);
     return ed::maya::MayaDispatchResult::PassThrough;
   }
   if (ELEM(action.id,
@@ -132,15 +155,13 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     return ed::maya::MayaDispatchResult::Handled;
   }
   if (action.id == ed::maya::MayaActionID::ActivateTool) {
-    const bool resume_temporary_pivot = runtime.physical_input.edit_pivot &&
-                                        !runtime.pivot_edit.persistent;
-    const bool resume_persistent_pivot = runtime.pivot_edit.persistent;
+    /* Switching tools rebuilds the pivot state for the new tool, but Edit Pivot itself survives:
+     * in Maya the mode stays on until it is toggled off. */
+    const bool resume_pivot_edit = runtime.pivot_edit.target !=
+                                   ed::maya::MayaPivotEditTarget::None;
     ed::maya::pivot_edit_end(C, runtime);
     ED_maya_tool_activate(C, action.tool, ed::maya::MayaToolActivationReason::Hotkey);
-    if (resume_temporary_pivot) {
-      ed::maya::pivot_edit_key_press(C, runtime);
-    }
-    else if (resume_persistent_pivot) {
+    if (resume_pivot_edit) {
       ed::maya::pivot_edit_resume_persistent(C, runtime);
     }
     return ed::maya::MayaDispatchResult::Handled;
@@ -278,7 +299,9 @@ ed::maya::MayaDispatchResult ED_maya_event_dispatch(bContext *C, const wmEvent *
         runtime->active_session->cancel(C);
         runtime->active_session.reset();
       }
-      ed::maya::pivot_edit_focus_lost(C, *runtime);
+      /* Leaving the Maya preset must drop the mode, unlike merely losing window focus. */
+      ed::maya::pivot_edit_input_reset(C, *runtime);
+      ed::maya::pivot_edit_end(C, *runtime);
     }
     return ed::maya::MayaDispatchResult::PassThrough;
   }
@@ -287,7 +310,7 @@ ed::maya::MayaDispatchResult ED_maya_event_dispatch(bContext *C, const wmEvent *
       runtime->active_session->cancel(C);
       runtime->active_session.reset();
     }
-    ed::maya::pivot_edit_focus_lost(C, *runtime);
+    ed::maya::pivot_edit_input_reset(C, *runtime);
     return ed::maya::MayaDispatchResult::PassThrough;
   }
   if (runtime != nullptr && runtime->active_session) {
@@ -311,6 +334,12 @@ ed::maya::MayaDispatchResult ED_maya_event_dispatch(bContext *C, const wmEvent *
   if (runtime == nullptr) {
     return ed::maya::MayaDispatchResult::PassThrough;
   }
+
+  /* Validate before translating: events that carry no Maya action (undo, mode switch, deleting the
+   * active object from another editor) must still be able to end a temporary Edit Pivot instead of
+   * leaving it armed until the next recognized action. */
+  ed::maya::pivot_edit_validate(C, *runtime);
+  ED_maya_tool_gizmo_state_ensure(C, runtime->tool);
 
   const std::optional<ed::maya::MayaInputAction> action = ED_maya_input_translate(C, *event);
   if (!action) {

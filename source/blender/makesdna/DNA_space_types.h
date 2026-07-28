@@ -1077,7 +1077,7 @@ struct SpaceTopBar {
   /* End 'SpaceLink' header. */
 
   /** Persistent identity for independent Shelf editor configurations. */
-  char shelf_id[UUID_STRING_SIZE] = {};
+  char shelf_id[/*UUID_STRING_SIZE*/ 37] = {};
   char _pad1[3] = {};
 };
 

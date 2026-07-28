@@ -11,6 +11,10 @@
 #include <cstdint>
 
 #include "BLI_enum_flags.hh"
+#include "BLI_math_quaternion_types.hh"
+#include "BLI_math_vector_types.hh"
+
+#include "ED_maya.hh"
 
 namespace blender {
 
@@ -31,10 +35,33 @@ enum class MayaToolID : uint8_t {
   QuadDraw,
 };
 
+struct MayaManipulatorPivotState {
+  double3 position_world = double3(0.0);
+  math::QuaternionBase<double> orientation_world = math::QuaternionBase<double>::identity();
+  bool position_valid = false;
+  bool orientation_valid = false;
+  bool pin_component_pivot = false;
+  bool snap_position = true;
+  bool snap_orientation = true;
+  eMayaPivotResetMode reset_mode = MAYA_PIVOT_RESET_CENTER;
+  bool bake_orientation_automatically = false;
+  bool preserve_children = true;
+  bool show_orientation_handle = true;
+  MayaObjectRuntimeRef last_object;
+  int active_axis = 0;
+};
+
 struct MayaToolState {
   MayaToolID active = MayaToolID::Select;
   MayaToolID previous = MayaToolID::Select;
   uint64_t revision = 0;
+  /**
+   * The window runtime is not serialized, so a fresh runtime adopts the tool from the 3D View
+   * manipulator state once. This keeps the active tool across file load and new windows instead of
+   * silently resetting it to Select.
+   */
+  bool adopted_from_view = false;
+  MayaManipulatorPivotState manipulator_pivot;
 };
 
 enum class MayaToolCapability : uint32_t {
@@ -77,6 +104,12 @@ enum class MayaToolActivationResult : uint8_t {
 }  // namespace ed::maya
 
 const ed::maya::MayaToolType *ED_maya_tool_type_find(ed::maya::MayaToolID tool_id);
+/**
+ * Keep the globally active Maya tool and the 3D View under the cursor in sync: adopt the tool from
+ * the view once for a fresh runtime, then re-apply the manipulator to new areas, other workspaces,
+ * and views changed outside the Maya tools.
+ */
+void ED_maya_tool_gizmo_state_ensure(bContext *C, ed::maya::MayaToolState &tool);
 ed::maya::MayaToolActivationResult ED_maya_tool_activate(
     bContext *C,
     ed::maya::MayaToolID tool_id,

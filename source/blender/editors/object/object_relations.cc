@@ -253,6 +253,9 @@ static wmOperatorStatus vertex_parent_set_exec(bContext *C, wmOperator *op)
 
   CTX_DATA_BEGIN (C, Object *, ob, selected_editable_objects) {
     if (ob != obedit) {
+      const bool uses_maya_transform = BKE_object_uses_maya_transform(ob);
+      const double4x4 maya_world_matrix = uses_maya_transform ? double4x4(ob->object_to_world()) :
+                                                                double4x4::identity();
       DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION);
       par = obedit->parent;
 
@@ -267,16 +270,19 @@ static wmOperatorStatus vertex_parent_set_exec(bContext *C, wmOperator *op)
           ob->par1 = par1;
           ob->par2 = par2;
           ob->par3 = par3;
-
-          /* inverse parent matrix */
-          invert_m4_m4(ob->parentinv, BKE_object_calc_parent(depsgraph, scene, ob).ptr());
         }
         else {
           ob->partype = PARVERT1;
           ob->par1 = par1;
+        }
 
+        const float4x4 parent_effect = BKE_object_calc_parent(depsgraph, scene, ob);
+        if (uses_maya_transform) {
+          BKE_object_maya_parent_keep_transform(ob, double4x4(parent_effect), maya_world_matrix);
+        }
+        else {
           /* inverse parent matrix */
-          invert_m4_m4(ob->parentinv, BKE_object_calc_parent(depsgraph, scene, ob).ptr());
+          invert_m4_m4(ob->parentinv, parent_effect.ptr());
         }
       }
     }
@@ -388,6 +394,10 @@ void parent_clear(Object *ob, const int type)
   if (ob->parent == nullptr) {
     return;
   }
+  const bool maya_keep_transform = type == CLEAR_PARENT_KEEP_TRANSFORM &&
+                                   BKE_object_uses_maya_transform(ob);
+  const double4x4 maya_world_matrix = maya_keep_transform ? double4x4(ob->object_to_world()) :
+                                                            double4x4::identity();
   uint flags = ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION;
   switch (type) {
     case CLEAR_PARENT_ALL: {
@@ -403,7 +413,12 @@ void parent_clear(Object *ob, const int type)
       /* remove parent, and apply the parented transform
        * result as object's local transforms */
       parent_clear_data(ob);
-      BKE_object_apply_mat4(ob, ob->object_to_world().ptr(), true, false);
+      if (maya_keep_transform) {
+        BKE_object_maya_clear_parent_keep_transform(ob, maya_world_matrix);
+      }
+      else {
+        BKE_object_apply_mat4(ob, ob->object_to_world().ptr(), true, false);
+      }
       /* Don't recalculate the animation because it would change the transform
        * instead of keeping it. */
       flags &= ~ID_RECALC_ANIMATION;
@@ -518,6 +533,9 @@ static bool parent_set_with_depsgraph(ReportList *reports,
   Main *bmain = CTX_data_main(C);
   bPoseChannel *pchan = nullptr;
   bPoseChannel *pchan_eval = nullptr;
+  const bool maya_keep_transform = keep_transform && BKE_object_uses_maya_transform(ob);
+  const double4x4 maya_world_matrix = maya_keep_transform ? double4x4(ob->object_to_world()) :
+                                                            double4x4::identity();
 
   /* Preconditions. */
   if (ob == par) {
@@ -582,7 +600,7 @@ static bool parent_set_with_depsgraph(ReportList *reports,
   }
 
   /* Apply transformation of previous parenting. */
-  if (keep_transform) {
+  if (keep_transform && !maya_keep_transform) {
     /* Was removed because of bug #23577,      * but this can be handy in some cases too #32616, so
      * make optional. */
     BKE_object_apply_mat4(ob, ob->object_to_world().ptr(), false, false);
@@ -775,6 +793,18 @@ static bool parent_set_with_depsgraph(ReportList *reports,
   else {
     /* calculate inverse parent matrix */
     invert_m4_m4(ob->parentinv, BKE_object_calc_parent(depsgraph, scene, ob).ptr());
+  }
+
+  if (BKE_object_uses_maya_transform(ob) && partype != PAR_PATH_CONST) {
+    unit_m4(ob->parentinv);
+    if (maya_keep_transform) {
+      const double4x4 parent_effect_matrix(BKE_object_calc_parent(depsgraph, scene, ob));
+      if (!BKE_object_maya_parent_keep_transform(ob, parent_effect_matrix, maya_world_matrix)) {
+        BKE_report(reports,
+                   RPT_WARNING,
+                   "Could not preserve Maya transform while parenting a singular matrix");
+      }
+    }
   }
 
   DEG_id_tag_update(&par->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
@@ -1138,6 +1168,8 @@ void OBJECT_OT_parent_set(wmOperatorType *ot)
 static wmOperatorStatus parent_noinv_set_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Object *par = context_active_object(C);
 
   const bool keep_transform = RNA_boolean_get(op->ptr, "keep_transform");
@@ -1147,6 +1179,9 @@ static wmOperatorStatus parent_noinv_set_exec(bContext *C, wmOperator *op)
   /* context iterator */
   CTX_DATA_BEGIN (C, Object *, ob, selected_editable_objects) {
     if (ob != par) {
+      const bool maya_keep_transform = keep_transform && BKE_object_uses_maya_transform(ob);
+      const double4x4 maya_world_matrix = maya_keep_transform ? double4x4(ob->object_to_world()) :
+                                                                double4x4::identity();
       if (BKE_object_parent_loop_check(par, ob)) {
         BKE_report(op->reports, RPT_ERROR, "Loop in parents");
       }
@@ -1159,7 +1194,13 @@ static wmOperatorStatus parent_noinv_set_exec(bContext *C, wmOperator *op)
         ob->partype = PAROBJECT; /* NOTE: DNA define, not operator property. */
 
         if (keep_transform) {
-          BKE_object_apply_parent_inverse(ob);
+          if (maya_keep_transform) {
+            const double4x4 parent_effect_matrix(BKE_object_calc_parent(depsgraph, scene, ob));
+            BKE_object_maya_parent_keep_transform(ob, parent_effect_matrix, maya_world_matrix);
+          }
+          else {
+            BKE_object_apply_parent_inverse(ob);
+          }
           continue;
         }
 

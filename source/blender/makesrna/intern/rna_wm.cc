@@ -1570,12 +1570,15 @@ static bool rna_WindowManager_is_event_handling_break_get(PointerRNA *ptr)
 static bool rna_WindowManager_maya_interaction_enabled_get(PointerRNA *ptr)
 {
   const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
-  return wm->runtime->maya_interaction_enabled;
+  return wm->runtime != nullptr && wm->runtime->maya_interaction_enabled;
 }
 
 static void rna_WindowManager_maya_interaction_enabled_set(PointerRNA *ptr, const bool value)
 {
   wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  if (wm->runtime == nullptr) {
+    return;
+  }
   if (wm->runtime->maya_interaction_enabled != value) {
     wm->runtime->maya_interaction_revision++;
   }

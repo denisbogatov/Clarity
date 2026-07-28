@@ -11,6 +11,9 @@
 #include <cstdint>
 #include <memory>
 
+#include "BLI_math_matrix_types.hh"
+#include "BLI_math_quaternion_types.hh"
+#include "BLI_math_vector_types.hh"
 #include "BLI_vector.hh"
 
 #include "maya_navigation.hh"
@@ -20,6 +23,8 @@ namespace blender {
 
 struct bContext;
 struct ARegion;
+struct Depsgraph;
+struct ID;
 struct Object;
 struct ScrArea;
 struct Scene;
@@ -28,6 +33,7 @@ struct WorkSpace;
 namespace ed::maya {
 
 class MayaInteractionSession;
+struct MayaInputAction;
 struct MayaPivotUndoState;
 struct MayaSelectionMemory;
 struct MayaShiftTransformState;
@@ -50,9 +56,13 @@ enum class MayaPivotMode : uint8_t {
   Custom,
 };
 
+/**
+ * Edit Pivot is a toggle, so the mode has three states: off, on, and dragging the pivot.
+ * #PivotCommitPending is the tail of a drag whose outcome (exit or restart) was decided while the
+ * transform was still running.
+ */
 enum class MayaPivotEditPhase : uint8_t {
   Normal,
-  PivotArmed,
   PivotDragging,
   PivotCommitPending,
   PersistentPivot,
@@ -93,11 +103,15 @@ struct MayaPivotEditState {
   ARegion *region = nullptr;
   MayaToolID tool = MayaToolID::None;
   uint64_t tool_revision = 0;
+  /**
+   * The user's toggle. Stays set even while the current context cannot host a pivot manipulator,
+   * so validation can bring the mode back as soon as a supported context becomes active.
+   */
   bool persistent = false;
+  /** Leave the mode once the running pivot drag finishes. */
   bool exit_after_drag = false;
+  /** Rebuild the mode for the new context once the running pivot drag finishes. */
   bool restart_after_drag = false;
-  bool restart_after_cancel = false;
-  bool restart_persistent = false;
   bool data_origin_was_enabled = false;
   std::unique_ptr<MayaCustomPivotData> custom;
   bool follow_transform = false;
@@ -110,9 +124,6 @@ struct MayaTemporaryOverrides {
   bool edit_pivot = false;
 };
 
-struct MayaPhysicalInputState {
-  bool edit_pivot = false;
-};
 
 struct MayaSelectionSettings {
   bool preserve_component_selection = true;
@@ -148,7 +159,6 @@ struct MayaWindowRuntime {
   bool transform_active = false;
   uint64_t instance_id = 0;
   uint64_t interaction_revision_seen = 0;
-  MayaPhysicalInputState physical_input;
   MayaTemporaryOverrides temporary;
   MayaNavigationSettings navigation_settings;
   double last_tool_activation_time = 0.0;
@@ -157,16 +167,39 @@ struct MayaWindowRuntime {
   bool navigation_active() const;
 };
 
+class MayaTransformTransaction {
+ public:
+  MayaTransformTransaction(Depsgraph *depsgraph, Scene *scene);
+  ~MayaTransformTransaction();
+  MayaTransformTransaction(const MayaTransformTransaction &) = delete;
+  MayaTransformTransaction &operator=(const MayaTransformTransaction &) = delete;
+
+  bool capture_object(Object &object);
+  bool capture_geometry(ID &data);
+  bool capture_child(Object &child);
+  bool capture_runtime(MayaManipulatorPivotState &state);
+  bool transform_geometry(ID &data, const float4x4 &matrix);
+
+  void commit();
+  void rollback();
+
+ private:
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
+};
+
 MayaWindowRuntime *runtime_get(const bContext *C);
 MayaWindowRuntime *runtime_ensure(const bContext *C);
 bool navigation_debug_logging_enabled(const bContext *C);
 int navigation_frame_rate_limit_setting(const bContext *C);
-bool pivot_edit_key_press(bContext *C, MayaWindowRuntime &runtime);
-bool pivot_edit_key_release(bContext *C, MayaWindowRuntime &runtime);
 bool pivot_edit_toggle_persistent(bContext *C, MayaWindowRuntime &runtime);
 bool pivot_edit_resume_persistent(bContext *C, MayaWindowRuntime &runtime);
 bool pivot_edit_pin_toggle(bContext *C, MayaWindowRuntime &runtime);
-void pivot_edit_focus_lost(bContext *C, MayaWindowRuntime &runtime);
+MayaDispatchResult pivot_edit_click_handle_action(bContext *C,
+                                                   MayaWindowRuntime &runtime,
+                                                   const MayaInputAction &action);
+void pivot_edit_selection_changed(bContext *C, MayaWindowRuntime &runtime);
+void pivot_edit_input_reset(bContext *C, MayaWindowRuntime &runtime);
 void pivot_edit_validate(bContext *C, MayaWindowRuntime &runtime);
 void pivot_edit_end(bContext *C, MayaWindowRuntime &runtime);
 

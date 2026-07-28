@@ -347,7 +347,13 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
   }
   if ((t->flag & T_OVERRIDE_CENTER) == 0) {
     float maya_pivot_matrix[4][4];
-    if (ED_maya_pivot_custom_matrix_get(C, maya_pivot_matrix)) {
+    if (ELEM(t->mode, TFM_ROTATION, TFM_TRACKBALL, TFM_RESIZE) &&
+        ED_maya_pivot_custom_matrix_get(C,
+                                        t->mode == TFM_RESIZE ?
+                                            ed::maya::MayaPivotUsage::Scale :
+                                            ed::maya::MayaPivotUsage::Rotate,
+                                        maya_pivot_matrix))
+    {
       copy_v3_v3(t->center_global, maya_pivot_matrix[3]);
       t->flag |= T_OVERRIDE_CENTER;
     }

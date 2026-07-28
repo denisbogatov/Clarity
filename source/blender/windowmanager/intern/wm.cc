@@ -13,6 +13,9 @@
 /* Allow using deprecated functionality for .blend file I/O. */
 #define DNA_DEPRECATED_ALLOW
 
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include "DNA_ID_enums.h"
@@ -66,6 +69,22 @@
 namespace blender {
 
 /* ****************************************************** */
+
+static void startup_trace(const char *format, ...)
+{
+  const char *filepath = std::getenv("BLENDER_STARTUP_TRACE_FILE");
+  if (filepath == nullptr) {
+    return;
+  }
+  if (std::FILE *file = std::fopen(filepath, "a")) {
+    va_list args;
+    va_start(args, format);
+    std::vfprintf(file, format, args);
+    va_end(args);
+    std::fputc('\n', file);
+    std::fclose(file);
+  }
+}
 
 static void window_manager_free_data(ID *id)
 {
@@ -489,8 +508,22 @@ void WM_check(bContext *C)
 
   if (!G.background) {
     /* Case: file-read. */
-    if ((wm->init_flag & WM_INIT_FLAG_WINDOW) == 0) {
+    const bool window_needs_init = (wm->init_flag & WM_INIT_FLAG_WINDOW) == 0;
+    const bool keyconfig_needs_init = wm->runtime->defaultconf == nullptr ||
+                                      wm->runtime->addonconf == nullptr ||
+                                      wm->runtime->userconf == nullptr;
+    startup_trace("WM_CHECK wm=%p init_flag=%u defaultconf=%p addonconf=%p userconf=%p",
+                  static_cast<void *>(wm),
+                  uint(wm->init_flag),
+                  static_cast<void *>(wm->runtime->defaultconf),
+                  static_cast<void *>(wm->runtime->addonconf),
+                  static_cast<void *>(wm->runtime->userconf));
+    if (window_needs_init || keyconfig_needs_init) {
       WM_keyconfig_init(C);
+      startup_trace("WM_CHECK keyconfig initialized defaultconf=%p",
+                    static_cast<void *>(wm->runtime->defaultconf));
+    }
+    if (window_needs_init) {
       WM_file_autosave_init(wm);
     }
 
@@ -598,23 +631,47 @@ void wm_close_and_free(bContext *C, wmWindowManager *wm)
 void WM_main(bContext *C)
 {
   PRF_scope(ProfileCategory::Core);
+  startup_trace("WM_MAIN enter");
   /* Single refresh before handling events.
    * This ensures we don't run operators before the depsgraph has been evaluated. */
+  startup_trace("WM_MAIN initial_refresh begin");
   wm_event_do_refresh_wm_and_depsgraph(C);
+  startup_trace("WM_MAIN initial_refresh end");
 
+  int startup_trace_iteration = 0;
   while (true) {
+    const bool trace_iteration = startup_trace_iteration < 32;
+    if (trace_iteration) {
+      startup_trace("WM_MAIN loop=%d window_events begin", startup_trace_iteration);
+    }
 
     /* Get events from ghost, handle window events, add to window queues. */
     wm_window_events_process(C);
+    if (trace_iteration) {
+      startup_trace("WM_MAIN loop=%d window_events end", startup_trace_iteration);
+      startup_trace("WM_MAIN loop=%d handlers begin", startup_trace_iteration);
+    }
 
     /* Per window, all events to the window, screen, area and region handlers. */
     wm_event_do_handlers(C);
+    if (trace_iteration) {
+      startup_trace("WM_MAIN loop=%d handlers end", startup_trace_iteration);
+      startup_trace("WM_MAIN loop=%d notifiers begin", startup_trace_iteration);
+    }
 
     /* Events have left notes about changes, we handle and cache it. */
     wm_event_do_notifiers(C);
+    if (trace_iteration) {
+      startup_trace("WM_MAIN loop=%d notifiers end", startup_trace_iteration);
+      startup_trace("WM_MAIN loop=%d draw begin", startup_trace_iteration);
+    }
 
     /* Execute cached changes draw. */
     wm_draw_update(C);
+    if (trace_iteration) {
+      startup_trace("WM_MAIN loop=%d draw end", startup_trace_iteration);
+      startup_trace_iteration++;
+    }
 
     PRF_frame_mark;
   }

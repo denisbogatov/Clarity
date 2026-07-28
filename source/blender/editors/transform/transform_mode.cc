@@ -744,6 +744,9 @@ void ElementRotation_ex(const TransInfo *t,
     }
   }
   else {
+    const float (*rotation_mtx)[3] = (td->flag & TD_MAYA_TRANSFORM) ? td_ext->r_mtx : td->mtx;
+    const float (*rotation_smtx)[3] = (td->flag & TD_MAYA_TRANSFORM) ? td_ext->r_smtx : td->smtx;
+
     if ((td->flag & TD_NO_LOC) == 0) {
       /* Translation. */
       sub_v3_v3v3(vec, td->center, center);
@@ -766,7 +769,7 @@ void ElementRotation_ex(const TransInfo *t,
       if ((td_ext->rotOrder == ROT_MODE_QUAT) || (td->flag & TD_USEQUAT)) {
         /* Can be called for texture space translate for example, then opt out. */
         if (td_ext->quat) {
-          mul_m3_series(fmat, td->smtx, mat, td->mtx);
+          mul_m3_series(fmat, rotation_smtx, mat, rotation_mtx);
 
           if (!is_zero_v3(td_ext->dquat)) {
             /* Correct for delta quat. */
@@ -796,7 +799,7 @@ void ElementRotation_ex(const TransInfo *t,
 
         axis_angle_to_quat(iquat, td_ext->irotAxis, td_ext->irotAngle);
 
-        mul_m3_series(fmat, td->smtx, mat, td->mtx);
+        mul_m3_series(fmat, rotation_smtx, mat, rotation_mtx);
         mat3_to_quat(quat, fmat); /* Actual transform. */
         mul_qt_qtqt(tquat, quat, iquat);
 
@@ -813,8 +816,8 @@ void ElementRotation_ex(const TransInfo *t,
         /* Calculate the total rotation in eulers. */
         float obmat[3][3];
 
-        mul_m3_m3m3(totmat, mat, td->mtx);
-        mul_m3_m3m3(smat, td->smtx, totmat);
+        mul_m3_m3m3(totmat, mat, rotation_mtx);
+        mul_m3_m3m3(smat, rotation_smtx, totmat);
 
         if (!is_zero_v3(td_ext->drot)) {
           /* Correct for delta rot. */

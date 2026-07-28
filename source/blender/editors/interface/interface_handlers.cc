@@ -10,6 +10,8 @@
 #include <cctype>
 #include <cfloat>
 #include <cmath>
+#include <cstdarg>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <optional>
@@ -91,6 +93,22 @@
 namespace blender::ui {
 
 static CLG_LogRef LOG = {"ui.handler"};
+
+static void startup_trace(const char *format, ...)
+{
+  const char *filepath = std::getenv("BLENDER_STARTUP_TRACE_FILE");
+  if (filepath == nullptr) {
+    return;
+  }
+  if (std::FILE *file = std::fopen(filepath, "a")) {
+    va_list args;
+    va_start(args, format);
+    std::vfprintf(file, format, args);
+    va_end(args);
+    std::fputc('\n', file);
+    std::fclose(file);
+  }
+}
 
 /* -------------------------------------------------------------------- */
 /** \name Feature Defines
@@ -12733,6 +12751,15 @@ static int handle_menus_recursive(bContext *C,
     }
     else {
       Block *block = static_cast<Block *>(menu->region->runtime->uiblocks.first);
+      if (block == nullptr) {
+        startup_trace("HANDLE_MENUS empty block menu=%p region=%p event=%d value=%d level=%d",
+                      static_cast<void *>(menu),
+                      static_cast<void *>(menu->region),
+                      int(event->type),
+                      event->val,
+                      level);
+        return retval;
+      }
 
       if (block->flag & BLOCK_PIE_MENU) {
         retval = pie_handler(C, event, menu);
@@ -13060,6 +13087,27 @@ static int handler_region_menu(bContext *C, const wmEvent *event, void * /*userd
 static int popup_handler(bContext *C, const wmEvent *event, void *userdata)
 {
   PopupBlockHandle *menu = static_cast<PopupBlockHandle *>(userdata);
+  static int trace_count = 0;
+  if (trace_count < 64) {
+    ARegion *region = menu ? menu->region : nullptr;
+    Block *block = (region && region->runtime) ?
+                       static_cast<Block *>(region->runtime->uiblocks.first) :
+                       nullptr;
+    startup_trace(
+        "POPUP_HANDLER count=%d menu=%p region=%p block=%p event=%d value=%d retval=%d",
+        trace_count,
+        static_cast<void *>(menu),
+        static_cast<void *>(region),
+        static_cast<void *>(block),
+        int(event->type),
+        event->val,
+        menu ? menu->menuretval : -1);
+    trace_count++;
+  }
+  if (menu == nullptr || menu->region == nullptr || !menu->region->runtime) {
+    startup_trace("POPUP_HANDLER invalid popup state");
+    return WM_UI_HANDLER_CONTINUE;
+  }
   /* we block all events, this is modal interaction,
    * except for drop events which is described below */
   int retval = WM_UI_HANDLER_BREAK;
@@ -13091,7 +13139,7 @@ static int popup_handler(bContext *C, const wmEvent *event, void *userdata)
     Block *block = static_cast<Block *>(menu->region->runtime->uiblocks.first);
 
     /* set last pie event to allow chained pie spawning */
-    if (block->flag & BLOCK_PIE_MENU) {
+    if (block && (block->flag & BLOCK_PIE_MENU)) {
       win->pie_event_type_last = block->pie_data->event_type;
       reset_pie = true;
     }

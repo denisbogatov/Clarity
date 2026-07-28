@@ -1881,7 +1881,6 @@ void ED_spacetype_item()
   art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
   art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FRAMES;
   art->listener = view3d_buttons_region_listener;
-  art->message_subscribe = ED_area_do_mgs_subscribe_for_tool_ui;
   art->init = view3d_buttons_region_init;
   art->snap_size = ED_region_generic_panel_region_snap_size;
   art->layout = ED_region_panels_layout;

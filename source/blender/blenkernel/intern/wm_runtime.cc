@@ -13,6 +13,8 @@
 #include "BLI_ghash.h"
 #include "BLI_listbase.h"
 
+#include "DNA_userdef_types.h"
+
 #include "WM_api.hh"
 
 #include "WM_message.hh"
@@ -21,6 +23,10 @@ namespace blender::bke {
 
 WindowManagerRuntime::WindowManagerRuntime()
 {
+  this->maya_interaction_enabled = U.interaction_preset == INTERACTION_PRESET_MAYA;
+  this->maya_snap_mode = 0;
+  this->maya_snap_temporary_mode = 0;
+  this->maya_interaction_revision = 0;
   BKE_reports_init(&this->reports, RPT_STORE);
 }
 

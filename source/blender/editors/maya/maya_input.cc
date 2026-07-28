@@ -193,7 +193,7 @@ std::optional<ed::maya::MayaInputAction> ED_maya_input_translate(
                                               ed::maya::MayaActionID::SelectLoop;
     action.phase = ed::maya::MayaActionPhase::Begin;
   }
-  else if (event.type == LEFTMOUSE && event.val == KM_CLICK_DRAG && !action.alt) {
+  else if (event.type == LEFTMOUSE && event.val == KM_PRESS_DRAG && !action.alt) {
     action.id = ed::maya::MayaActionID::SelectMarquee;
     action.phase = ed::maya::MayaActionPhase::Begin;
   }
@@ -256,6 +256,12 @@ std::optional<ed::maya::MayaInputAction> ED_maya_input_translate(
     if (!action.shift && !action.ctrl && !action.alt && event.val == KM_PRESS) {
       action.id = ed::maya::MayaActionID::ActivateTool;
       action.phase = ed::maya::MayaActionPhase::Begin;
+    }
+    else if (event.val == KM_RELEASE) {
+      /* Tool keys are permanent switches in Maya: the release must be consumed so it cannot reach
+       * a Blender keymap and start a one-shot operator. */
+      action.id = ed::maya::MayaActionID::ToolHotkeyReleased;
+      action.phase = ed::maya::MayaActionPhase::End;
     }
   }
   else if (action.pointer_button != ed::maya::MayaPointerButton::None &&

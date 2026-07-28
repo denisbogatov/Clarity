@@ -250,6 +250,18 @@ add_blender_test(
   --python ${CMAKE_CURRENT_LIST_DIR}/bl_disk_file_hash_service_test.py
 )
 
+add_blender_test(
+  maya_interaction_defaults
+  --factory-startup
+  --python ${CMAKE_CURRENT_LIST_DIR}/maya_interaction_defaults.py
+)
+
+add_blender_test(
+  maya_pivot_lifecycle
+  --factory-startup
+  --python ${CMAKE_CURRENT_LIST_DIR}/maya_pivot_lifecycle.py
+)
+
 # test running operators doesn't segfault under various conditions
 if(WITH_TESTS_EXPERIMENTAL)
   add_blender_test(

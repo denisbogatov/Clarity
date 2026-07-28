@@ -67,6 +67,7 @@
 
 #include "ANIM_keyframing.hh"
 #include "ANIM_keyingsets.hh"
+#include "ANIM_rna.hh"
 
 #include "ED_anim_api.hh"
 #include "ED_armature.hh"
@@ -82,6 +83,14 @@
 #include "object_intern.hh"
 
 namespace blender::ed::object {
+
+ObjectTransformRNAPaths transform_rna_paths_get(const Object &object)
+{
+  if (BKE_object_uses_maya_transform(&object)) {
+    return {"maya_transform.translation", "maya_transform.rotation", "maya_transform.scale"};
+  }
+  return {"location", animrig::get_rotation_mode_path(eRotationModes(object.rotmode)), "scale"};
+}
 
 /* -------------------------------------------------------------------- */
 /** \name Clear Transformation Utilities

@@ -14,16 +14,25 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "BLI_fileops.h"
+#include "BLI_bounds_types.hh"
+#include "BLI_index_range.hh"
+#include "BLI_listbase_iterator.hh"
 #include "BLI_map.hh"
 #include "BLI_math_matrix.h"
+#include "BLI_math_matrix.hh"
 #include "BLI_math_matrix_types.hh"
+#include "BLI_math_quaternion.hh"
 #include "BLI_math_rotation.h"
 #include "BLI_math_vector.h"
+#include "BLI_math_vector.hh"
 #include "BLI_path_utils.hh"
+#include "BLI_string.h"
 #include "BLI_time.h"
 #include "BLI_utildefines.h"
 #include "BLI_vector.hh"
@@ -34,6 +43,11 @@
 #include "BKE_global.hh"
 #include "BKE_layer.hh"
 #include "BKE_lib_id.hh"
+#include "BKE_main.hh"
+#include "BKE_maya_constraints.hh"
+#include "BKE_object.hh"
+#include "BKE_object_custom_pivot.hh"
+#include "BKE_object_transform_maya.hh"
 #include "BKE_undo_system.hh"
 #include "BKE_wm_runtime.hh"
 
@@ -44,13 +58,19 @@
 #include "DNA_windowmanager_types.h"
 
 #include "ED_maya.hh"
+#include "ED_object.hh"
 #include "ED_screen.hh"
+#include "ED_undo.hh"
+#include "ED_view3d.hh"
+
+#include "DEG_depsgraph.hh"
 
 #include "bmesh.hh"
 
 #include "RNA_access.hh"
 
 #include "maya_session.hh"
+#include "maya_input.hh"
 #include "maya_tool_presentation.hh"
 #include "maya_tools.hh"
 
@@ -63,8 +83,11 @@ namespace blender::ed::maya {
 struct MayaPivotUndoSnapshot {
   uint32_t scene_session_uid = 0;
   uint32_t object_session_uid = 0;
+  MayaObjectRuntimeRef manipulator_object;
   float location[3] = {};
   float rotation_quaternion[4] = {1.0f, 0.0f, 0.0f, 0.0f};
+  double manipulator_position[3] = {};
+  double manipulator_orientation[4] = {1.0, 0.0, 0.0, 0.0};
   int selection_mode = 0;
   int pivot_point = 0;
   int selected_counts[3] = {};
@@ -76,11 +99,166 @@ struct MayaPivotUndoSnapshot {
   bool position_valid = false;
   bool orientation_valid = false;
   bool pinned = false;
+  bool has_custom = false;
+  bool manipulator_position_valid = false;
+  bool manipulator_orientation_valid = false;
 };
 
 struct MayaPivotUndoState {
   std::optional<MayaPivotUndoSnapshot> pending_before;
 };
+
+struct MayaTransformTransaction::Impl {
+  struct ObjectState {
+    Object *object = nullptr;
+    void *transform_backup = nullptr;
+    std::optional<MayaObjectTransform> maya_transform;
+    std::optional<ObjectCustomPivot> custom_pivot;
+    bool had_custom_pivot = false;
+
+    ~ObjectState()
+    {
+      if (transform_backup != nullptr) {
+        BKE_object_tfm_free(transform_backup);
+      }
+    }
+  };
+
+  struct GeometryState {
+    ID *data = nullptr;
+    std::unique_ptr<ed::object::XFormObjectData> snapshot;
+  };
+
+  Depsgraph *depsgraph = nullptr;
+  Scene *scene = nullptr;
+  Vector<std::unique_ptr<ObjectState>> objects;
+  Vector<std::unique_ptr<GeometryState>> geometry;
+  MayaManipulatorPivotState *runtime_state = nullptr;
+  std::optional<MayaManipulatorPivotState> runtime_snapshot;
+  bool committed = false;
+  bool rolled_back = false;
+};
+
+MayaTransformTransaction::MayaTransformTransaction(Depsgraph *depsgraph, Scene *scene)
+    : impl_(std::make_unique<Impl>())
+{
+  impl_->depsgraph = depsgraph;
+  impl_->scene = scene;
+}
+
+MayaTransformTransaction::~MayaTransformTransaction()
+{
+  if (impl_ && !impl_->committed && !impl_->rolled_back) {
+    rollback();
+  }
+}
+
+bool MayaTransformTransaction::capture_object(Object &object)
+{
+  for (const std::unique_ptr<Impl::ObjectState> &state : impl_->objects) {
+    if (state->object == &object) {
+      return true;
+    }
+  }
+  auto state = std::make_unique<Impl::ObjectState>();
+  state->object = &object;
+  state->transform_backup = BKE_object_tfm_backup(&object);
+  if (state->transform_backup == nullptr) {
+    return false;
+  }
+  if (BKE_object_uses_maya_transform(&object)) {
+    state->maya_transform = *object.maya_transform;
+  }
+  state->had_custom_pivot = object.custom_pivot != nullptr;
+  if (state->had_custom_pivot) {
+    state->custom_pivot = *object.custom_pivot;
+  }
+  impl_->objects.append(std::move(state));
+  return true;
+}
+
+bool MayaTransformTransaction::capture_geometry(ID &data)
+{
+  for (const std::unique_ptr<Impl::GeometryState> &state : impl_->geometry) {
+    if (state->data == &data) {
+      return true;
+    }
+  }
+  auto state = std::make_unique<Impl::GeometryState>();
+  state->data = &data;
+  state->snapshot = ed::object::data_xform_create(&data);
+  if (!state->snapshot) {
+    return false;
+  }
+  impl_->geometry.append(std::move(state));
+  return true;
+}
+
+bool MayaTransformTransaction::capture_child(Object &child)
+{
+  return capture_object(child);
+}
+
+bool MayaTransformTransaction::capture_runtime(MayaManipulatorPivotState &state)
+{
+  if (impl_->runtime_state != nullptr && impl_->runtime_state != &state) {
+    return false;
+  }
+  impl_->runtime_state = &state;
+  impl_->runtime_snapshot = state;
+  return true;
+}
+
+bool MayaTransformTransaction::transform_geometry(ID &data, const float4x4 &matrix)
+{
+  for (const std::unique_ptr<Impl::GeometryState> &state : impl_->geometry) {
+    if (state->data == &data) {
+      ed::object::data_xform_by_mat4(*state->snapshot, matrix);
+      ed::object::data_xform_tag_update(*state->snapshot);
+      return true;
+    }
+  }
+  return false;
+}
+
+void MayaTransformTransaction::commit()
+{
+  impl_->committed = true;
+}
+
+void MayaTransformTransaction::rollback()
+{
+  if (impl_->committed || impl_->rolled_back) {
+    return;
+  }
+  for (const std::unique_ptr<Impl::GeometryState> &state : impl_->geometry) {
+    ed::object::data_xform_restore(*state->snapshot);
+    ed::object::data_xform_tag_update(*state->snapshot);
+  }
+  for (const std::unique_ptr<Impl::ObjectState> &state : impl_->objects) {
+    if (state->maya_transform.has_value()) {
+      *state->object->maya_transform = *state->maya_transform;
+      BKE_object_maya_evaluated_channels_invalidate(*state->object);
+    }
+    if (state->had_custom_pivot) {
+      *BKE_object_custom_pivot_ensure(*state->object) = *state->custom_pivot;
+    }
+    else {
+      BKE_object_custom_pivot_reset(*state->object);
+    }
+    BKE_object_tfm_restore(state->object, state->transform_backup);
+    DEG_id_tag_update(&state->object->id, ID_RECALC_TRANSFORM);
+  }
+  if (impl_->runtime_state != nullptr && impl_->runtime_snapshot.has_value()) {
+    *impl_->runtime_state = *impl_->runtime_snapshot;
+  }
+  if (impl_->depsgraph != nullptr && impl_->scene != nullptr) {
+    for (const std::unique_ptr<Impl::ObjectState> &state : impl_->objects) {
+      BKE_object_where_is_calc(impl_->depsgraph, impl_->scene, state->object);
+    }
+  }
+  impl_->rolled_back = true;
+}
 
 struct MayaPivotUndoStepPayload {
   const wmWindow *owner_window = nullptr;
@@ -355,6 +533,16 @@ static Map<const wmWindow *, MayaWindowRuntime> &runtimes()
   return runtime_by_window;
 }
 
+static bool object_runtime_ref_is_empty(const MayaObjectRuntimeRef &reference)
+{
+  return reference.session_uid == 0;
+}
+
+static void object_runtime_ref_clear(MayaObjectRuntimeRef &reference)
+{
+  reference = {};
+}
+
 MayaWindowRuntime *runtime_get(const bContext *C)
 {
   const wmWindow *win = CTX_wm_window(C);
@@ -373,6 +561,30 @@ MayaWindowRuntime *runtime_ensure(const bContext *C)
   return &runtimes().lookup_or_add_default(win);
 }
 
+static Object *manipulator_pivot_last_object_resolve(const bContext *C,
+                                                     MayaWindowRuntime &runtime)
+{
+  MayaManipulatorPivotState &pivot = runtime.tool.manipulator_pivot;
+  if (object_runtime_ref_is_empty(pivot.last_object)) {
+    return nullptr;
+  }
+  Main *bmain = CTX_data_main(C);
+  Object *object = bmain != nullptr ?
+                       ED_maya_object_runtime_ref_resolve(*bmain, pivot.last_object) :
+                       nullptr;
+  if (object != nullptr) {
+    return object;
+  }
+  pivot.position_valid = false;
+  pivot.orientation_valid = false;
+  object_runtime_ref_clear(pivot.last_object);
+  runtime.pivot_edit.custom.reset();
+  runtime.pivot_edit.object = nullptr;
+  runtime.pivot_edit.target = MayaPivotEditTarget::None;
+  runtime.pivot_edit.phase = MayaPivotEditPhase::Normal;
+  return nullptr;
+}
+
 static UndoStep *pivot_undo_active_step_get(const bContext *C)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
@@ -386,36 +598,52 @@ static std::optional<MayaPivotUndoSnapshot> pivot_undo_snapshot_create(
     const bContext *C, const MayaWindowRuntime &runtime)
 {
   const MayaCustomPivotData *custom = runtime.pivot_edit.custom.get();
-  if (custom == nullptr || custom->scene == nullptr || custom->object == nullptr ||
-      CTX_data_mode_enum(C) != CTX_MODE_EDIT_MESH ||
-      custom->scene != CTX_data_scene(C))
+  const bool has_custom = custom != nullptr && custom->scene != nullptr &&
+                          custom->object != nullptr && custom->scene == CTX_data_scene(C);
+  if (!has_custom && runtime.pivot_edit.target == MayaPivotEditTarget::None &&
+      object_runtime_ref_is_empty(runtime.tool.manipulator_pivot.last_object))
   {
     return std::nullopt;
   }
 
-  BKE_lib_libblock_session_uid_ensure(&custom->scene->id);
-  BKE_lib_libblock_session_uid_ensure(&custom->object->id);
   MayaPivotUndoSnapshot snapshot;
-  snapshot.scene_session_uid = custom->scene->id.session_uid;
-  snapshot.object_session_uid = custom->object->id.session_uid;
-  copy_v3_v3(snapshot.location, custom->location);
-  copy_qt_qt(snapshot.rotation_quaternion, custom->rotation_quaternion);
-  snapshot.selection_mode = custom->selection_mode;
-  snapshot.pivot_point = custom->pivot_point;
-  std::copy(custom->selected_counts, custom->selected_counts + 3, snapshot.selected_counts);
-  std::copy(custom->element_counts, custom->element_counts + 3, snapshot.element_counts);
-  snapshot.selection_hash = custom->selection_hash;
-  snapshot.active_element_index = custom->active_element_index;
-  snapshot.active_element_type = custom->active_element_type;
-  snapshot.selection_signature_valid = custom->selection_signature_valid;
-  snapshot.position_valid = custom->position_valid;
-  snapshot.orientation_valid = custom->orientation_valid;
-  snapshot.pinned = custom->pinned;
+  snapshot.has_custom = has_custom;
+  if (has_custom) {
+    BKE_lib_libblock_session_uid_ensure(&custom->scene->id);
+    BKE_lib_libblock_session_uid_ensure(&custom->object->id);
+    snapshot.scene_session_uid = custom->scene->id.session_uid;
+    snapshot.object_session_uid = custom->object->id.session_uid;
+    copy_v3_v3(snapshot.location, custom->location);
+    copy_qt_qt(snapshot.rotation_quaternion, custom->rotation_quaternion);
+    snapshot.selection_mode = custom->selection_mode;
+    snapshot.pivot_point = custom->pivot_point;
+    std::copy(custom->selected_counts, custom->selected_counts + 3, snapshot.selected_counts);
+    std::copy(custom->element_counts, custom->element_counts + 3, snapshot.element_counts);
+    snapshot.selection_hash = custom->selection_hash;
+    snapshot.active_element_index = custom->active_element_index;
+    snapshot.active_element_type = custom->active_element_type;
+    snapshot.selection_signature_valid = custom->selection_signature_valid;
+    snapshot.position_valid = custom->position_valid;
+    snapshot.orientation_valid = custom->orientation_valid;
+    snapshot.pinned = custom->pinned;
+  }
+
+  const MayaManipulatorPivotState &pivot = runtime.tool.manipulator_pivot;
+  std::copy_n(
+      static_cast<const double *>(pivot.position_world), 3, snapshot.manipulator_position);
+  snapshot.manipulator_orientation[0] = pivot.orientation_world.w;
+  snapshot.manipulator_orientation[1] = pivot.orientation_world.x;
+  snapshot.manipulator_orientation[2] = pivot.orientation_world.y;
+  snapshot.manipulator_orientation[3] = pivot.orientation_world.z;
+  snapshot.manipulator_position_valid = pivot.position_valid;
+  snapshot.manipulator_orientation_valid = pivot.orientation_valid;
+  snapshot.manipulator_object = pivot.last_object;
   return snapshot;
 }
 
 static void pivot_undo_step_begin(const bContext *C, MayaWindowRuntime &runtime)
 {
+  manipulator_pivot_last_object_resolve(C, runtime);
   if (runtime.pivot_undo) {
     runtime.pivot_undo->pending_before.reset();
   }
@@ -441,12 +669,14 @@ static void pivot_undo_step_payload_free(void *user_data)
   MEM_delete(static_cast<MayaPivotUndoStepPayload *>(user_data));
 }
 
-static const MayaPivotUndoStepPayload *pivot_undo_step_payload_get(const UndoStep *step)
+static const MayaPivotUndoStepPayload *pivot_undo_step_payload_get(const UndoStack *undo_stack,
+                                                                   const UndoStep *step)
 {
-  if (step == nullptr || step->user_data_free != pivot_undo_step_payload_free) {
+  if (undo_stack == nullptr || step == nullptr) {
     return nullptr;
   }
-  return static_cast<const MayaPivotUndoStepPayload *>(step->user_data);
+  return static_cast<const MayaPivotUndoStepPayload *>(BKE_undosys_step_user_data_get(
+      undo_stack, step, pivot_undo_step_payload_free));
 }
 
 static bool pivot_undo_snapshot_restore(bContext *C,
@@ -459,6 +689,25 @@ static bool pivot_undo_snapshot_restore(bContext *C,
   }
 
   Main *bmain = CTX_data_main(C);
+  MayaManipulatorPivotState &pivot = runtime->tool.manipulator_pivot;
+  pivot.position_world = double3(snapshot.manipulator_position);
+  pivot.orientation_world = math::QuaternionBase<double>(
+      snapshot.manipulator_orientation[0],
+      snapshot.manipulator_orientation[1],
+      snapshot.manipulator_orientation[2],
+      snapshot.manipulator_orientation[3]);
+  pivot.position_valid = snapshot.manipulator_position_valid;
+  pivot.orientation_valid = snapshot.manipulator_orientation_valid;
+  pivot.pin_component_pivot = snapshot.pinned;
+  pivot.last_object = snapshot.manipulator_object;
+  manipulator_pivot_last_object_resolve(C, *runtime);
+
+  if (!snapshot.has_custom) {
+    runtime->pivot_edit.custom.reset();
+    WM_main_add_notifier(NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+    return true;
+  }
+
   Scene *scene = id_cast<Scene *>(
       BKE_libblock_find_session_uid(bmain, ID_SCE, snapshot.scene_session_uid));
   Object *object = id_cast<Object *>(
@@ -466,7 +715,6 @@ static bool pivot_undo_snapshot_restore(bContext *C,
   if (scene == nullptr || object == nullptr) {
     return false;
   }
-
   auto custom = std::make_unique<MayaCustomPivotData>();
   custom->scene = scene;
   custom->object = object;
@@ -527,10 +775,12 @@ int navigation_frame_rate_limit_setting(const bContext * /*C*/)
 static MayaPivotEditTarget pivot_edit_target_from_context(const bContext *C,
                                                           const MayaWindowRuntime &runtime)
 {
+  /* Editing the pivot does not depend on the active tool: Maya presents the pivot manipulator for
+   * any tool, including Select, where no transform manipulator is shown. */
+  UNUSED_VARS(runtime);
   const ARegion *region = CTX_wm_region(C);
   if (region == nullptr || region->regiontype != RGN_TYPE_WINDOW ||
-      CTX_data_active_object(C) == nullptr ||
-      !ELEM(runtime.tool.active, MayaToolID::Move, MayaToolID::Rotate, MayaToolID::Scale))
+      CTX_data_active_object(C) == nullptr)
   {
     return MayaPivotEditTarget::None;
   }
@@ -545,19 +795,13 @@ static MayaPivotEditTarget pivot_edit_target_from_context(const bContext *C,
   }
 }
 
-static void pivot_edit_status_set(bContext *C,
-                                  const MayaPivotEditTarget target,
-                                  const bool persistent)
+static void pivot_edit_status_set(bContext *C, const MayaPivotEditTarget target)
 {
   ED_workspace_status_text(
       C,
       target == MayaPivotEditTarget::ObjectOrigin ?
-          (persistent ?
-               "Edit Pivot (Object): drag the move or rotate handles; Insert exits" :
-               "Edit Pivot (Object): release D to exit") :
-          (persistent ?
-               "Edit Pivot (Components): drag the move or rotate handles; Insert exits" :
-               "Edit Pivot (Components): release D to exit"));
+          "Edit Pivot (Object): drag the move or rotate handles; D, Insert or Esc exits" :
+          "Edit Pivot (Components): drag the move or rotate handles; D, Insert or Esc exits");
 }
 
 static Vector<Object *> pivot_edit_mesh_objects_get(const bContext *C)
@@ -610,7 +854,7 @@ static bool pivot_component_selection_signature_get(const Scene *scene,
     r_element_counts[1] += bm->totedge;
     r_element_counts[2] += bm->totface;
 
-    auto hash_selected_element = [&](const BMElem *element, const uint64_t type) {
+    auto hash_selected_element = [&](const auto *element, const uint64_t type) {
       hash_value((uint64_t(BM_elem_index_get(element)) << 8) ^ type);
     };
     BMVert *vert;
@@ -915,15 +1159,439 @@ static bool pivot_custom_sync_to_selection(const bContext *C,
   return true;
 }
 
+static double4x4 maya_parent_effect_matrix_get(const Object &object)
+{
+  if (object.parent == nullptr) {
+    return double4x4::identity();
+  }
+  float parent_effect[4][4];
+  BKE_object_get_parent_matrix(&object, object.parent, parent_effect);
+  return double4x4(float4x4(parent_effect));
+}
+
+/* -------------------------------------------------------------------- */
+/** \name Object Pivot Resolver
+ *
+ * Maya keeps exactly one rotate and one scale pivot per transform node. An object using the Maya
+ * transform model stores them in its DAG channels, where they take part in the matrix composition
+ * and therefore in every later rotation, and where moving the pivot is compensated by
+ * `rotatePivotTranslate` / `scalePivotTranslate` so the object does not move.
+ *
+ * #ObjectCustomPivot is the shim for objects still using the Blender transform model, which has no
+ * such channel: there the pivot is tool state until it is baked.
+ *
+ * Everything in the pivot tool layer goes through this resolver, so an object never ends up with
+ * two competing pivots.
+ * \{ */
+
+static bool object_pivot_uses_dag_channels(const Object &object)
+{
+  return BKE_object_uses_maya_transform(&object);
+}
+
+/** True when the pivot is authored away from the object origin. */
+static bool object_pivot_valid(const Object &object, const bool use_scale_pivot)
+{
+  if (object_pivot_uses_dag_channels(object)) {
+    const MayaObjectTransform &transform = *object.maya_transform;
+    const double3 pivot(use_scale_pivot ? transform.scale_pivot : transform.rotate_pivot);
+    return pivot != double3(0.0);
+  }
+  return BKE_object_custom_pivot_position_valid(object, use_scale_pivot);
+}
+
+static bool object_pivot_world_get(const Object &object,
+                                   const bool use_scale_pivot,
+                                   double3 &r_position)
+{
+  if (object_pivot_uses_dag_channels(object)) {
+    if (!object_pivot_valid(object, use_scale_pivot)) {
+      return false;
+    }
+    const double4x4 parent_effect = maya_parent_effect_matrix_get(object);
+    r_position = use_scale_pivot ?
+                     BKE_object_maya_scale_pivot_world_get(object, parent_effect) :
+                     BKE_object_maya_rotate_pivot_world_get(object, parent_effect);
+    return true;
+  }
+  return BKE_object_custom_pivot_position_world_get(object, use_scale_pivot, r_position);
+}
+
+/**
+ * Move the pivot to \a position. Maya never moves the object while editing the pivot, so the DAG
+ * path always compensates in the pivot translate channels.
+ */
+static bool object_pivot_world_set(Object &object,
+                                   const bool use_scale_pivot,
+                                   const double3 &position)
+{
+  if (object_pivot_uses_dag_channels(object)) {
+    const double4x4 parent_effect = maya_parent_effect_matrix_get(object);
+    return use_scale_pivot ? BKE_object_maya_scale_pivot_world_set(
+                                 object, parent_effect, position, true) :
+                             BKE_object_maya_rotate_pivot_world_set(
+                                 object, parent_effect, position, true);
+  }
+  return BKE_object_custom_pivot_position_world_set(object, use_scale_pivot, position);
+}
+
+/** Send both pivots back to the object origin, keeping the object in place. */
+static void object_pivot_clear(Object &object)
+{
+  if (object_pivot_uses_dag_channels(object)) {
+    MayaObjectTransform &transform = *object.maya_transform;
+    BKE_maya_transform_set_rotate_pivot(transform, double3(0.0), true);
+    BKE_maya_transform_set_scale_pivot(transform, double3(0.0), true);
+    BKE_object_maya_evaluated_channels_invalidate(object);
+    return;
+  }
+  BKE_object_custom_pivot_position_clear(object, true, true);
+}
+
+/**
+ * Drop the pivot channels without compensating, for baking the pivot into the transform. The
+ * caller solves the target world matrix afterwards, so the pivot translates have to go as well:
+ * they take part in the matrix composition.
+ */
+static void object_pivot_clear_baked(Object &object)
+{
+  if (object_pivot_uses_dag_channels(object)) {
+    MayaObjectTransform &transform = *object.maya_transform;
+    BKE_maya_transform_set_rotate_pivot(transform, double3(0.0), false);
+    BKE_maya_transform_set_scale_pivot(transform, double3(0.0), false);
+    std::fill_n(transform.rotate_pivot_translate, 3, 0.0);
+    std::fill_n(transform.scale_pivot_translate, 3, 0.0);
+    BKE_object_maya_evaluated_channels_invalidate(object);
+    return;
+  }
+  BKE_object_custom_pivot_position_clear(object, true, true);
+}
+
+/** \} */
+
+static void manipulator_pivot_sync_from_component(MayaWindowRuntime &runtime,
+                                                  const MayaCustomPivotData &custom)
+{
+  MayaManipulatorPivotState &pivot = runtime.tool.manipulator_pivot;
+  pivot.position_world = double3(custom.location);
+  pivot.orientation_world = math::QuaternionBase<double>(
+      double(custom.rotation_quaternion[0]),
+      double(custom.rotation_quaternion[1]),
+      double(custom.rotation_quaternion[2]),
+      double(custom.rotation_quaternion[3]));
+  pivot.position_valid = custom.position_valid;
+  pivot.orientation_valid = custom.orientation_valid;
+  pivot.pin_component_pivot = custom.pinned;
+  pivot.last_object = custom.object != nullptr ?
+                          ED_maya_object_runtime_ref_create(*custom.object) :
+                          MayaObjectRuntimeRef{};
+}
+
+static bool manipulator_pivot_sync_from_object(MayaWindowRuntime &runtime, Object &object)
+{
+  const MayaTransformCapabilities capabilities = BKE_maya_transform_capabilities_get(object);
+  if (!capabilities.edit_pivot_position || !capabilities.edit_pivot_orientation) {
+    return false;
+  }
+
+  MayaManipulatorPivotState &pivot = runtime.tool.manipulator_pivot;
+  /* The manipulator anchors on the rotate pivot, falling back to a scale-only pivot and finally to
+   * the object origin. */
+  double3 position_world;
+  if (!object_pivot_world_get(object, false, position_world) &&
+      !object_pivot_world_get(object, true, position_world))
+  {
+    position_world = double3(object.object_to_world().location());
+  }
+  pivot.position_world = position_world;
+  if (!BKE_object_custom_pivot_orientation_world_get(object, pivot.orientation_world)) {
+    return false;
+  }
+  pivot.position_valid = true;
+  pivot.orientation_valid = true;
+  pivot.last_object = ED_maya_object_runtime_ref_create(object);
+  return true;
+}
+
+static bool object_is_descendant_of(const Object &object, const Object &ancestor)
+{
+  for (const Object *parent = object.parent; parent != nullptr; parent = parent->parent) {
+    if (parent == &ancestor) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static std::optional<double3> object_hierarchy_bounds_center_world_get(const bContext *C,
+                                                                       const Object &root)
+{
+  const Main *bmain = CTX_data_main(C);
+  if (bmain == nullptr) {
+    return std::nullopt;
+  }
+
+  double3 minimum(std::numeric_limits<double>::max());
+  double3 maximum(std::numeric_limits<double>::lowest());
+  bool has_bounds = false;
+  for (const Object &object : bmain->objects) {
+    if (&object != &root && !object_is_descendant_of(object, root)) {
+      continue;
+    }
+    const std::optional<Bounds<float3>> bounds = BKE_object_boundbox_get(&object);
+    if (!bounds) {
+      continue;
+    }
+    for (const int x : IndexRange(2)) {
+      for (const int y : IndexRange(2)) {
+        for (const int z : IndexRange(2)) {
+          const double3 corner = {
+              x == 0 ? bounds->min.x : bounds->max.x,
+              y == 0 ? bounds->min.y : bounds->max.y,
+              z == 0 ? bounds->min.z : bounds->max.z,
+          };
+          const double3 world_corner = math::transform_point(
+              double4x4(object.object_to_world()), corner);
+          minimum = math::min(minimum, world_corner);
+          maximum = math::max(maximum, world_corner);
+          has_bounds = true;
+        }
+      }
+    }
+  }
+  return has_bounds ? std::optional<double3>((minimum + maximum) * 0.5) : std::nullopt;
+}
+
+class MayaObjectPivotEditTarget final : public MayaPivotEditTargetBackend {
+ private:
+  bContext *context_;
+  MayaWindowRuntime &runtime_;
+  Object &object_;
+  std::optional<ObjectCustomPivot> initial_custom_pivot_;
+  /** Editing the pivot of a Maya transform writes its DAG channels, so they need a snapshot too. */
+  std::optional<MayaObjectTransform> initial_maya_transform_;
+  bool initially_had_custom_pivot_;
+  MayaManipulatorPivotState initial_pivot_;
+  bool orientation_changed_ = false;
+
+  void notify_changed()
+  {
+    WM_event_add_notifier(context_, NC_OBJECT | ND_TRANSFORM, &object_);
+  }
+
+ public:
+  MayaObjectPivotEditTarget(bContext *context, MayaWindowRuntime &runtime, Object &object)
+      : context_(context),
+        runtime_(runtime),
+        object_(object),
+        initially_had_custom_pivot_(object.custom_pivot != nullptr),
+        initial_pivot_(runtime.tool.manipulator_pivot)
+  {
+    if (object.custom_pivot != nullptr) {
+      initial_custom_pivot_ = *object.custom_pivot;
+    }
+    if (object.maya_transform != nullptr) {
+      initial_maya_transform_ = *object.maya_transform;
+    }
+  }
+
+  MayaPivotTargetType type() const override
+  {
+    return MayaPivotTargetType::Object;
+  }
+
+  MayaPivotFrame frame_get() const override
+  {
+    const MayaManipulatorPivotState &pivot = runtime_.tool.manipulator_pivot;
+    return {pivot.position_world,
+            pivot.orientation_world,
+            pivot.position_valid,
+            pivot.orientation_valid};
+  }
+
+  bool position_set(const double3 &position_world, const bool preserve) override
+  {
+    /* Editing the pivot never moves the object, so both pivots follow the manipulator. */
+    UNUSED_VARS(preserve);
+    if (!object_pivot_world_set(object_, false, position_world) ||
+        !object_pivot_world_set(object_, true, position_world))
+    {
+      return false;
+    }
+    runtime_.tool.manipulator_pivot.position_world = position_world;
+    runtime_.tool.manipulator_pivot.position_valid = true;
+    runtime_.tool.manipulator_pivot.last_object = ED_maya_object_runtime_ref_create(object_);
+    notify_changed();
+    return true;
+  }
+
+  bool orientation_set(const math::QuaternionBase<double> &orientation_world,
+                       const bool bake) override
+  {
+    if (!BKE_object_custom_pivot_orientation_world_set(object_, orientation_world)) {
+      return false;
+    }
+    runtime_.tool.manipulator_pivot.orientation_world = math::normalize(orientation_world);
+    runtime_.tool.manipulator_pivot.orientation_valid = true;
+    runtime_.tool.manipulator_pivot.last_object = ED_maya_object_runtime_ref_create(object_);
+    orientation_changed_ = true;
+    if (bake) {
+      return ED_maya_pivot_bake(context_, MAYA_PIVOT_BAKE_ORIENTATION);
+    }
+    return true;
+  }
+
+  void reset_position(const eMayaPivotResetMode mode) override
+  {
+    if (mode == MAYA_PIVOT_RESET_CENTER) {
+      if (const std::optional<double3> center_world =
+              object_hierarchy_bounds_center_world_get(context_, object_))
+      {
+        position_set(*center_world, true);
+      }
+      return;
+    }
+
+    /* Reset Position clears both pivots, matching Edit Pivot Move which validates both. */
+    object_pivot_clear(object_);
+    runtime_.tool.manipulator_pivot.position_world = double3(
+        object_.object_to_world().location());
+    runtime_.tool.manipulator_pivot.position_valid = true;
+    notify_changed();
+  }
+
+  void reset_orientation() override
+  {
+    BKE_object_custom_pivot_orientation_clear(object_);
+    if (!BKE_object_custom_pivot_orientation_world_get(
+            object_, runtime_.tool.manipulator_pivot.orientation_world))
+    {
+      return;
+    }
+    runtime_.tool.manipulator_pivot.orientation_valid = false;
+    runtime_.tool.manipulator_pivot.last_object = ED_maya_object_runtime_ref_create(object_);
+    notify_changed();
+  }
+
+  void cancel() override
+  {
+    if (initially_had_custom_pivot_) {
+      *BKE_object_custom_pivot_ensure(object_) = *initial_custom_pivot_;
+    }
+    else {
+      BKE_object_custom_pivot_reset(object_);
+    }
+    if (initial_maya_transform_ && object_.maya_transform != nullptr) {
+      *object_.maya_transform = *initial_maya_transform_;
+      BKE_object_maya_evaluated_channels_invalidate(object_);
+    }
+    runtime_.tool.manipulator_pivot = initial_pivot_;
+    notify_changed();
+  }
+
+  void commit() override
+  {
+    if (orientation_changed_ && runtime_.tool.manipulator_pivot.bake_orientation_automatically) {
+      ED_maya_pivot_bake(context_, MAYA_PIVOT_BAKE_ORIENTATION);
+    }
+  }
+};
+
+class MayaComponentPivotEditTarget final : public MayaPivotEditTargetBackend {
+ private:
+  bContext *context_;
+  MayaWindowRuntime &runtime_;
+  MayaCustomPivotData &custom_;
+  MayaCustomPivotData initial_custom_;
+  MayaManipulatorPivotState initial_pivot_;
+
+ public:
+  MayaComponentPivotEditTarget(bContext *context,
+                               MayaWindowRuntime &runtime,
+                               MayaCustomPivotData &custom)
+      : context_(context),
+        runtime_(runtime),
+        custom_(custom),
+        initial_custom_(custom),
+        initial_pivot_(runtime.tool.manipulator_pivot)
+  {
+  }
+
+  MayaPivotTargetType type() const override
+  {
+    return MayaPivotTargetType::Component;
+  }
+
+  MayaPivotFrame frame_get() const override
+  {
+    const MayaManipulatorPivotState &pivot = runtime_.tool.manipulator_pivot;
+    return {pivot.position_world,
+            pivot.orientation_world,
+            pivot.position_valid,
+            pivot.orientation_valid};
+  }
+
+  bool position_set(const double3 &position_world, const bool /*preserve*/) override
+  {
+    runtime_.tool.manipulator_pivot.position_world = position_world;
+    runtime_.tool.manipulator_pivot.position_valid = true;
+    copy_v3fl_v3db(custom_.location, static_cast<const double *>(position_world));
+    custom_.position_valid = true;
+    return true;
+  }
+
+  bool orientation_set(const math::QuaternionBase<double> &orientation_world,
+                       const bool /*bake*/) override
+  {
+    const math::QuaternionBase<double> normalized = math::normalize(orientation_world);
+    runtime_.tool.manipulator_pivot.orientation_world = normalized;
+    runtime_.tool.manipulator_pivot.orientation_valid = true;
+    custom_.rotation_quaternion[0] = float(normalized.w);
+    custom_.rotation_quaternion[1] = float(normalized.x);
+    custom_.rotation_quaternion[2] = float(normalized.y);
+    custom_.rotation_quaternion[3] = float(normalized.z);
+    custom_.orientation_valid = true;
+    return true;
+  }
+
+  void reset_position(const eMayaPivotResetMode mode) override
+  {
+    if (mode == MAYA_PIVOT_RESET_ZERO && custom_.object != nullptr) {
+      position_set(double3(custom_.object->object_to_world().location()), true);
+      return;
+    }
+    if (pivot_custom_sync_to_selection(context_, runtime_, true)) {
+      manipulator_pivot_sync_from_component(runtime_, custom_);
+    }
+  }
+
+  void reset_orientation() override
+  {
+    const float3 position(custom_.location);
+    const bool position_valid = custom_.position_valid;
+    custom_.orientation_valid = false;
+    if (!pivot_custom_sync_to_selection(context_, runtime_, true)) {
+      return;
+    }
+    copy_v3_v3(custom_.location, position);
+    custom_.position_valid = position_valid;
+    manipulator_pivot_sync_from_component(runtime_, custom_);
+  }
+
+  void cancel() override
+  {
+    custom_ = initial_custom_;
+    runtime_.tool.manipulator_pivot = initial_pivot_;
+  }
+
+  void commit() override {}
+};
+
 void pivot_edit_end(bContext *C, MayaWindowRuntime &runtime)
 {
+  manipulator_pivot_last_object_resolve(C, runtime);
   MayaPivotEditState &state = runtime.pivot_edit;
   const MayaPivotEditTarget ended_target = state.target;
-  if (state.target == MayaPivotEditTarget::ObjectOrigin && state.scene != nullptr &&
-      !state.data_origin_was_enabled)
-  {
-    state.scene->toolsettings->transform_flag &= ~SCE_XFORM_DATA_ORIGIN;
-  }
 
   state.phase = MayaPivotEditPhase::Normal;
   state.target = MayaPivotEditTarget::None;
@@ -937,8 +1605,6 @@ void pivot_edit_end(bContext *C, MayaWindowRuntime &runtime)
   state.persistent = false;
   state.exit_after_drag = false;
   state.restart_after_drag = false;
-  state.restart_after_cancel = false;
-  state.restart_persistent = false;
   runtime.temporary.edit_pivot = false;
 
   if (C != nullptr && ended_target != MayaPivotEditTarget::None) {
@@ -950,22 +1616,38 @@ void pivot_edit_end(bContext *C, MayaWindowRuntime &runtime)
   }
 }
 
-static bool pivot_edit_begin(bContext *C,
-                             MayaWindowRuntime &runtime,
-                             const bool persistent)
+/** Build the mode for the current context. The toggle itself is owned by the caller. */
+static bool pivot_edit_begin(bContext *C, MayaWindowRuntime &runtime)
 {
   const MayaPivotEditTarget target = pivot_edit_target_from_context(C, runtime);
   Scene *scene = CTX_data_scene(C);
+  Main *bmain = CTX_data_main(C);
   Object *object = CTX_data_active_object(C);
-  if (target == MayaPivotEditTarget::None || scene == nullptr || object == nullptr) {
+  if (target == MayaPivotEditTarget::None || scene == nullptr || bmain == nullptr ||
+      object == nullptr)
+  {
     return false;
   }
 
   MayaPivotEditState &state = runtime.pivot_edit;
   if (target == MayaPivotEditTarget::ObjectOrigin) {
-    state.data_origin_was_enabled = (scene->toolsettings->transform_flag &
-                                     SCE_XFORM_DATA_ORIGIN) != 0;
-    scene->toolsettings->transform_flag |= SCE_XFORM_DATA_ORIGIN;
+    if (!BKE_id_is_editable(bmain, &object->id)) {
+      return false;
+    }
+    /* Re-entering the mode on the same object keeps the pivot the user already edited. */
+    const bool preserve_custom_manipulator =
+        manipulator_pivot_last_object_resolve(C, runtime) == object &&
+        (runtime.tool.manipulator_pivot.position_valid ||
+         runtime.tool.manipulator_pivot.orientation_valid);
+    if (preserve_custom_manipulator) {
+      runtime.tool.manipulator_pivot.last_object = ED_maya_object_runtime_ref_create(*object);
+    }
+    else {
+      if (!manipulator_pivot_sync_from_object(runtime, *object)) {
+        return false;
+      }
+    }
+    state.data_origin_was_enabled = false;
     runtime.pivot_mode = MayaPivotMode::Object;
   }
   else {
@@ -983,6 +1665,7 @@ static bool pivot_edit_begin(bContext *C,
       }
       return false;
     }
+    manipulator_pivot_sync_from_component(runtime, *state.custom);
     runtime.pivot_mode = MayaPivotMode::Custom;
   }
 
@@ -994,16 +1677,13 @@ static bool pivot_edit_begin(bContext *C,
   state.region = CTX_wm_region(C);
   state.tool = runtime.tool.active;
   state.tool_revision = runtime.tool.revision;
-  state.persistent = persistent;
+  state.persistent = true;
   state.exit_after_drag = false;
   state.restart_after_drag = false;
-  state.restart_after_cancel = false;
-  state.restart_persistent = false;
-  state.phase = persistent ? MayaPivotEditPhase::PersistentPivot :
-                             MayaPivotEditPhase::PivotArmed;
+  state.phase = MayaPivotEditPhase::PersistentPivot;
   runtime.temporary.edit_pivot = true;
 
-  pivot_edit_status_set(C, target, persistent);
+  pivot_edit_status_set(C, target);
   if (target == MayaPivotEditTarget::ObjectOrigin) {
     WM_event_add_notifier(C, NC_SCENE | ND_TOOLSETTINGS, nullptr);
   }
@@ -1013,82 +1693,33 @@ static bool pivot_edit_begin(bContext *C,
 
 bool pivot_edit_resume_persistent(bContext *C, MayaWindowRuntime &runtime)
 {
-  if (pivot_edit_begin(C, runtime, true)) {
+  if (pivot_edit_begin(C, runtime)) {
     return true;
   }
 
-  /* Insert is a persistent request, even while the current area, mode, or tool cannot host a
-   * pivot manipulator. Validation retries the request when a supported context becomes active. */
+  /* The toggle stays on even while the current area, mode, or object cannot host a pivot
+   * manipulator. Validation retries the request when a supported context becomes active. */
   runtime.pivot_edit.persistent = true;
   runtime.pivot_edit.phase = MayaPivotEditPhase::PersistentPivot;
   return true;
 }
 
-bool pivot_edit_key_press(bContext *C, MayaWindowRuntime &runtime)
+bool pivot_edit_toggle_persistent(bContext *C, MayaWindowRuntime &runtime)
 {
   MayaPivotEditState &state = runtime.pivot_edit;
-  if (runtime.physical_input.edit_pivot) {
-    return state.target != MayaPivotEditTarget::None || pivot_edit_begin(C, runtime, false);
-  }
-  runtime.physical_input.edit_pivot = true;
-  if (state.persistent) {
-    return true;
-  }
-  if (state.target != MayaPivotEditTarget::None) {
-    return true;
-  }
-  return pivot_edit_begin(C, runtime, false);
-}
-
-bool pivot_edit_key_release(bContext *C, MayaWindowRuntime &runtime)
-{
-  MayaPivotEditState &state = runtime.pivot_edit;
-  if (!runtime.physical_input.edit_pivot) {
-    return false;
+  if (!state.persistent) {
+    return pivot_edit_resume_persistent(C, runtime);
   }
 
-  runtime.physical_input.edit_pivot = false;
-  if (state.persistent) {
-    return true;
-  }
+  /* Turning the toggle off. A pivot drag in progress keeps its manipulator until it finishes. */
+  state.persistent = false;
   if (runtime.transform_active && state.target != MayaPivotEditTarget::None) {
     state.exit_after_drag = true;
     state.phase = MayaPivotEditPhase::PivotCommitPending;
     return true;
   }
-  if (state.target != MayaPivotEditTarget::None) {
-    pivot_edit_end(C, runtime);
-    return true;
-  }
-  return false;
-}
-
-bool pivot_edit_toggle_persistent(bContext *C, MayaWindowRuntime &runtime)
-{
-  MayaPivotEditState &state = runtime.pivot_edit;
-  if (!state.persistent && runtime.transform_active &&
-      state.target != MayaPivotEditTarget::None)
-  {
-    state.persistent = true;
-    state.exit_after_drag = false;
-    if (state.restart_after_drag) {
-      state.restart_persistent = true;
-    }
-    return true;
-  }
-  if (state.persistent) {
-    if (runtime.transform_active && state.target != MayaPivotEditTarget::None) {
-      state.persistent = false;
-      state.exit_after_drag = !runtime.physical_input.edit_pivot;
-      state.restart_persistent = false;
-      state.phase = MayaPivotEditPhase::PivotCommitPending;
-    }
-    else {
-      pivot_edit_end(C, runtime);
-    }
-    return true;
-  }
-  return pivot_edit_resume_persistent(C, runtime);
+  pivot_edit_end(C, runtime);
+  return true;
 }
 
 bool pivot_edit_pin_toggle(bContext *C, MayaWindowRuntime &runtime)
@@ -1117,49 +1748,96 @@ bool pivot_edit_pin_toggle(bContext *C, MayaWindowRuntime &runtime)
 
   pivot_undo_step_begin(C, runtime);
   state.custom->pinned = !state.custom->pinned;
+  runtime.tool.manipulator_pivot.pin_component_pivot = state.custom->pinned;
+  if (!state.custom->pinned) {
+    state.custom->position_valid = false;
+    state.custom->orientation_valid = false;
+    state.custom->selection_signature_valid = false;
+    if (!pivot_custom_sync_to_selection(C, runtime, true)) {
+      state.custom.reset();
+      runtime.tool.manipulator_pivot.position_valid = false;
+      runtime.tool.manipulator_pivot.orientation_valid = false;
+    }
+  }
+  if (state.custom) {
+    manipulator_pivot_sync_from_component(runtime, *state.custom);
+  }
   ED_maya_tool_presentation_refresh(C, runtime);
   return true;
 }
 
-void pivot_edit_focus_lost(bContext *C, MayaWindowRuntime &runtime)
+MayaDispatchResult pivot_edit_click_handle_action(bContext *C,
+                                                   MayaWindowRuntime &runtime,
+                                                   const MayaInputAction &action)
+{
+  if (runtime.pivot_edit.target == MayaPivotEditTarget::None ||
+      !ELEM(action.id,
+            MayaActionID::SelectPrimary,
+            MayaActionID::SelectAdd,
+            MayaActionID::SelectRemove,
+            MayaActionID::SelectToggle))
+  {
+    return MayaDispatchResult::PassThrough;
+  }
+
+  wmOperatorType *operator_type = WM_operatortype_find("TRANSFORM_OT_maya_pivot_click", true);
+  if (operator_type == nullptr) {
+    return MayaDispatchResult::PassThrough;
+  }
+  PointerRNA properties = WM_operator_properties_create_ptr(operator_type);
+  const int mouse[2] = {action.mouse_region.x, action.mouse_region.y};
+  RNA_int_set_array(&properties, "mouse", mouse);
+  RNA_boolean_set(&properties, "shift", action.shift);
+  RNA_boolean_set(&properties, "ctrl", action.ctrl);
+  WM_operator_name_call_ptr(
+      C, operator_type, wm::OpCallContext::ExecDefault, &properties, action.source_event);
+  WM_operator_properties_free(&properties);
+  return MayaDispatchResult::Handled;
+}
+
+void pivot_edit_selection_changed(bContext *C, MayaWindowRuntime &runtime)
+{
+  MayaCustomPivotData *custom = runtime.pivot_edit.custom.get();
+  if (custom == nullptr || custom->scene != CTX_data_scene(C)) {
+    return;
+  }
+  if (pivot_custom_sync_to_selection(C, runtime, false)) {
+    manipulator_pivot_sync_from_component(runtime, *custom);
+  }
+  else if (!custom->pinned) {
+    custom->position_valid = false;
+    custom->orientation_valid = false;
+    runtime.tool.manipulator_pivot.position_valid = false;
+    runtime.tool.manipulator_pivot.orientation_valid = false;
+  }
+}
+
+void pivot_edit_input_reset(bContext *C, MayaWindowRuntime &runtime)
 {
   runtime.temporary.snap_stack.clear();
-  if (wmWindowManager *wm = CTX_wm_manager(C)) {
+  if (wmWindowManager *wm = CTX_wm_manager(C); wm != nullptr && wm->runtime != nullptr) {
     wm->runtime->maya_snap_temporary_mode = uint8_t(MayaSnapMode::None);
   }
 
+  /* Losing focus must not turn the toggle off: like in Maya, Edit Pivot survives leaving and
+   * re-entering the window. Only the transient input overlays are dropped, and a drag that was
+   * interrupted rebuilds its manipulator once the transform finishes. */
   MayaPivotEditState &state = runtime.pivot_edit;
-  runtime.physical_input.edit_pivot = false;
-  if (state.persistent) {
-    if (runtime.transform_active && state.target != MayaPivotEditTarget::None) {
-      state.restart_after_drag = true;
-      state.restart_after_cancel = true;
-      state.restart_persistent = true;
-      state.phase = MayaPivotEditPhase::PivotCommitPending;
-    }
-    return;
-  }
-  if (state.target == MayaPivotEditTarget::None) {
-    return;
-  }
-  if (runtime.transform_active) {
-    state.exit_after_drag = true;
+  if (state.persistent && runtime.transform_active &&
+      state.target != MayaPivotEditTarget::None)
+  {
+    state.restart_after_drag = true;
     state.phase = MayaPivotEditPhase::PivotCommitPending;
-  }
-  else {
-    pivot_edit_end(C, runtime);
   }
 }
 
 void pivot_edit_validate(bContext *C, MayaWindowRuntime &runtime)
 {
+  manipulator_pivot_last_object_resolve(C, runtime);
   MayaPivotEditState &state = runtime.pivot_edit;
   if (state.target == MayaPivotEditTarget::None) {
     if (state.persistent) {
       pivot_edit_resume_persistent(C, runtime);
-    }
-    else if (runtime.physical_input.edit_pivot) {
-      pivot_edit_begin(C, runtime, false);
     }
     return;
   }
@@ -1173,20 +1851,14 @@ void pivot_edit_validate(bContext *C, MayaWindowRuntime &runtime)
   if (context_changed) {
     if (runtime.transform_active) {
       state.restart_after_drag = true;
-      state.restart_after_cancel = false;
-      state.restart_persistent = state.persistent;
-      state.phase = MayaPivotEditPhase::PivotCommitPending;
+          state.phase = MayaPivotEditPhase::PivotCommitPending;
       return;
     }
 
-    const bool resume_persistent = state.persistent;
-    const bool resume_temporary = runtime.physical_input.edit_pivot && !state.persistent;
+    const bool resume = state.persistent;
     pivot_edit_end(C, runtime);
-    if (resume_persistent) {
+    if (resume) {
       pivot_edit_resume_persistent(C, runtime);
-    }
-    else if (resume_temporary) {
-      pivot_edit_begin(C, runtime, false);
     }
   }
 }
@@ -1205,6 +1877,26 @@ static MayaNavigationSession *navigation_debug_session_get(const bContext *C)
 }  // namespace blender::ed::maya
 
 namespace blender {
+
+ed::maya::MayaObjectRuntimeRef ED_maya_object_runtime_ref_create(const Object &object)
+{
+  ID &id = const_cast<ID &>(object.id);
+  BKE_lib_libblock_session_uid_ensure(&id);
+  ed::maya::MayaObjectRuntimeRef reference;
+  reference.session_uid = id.session_uid;
+  STRNCPY(reference.id_name, id.name);
+  return reference;
+}
+
+Object *ED_maya_object_runtime_ref_resolve(
+    Main &bmain, const ed::maya::MayaObjectRuntimeRef &reference)
+{
+  if (reference.session_uid == 0) {
+    return nullptr;
+  }
+  ID *id = BKE_libblock_find_session_uid(&bmain, ID_OB, reference.session_uid);
+  return id != nullptr ? id_cast<Object *>(id) : nullptr;
+}
 
 int ED_maya_interaction_frame_rate_limit(const bContext *C)
 {
@@ -1235,17 +1927,134 @@ ed::maya::MayaPivotEditTarget ED_maya_pivot_edit_target_get(const bContext *C)
                               ed::maya::MayaPivotEditTarget::None;
 }
 
-bool ED_maya_pivot_custom_matrix_get(const bContext *C, float r_matrix[4][4])
+namespace ed::maya {
+
+/**
+ * The custom pivot must not silently take over every Blender pivot mode. Individual Custom Pivots
+ * are not implemented, so a selection asking for per-element centers keeps the standard Blender
+ * behavior.
+ */
+static bool pivot_custom_override_allowed(const bContext *C)
+{
+  if (!ED_maya_interaction_enabled(C)) {
+    return false;
+  }
+  const Scene *scene = CTX_data_scene(C);
+  if (scene != nullptr && scene->toolsettings != nullptr &&
+      scene->toolsettings->transform_pivot_point == V3D_AROUND_LOCAL_ORIGINS)
+  {
+    return false;
+  }
+  return true;
+}
+
+/** Resolve which of the two independent pivots the caller asks for. */
+static bool pivot_usage_is_scale(const MayaWindowRuntime *runtime, const MayaPivotUsage usage)
+{
+  switch (usage) {
+    case MayaPivotUsage::Rotate:
+      return false;
+    case MayaPivotUsage::Scale:
+      return true;
+    case MayaPivotUsage::Display:
+      return runtime != nullptr && runtime->tool.active == MayaToolID::Scale;
+  }
+  return false;
+}
+
+/** The object whose custom pivot may override the transform center, or null. */
+static Object *pivot_custom_object_get(const bContext *C,
+                                       const MayaWindowRuntime *runtime,
+                                       bool &r_object_pivot_edit)
+{
+  r_object_pivot_edit = runtime != nullptr &&
+                        runtime->pivot_edit.target == MayaPivotEditTarget::ObjectOrigin;
+  return r_object_pivot_edit ? runtime->pivot_edit.object : CTX_data_active_object(C);
+}
+
+}  // namespace ed::maya
+
+bool ED_maya_pivot_custom_matrix_get(const bContext *C,
+                                     const ed::maya::MayaPivotUsage usage,
+                                     float r_matrix[4][4])
 {
   ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
+  if (!ed::maya::pivot_custom_override_allowed(C)) {
+    return false;
+  }
+  bool object_pivot_edit;
+  Object *object = ed::maya::pivot_custom_object_get(C, runtime, object_pivot_edit);
+  const bool use_scale_pivot = ed::maya::pivot_usage_is_scale(runtime, usage);
+  if (CTX_data_mode_enum(C) == CTX_MODE_OBJECT && object != nullptr &&
+      (object_pivot_edit || ed::maya::object_pivot_valid(*object, use_scale_pivot)))
+  {
+    double3 position_world;
+    if (!ed::maya::object_pivot_world_get(*object, use_scale_pivot, position_world)) {
+      /* Edit Pivot always edits the custom pivot, starting from the object origin. */
+      if (!object_pivot_edit) {
+        return false;
+      }
+      position_world = double3(object->object_to_world().location());
+    }
+    math::QuaternionBase<double> orientation_world;
+    if (!BKE_object_custom_pivot_orientation_world_get(*object, orientation_world)) {
+      return false;
+    }
+    const float orientation[4] = {float(orientation_world.w),
+                                  float(orientation_world.x),
+                                  float(orientation_world.y),
+                                  float(orientation_world.z)};
+    quat_to_mat4(r_matrix, orientation);
+    copy_v3fl_v3db(r_matrix[3], static_cast<const double *>(position_world));
+    return true;
+  }
+  if (runtime == nullptr) {
+    return false;
+  }
+  if (!ed::maya::pivot_custom_sync_to_selection(C, *runtime, false)) {
+    return false;
+  }
+  const ed::maya::MayaCustomPivotData *custom =
+      runtime->pivot_edit.custom ? runtime->pivot_edit.custom.get() : nullptr;
+  if (custom == nullptr || !custom->position_valid) {
+    return false;
+  }
+  quat_to_mat4(r_matrix, custom->rotation_quaternion);
+  copy_v3_v3(r_matrix[3], custom->location);
+  return true;
+}
+
+bool ED_maya_pivot_custom_orientation_get(const bContext *C, float r_orientation[3][3])
+{
+  ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
+  if (!ed::maya::pivot_custom_override_allowed(C)) {
+    return false;
+  }
+  bool object_pivot_edit;
+  Object *object = ed::maya::pivot_custom_object_get(C, runtime, object_pivot_edit);
+  if (CTX_data_mode_enum(C) == CTX_MODE_OBJECT && object != nullptr &&
+      (object_pivot_edit || BKE_object_custom_pivot_orientation_valid(*object)))
+  {
+    math::QuaternionBase<double> orientation_world;
+    if (!BKE_object_custom_pivot_orientation_world_get(*object, orientation_world)) {
+      return false;
+    }
+    const float orientation[4] = {float(orientation_world.w),
+                                  float(orientation_world.x),
+                                  float(orientation_world.y),
+                                  float(orientation_world.z)};
+    quat_to_mat3(r_orientation, orientation);
+    return true;
+  }
   if (runtime == nullptr || !ed::maya::pivot_custom_sync_to_selection(C, *runtime, false)) {
     return false;
   }
   const ed::maya::MayaCustomPivotData *custom =
       runtime->pivot_edit.custom ? runtime->pivot_edit.custom.get() : nullptr;
-
-  quat_to_mat4(r_matrix, custom->rotation_quaternion);
-  copy_v3_v3(r_matrix[3], custom->location);
+  if (custom == nullptr || !custom->orientation_valid) {
+    return false;
+  }
+  quat_to_mat3(r_orientation, custom->rotation_quaternion);
   return true;
 }
 
@@ -1268,6 +2077,391 @@ bool ED_maya_pivot_edit_data_get(const bContext *C,
 
   *r_location = custom->location;
   *r_rotation_quaternion = custom->rotation_quaternion;
+  return true;
+}
+
+std::unique_ptr<ed::maya::MayaPivotEditTargetBackend> ED_maya_pivot_edit_target_create(
+    bContext *C)
+{
+  ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
+  if (runtime == nullptr) {
+    return nullptr;
+  }
+
+  const bool use_active_object = runtime->pivot_edit.target == ed::maya::MayaPivotEditTarget::None &&
+                                 CTX_data_mode_enum(C) == CTX_MODE_OBJECT;
+  if (runtime->pivot_edit.target == ed::maya::MayaPivotEditTarget::ObjectOrigin ||
+      use_active_object)
+  {
+    Object *object = use_active_object ? CTX_data_active_object(C) :
+                                        runtime->pivot_edit.object;
+    Main *bmain = CTX_data_main(C);
+    const MayaTransformCapabilities capabilities = object != nullptr ?
+                                                       BKE_maya_transform_capabilities_get(*object) :
+                                                       MayaTransformCapabilities{};
+    if (object == nullptr || bmain == nullptr || !BKE_id_is_editable(bmain, &object->id) ||
+        !capabilities.edit_pivot_position || !capabilities.edit_pivot_orientation)
+    {
+      return nullptr;
+    }
+    if (use_active_object ||
+        ed::maya::manipulator_pivot_last_object_resolve(C, *runtime) != object)
+    {
+      if (!ed::maya::manipulator_pivot_sync_from_object(*runtime, *object)) {
+        return nullptr;
+      }
+    }
+    return std::make_unique<ed::maya::MayaObjectPivotEditTarget>(C, *runtime, *object);
+  }
+
+  if (runtime->pivot_edit.target == ed::maya::MayaPivotEditTarget::ComponentPivot &&
+      ed::maya::pivot_custom_sync_to_selection(C, *runtime, false) &&
+      runtime->pivot_edit.custom)
+  {
+    ed::maya::manipulator_pivot_sync_from_component(*runtime, *runtime->pivot_edit.custom);
+    return std::make_unique<ed::maya::MayaComponentPivotEditTarget>(
+        C, *runtime, *runtime->pivot_edit.custom);
+  }
+  return nullptr;
+}
+
+void ED_maya_pivot_reset_position(bContext *C, const ed::maya::eMayaPivotResetMode mode)
+{
+  if (std::unique_ptr<ed::maya::MayaPivotEditTargetBackend> target =
+          ED_maya_pivot_edit_target_create(C))
+  {
+    target->reset_position(mode);
+    target->commit();
+  }
+}
+
+void ED_maya_pivot_reset_orientation(bContext *C)
+{
+  if (std::unique_ptr<ed::maya::MayaPivotEditTargetBackend> target =
+          ED_maya_pivot_edit_target_create(C))
+  {
+    target->reset_orientation();
+    target->commit();
+  }
+}
+
+void ED_maya_pivot_reset_all(bContext *C, const ed::maya::eMayaPivotResetMode mode)
+{
+  if (std::unique_ptr<ed::maya::MayaPivotEditTargetBackend> target =
+          ED_maya_pivot_edit_target_create(C))
+  {
+    target->reset_position(mode);
+    target->reset_orientation();
+    target->commit();
+  }
+}
+
+void ED_maya_pivot_undo_begin(const bContext *C)
+{
+  if (ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_ensure(C)) {
+    ed::maya::pivot_undo_step_begin(C, *runtime);
+  }
+}
+
+bool ED_maya_pivot_tool_settings_get(const bContext *C,
+                                     ed::maya::MayaPivotToolSettings &r_settings)
+{
+  const ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
+  if (runtime == nullptr) {
+    return false;
+  }
+  const ed::maya::MayaManipulatorPivotState &pivot = runtime->tool.manipulator_pivot;
+  r_settings.pin_component_pivot = pivot.pin_component_pivot;
+  r_settings.snap_position = pivot.snap_position;
+  r_settings.snap_orientation = pivot.snap_orientation;
+  r_settings.bake_orientation_automatically = pivot.bake_orientation_automatically;
+  r_settings.preserve_children = pivot.preserve_children;
+  r_settings.show_orientation_handle = pivot.show_orientation_handle;
+  r_settings.reset_mode = pivot.reset_mode;
+  r_settings.active_axis = pivot.active_axis;
+  return true;
+}
+
+bool ED_maya_pivot_tool_settings_set(const bContext *C,
+                                     const ed::maya::MayaPivotToolSettings &settings)
+{
+  ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_ensure(C);
+  if (runtime == nullptr) {
+    return false;
+  }
+  ed::maya::MayaManipulatorPivotState &pivot = runtime->tool.manipulator_pivot;
+  pivot.snap_position = settings.snap_position;
+  pivot.snap_orientation = settings.snap_orientation;
+  pivot.bake_orientation_automatically = settings.bake_orientation_automatically;
+  pivot.preserve_children = settings.preserve_children;
+  pivot.show_orientation_handle = settings.show_orientation_handle;
+  pivot.reset_mode = settings.reset_mode;
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+  return true;
+}
+
+void ED_maya_pivot_active_axis_set(const bContext *C, const int active_axis)
+{
+  if (ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C)) {
+    runtime->tool.manipulator_pivot.active_axis = clamp_i(active_axis, 0, 2);
+  }
+}
+
+static bool maya_pivot_bake_children_supported(const Main &bmain, const Object &parent)
+{
+  for (const Object &object : bmain.objects) {
+    if (object.parent == &parent &&
+        (object.constraints.first != nullptr || object.maya_constraints.first != nullptr))
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
+struct MayaPivotChildBakeState {
+  Object *object;
+  double4x4 world_matrix;
+};
+
+static bool maya_pivot_preserve_direct_children(Depsgraph *depsgraph,
+                                                Scene *scene,
+                                                Object &parent,
+                                                const Vector<MayaPivotChildBakeState>
+                                                    &child_states)
+{
+  BKE_object_where_is_calc(depsgraph, scene, &parent);
+  MayaTransformSetOptions options;
+  for (const MayaPivotChildBakeState &child_state : child_states) {
+    if (BKE_object_uses_maya_transform(child_state.object)) {
+      Object &child = *child_state.object;
+      if (!BKE_object_maya_set_world_matrix(child,
+                                            ed::maya::maya_parent_effect_matrix_get(child),
+                                            child_state.world_matrix,
+                                            options))
+      {
+        return false;
+      }
+      BKE_object_where_is_calc(depsgraph, scene, &child);
+      DEG_id_tag_update(&child.id, ID_RECALC_TRANSFORM);
+    }
+  }
+  for (const MayaPivotChildBakeState &child_state : child_states) {
+    if (!BKE_object_uses_maya_transform(child_state.object)) {
+      Object &child = *child_state.object;
+      BKE_object_apply_mat4(&child, float4x4(child_state.world_matrix).ptr(), true, true);
+      BKE_object_where_is_calc(depsgraph, scene, &child);
+      DEG_id_tag_update(&child.id, ID_RECALC_TRANSFORM);
+    }
+  }
+  return true;
+}
+
+bool ED_maya_pivot_bake(bContext *C, const ed::maya::eMayaPivotBakeMode mode)
+{
+  ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
+  Object *object = CTX_data_active_object(C);
+  Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  if (runtime == nullptr || object == nullptr || bmain == nullptr || scene == nullptr ||
+      !BKE_id_is_editable(bmain, &object->id) ||
+      CTX_data_mode_enum(C) != CTX_MODE_OBJECT ||
+      object->constraints.first != nullptr || object->maya_constraints.first != nullptr)
+  {
+    return false;
+  }
+
+  const bool bake_position = ELEM(
+      mode, ed::maya::MAYA_PIVOT_BAKE_POSITION, ed::maya::MAYA_PIVOT_BAKE_BOTH);
+  const bool bake_orientation = ELEM(
+      mode, ed::maya::MAYA_PIVOT_BAKE_ORIENTATION, ed::maya::MAYA_PIVOT_BAKE_BOTH);
+  const MayaTransformCapabilities capabilities = BKE_maya_transform_capabilities_get(*object);
+  if ((bake_position && !capabilities.bake_position) ||
+      (bake_orientation && !capabilities.bake_orientation) ||
+      (runtime->tool.manipulator_pivot.preserve_children &&
+       !capabilities.preserve_children))
+  {
+    return false;
+  }
+  if (capabilities.geometry_compensation && object->data != nullptr &&
+      ID_REAL_USERS(static_cast<ID *>(object->data)) > 1)
+  {
+    return false;
+  }
+  if (runtime->tool.manipulator_pivot.preserve_children &&
+      !maya_pivot_bake_children_supported(*bmain, *object))
+  {
+    return false;
+  }
+  ed::maya::MayaManipulatorPivotState pivot_before = runtime->tool.manipulator_pivot;
+  /* Baking the position moves the object origin onto the rotate pivot. */
+  pivot_before.position_valid = ed::maya::object_pivot_valid(*object, false);
+  pivot_before.orientation_valid = BKE_object_custom_pivot_orientation_valid(*object);
+  if ((bake_position &&
+       (!pivot_before.position_valid ||
+        !ed::maya::object_pivot_world_get(*object, false, pivot_before.position_world))) ||
+      (bake_orientation &&
+       (!pivot_before.orientation_valid ||
+        !BKE_object_custom_pivot_orientation_world_get(
+            *object, pivot_before.orientation_world))))
+  {
+    return false;
+  }
+
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  ed::maya::MayaTransformTransaction transaction(depsgraph, scene);
+  if (!transaction.capture_object(*object) ||
+      !transaction.capture_runtime(runtime->tool.manipulator_pivot))
+  {
+    return false;
+  }
+  if (capabilities.geometry_compensation && object->data != nullptr &&
+      !transaction.capture_geometry(*static_cast<ID *>(object->data)))
+  {
+    return false;
+  }
+
+  const double4x4 world_before(object->object_to_world());
+  double4x4 target_world = world_before;
+  if (bake_position) {
+    target_world.location() = pivot_before.position_world;
+  }
+  if (bake_orientation) {
+    float current_rotation_float[3][3];
+    if (!BKE_maya_matrix_orthonormalize(double3x3(world_before), current_rotation_float)) {
+      return false;
+    }
+    const double3x3 current_rotation{float3x3(current_rotation_float)};
+    const double3x3 residual = math::transpose(current_rotation) * double3x3(world_before);
+    const double3x3 desired_rotation = math::from_rotation<double3x3>(
+        pivot_before.orientation_world);
+    const double3x3 target_linear = desired_rotation * residual;
+    for (const int column : IndexRange(3)) {
+      for (const int row : IndexRange(3)) {
+        target_world[column][row] = target_linear[column][row];
+      }
+    }
+  }
+
+  Vector<MayaPivotChildBakeState> child_states;
+  if (runtime->tool.manipulator_pivot.preserve_children) {
+    for (Object &child : bmain->objects) {
+      if (child.parent == object) {
+        if (!transaction.capture_child(child)) {
+          return false;
+        }
+        child_states.append({&child, double4x4(child.object_to_world())});
+      }
+    }
+  }
+
+  /* Drop the pivot channels before solving the target matrix. They take part in the composition of
+   * a Maya transform, so clearing them afterwards would displace the object. */
+  if (bake_position) {
+    ed::maya::object_pivot_clear_baked(*object);
+  }
+
+  if (BKE_object_uses_maya_transform(object)) {
+    MayaTransformSetOptions options;
+    if (!BKE_object_maya_set_world_matrix(
+            *object, ed::maya::maya_parent_effect_matrix_get(*object), target_world, options))
+    {
+      return false;
+    }
+  }
+  else {
+    BKE_object_apply_mat4(object, float4x4(target_world).ptr(), true, true);
+  }
+  BKE_object_where_is_calc(depsgraph, scene, object);
+
+  const double4x4 world_after(object->object_to_world());
+  bool inverse_success;
+  const double4x4 world_after_inverse = math::invert(world_after, inverse_success);
+  if (!inverse_success) {
+    return false;
+  }
+  if (capabilities.geometry_compensation && object->data != nullptr &&
+      !transaction.transform_geometry(*static_cast<ID *>(object->data),
+                                      float4x4(world_after_inverse * world_before)))
+  {
+    return false;
+  }
+
+  if (!child_states.is_empty() &&
+      !maya_pivot_preserve_direct_children(depsgraph, scene, *object, child_states))
+  {
+    return false;
+  }
+
+  DEG_id_tag_update(&object->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+  if (bake_orientation) {
+    BKE_object_custom_pivot_orientation_clear(*object);
+  }
+  if (bake_position) {
+    runtime->tool.manipulator_pivot.position_world = double3(
+        object->object_to_world().location());
+    runtime->tool.manipulator_pivot.position_valid = false;
+  }
+  if (bake_orientation) {
+    BKE_object_custom_pivot_orientation_world_get(
+        *object, runtime->tool.manipulator_pivot.orientation_world);
+    runtime->tool.manipulator_pivot.orientation_valid = false;
+  }
+  runtime->tool.manipulator_pivot.last_object = ED_maya_object_runtime_ref_create(*object);
+  transaction.commit();
+  WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, object);
+  WM_event_add_notifier(C, NC_GEOM | ND_DATA, object->data);
+  return true;
+}
+
+bool ED_maya_pivot_orientation_aim(ed::maya::MayaPivotFrame &frame,
+                                   const double3 &target_world,
+                                   const int active_axis,
+                                   const double3 &view_up)
+{
+  if (!frame.position_valid || active_axis < 0 || active_axis > 2) {
+    return false;
+  }
+  double3 aim = target_world - frame.position_world;
+  double aim_length;
+  aim = math::normalize_and_get_length(aim, aim_length);
+  if (aim_length <= 1.0e-12) {
+    return false;
+  }
+
+  double3x3 previous = math::from_rotation<double3x3>(frame.orientation_world);
+  double3 secondary = previous[(active_axis + 1) % 3];
+  secondary -= aim * math::dot(secondary, aim);
+  double secondary_length;
+  secondary = math::normalize_and_get_length(secondary, secondary_length);
+  if (secondary_length <= 1.0e-8) {
+    secondary = view_up - aim * math::dot(view_up, aim);
+    secondary = math::normalize_and_get_length(secondary, secondary_length);
+    if (secondary_length <= 1.0e-8) {
+      secondary = previous[(active_axis + 2) % 3];
+      secondary -= aim * math::dot(secondary, aim);
+      secondary = math::normalize_and_get_length(secondary, secondary_length);
+      if (secondary_length <= 1.0e-8) {
+        return false;
+      }
+    }
+  }
+
+  double3x3 orientation = double3x3::identity();
+  orientation[active_axis] = aim;
+  orientation[(active_axis + 1) % 3] = secondary;
+  orientation[(active_axis + 2) % 3] = math::cross(aim, secondary);
+  if (active_axis == 1) {
+    orientation[0] = math::cross(orientation[1], orientation[2]);
+  }
+  else if (active_axis == 2) {
+    orientation[1] = math::cross(orientation[2], orientation[0]);
+  }
+  if (math::determinant(orientation) < 0.0) {
+    orientation[(active_axis + 1) % 3] = -orientation[(active_axis + 1) % 3];
+  }
+  frame.orientation_world = math::normalize(math::to_quaternion(orientation));
+  frame.orientation_valid = true;
   return true;
 }
 
@@ -1378,16 +2572,14 @@ void ED_maya_pivot_event_pre_modal(bContext *C, const wmEvent *event)
     return;
   }
 
-  if (event->type == EVT_DKEY && event->val == KM_RELEASE) {
-    ed::maya::pivot_edit_key_release(C, *runtime);
-  }
-  else if (event->type == EVT_INSERTKEY && event->val == KM_PRESS &&
-           (event->flag & WM_EVENT_IS_REPEAT) == 0)
+  /* Both pivot keys toggle, so a running transform sees the same model as the idle dispatcher. */
+  if (ELEM(event->type, EVT_DKEY, EVT_INSERTKEY) && event->val == KM_PRESS &&
+      (event->flag & WM_EVENT_IS_REPEAT) == 0)
   {
     ed::maya::pivot_edit_toggle_persistent(C, *runtime);
   }
   else if (event->type == WINDEACTIVATE) {
-    ed::maya::pivot_edit_focus_lost(C, *runtime);
+    ed::maya::pivot_edit_input_reset(C, *runtime);
   }
 }
 
@@ -1460,8 +2652,6 @@ void ED_maya_transform_end(bContext *C, const bool cancelled)
                                      ed::maya::MayaPivotEditPhase::PivotCommitPending);
     const bool exit_after_drag = pivot.exit_after_drag;
     const bool restart_after_drag = pivot.restart_after_drag;
-    const bool restart_after_cancel = pivot.restart_after_cancel;
-    const bool restart_persistent = pivot.restart_persistent;
     if (cancelled && pivot.follow_transform && pivot.custom &&
         pivot.custom->scene == CTX_data_scene(C))
     {
@@ -1475,24 +2665,18 @@ void ED_maya_transform_end(bContext *C, const bool cancelled)
       ed::maya::pivot_undo_pending_clear(*runtime);
     }
 
+    /* Cancelling the drag only restores the pivot, it never leaves the mode: the toggle decides
+     * that, and the backend already rolled the pivot back. */
     if (was_pivot_drag) {
-      if (cancelled || exit_after_drag || restart_after_drag ||
-          (!pivot.persistent && !runtime->physical_input.edit_pivot))
-      {
+      if (exit_after_drag) {
         ed::maya::pivot_edit_end(C, *runtime);
-        if (restart_after_drag && (!cancelled || restart_after_cancel)) {
-          if (restart_persistent) {
-            ed::maya::pivot_edit_resume_persistent(C, *runtime);
-          }
-          else if (runtime->physical_input.edit_pivot) {
-            ed::maya::pivot_edit_begin(C, *runtime, false);
-          }
-        }
+      }
+      else if (restart_after_drag) {
+        ed::maya::pivot_edit_end(C, *runtime);
+        ed::maya::pivot_edit_resume_persistent(C, *runtime);
       }
       else {
-        pivot.phase = pivot.persistent ?
-                          ed::maya::MayaPivotEditPhase::PersistentPivot :
-                          ed::maya::MayaPivotEditPhase::PivotArmed;
+        pivot.phase = ed::maya::MayaPivotEditPhase::PersistentPivot;
       }
     }
   }
@@ -1501,16 +2685,18 @@ void ED_maya_transform_end(bContext *C, const bool cancelled)
 void ED_maya_undo_step_store(const bContext *C)
 {
   ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
+  UndoStack *undo_stack = ED_undo_stack_get();
   UndoStep *step = ed::maya::pivot_undo_active_step_get(C);
-  if (runtime == nullptr || step == nullptr || !runtime->pivot_undo ||
+  if (runtime == nullptr || undo_stack == nullptr || step == nullptr || !runtime->pivot_undo ||
       !runtime->pivot_undo->pending_before)
   {
     return;
   }
+  ed::maya::manipulator_pivot_last_object_resolve(C, *runtime);
 
   const std::optional<ed::maya::MayaPivotUndoSnapshot> after =
       ed::maya::pivot_undo_snapshot_create(C, *runtime);
-  if (!after || step->user_data != nullptr) {
+  if (!after || ed::maya::pivot_undo_step_payload_get(undo_stack, step) != nullptr) {
     ed::maya::pivot_undo_pending_clear(*runtime);
     return;
   }
@@ -1520,8 +2706,8 @@ void ED_maya_undo_step_store(const bContext *C)
   payload->owner_runtime_id = runtime->instance_id;
   payload->before = *runtime->pivot_undo->pending_before;
   payload->after = *after;
-  step->user_data = payload;
-  step->user_data_free = ed::maya::pivot_undo_step_payload_free;
+  BKE_undosys_step_user_data_set(
+      undo_stack, step, payload, ed::maya::pivot_undo_step_payload_free);
   step->data_size += sizeof(*payload);
   ed::maya::pivot_undo_pending_clear(*runtime);
 }
@@ -1542,13 +2728,14 @@ void ED_maya_undo_steps_restore(bContext *C,
     return;
   }
 
+  const UndoStack *undo_stack = ED_undo_stack_get();
   if (is_undo) {
     for (const UndoStep *step = step_from; step != step_to; step = step->prev) {
       if (step == nullptr) {
         break;
       }
       if (const ed::maya::MayaPivotUndoStepPayload *payload =
-              ed::maya::pivot_undo_step_payload_get(step))
+              ed::maya::pivot_undo_step_payload_get(undo_stack, step))
       {
         ed::maya::pivot_undo_snapshot_restore(C, *payload, payload->before);
       }
@@ -1560,7 +2747,7 @@ void ED_maya_undo_steps_restore(bContext *C,
        step = step->next)
   {
     if (const ed::maya::MayaPivotUndoStepPayload *payload =
-            ed::maya::pivot_undo_step_payload_get(step))
+            ed::maya::pivot_undo_step_payload_get(undo_stack, step))
     {
       ed::maya::pivot_undo_snapshot_restore(C, *payload, payload->after);
     }

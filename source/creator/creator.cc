@@ -6,6 +6,7 @@
  * \ingroup creator
  */
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -329,6 +330,18 @@ extern "C" int GHOST_HACK_getFirstFile(char buf[]);
  * - run #WM_main() event loop,
  *   or exit immediately when running in background-mode.
  */
+static void startup_trace_marker(const char *marker, const bool reset = false)
+{
+  const char *filepath = std::getenv("BLENDER_STARTUP_TRACE_FILE");
+  if (filepath == nullptr) {
+    return;
+  }
+  if (std::FILE *file = std::fopen(filepath, reset ? "w" : "a")) {
+    std::fprintf(file, "%s\n", marker);
+    std::fclose(file);
+  }
+}
+
 int main(int argc,
 #ifdef USE_WIN32_UNICODE_ARGS
          const char ** /*argv_c*/
@@ -338,6 +351,9 @@ int main(int argc,
 )
 {
   using namespace blender;
+
+  startup_trace_marker("TRACE_BUILD item-region-message-v6", true);
+  startup_trace_marker("CREATOR main enter");
 
   bContext *C;
 #ifndef WITH_PYTHON_MODULE
@@ -491,6 +507,7 @@ int main(int argc,
   DNA_sdna_current_init();
 
   BKE_blender_globals_init(); /* `blender.cc` */
+  startup_trace_marker("CREATOR globals initialized");
 
   BKE_cpp_types_init();
   fn::multi_function::register_common_functions();
@@ -571,6 +588,7 @@ int main(int argc,
 
   BKE_brush_system_init();
   BKE_particle_init_rng();
+  startup_trace_marker("CREATOR core systems initialized");
   /* End second initialization. */
 
 #if defined(WITH_PYTHON_MODULE) || defined(WITH_HEADLESS)
@@ -600,7 +618,9 @@ int main(int argc,
   BLI_args_parse(ba, ARG_PASS_SETTINGS_FORCE, nullptr, nullptr);
 #endif
 
+  startup_trace_marker("CREATOR WM_init begin");
   WM_init(C, argc, argv);
+  startup_trace_marker("CREATOR WM_init end");
 
 #ifndef WITH_PYTHON
   fprintf(stderr,
@@ -620,6 +640,7 @@ int main(int argc,
 #ifndef WITH_PYTHON_MODULE
   /* Handles #ARG_PASS_FINAL. */
   BLI_args_parse(ba, ARG_PASS_FINAL, main_args_handle_load_file, C);
+  startup_trace_marker("CREATOR final arguments handled");
 #endif
 
   /* Explicitly free data allocated for argument parsing:
@@ -658,8 +679,11 @@ int main(int argc,
     BLI_assert(app_state.main_arg_deferred == nullptr);
 
     /* Shows the splash as needed. */
+    startup_trace_marker("CREATOR splash begin");
     WM_init_splash_on_startup(C);
+    startup_trace_marker("CREATOR splash end");
 
+    startup_trace_marker("CREATOR WM_main begin");
     WM_main(C);
   }
   /* Neither #WM_exit, #WM_main return, this quiets CLANG's `unreachable-code-return` warning. */

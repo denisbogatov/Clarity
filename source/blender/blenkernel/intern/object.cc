@@ -9,6 +9,7 @@
 /* Allow using deprecated functionality for .blend file I/O. */
 #define DNA_DEPRECATED_ALLOW
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -52,6 +53,7 @@
 #include "BLI_linklist.h"
 #include "BLI_listbase.h"
 #include "BLI_math_matrix.h"
+#include "BLI_math_matrix.hh"
 #include "BLI_math_rotation.h"
 #include "BLI_math_vector_types.hh"
 #include "BLI_path_utils.hh"
@@ -106,6 +108,7 @@
 #include "BKE_linestyle.h"
 #include "BKE_main.hh"
 #include "BKE_material.hh"
+#include "BKE_maya_constraints.hh"
 #include "BKE_mball.hh"
 #include "BKE_mesh.hh"
 #include "BKE_mesh_wrapper.hh"
@@ -113,6 +116,7 @@
 #include "BKE_multires.hh"
 #include "BKE_node.hh"
 #include "BKE_object.hh"
+#include "BKE_object_transform_maya.hh"
 #include "BKE_object_types.hh"
 #include "BKE_paint.hh"
 #include "BKE_particle.h"
@@ -172,6 +176,33 @@ static Mutex vparent_lock;
 static_assert(sizeof(blender::bke::ObjectRuntime::contained_geometry_types) * 8 >=
               GEO_COMPONENT_TYPE_ENUM_SIZE);
 
+static void maya_constraints_free(ListBaseT<MayaConstraint> &constraints)
+{
+  for (MayaConstraint &constraint : constraints) {
+    BLI_freelistN(&constraint.targets);
+  }
+  BLI_freelistN(&constraints);
+}
+
+static void maya_constraints_copy(ListBaseT<MayaConstraint> &dst,
+                                  const ListBaseT<MayaConstraint> &src)
+{
+  dst.clear_no_delete();
+  for (const MayaConstraint &constraint_src : src) {
+    MayaConstraint *constraint_dst = MEM_dupalloc(&constraint_src);
+    constraint_dst->next = nullptr;
+    constraint_dst->prev = nullptr;
+    constraint_dst->targets.clear_no_delete();
+    for (const MayaConstraintTarget &target_src : constraint_src.targets) {
+      MayaConstraintTarget *target_dst = MEM_dupalloc(&target_src);
+      target_dst->next = nullptr;
+      target_dst->prev = nullptr;
+      BLI_addtail(&constraint_dst->targets, target_dst);
+    }
+    BLI_addtail(&dst, constraint_dst);
+  }
+}
+
 static void copy_object_pose(Object *obn, const Object *ob, const int flag);
 
 static void object_init_data(ID *id)
@@ -220,6 +251,13 @@ static void object_copy_data(Main *bmain,
   if (ob_src->iuser) {
     ob_dst->iuser = MEM_dupalloc(ob_src->iuser);
   }
+  if (ob_src->maya_transform) {
+    ob_dst->maya_transform = MEM_dupalloc(ob_src->maya_transform);
+  }
+  if (ob_src->custom_pivot) {
+    ob_dst->custom_pivot = MEM_dupalloc(ob_src->custom_pivot);
+  }
+  maya_constraints_copy(ob_dst->maya_constraints, ob_src->maya_constraints);
 
   ob_dst->shader_fx.clear_no_delete();
   for (ShaderFxData &fx : ob_src->shader_fx) {
@@ -299,6 +337,9 @@ static void object_free_data(ID *id)
   MEM_SAFE_DELETE(ob->mat);
   MEM_SAFE_DELETE(ob->matbits);
   MEM_SAFE_DELETE(ob->iuser);
+  MEM_SAFE_DELETE(ob->maya_transform);
+  MEM_SAFE_DELETE(ob->custom_pivot);
+  maya_constraints_free(ob->maya_constraints);
 
   if (ob->pose) {
     BKE_pose_free_ex(ob->pose, false);
@@ -462,6 +503,12 @@ static void object_foreach_id(ID *id, LibraryForeachIDData *data)
       data,
       BKE_constraints_id_loop(
           &object->constraints, library_foreach_constraintObjectLooper, flag, data));
+  for (MayaConstraint &constraint : object->maya_constraints) {
+    for (MayaConstraintTarget &target : constraint.targets) {
+      BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, target.object, IDWALK_CB_NOP);
+    }
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, constraint.aim.world_up_object, IDWALK_CB_NOP);
+  }
   BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(
       data, BKE_shaderfx_foreach_ID_link(object, library_foreach_shaderfxForeachIDLink, data));
 
@@ -805,6 +852,12 @@ static void object_blend_write(BlendWriter *writer, ID *id, const void *id_addre
   /* direct data */
   writer->write_pointer_array(ob->totcol, ob->mat);
   writer->write_char_array(ob->totcol, ob->matbits);
+  writer->write_struct(ob->maya_transform);
+  writer->write_struct(ob->custom_pivot);
+  writer->write_struct_list(&ob->maya_constraints);
+  for (const MayaConstraint &constraint : ob->maya_constraints) {
+    writer->write_struct_list(&constraint.targets);
+  }
 
   if (ob->pose) {
     BLI_assert(ob->type == OB_ARMATURE);
@@ -901,6 +954,22 @@ static void object_blend_read_data(BlendDataReader *reader, ID *id)
   BLO_read_pointer_array_and_validate_size(reader, &ob->mat, &ob->totcol);
   /* Ignore failure to read, matbis will become null which is valid. */
   (void)BLO_read_array(reader, &ob->matbits, ob->totcol);
+  BLO_read_struct(reader, MayaObjectTransform, &ob->maya_transform);
+  BLO_read_struct(reader, ObjectCustomPivot, &ob->custom_pivot);
+  BLO_read_struct_list(reader, MayaConstraint, &ob->maya_constraints);
+  for (MayaConstraint &constraint : ob->maya_constraints) {
+    BLO_read_struct_list(reader, MayaConstraintTarget, &constraint.targets);
+  }
+  if (ob->transform_model == OBJECT_TRANSFORM_MAYA && ob->maya_transform == nullptr) {
+    ob->transform_model = OBJECT_TRANSFORM_BLENDER;
+  }
+  else if (BKE_object_uses_maya_transform(ob)) {
+    const double4x4 offset_parent_matrix = double4x4(float4x4(ob->parentinv)) *
+                                           double4x4(ob->maya_transform->offset_parent_matrix);
+    std::copy_n(
+        offset_parent_matrix.base_ptr(), 16, &ob->maya_transform->offset_parent_matrix[0][0]);
+    unit_m4(ob->parentinv);
+  }
 
   /* do it here, below old data gets converted */
   BKE_modifier_blend_read_data(reader, &ob->modifiers, ob);
@@ -3081,7 +3150,105 @@ void BKE_object_tfm_protected_restore(Object *ob,
   }
 }
 
-void BKE_object_tfm_copy(Object *object_dst, const Object *object_src)
+bool BKE_object_uses_maya_transform(const Object *object)
+{
+  return object != nullptr && object->transform_model == OBJECT_TRANSFORM_MAYA &&
+         object->maya_transform != nullptr;
+}
+
+MayaObjectTransform *BKE_object_maya_transform_ensure(Object *object)
+{
+  BLI_assert(object != nullptr);
+  if (object->maya_transform == nullptr) {
+    object->maya_transform = MEM_new<MayaObjectTransform>(__func__);
+    BKE_maya_transform_set_defaults(*object->maya_transform);
+  }
+  return object->maya_transform;
+}
+
+void BKE_object_maya_transform_reset(Object *object)
+{
+  BLI_assert(object != nullptr);
+  BKE_maya_transform_set_defaults(*BKE_object_maya_transform_ensure(object));
+  if (object->transform_model == OBJECT_TRANSFORM_MAYA) {
+    unit_m4(object->parentinv);
+  }
+  BKE_object_maya_evaluated_channels_invalidate(*object);
+}
+
+static bool matrices_near(const double4x4 &a, const double4x4 &b, const double epsilon)
+{
+  for (int index = 0; index < 16; index++) {
+    if (std::abs(a.base_ptr()[index] - b.base_ptr()[index]) > epsilon) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool BKE_object_transform_model_set(Object &object, const int transform_model)
+{
+  if (!ELEM(transform_model, OBJECT_TRANSFORM_BLENDER, OBJECT_TRANSFORM_MAYA)) {
+    return false;
+  }
+  if (object.transform_model == transform_model &&
+      (transform_model != OBJECT_TRANSFORM_MAYA || object.maya_transform != nullptr))
+  {
+    return true;
+  }
+  if (object.constraints.first != nullptr || object.maya_constraints.first != nullptr) {
+    return false;
+  }
+
+  float world_matrix_float[4][4];
+  BKE_object_where_is_calc_mat4(&object, world_matrix_float);
+  const double4x4 world_matrix{float4x4(world_matrix_float)};
+  double4x4 parent_effect_matrix = double4x4::identity();
+  if (object.parent != nullptr) {
+    float parent_effect[4][4];
+    BKE_object_get_parent_matrix(&object, object.parent, parent_effect);
+    parent_effect_matrix = double4x4(float4x4(parent_effect));
+  }
+
+  Object channel_backup{};
+  BKE_object_transform_channels_copy(&channel_backup, &object);
+  float parent_inverse_backup[4][4];
+  copy_m4_m4(parent_inverse_backup, object.parentinv);
+
+  bool success = false;
+  if (transform_model == OBJECT_TRANSFORM_MAYA) {
+    object.transform_model = OBJECT_TRANSFORM_MAYA;
+    BKE_maya_transform_set_defaults(*BKE_object_maya_transform_ensure(&object));
+    MayaTransformSetOptions options;
+    options.preserve_offset_parent_matrix = false;
+    success = BKE_object_maya_set_world_matrix(
+        object, parent_effect_matrix, world_matrix, options);
+    if (success) {
+      unit_m4(object.parentinv);
+    }
+  }
+  else {
+    object.transform_model = OBJECT_TRANSFORM_BLENDER;
+    const float4x4 target_world(world_matrix);
+    BKE_object_apply_mat4(&object, target_world.ptr(), true, true);
+    float result_world[4][4];
+    BKE_object_where_is_calc_mat4(&object, result_world);
+    success = matrices_near(double4x4(float4x4(result_world)), world_matrix, 1.0e-5);
+    if (success) {
+      MEM_SAFE_DELETE(object.maya_transform);
+    }
+  }
+
+  if (!success) {
+    BKE_object_transform_channels_copy(&object, &channel_backup);
+    copy_m4_m4(object.parentinv, parent_inverse_backup);
+  }
+  MEM_SAFE_DELETE(channel_backup.maya_transform);
+  BKE_object_maya_evaluated_channels_invalidate(object);
+  return success;
+}
+
+void BKE_object_transform_channels_copy(Object *object_dst, const Object *object_src)
 {
 #define TFMCPY(_v) (object_dst->_v = object_src->_v)
 #define TFMCPY3D(_v) copy_v3_v3(object_dst->_v, object_src->_v)
@@ -3100,9 +3267,22 @@ void BKE_object_tfm_copy(Object *object_dst, const Object *object_src)
   TFMCPY(rotAngle);
   TFMCPY(drotAngle);
 
+  object_dst->transform_model = object_src->transform_model;
+  if (object_src->maya_transform != nullptr) {
+    *BKE_object_maya_transform_ensure(object_dst) = *object_src->maya_transform;
+  }
+  else {
+    MEM_SAFE_DELETE(object_dst->maya_transform);
+  }
+
 #undef TFMCPY
 #undef TFMCPY3D
 #undef TFMCPY4D
+}
+
+void BKE_object_tfm_copy(Object *object_dst, const Object *object_src)
+{
+  BKE_object_transform_channels_copy(object_dst, object_src);
 }
 
 void BKE_object_to_mat3(const Object *ob, float r_mat[3][3]) /* no parent */
@@ -3129,8 +3309,98 @@ void BKE_object_to_mat4(const Object *ob, float r_mat[4][4])
   add_v3_v3v3(r_mat[3], ob->loc, ob->dloc);
 }
 
+double4x4 BKE_object_local_matrix_get_double(const Object *object)
+{
+  if (BKE_object_uses_maya_transform(object)) {
+    const MayaObjectTransform &transform =
+        object->runtime != nullptr && object->runtime->maya_transform.valid ?
+                                               object->runtime->maya_transform.evaluated :
+                                               *object->maya_transform;
+    return BKE_maya_transform_dag_local_matrix(transform);
+  }
+
+  float4x4 matrix;
+  BKE_object_to_mat4(object, matrix.ptr());
+  return double4x4(matrix);
+}
+
+void BKE_object_local_matrix_get(const Object *object, float r_matrix[4][4])
+{
+  if (BKE_object_uses_maya_transform(object)) {
+    const MayaObjectTransform &transform =
+        object->runtime != nullptr && object->runtime->maya_transform.valid ?
+                                               object->runtime->maya_transform.evaluated :
+                                               *object->maya_transform;
+    const float4x4 matrix(BKE_maya_transform_dag_local_matrix(transform));
+    copy_m4_m4(r_matrix, matrix.ptr());
+  }
+  else {
+    BKE_object_to_mat4(object, r_matrix);
+  }
+}
+
+static void maya_offset_parent_matrix_set(MayaObjectTransform &transform, const double4x4 &matrix)
+{
+  std::copy_n(matrix.base_ptr(), 16, &transform.offset_parent_matrix[0][0]);
+}
+
+bool BKE_object_maya_parent_keep_transform(Object *object,
+                                           const double4x4 &parent_effect_matrix,
+                                           const double4x4 &world_matrix)
+{
+  if (!BKE_object_uses_maya_transform(object)) {
+    return false;
+  }
+
+  bool channel_inverse_success;
+  const double4x4 channel_inverse = math::invert(
+      BKE_maya_transform_channel_matrix(*object->maya_transform), channel_inverse_success);
+  if (!channel_inverse_success) {
+    return false;
+  }
+
+  double4x4 offset_parent_matrix;
+  if (object->maya_transform->inherits_transform) {
+    bool parent_inverse_success;
+    const double4x4 parent_inverse = math::invert(parent_effect_matrix, parent_inverse_success);
+    if (!parent_inverse_success) {
+      return false;
+    }
+    offset_parent_matrix = parent_inverse * world_matrix * channel_inverse;
+  }
+  else {
+    offset_parent_matrix = world_matrix * channel_inverse;
+  }
+
+  maya_offset_parent_matrix_set(*object->maya_transform, offset_parent_matrix);
+  unit_m4(object->parentinv);
+  return true;
+}
+
+bool BKE_object_maya_clear_parent_keep_transform(Object *object, const double4x4 &world_matrix)
+{
+  if (!BKE_object_uses_maya_transform(object)) {
+    return false;
+  }
+
+  bool channel_inverse_success;
+  const double4x4 channel_inverse = math::invert(
+      BKE_maya_transform_channel_matrix(*object->maya_transform), channel_inverse_success);
+  if (!channel_inverse_success) {
+    return false;
+  }
+
+  maya_offset_parent_matrix_set(*object->maya_transform, world_matrix * channel_inverse);
+  unit_m4(object->parentinv);
+  return true;
+}
+
 void BKE_object_matrix_local_get(Object *ob, float r_mat[4][4])
 {
+  if (BKE_object_uses_maya_transform(ob)) {
+    BKE_object_local_matrix_get(ob, r_mat);
+    return;
+  }
   if (ob->parent) {
     float par_imat[4][4];
 
@@ -3450,13 +3720,27 @@ static void solve_parenting(const Object *ob,
   float tmat[4][4];
   float locmat[4][4];
 
-  BKE_object_to_mat4(ob, locmat);
+  BKE_object_local_matrix_get(ob, locmat);
+
+  if (BKE_object_uses_maya_transform(ob) && !ob->maya_transform->inherits_transform) {
+    copy_m4_m4(r_obmat, locmat);
+    if (r_originmat) {
+      unit_m3(r_originmat);
+    }
+    return;
+  }
 
   BKE_object_get_parent_matrix(ob, par, totmat);
 
-  /* total */
-  mul_m4_m4m4(tmat, totmat, ob->parentinv);
-  mul_m4_m4m4(r_obmat, tmat, locmat);
+  if (BKE_object_uses_maya_transform(ob)) {
+    mul_m4_m4m4(r_obmat, totmat, locmat);
+    copy_m4_m4(tmat, totmat);
+  }
+  else {
+    /* total */
+    mul_m4_m4m4(tmat, totmat, ob->parentinv);
+    mul_m4_m4m4(r_obmat, tmat, locmat);
+  }
 
   if (r_originmat) {
     /* Usable `r_originmat`. */
@@ -3488,7 +3772,7 @@ static void object_where_is_calc_ex(Depsgraph *depsgraph,
     solve_parenting(ob, par, true, ob->runtime->object_to_world.ptr(), r_originmat);
   }
   else {
-    BKE_object_to_mat4(ob, ob->runtime->object_to_world.ptr());
+    BKE_object_local_matrix_get(ob, ob->runtime->object_to_world.ptr());
   }
 
   /* try to fall back to the scene rigid body world if none given */
@@ -3531,7 +3815,7 @@ void BKE_object_where_is_calc_mat4(const Object *ob, float r_obmat[4][4])
     solve_parenting(ob, par, false, r_obmat, nullptr);
   }
   else {
-    BKE_object_to_mat4(ob, r_obmat);
+    BKE_object_local_matrix_get(ob, r_obmat);
   }
 }
 
@@ -5124,6 +5408,7 @@ void BKE_object_runtime_reset_on_copy(Object *object, const int /*flag*/)
   runtime->geometry_set_eval = nullptr;
   runtime->contained_geometry_types = 0;
   runtime->sculpt_session = nullptr;
+  runtime->maya_transform = {};
 
   runtime->crazyspace_deform_imats = {};
   runtime->crazyspace_deform_cos = {};

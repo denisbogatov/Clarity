@@ -42,6 +42,7 @@ set(LIB
   PRIVATE bf::blenkernel
   PRIVATE bf::blenlib
   PRIVATE bf::bmesh
+  PRIVATE bf::depsgraph
   PRIVATE bf::dna
   PRIVATE bf::intern::clog
   PRIVATE bf::intern::guardedalloc
@@ -53,3 +54,14 @@ blender_add_lib(bf_editor_maya "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 
 # RNA_prototypes.hh
 add_dependencies(bf_editor_maya bf_rna)
+
+if(WITH_GTESTS)
+  set(TEST_SRC
+    maya_runtime_test.cc
+  )
+  set(TEST_INC
+  )
+  set(TEST_LIB
+  )
+  blender_add_test_suite_lib(editor_maya "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
+endif()

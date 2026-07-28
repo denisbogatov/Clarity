@@ -947,6 +947,12 @@ static eSnapMode snap_object_center_if_enabled(SnapObjectContext *sctx,
   if (!sctx->runtime.params.include_object_pivots) {
     return fallback;
   }
+  const float *excluded_location = sctx->runtime.params.excluded_object_pivot_location;
+  if (excluded_location != nullptr &&
+      len_squared_v3v3(obmat.location(), excluded_location) <= square_f(1.0e-7f))
+  {
+    return fallback;
+  }
   const eSnapMode center = snap_object_center(
       sctx, ob_eval, obmat, sctx->runtime.snap_to_flag);
   return center == SCE_SNAP_TO_NONE ? fallback : center;

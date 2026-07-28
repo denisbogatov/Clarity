@@ -894,6 +894,11 @@ struct bUserAssetShelfSettings {
   ListBaseT<AssetCatalogPathLink> enabled_catalog_paths = {nullptr, nullptr};
 };
 
+enum eInteractionPreset : uint8_t {
+  INTERACTION_PRESET_MAYA = 0,
+  INTERACTION_PRESET_BLENDER = 1,
+};
+
 /**
  * Main user preferences data, typically accessed from #U.
  * See: #BKE_blendfile_userdef_from_defaults & #BKE_blendfile_userdef_read.
@@ -1060,7 +1065,10 @@ struct UserDef {
   ListBaseT<bUserExtensionRepo> extension_repos = {nullptr, nullptr};
   ListBaseT<bUserAssetShelfSettings> asset_shelves_settings = {nullptr, nullptr};
 
-  char keyconfigstr[64] = "Blender";
+  char keyconfigstr[64] = "Maya";
+  eInteractionPreset interaction_preset = INTERACTION_PRESET_MAYA;
+  uint8_t maya_interaction_defaults_initialized = 0;
+  uint8_t _pad_interaction[6] = {};
 
   /** Index of the extension repo in the Preferences UI. */
   short active_extension_repo = 0;

@@ -234,9 +234,12 @@ set(SRC
   intern/node_tree_structure_type_inferencing.cc
   intern/node_tree_update.cc
   intern/node_tree_zones.cc
+  intern/maya_constraints.cc
   intern/object.cc
+  intern/object_custom_pivot.cc
   intern/object_deform.cc
   intern/object_dupli.cc
+  intern/object_transform_maya.cc
   intern/object_update.cc
   intern/ocean.cc
   intern/ocean_spectrum.cc
@@ -482,8 +485,11 @@ set(SRC
   BKE_node_tree_reference_lifetimes.hh
   BKE_node_tree_update.hh
   BKE_node_tree_zones.hh
+  BKE_maya_constraints.hh
   BKE_object.hh
+  BKE_object_custom_pivot.hh
   BKE_object_deform.h
+  BKE_object_transform_maya.hh
   BKE_object_types.hh
   BKE_ocean.h
   BKE_outliner_treehash.hh
@@ -776,8 +782,12 @@ if(WITH_GTESTS)
     intern/lib_remap_test.cc
     intern/main_test.cc
     intern/main_namemap_test.cc
+    intern/maya_constraints_test.cc
     intern/nla_test.cc
     intern/node_socket_value_iter_test.cc
+    intern/object_custom_pivot_test.cc
+    intern/object_transform_maya_parenting_test.cc
+    intern/object_transform_maya_test.cc
     intern/path_templates_test.cc
     intern/scene_test.cc
     intern/subdiv_ccg_test.cc

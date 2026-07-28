@@ -18,6 +18,7 @@ namespace blender {
 
 struct Main;
 struct UndoStep;
+struct UndoStepUserDataRuntime;
 struct UndoType;
 struct bContext;
 
@@ -71,15 +72,15 @@ struct UndoStack {
    * within which all but the last undo-step is marked for skipping.
    */
   int group_level;
+
+  /** Optional owner-managed data associated with individual steps. */
+  UndoStepUserDataRuntime *step_user_data_runtime;
 };
 
 struct UndoStep {
   UndoStep *next, *prev;
   char name[64];
   const UndoType *type;
-  /** Optional owner-managed payload whose lifetime is exactly the lifetime of this step. */
-  void *user_data;
-  void (*user_data_free)(void *user_data);
   /** Size in bytes of all data in step (not including the step). */
   size_t data_size;
   /** Users should never see this step (only use for internal consistency). */
@@ -95,6 +96,8 @@ struct UndoStep {
   bool is_applied;
   /* Over alloc 'type->struct_size'. */
 };
+
+using UndoStepUserDataFreeFn = void (*)(void *user_data);
 
 enum eUndoStepDir {
   STEP_REDO = 1,
@@ -219,6 +222,13 @@ void BKE_undosys_stack_init_from_main(UndoStack *ustack, Main *bmain);
 void BKE_undosys_stack_init_from_context(UndoStack *ustack, bContext *C);
 UndoStep *BKE_undosys_stack_active_with_type(UndoStack *ustack, const UndoType *ut);
 UndoStep *BKE_undosys_stack_init_or_active_with_type(UndoStack *ustack, const UndoType *ut);
+void *BKE_undosys_step_user_data_get(const UndoStack *ustack,
+                                     const UndoStep *us,
+                                     UndoStepUserDataFreeFn free_fn);
+void BKE_undosys_step_user_data_set(UndoStack *ustack,
+                                    UndoStep *us,
+                                    void *user_data,
+                                    UndoStepUserDataFreeFn free_fn);
 /**
  * \param steps: Limit the number of undo steps.
  * \param memory_limit: Limit the amount of memory used by the undo stack.

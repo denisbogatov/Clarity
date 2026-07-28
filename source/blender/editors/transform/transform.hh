@@ -397,6 +397,8 @@ enum {
   TD_PBONE_LOCAL_MTX_C = 1 << 18,
   /* Grease pencil layer frames. */
   TD_GREASE_PENCIL_FRAME = 1 << 19,
+  /** Object transform is backed by Maya double-precision proxy channels. */
+  TD_MAYA_TRANSFORM = 1 << 20,
 };
 
 struct TransDataBasic {

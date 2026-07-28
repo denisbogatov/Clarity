@@ -19,6 +19,7 @@
 #include "DNA_screen_types.h"
 #include "DNA_view3d_types.h"
 
+#include "BLI_listbase_iterator.hh"
 #include "BLI_map.hh"
 #include "BLI_index_range.hh"
 #include "BLI_math_vector.h"
@@ -30,8 +31,12 @@
 #include "BKE_editmesh.hh"
 #include "BKE_layer.hh"
 #include "BKE_lib_id.hh"
+#include "BKE_object.hh"
+#include "BKE_object_transform_maya.hh"
+#include "BKE_report.hh"
 
 #include "DEG_depsgraph.hh"
+#include "DEG_depsgraph_build.hh"
 
 #include "ED_maya.hh"
 #include "ED_mesh.hh"
@@ -571,11 +576,211 @@ static void MAYA_OT_pivot_pin_toggle(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
+static const EnumPropertyItem maya_pivot_reset_mode_items[] = {
+    {MAYA_PIVOT_RESET_CENTER,
+     "CENTER",
+     0,
+     "Center",
+     "Reset the pivot position to the object hierarchy or component bounding-box center"},
+    {MAYA_PIVOT_RESET_ZERO,
+     "ZERO",
+     0,
+     "Zero",
+     "Reset the object pivot channels to zero or use the component object's origin"},
+    {0, nullptr, 0, nullptr, nullptr},
+};
+
+static const EnumPropertyItem maya_pivot_reset_action_items[] = {
+    {0, "POSITION", 0, "Position", "Reset only the pivot position"},
+    {1, "ORIENTATION", 0, "Orientation", "Reset only the manipulator orientation"},
+    {2, "BOTH", 0, "Both", "Reset pivot position and orientation"},
+    {0, nullptr, 0, nullptr, nullptr},
+};
+
+static const EnumPropertyItem maya_pivot_bake_mode_items[] = {
+    {MAYA_PIVOT_BAKE_POSITION, "POSITION", 0, "Position", "Bake the custom pivot position"},
+    {MAYA_PIVOT_BAKE_ORIENTATION,
+     "ORIENTATION",
+     0,
+     "Orientation",
+     "Bake the custom pivot orientation"},
+    {MAYA_PIVOT_BAKE_BOTH, "BOTH", 0, "Both", "Bake custom position and orientation"},
+    {0, nullptr, 0, nullptr, nullptr},
+};
+
+static wmOperatorStatus maya_pivot_edit_toggle_exec(bContext *C, wmOperator * /*op*/)
+{
+  MayaWindowRuntime *runtime = runtime_ensure(C);
+  return runtime != nullptr && pivot_edit_toggle_persistent(C, *runtime) ? OPERATOR_FINISHED :
+                                                                          OPERATOR_CANCELLED;
+}
+
+static void MAYA_OT_pivot_edit_toggle(wmOperatorType *ot)
+{
+  ot->name = "Maya Edit Pivot";
+  ot->description = "Enter or leave persistent Maya Edit Pivot mode";
+  ot->idname = "MAYA_OT_pivot_edit_toggle";
+  ot->exec = maya_pivot_edit_toggle_exec;
+  ot->poll = ED_operator_view3d_active;
+  ot->flag = OPTYPE_REGISTER;
+}
+
+static wmOperatorStatus maya_pivot_settings_set_exec(bContext *C, wmOperator *op)
+{
+  MayaPivotToolSettings settings;
+  ED_maya_pivot_tool_settings_get(C, settings);
+  if (RNA_struct_property_is_set(op->ptr, "snap_position")) {
+    settings.snap_position = RNA_boolean_get(op->ptr, "snap_position");
+  }
+  if (RNA_struct_property_is_set(op->ptr, "snap_orientation")) {
+    settings.snap_orientation = RNA_boolean_get(op->ptr, "snap_orientation");
+  }
+  if (RNA_struct_property_is_set(op->ptr, "bake_orientation_automatically")) {
+    settings.bake_orientation_automatically = RNA_boolean_get(
+        op->ptr, "bake_orientation_automatically");
+  }
+  if (RNA_struct_property_is_set(op->ptr, "preserve_children")) {
+    settings.preserve_children = RNA_boolean_get(op->ptr, "preserve_children");
+  }
+  if (RNA_struct_property_is_set(op->ptr, "show_orientation_handle")) {
+    settings.show_orientation_handle = RNA_boolean_get(op->ptr, "show_orientation_handle");
+  }
+  if (RNA_struct_property_is_set(op->ptr, "reset_mode")) {
+    settings.reset_mode = eMayaPivotResetMode(RNA_enum_get(op->ptr, "reset_mode"));
+  }
+  return ED_maya_pivot_tool_settings_set(C, settings) ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+}
+
+static void MAYA_OT_pivot_settings_set(wmOperatorType *ot)
+{
+  ot->name = "Maya Pivot Settings";
+  ot->description = "Set Maya manipulator-pivot behavior";
+  ot->idname = "MAYA_OT_pivot_settings_set";
+  ot->exec = maya_pivot_settings_set_exec;
+  ot->poll = ED_operator_view3d_active;
+  ot->flag = OPTYPE_REGISTER;
+  RNA_def_boolean(
+      ot->srna, "snap_position", true, "Snap Position", "Apply snap targets to pivot position");
+  RNA_def_boolean(ot->srna,
+                  "snap_orientation",
+                  true,
+                  "Snap Orientation",
+                  "Apply available target orientation independently from position");
+  RNA_def_boolean(ot->srna,
+                  "bake_orientation_automatically",
+                  false,
+                  "Bake Pivot Orientation",
+                  "Bake the custom orientation when an orientation edit is committed");
+  RNA_def_boolean(ot->srna,
+                  "preserve_children",
+                  true,
+                  "Preserve Child Position",
+                  "Keep direct children in world space while baking the pivot");
+  RNA_def_boolean(ot->srna,
+                  "show_orientation_handle",
+                  true,
+                  "Show Orientation Handle",
+                  "Show rotation handles while Edit Pivot is active");
+  RNA_def_enum(ot->srna,
+               "reset_mode",
+               maya_pivot_reset_mode_items,
+               MAYA_PIVOT_RESET_CENTER,
+               "Reset Mode",
+               "");
+}
+
+static wmOperatorStatus maya_pivot_reset_exec(bContext *C, wmOperator *op)
+{
+  ED_maya_pivot_undo_begin(C);
+  MayaPivotToolSettings settings;
+  ED_maya_pivot_tool_settings_get(C, settings);
+  const eMayaPivotResetMode mode = RNA_struct_property_is_set(op->ptr, "mode") ?
+                                       eMayaPivotResetMode(RNA_enum_get(op->ptr, "mode")) :
+                                       settings.reset_mode;
+  switch (RNA_enum_get(op->ptr, "action")) {
+    case 0:
+      ED_maya_pivot_reset_position(C, mode);
+      break;
+    case 1:
+      ED_maya_pivot_reset_orientation(C);
+      break;
+    case 2:
+      ED_maya_pivot_reset_all(C, mode);
+      break;
+    default:
+      return OPERATOR_CANCELLED;
+  }
+  return OPERATOR_FINISHED;
+}
+
+static void MAYA_OT_pivot_reset(wmOperatorType *ot)
+{
+  ot->name = "Reset Maya Pivot";
+  ot->description = "Reset Maya pivot position, orientation, or both";
+  ot->idname = "MAYA_OT_pivot_reset";
+  ot->exec = maya_pivot_reset_exec;
+  ot->poll = ED_operator_view3d_active;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  RNA_def_enum(ot->srna, "action", maya_pivot_reset_action_items, 2, "Reset", "");
+  RNA_def_enum(
+      ot->srna, "mode", maya_pivot_reset_mode_items, MAYA_PIVOT_RESET_CENTER, "Mode", "");
+}
+
+static wmOperatorStatus maya_pivot_bake_exec(bContext *C, wmOperator *op)
+{
+  ED_maya_pivot_undo_begin(C);
+  if (!ED_maya_pivot_bake(C, eMayaPivotBakeMode(RNA_enum_get(op->ptr, "mode")))) {
+    ED_maya_undo_step_clear(C);
+    BKE_report(op->reports,
+               RPT_WARNING,
+               "Bake Pivot requires valid custom pivot data, no constraints, a supported object "
+               "type, and single-user geometry when data compensation is needed");
+    return OPERATOR_CANCELLED;
+  }
+  return OPERATOR_FINISHED;
+}
+
+static bool maya_pivot_bake_poll(bContext *C)
+{
+  if (!ED_operator_objectmode(C)) {
+    return false;
+  }
+  const Main *bmain = CTX_data_main(C);
+  const Object *object = CTX_data_active_object(C);
+  if (bmain == nullptr || object == nullptr || !BKE_id_is_editable(bmain, &object->id) ||
+      object->constraints.first != nullptr || object->maya_constraints.first != nullptr)
+  {
+    return false;
+  }
+  const MayaTransformCapabilities capabilities = BKE_maya_transform_capabilities_get(*object);
+  return capabilities.bake_position || capabilities.bake_orientation;
+}
+
+static void MAYA_OT_pivot_bake(wmOperatorType *ot)
+{
+  ot->name = "Bake Maya Pivot";
+  ot->description = "Bake Maya manipulator pivot state into the object and its geometry";
+  ot->idname = "MAYA_OT_pivot_bake";
+  ot->exec = maya_pivot_bake_exec;
+  ot->poll = maya_pivot_bake_poll;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  RNA_def_enum(ot->srna,
+               "mode",
+               maya_pivot_bake_mode_items,
+               MAYA_PIVOT_BAKE_BOTH,
+               "Bake",
+               "");
+}
+
 void register_tool_operators()
 {
   WM_operatortype_append(MAYA_OT_component_mode_set);
   WM_operatortype_append(MAYA_OT_selection_settings_set);
   WM_operatortype_append(MAYA_OT_pivot_pin_toggle);
+  WM_operatortype_append(MAYA_OT_pivot_edit_toggle);
+  WM_operatortype_append(MAYA_OT_pivot_settings_set);
+  WM_operatortype_append(MAYA_OT_pivot_reset);
+  WM_operatortype_append(MAYA_OT_pivot_bake);
 }
 
 static wmOperatorStatus component_mode_operator_call(bContext *C, const MayaComponentMode mode)

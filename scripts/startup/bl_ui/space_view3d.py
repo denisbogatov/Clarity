@@ -6521,8 +6521,25 @@ def _maya_navigation_debug_update(window_manager, _context):
         pass
 
 
+def _maya_pivot_settings_update(window_manager, context):
+    area = context.area
+    if area is None or area.type != 'VIEW_3D':
+        return
+    try:
+        bpy.ops.maya.pivot_settings_set(
+            snap_position=window_manager.maya_pivot_snap_position,
+            snap_orientation=window_manager.maya_pivot_snap_orientation,
+            bake_orientation_automatically=window_manager.maya_pivot_bake_orientation,
+            preserve_children=window_manager.maya_pivot_preserve_children,
+            show_orientation_handle=window_manager.maya_pivot_show_orientation_handle,
+            reset_mode=window_manager.maya_pivot_reset_mode,
+        )
+    except RuntimeError:
+        pass
+
+
 def register_props():
-    from bpy.props import BoolProperty
+    from bpy.props import BoolProperty, EnumProperty
 
     bpy.types.WindowManager.maya_navigation_debug = BoolProperty(
         name="Viewport Performance Debug Log",
@@ -6530,9 +6547,54 @@ def register_props():
         default=False,
         update=_maya_navigation_debug_update,
     )
+    bpy.types.WindowManager.maya_pivot_snap_position = BoolProperty(
+        name="Snap Position",
+        description="Apply Maya pivot snap targets to position",
+        default=True,
+        update=_maya_pivot_settings_update,
+    )
+    bpy.types.WindowManager.maya_pivot_snap_orientation = BoolProperty(
+        name="Snap Orientation",
+        description="Apply Maya pivot target orientation independently from position",
+        default=True,
+        update=_maya_pivot_settings_update,
+    )
+    bpy.types.WindowManager.maya_pivot_bake_orientation = BoolProperty(
+        name="Bake Pivot Orientation",
+        description="Bake custom orientation when an orientation edit is committed",
+        default=False,
+        update=_maya_pivot_settings_update,
+    )
+    bpy.types.WindowManager.maya_pivot_preserve_children = BoolProperty(
+        name="Preserve Child Position",
+        description="Keep direct children fixed in world space while baking",
+        default=True,
+        update=_maya_pivot_settings_update,
+    )
+    bpy.types.WindowManager.maya_pivot_show_orientation_handle = BoolProperty(
+        name="Show Orientation Handle",
+        description="Show rotation handles while Edit Pivot is active",
+        default=True,
+        update=_maya_pivot_settings_update,
+    )
+    bpy.types.WindowManager.maya_pivot_reset_mode = EnumProperty(
+        name="Reset Mode",
+        items=(
+            ('CENTER', "Center", "Use the hierarchy or component bounding-box center"),
+            ('ZERO', "Zero", "Use zero pivot channels or the component object's origin"),
+        ),
+        default='CENTER',
+        update=_maya_pivot_settings_update,
+    )
 
 
 def unregister_props():
+    del bpy.types.WindowManager.maya_pivot_reset_mode
+    del bpy.types.WindowManager.maya_pivot_show_orientation_handle
+    del bpy.types.WindowManager.maya_pivot_preserve_children
+    del bpy.types.WindowManager.maya_pivot_bake_orientation
+    del bpy.types.WindowManager.maya_pivot_snap_orientation
+    del bpy.types.WindowManager.maya_pivot_snap_position
     del bpy.types.WindowManager.maya_navigation_debug
 
 
@@ -6563,8 +6625,45 @@ class VIEW3D_PT_maya_interaction(Panel):
     bl_label = "Maya Interaction"
     bl_parent_id = "VIEW3D_PT_view3d_properties"
 
+    @classmethod
+    def poll(cls, context):
+        return context.preferences.inputs.interaction_preset == 'MAYA'
+
     def draw(self, context):
-        self.layout.prop(context.window_manager, "maya_interaction_enabled", text="Enabled")
+        self.layout.label(text="Interaction Preset: Maya", icon='PREFERENCES')
+
+
+class VIEW3D_PT_maya_pivot_settings(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "View"
+    bl_label = "Pivot Tool Settings"
+    bl_parent_id = "VIEW3D_PT_maya_interaction"
+
+    def draw(self, context):
+        layout = self.layout
+        window_manager = context.window_manager
+
+        layout.operator("maya.pivot_edit_toggle", text="Edit Pivot")
+        layout.operator("maya.pivot_pin_toggle", text="Pin Component Pivot")
+
+        column = layout.column(align=True)
+        column.prop(window_manager, "maya_pivot_snap_position")
+        column.prop(window_manager, "maya_pivot_snap_orientation")
+        column.prop(window_manager, "maya_pivot_bake_orientation")
+        column.prop(window_manager, "maya_pivot_show_orientation_handle")
+        column.prop(window_manager, "maya_pivot_preserve_children")
+        column.prop(window_manager, "maya_pivot_reset_mode")
+
+        row = layout.row(align=True)
+        row.operator("maya.pivot_reset", text="Reset Position").action = 'POSITION'
+        row.operator("maya.pivot_reset", text="Orientation").action = 'ORIENTATION'
+        row.operator("maya.pivot_reset", text="Both").action = 'BOTH'
+
+        row = layout.row(align=True)
+        row.operator("maya.pivot_bake", text="Bake Position").mode = 'POSITION'
+        row.operator("maya.pivot_bake", text="Orientation").mode = 'ORIENTATION'
+        row.operator("maya.pivot_bake", text="Both").mode = 'BOTH'
 
 
 class VIEW3D_PT_view3d_cursor(Panel):
@@ -9581,6 +9680,7 @@ classes = (
     VIEW3D_PT_view3d_properties,
     VIEW3D_PT_view3d_lock,
     VIEW3D_PT_maya_interaction,
+    VIEW3D_PT_maya_pivot_settings,
     VIEW3D_PT_maya_navigation_debug,
     VIEW3D_PT_view3d_cursor,
     VIEW3D_PT_collections,

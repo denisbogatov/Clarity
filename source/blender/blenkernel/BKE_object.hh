@@ -35,6 +35,7 @@ struct KeyBlock;
 struct Lattice;
 struct LinkNode;
 struct Main;
+struct MayaObjectTransform;
 struct Mesh;
 struct ModifierData;
 struct MovieClip;
@@ -260,6 +261,19 @@ float4 BKE_object_rot_to_quat(const Object &ob);
 void BKE_object_quat_to_rot(Object &ob, const float4 &quat);
 void BKE_object_to_mat3(const Object *ob, float r_mat[3][3]);
 void BKE_object_to_mat4(const Object *ob, float r_mat[4][4]);
+
+bool BKE_object_uses_maya_transform(const Object *object);
+MayaObjectTransform *BKE_object_maya_transform_ensure(Object *object);
+void BKE_object_maya_transform_reset(Object *object);
+bool BKE_object_transform_model_set(Object &object, int transform_model);
+double4x4 BKE_object_local_matrix_get_double(const Object *object);
+void BKE_object_local_matrix_get(const Object *object, float r_matrix[4][4]);
+void BKE_object_transform_channels_copy(Object *destination, const Object *source);
+bool BKE_object_maya_parent_keep_transform(Object *object,
+                                           const double4x4 &parent_effect_matrix,
+                                           const double4x4 &world_matrix);
+bool BKE_object_maya_clear_parent_keep_transform(Object *object, const double4x4 &world_matrix);
+
 /**
  * Applies the global transformation \a mat to the \a ob using a relative parent space if
  * supplied.

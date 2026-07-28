@@ -9,10 +9,19 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
+#include <optional>
+
+#include "BLI_math_quaternion_types.hh"
+#include "BLI_math_vector_types.hh"
+
+#include "DNA_ID.h"
 
 namespace blender {
 
 struct bContext;
+struct Main;
+struct Object;
 struct UndoStep;
 struct wmEvent;
 struct wmOperator;
@@ -30,6 +39,93 @@ enum class MayaPivotEditTarget : uint8_t {
   None,
   ObjectOrigin,
   ComponentPivot,
+};
+
+enum class MayaPivotTargetType : uint8_t {
+  Object,
+  Component,
+};
+
+/**
+ * Which stored pivot a caller asks for. Rotate and scale pivots are authored independently, so the
+ * requested usage decides which one may override the regular transform center.
+ */
+enum class MayaPivotUsage : uint8_t {
+  /** Rotation around the custom rotate pivot (#TFM_ROTATION, #TFM_TRACKBALL). */
+  Rotate,
+  /** Scaling around the custom scale pivot (#TFM_RESIZE). */
+  Scale,
+  /** Gizmo drawing and snapping: follow the pivot of the active Maya tool. */
+  Display,
+};
+
+enum eMayaPivotResetMode : uint8_t {
+  MAYA_PIVOT_RESET_CENTER = 0,
+  MAYA_PIVOT_RESET_ZERO = 1,
+};
+
+enum eMayaPivotBakeMode : uint8_t {
+  MAYA_PIVOT_BAKE_POSITION = 0,
+  MAYA_PIVOT_BAKE_ORIENTATION,
+  MAYA_PIVOT_BAKE_BOTH,
+};
+
+struct MayaPivotFrame {
+  double3 position_world = double3(0.0);
+  math::QuaternionBase<double> orientation_world = math::QuaternionBase<double>::identity();
+  bool position_valid = false;
+  bool orientation_valid = false;
+};
+
+enum class MayaPivotSnapTargetType : uint8_t {
+  None,
+  Vertex,
+  Edge,
+  Face,
+  Curve,
+  Grid,
+  ObjectPivot,
+  ComponentPivot,
+  ViewPlane,
+};
+
+struct MayaPivotSnapResult {
+  std::optional<double3> position_world;
+  std::optional<math::QuaternionBase<double>> orientation_world;
+  MayaPivotSnapTargetType type = MayaPivotSnapTargetType::None;
+  Object *object = nullptr;
+  int component_index = -1;
+};
+
+struct MayaPivotToolSettings {
+  bool pin_component_pivot = false;
+  bool snap_position = true;
+  bool snap_orientation = true;
+  bool bake_orientation_automatically = false;
+  bool preserve_children = true;
+  bool show_orientation_handle = true;
+  eMayaPivotResetMode reset_mode = MAYA_PIVOT_RESET_CENTER;
+  int active_axis = 0;
+};
+
+struct MayaObjectRuntimeRef {
+  uint32_t session_uid = 0;
+  char id_name[MAX_ID_NAME] = {};
+};
+
+class MayaPivotEditTargetBackend {
+ public:
+  virtual ~MayaPivotEditTargetBackend() = default;
+
+  virtual MayaPivotTargetType type() const = 0;
+  virtual MayaPivotFrame frame_get() const = 0;
+  virtual bool position_set(const double3 &position_world, bool preserve) = 0;
+  virtual bool orientation_set(const math::QuaternionBase<double> &orientation_world,
+                               bool bake) = 0;
+  virtual void reset_position(eMayaPivotResetMode mode) = 0;
+  virtual void reset_orientation() = 0;
+  virtual void cancel() = 0;
+  virtual void commit() = 0;
 };
 
 enum class MayaSnapMode : uint8_t {
@@ -87,15 +183,37 @@ enum class MayaNavigationDebugStage : uint8_t {
 }  // namespace ed::maya
 
 bool ED_maya_interaction_enabled(const bContext *C);
+ed::maya::MayaObjectRuntimeRef ED_maya_object_runtime_ref_create(const Object &object);
+Object *ED_maya_object_runtime_ref_resolve(
+    Main &bmain, const ed::maya::MayaObjectRuntimeRef &reference);
 void ED_operatortypes_maya();
 ed::maya::MayaDispatchResult ED_maya_event_dispatch(bContext *C, const wmEvent *event);
 int ED_maya_interaction_frame_rate_limit(const bContext *C);
 bool ED_maya_navigation_debug_active(const bContext *C);
 ed::maya::MayaPivotEditTarget ED_maya_pivot_edit_target_get(const bContext *C);
-bool ED_maya_pivot_custom_matrix_get(const bContext *C, float r_matrix[4][4]);
+bool ED_maya_pivot_custom_matrix_get(const bContext *C,
+                                     ed::maya::MayaPivotUsage usage,
+                                     float r_matrix[4][4]);
+bool ED_maya_pivot_custom_orientation_get(const bContext *C, float r_orientation[3][3]);
 bool ED_maya_pivot_edit_data_get(const bContext *C,
                                  float **r_location,
                                  float **r_rotation_quaternion);
+std::unique_ptr<ed::maya::MayaPivotEditTargetBackend> ED_maya_pivot_edit_target_create(
+    bContext *C);
+void ED_maya_pivot_reset_position(bContext *C, ed::maya::eMayaPivotResetMode mode);
+void ED_maya_pivot_reset_orientation(bContext *C);
+void ED_maya_pivot_reset_all(bContext *C, ed::maya::eMayaPivotResetMode mode);
+void ED_maya_pivot_undo_begin(const bContext *C);
+bool ED_maya_pivot_bake(bContext *C, ed::maya::eMayaPivotBakeMode mode);
+bool ED_maya_pivot_tool_settings_get(const bContext *C,
+                                     ed::maya::MayaPivotToolSettings &r_settings);
+bool ED_maya_pivot_tool_settings_set(const bContext *C,
+                                     const ed::maya::MayaPivotToolSettings &settings);
+void ED_maya_pivot_active_axis_set(const bContext *C, int active_axis);
+bool ED_maya_pivot_orientation_aim(ed::maya::MayaPivotFrame &frame,
+                                   const double3 &target_world,
+                                   int active_axis,
+                                   const double3 &view_up);
 bool ED_maya_snap_override_set(const bContext *C, ed::maya::MayaSnapMode mode, bool enabled);
 ed::maya::MayaSnapMode ED_maya_snap_override_get(const bContext *C);
 bool ED_maya_snap_mode_set(const bContext *C, ed::maya::MayaSnapMode mode);

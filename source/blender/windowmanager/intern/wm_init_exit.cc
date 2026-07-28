@@ -59,6 +59,7 @@
 #include "BKE_studiolight.h"
 #include "BKE_subdiv.hh"
 #include "BKE_tracking.hh" /* Free tracking clipboard. */
+#include "BKE_wm_runtime.hh"
 
 #include "RE_engine.h"
 #include "RE_pipeline.h" /* `RE_` free stuff. */
@@ -118,6 +119,39 @@
 #include "DRW_engine.hh"
 
 namespace blender {
+
+static void wm_maya_interaction_defaults_ensure()
+{
+  if (U.maya_interaction_defaults_initialized) {
+    return;
+  }
+  U.interaction_preset = INTERACTION_PRESET_MAYA;
+  STRNCPY(U.keyconfigstr, "Maya");
+  U.maya_interaction_defaults_initialized = true;
+  U.runtime.is_dirty = true;
+
+  if (G_MAIN == nullptr) {
+    return;
+  }
+  for (wmWindowManager &wm : G_MAIN->wm) {
+    if (wm.runtime != nullptr) {
+      wm.runtime->maya_interaction_enabled = true;
+      wm.runtime->maya_interaction_revision++;
+    }
+  }
+}
+
+static void wm_startup_trace(const char *marker)
+{
+  const char *filepath = std::getenv("BLENDER_STARTUP_TRACE_FILE");
+  if (filepath == nullptr) {
+    return;
+  }
+  if (std::FILE *file = std::fopen(filepath, "a")) {
+    std::fprintf(file, "%s\n", marker);
+    std::fclose(file);
+  }
+}
 
 CLG_LOGREF_DECLARE_GLOBAL(WM_LOG_OPERATORS, "operator");
 CLG_LOGREF_DECLARE_GLOBAL(WM_LOG_EVENTS, "event");
@@ -200,25 +234,36 @@ static void sound_jack_sync_callback(Main *bmain, int mode, double time)
 
 void WM_init(bContext *C, int argc, const char **argv)
 {
+  wm_startup_trace("WM_INIT enter");
 
   if (!G.background) {
+    wm_startup_trace("WM_INIT ghost begin");
     wm_ghost_init(C); /* NOTE: it assigns C to ghost! */
+    wm_startup_trace("WM_INIT ghost end");
     wm_init_cursor_data();
+    wm_startup_trace("WM_INIT cursor data initialized");
     BKE_sound_jack_sync_callback_set(sound_jack_sync_callback);
   }
 
+  wm_startup_trace("WM_INIT preference types begin");
   BKE_addon_pref_type_init();
   BKE_keyconfig_pref_type_init();
+  wm_startup_trace("WM_INIT preference types end");
 
+  wm_startup_trace("WM_INIT operator types begin");
   wm_operatortypes_register();
+  wm_startup_trace("WM_INIT operator types end");
 
+  wm_startup_trace("WM_INIT UI types begin");
   WM_paneltype_init(); /* Lookup table only. */
   WM_menutype_init();
   WM_uilisttype_init();
   wm_gizmotype_init();
   wm_gizmogrouptype_init();
+  wm_startup_trace("WM_INIT UI types end");
 
   ED_undosys_type_init();
+  wm_startup_trace("WM_INIT undo types initialized");
 
   BKE_library_callback_free_notifier_reference_set(WM_main_remove_notifier_reference);
   BKE_region_callback_free_gizmomap_set(wm_gizmomap_remove);
@@ -226,29 +271,38 @@ void WM_init(bContext *C, int argc, const char **argv)
   BKE_library_callback_remap_editor_id_reference_set(WM_main_remap_editor_id_reference);
   BKE_spacedata_callback_id_remap_set(ED_spacedata_id_remap_single);
   DEG_editors_set_update_cb(ED_render_id_flush_update, ED_render_scene_update);
+  wm_startup_trace("WM_INIT editor callbacks initialized");
 
+  wm_startup_trace("WM_INIT space types begin");
   ED_spacetypes_init();
+  wm_startup_trace("WM_INIT space types end");
 
   ED_node_init_butfuncs();
+  wm_startup_trace("WM_INIT node buttons initialized");
 
   BLF_init();
+  wm_startup_trace("WM_INIT fonts initialized");
 
   BLT_lang_init();
   /* Must call first before doing any `.blend` file reading,
    * since versioning code may create new IDs. See #57066. */
   BLT_lang_set(nullptr);
+  wm_startup_trace("WM_INIT language initialized");
 
   /* Init icons & previews before reading .blend files for preview icons, which can
    * get triggered by the depsgraph. This is also done in background mode
    * for scripts that do background processing with preview icons. */
   BKE_icons_init(BIFICONID_LAST_STATIC);
   BKE_preview_images_init();
+  wm_startup_trace("WM_INIT icons initialized");
 
   WM_msgbus_types_init();
+  wm_startup_trace("WM_INIT message bus initialized");
 
   /* Studio-lights needs to be init before we read the home-file,
    * otherwise the versioning cannot find the default studio-light. */
   BKE_studiolight_init();
+  wm_startup_trace("WM_INIT studio lights initialized");
 
   BLI_assert((G.fileflags & G_FILE_NO_UI) == 0);
 
@@ -280,7 +334,10 @@ void WM_init(bContext *C, int argc, const char **argv)
   read_homefile_params.app_template_override = WM_init_state_app_template_get();
   read_homefile_params.is_first_time = true;
 
+  wm_startup_trace("WM_INIT homefile read begin");
   wm_homefile_read_ex(C, &read_homefile_params, nullptr, &params_file_read_post);
+  wm_startup_trace("WM_INIT homefile read end");
+  wm_maya_interaction_defaults_ensure();
 
   /* NOTE: leave `G_MAIN->filepath` set to an empty string since this
    * matches behavior after loading a new file. */
@@ -291,6 +348,7 @@ void WM_init(bContext *C, int argc, const char **argv)
 
   /* For file-system. Called here so can include user preference paths if needed. */
   ED_file_init();
+  wm_startup_trace("WM_INIT file system initialized");
 
   if (!G.background) {
     wmWindowManager *wm = CTX_wm_manager(C);
@@ -305,31 +363,40 @@ void WM_init(bContext *C, int argc, const char **argv)
       WM_exit(C, EXIT_FAILURE);
     }
 
+    wm_startup_trace("WM_INIT GPU render begin");
     GPU_render_begin();
 
 #ifdef WITH_INPUT_NDOF
     /* Sets 3D mouse dead-zone. */
     WM_ndof_deadzone_set(U.ndof_deadzone);
 #endif
+    wm_startup_trace("WM_INIT GPU init begin");
     WM_init_gpu();
+    wm_startup_trace("WM_INIT GPU init end");
 
     if (!WM_platform_support_perform_checks()) {
       WM_exit(C, -1);
     }
 
+    wm_startup_trace("WM_INIT UI runtime begin");
     GPU_context_begin_frame(GPU_context_active_get());
     ui::init();
     GPU_context_end_frame(GPU_context_active_get());
     GPU_render_end();
+    wm_startup_trace("WM_INIT UI runtime end");
   }
 
   bke::subdiv::init();
+  wm_startup_trace("WM_INIT subdiv initialized");
 
   ED_spacemacros_init();
+  wm_startup_trace("WM_INIT space macros initialized");
 
 #ifdef WITH_PYTHON
+  wm_startup_trace("WM_INIT Python begin");
   BPY_python_start(C, argc, argv);
   BPY_python_reset(C);
+  wm_startup_trace("WM_INIT Python end");
 #else
   UNUSED_VARS(argc, argv);
 #endif
@@ -347,6 +414,7 @@ void WM_init(bContext *C, int argc, const char **argv)
   ED_render_clear_mtex_copybuf();
 
   wm_history_file_read();
+  wm_startup_trace("WM_INIT history initialized");
 
   if (!G.background) {
     ui::string_search::read_recent_searches_file();
@@ -360,16 +428,24 @@ void WM_init(bContext *C, int argc, const char **argv)
    * needed to properly load user-configured add-on key-maps, see: #113603. */
   WM_keyconfig_update_postpone_begin();
 
+  wm_startup_trace("WM_INIT keyconfig begin");
   WM_keyconfig_init(C);
+  wm_startup_trace("WM_INIT keyconfig end");
 
   /* Load add-ons after key-maps have been initialized (but before the blend file has been read),
    * important to guarantee default key-maps have been declared & before post-read handlers run. */
+  wm_startup_trace("WM_INIT script extensions begin");
   wm_init_scripts_extensions_once(C);
+  wm_startup_trace("WM_INIT script extensions end");
 
   WM_keyconfig_update_postpone_end();
   WM_keyconfig_update_on_startup(static_cast<wmWindowManager *>(G_MAIN->wm.first));
+  wm_startup_trace("WM_INIT keyconfig startup update end");
 
+  wm_startup_trace("WM_INIT homefile post begin");
   wm_homefile_read_post(C, params_file_read_post);
+  wm_startup_trace("WM_INIT homefile post end");
+  wm_startup_trace("WM_INIT leave");
 }
 
 static bool wm_init_splash_show_on_startup_check()

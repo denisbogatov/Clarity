@@ -1189,7 +1189,7 @@ static bool gizmo_3d_calc_pos(const bContext *C,
 
 void gizmo_prepare_mat(const bContext *C, RegionView3D *rv3d, const TransformBounds *tbounds)
 {
-  if (ED_maya_pivot_custom_matrix_get(C, rv3d->twmat)) {
+  if (ED_maya_pivot_custom_matrix_get(C, ed::maya::MayaPivotUsage::Display, rv3d->twmat)) {
     return;
   }
   Scene *scene = CTX_data_scene(C);
@@ -2069,7 +2069,7 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
   }
 
   float maya_pivot_matrix[4][4];
-  if (ED_maya_pivot_custom_matrix_get(C, maya_pivot_matrix)) {
+  if (ED_maya_pivot_custom_matrix_get(C, ed::maya::MayaPivotUsage::Display, maya_pivot_matrix)) {
     copy_m4_m4(rv3d->twmat, maya_pivot_matrix);
   }
   else {
@@ -2277,8 +2277,10 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
     if (PropertyRNA *prop_maya_pivot_transform = RNA_struct_find_property(
             &gzop->ptr, "maya_pivot_transform"))
     {
-      const bool transform_maya_pivot = ED_maya_pivot_edit_target_get(C) ==
-                                        ed::maya::MayaPivotEditTarget::ComponentPivot;
+      /* While Edit Pivot is active the drag edits the pivot, never the object, whichever transform
+       * model the object uses. */
+      const bool transform_maya_pivot = ED_maya_pivot_edit_target_get(C) !=
+                                        ed::maya::MayaPivotEditTarget::None;
       RNA_property_boolean_set(
           &gzop->ptr, prop_maya_pivot_transform, transform_maya_pivot);
     }
@@ -2386,7 +2388,13 @@ static bool WIDGETGROUP_gizmo_poll_context(const bContext *C, wmGizmoGroupType *
   if (v3d->gizmo_flag & V3D_GIZMO_HIDE_CONTEXT) {
     return false;
   }
-  if ((v3d->gizmo_show_object & (V3D_GIZMO_SHOW_OBJECT_TRANSLATE | V3D_GIZMO_SHOW_OBJECT_ROTATE |
+  /* Edit Pivot draws its own translate and rotate manipulator through this group, so it must not
+   * depend on the manipulator bits of the active tool: Maya shows the pivot manipulator even with
+   * the Select tool active. */
+  const bool maya_edit_pivot = ED_maya_pivot_edit_target_get(C) !=
+                               ed::maya::MayaPivotEditTarget::None;
+  if (!maya_edit_pivot &&
+      (v3d->gizmo_show_object & (V3D_GIZMO_SHOW_OBJECT_TRANSLATE | V3D_GIZMO_SHOW_OBJECT_ROTATE |
                                  V3D_GIZMO_SHOW_OBJECT_SCALE)) == 0)
   {
     return false;

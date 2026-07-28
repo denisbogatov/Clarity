@@ -14,6 +14,7 @@
 #include "CLG_log.h"
 
 #include "BLI_listbase.h"
+#include "BLI_map.hh"
 #include "BLI_string.h"
 #include "BLI_sys_types.h"
 #include "BLI_utildefines.h"
@@ -56,6 +57,15 @@ namespace blender {
 
 /** We only need this locally. */
 static CLG_LogRef LOG = {"undo"};
+
+struct UndoStepUserData {
+  void *data;
+  UndoStepUserDataFreeFn free_fn;
+};
+
+struct UndoStepUserDataRuntime {
+  Map<const UndoStep *, UndoStepUserData> data_by_step;
+};
 
 /* -------------------------------------------------------------------- */
 /** \name Undo Types
@@ -237,8 +247,9 @@ static void undosys_step_free_and_unlink(UndoStack *ustack, UndoStep *us)
   UNDO_NESTED_CHECK_BEGIN;
   us->type->step_free(us);
   UNDO_NESTED_CHECK_END;
-  if (us->user_data_free != nullptr) {
-    us->user_data_free(us->user_data);
+  if (UndoStepUserData *user_data = ustack->step_user_data_runtime->data_by_step.lookup_ptr(us)) {
+    user_data->free_fn(user_data->data);
+    ustack->step_user_data_runtime->data_by_step.remove(us);
   }
 
   BLI_remlink(&ustack->steps, us);
@@ -275,13 +286,34 @@ static void undosys_stack_validate(UndoStack * /*ustack*/, bool /*expect_non_emp
 UndoStack *BKE_undosys_stack_create()
 {
   UndoStack *ustack = MEM_new_zeroed<UndoStack>(__func__);
+  ustack->step_user_data_runtime = MEM_new<UndoStepUserDataRuntime>(__func__);
   return ustack;
 }
 
 void BKE_undosys_stack_destroy(UndoStack *ustack)
 {
   BKE_undosys_stack_clear(ustack);
+  MEM_delete(ustack->step_user_data_runtime);
   MEM_delete(ustack);
+}
+
+void *BKE_undosys_step_user_data_get(const UndoStack *ustack,
+                                     const UndoStep *us,
+                                     const UndoStepUserDataFreeFn free_fn)
+{
+  const UndoStepUserData *user_data = ustack->step_user_data_runtime->data_by_step.lookup_ptr(us);
+  return user_data != nullptr && user_data->free_fn == free_fn ? user_data->data : nullptr;
+}
+
+void BKE_undosys_step_user_data_set(UndoStack *ustack,
+                                    UndoStep *us,
+                                    void *user_data,
+                                    const UndoStepUserDataFreeFn free_fn)
+{
+  BLI_assert(user_data != nullptr);
+  BLI_assert(free_fn != nullptr);
+  BLI_assert(!ustack->step_user_data_runtime->data_by_step.contains(us));
+  ustack->step_user_data_runtime->data_by_step.add_new(us, {user_data, free_fn});
 }
 
 void BKE_undosys_stack_clear(UndoStack *ustack)

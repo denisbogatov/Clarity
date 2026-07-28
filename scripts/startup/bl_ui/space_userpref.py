@@ -1870,6 +1870,14 @@ class InputPanel:
     bl_context = "input"
 
 
+class USERPREF_PT_input_interaction(InputPanel, CenterAlignMixIn, Panel):
+    bl_label = "Interaction"
+
+    def draw_centered(self, context, layout):
+        layout.prop(context.preferences.inputs, "interaction_preset")
+        layout.label(text="The preset changes input behavior only; scene transforms remain Blender data.")
+
+
 class USERPREF_PT_input_keyboard(InputPanel, CenterAlignMixIn, Panel):
     bl_label = "Keyboard"
 
@@ -3118,6 +3126,7 @@ classes = (
 
     USERPREF_MT_keyconfigs,
 
+    USERPREF_PT_input_interaction,
     USERPREF_PT_input_keyboard,
     USERPREF_PT_input_mouse,
     USERPREF_PT_input_tablet,

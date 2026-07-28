@@ -25,6 +25,7 @@
 #include "BLT_translation.hh"
 
 #include "BKE_studiolight.h"
+#include "BKE_wm_runtime.hh"
 
 #include "RNA_define.hh"
 #include "RNA_enum_types.hh"
@@ -891,6 +892,34 @@ static void rna_userdef_keyconfig_reload_update(bContext *C,
                                                 PointerRNA * /*ptr*/)
 {
   WM_keyconfig_reload(C);
+  USERDEF_TAG_DIRTY;
+}
+
+static void rna_userdef_interaction_preset_update(bContext *C,
+                                                  Main *bmain,
+                                                  Scene * /*scene*/,
+                                                  PointerRNA *ptr)
+{
+  UserDef *userdef = static_cast<UserDef *>(ptr->data);
+  const bool use_maya = userdef->interaction_preset == INTERACTION_PRESET_MAYA;
+  STRNCPY(userdef->keyconfigstr, use_maya ? "Maya" : "Blender");
+  userdef->maya_interaction_defaults_initialized = true;
+  if (bmain != nullptr) {
+    for (wmWindowManager &wm : bmain->wm) {
+      if (wm.runtime == nullptr) {
+        continue;
+      }
+      if (wm.runtime->maya_interaction_enabled != use_maya) {
+        wm.runtime->maya_interaction_revision++;
+      }
+      wm.runtime->maya_interaction_enabled = use_maya;
+      if (!use_maya) {
+        wm.runtime->maya_snap_temporary_mode = 0;
+      }
+    }
+  }
+  WM_keyconfig_reload(C);
+  WM_main_add_notifier(NC_WINDOW, nullptr);
   USERDEF_TAG_DIRTY;
 }
 
@@ -6606,6 +6635,27 @@ static void rna_def_userdef_input(BlenderRNA *brna)
   RNA_def_struct_sdna(srna, "UserDef");
   RNA_def_struct_nested(brna, srna, "Preferences");
   RNA_def_struct_ui_text(srna, "Input", "Settings for input devices");
+
+  static const EnumPropertyItem interaction_preset_items[] = {
+      {INTERACTION_PRESET_MAYA,
+       "MAYA",
+       0,
+       "Maya",
+       "Use Maya-style viewport navigation, selection, tools, and pivot workflow"},
+      {INTERACTION_PRESET_BLENDER,
+       "BLENDER",
+       0,
+       "Blender",
+       "Use the standard Blender interaction and key configuration"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+  prop = RNA_def_property(srna, "interaction_preset", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, nullptr, "interaction_preset");
+  RNA_def_property_enum_items(prop, interaction_preset_items);
+  RNA_def_property_ui_text(
+      prop, "Interaction Preset", "Input behavior without changing scene or object data");
+  RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
+  RNA_def_property_update(prop, 0, "rna_userdef_interaction_preset_update");
 
   prop = RNA_def_property(srna, "view_zoom_method", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, nullptr, "viewzoom");

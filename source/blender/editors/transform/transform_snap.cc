@@ -1660,6 +1660,8 @@ static eSnapMode snapObjectsTransform(
   snap_object_params.use_backface_culling = (t->tsnap.flag & SCE_SNAP_BACKFACE_CULLING) != 0;
   snap_object_params.curve_targets_only = t->tsnap.maya_curve_targets_only;
   snap_object_params.include_object_pivots = t->tsnap.maya_include_object_pivots;
+  snap_object_params.excluded_object_pivot_location =
+      (t->options & CTX_MAYA_PIVOT) != 0 ? t->center_global : nullptr;
 
   float *prev_co = (t->tsnap.status & SNAP_SOURCE_FOUND) ? t->tsnap.snap_source : t->center_global;
   float *grid_co = nullptr, grid_co_stack[3];
@@ -1684,10 +1686,14 @@ static eSnapMode snapObjectsTransform(
                                                                dist_px,
                                                                r_loc,
                                                                r_no);
-  if (t->tsnap.maya_include_object_pivots && t->context != nullptr) {
+  if (t->tsnap.maya_include_object_pivots && t->context != nullptr &&
+      (t->options & CTX_MAYA_PIVOT) == 0)
+  {
     float pivot_matrix[4][4];
     float pivot_screen[2];
-    if (ED_maya_pivot_custom_matrix_get(t->context, pivot_matrix) &&
+    /* Snap to the pivot the user actually sees. */
+    if (ED_maya_pivot_custom_matrix_get(
+            t->context, ed::maya::MayaPivotUsage::Display, pivot_matrix) &&
         ED_view3d_project_float_global(
             t->region, pivot_matrix[3], pivot_screen, V3D_PROJ_TEST_CLIP_DEFAULT) ==
             V3D_PROJ_RET_OK)

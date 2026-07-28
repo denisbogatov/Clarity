@@ -6,10 +6,13 @@
  * \ingroup edtransform
  */
 
+#include <cmath>
+
 #include "MEM_guardedalloc.h"
 
 #include "BLI_listbase.h"
 #include "BLI_math_matrix.h"
+#include "BLI_math_matrix.hh"
 #include "BLI_math_rotation.h"
 #include "BLI_math_vector.h"
 
@@ -18,8 +21,11 @@
 #include "BKE_layer.hh"
 #include "BKE_lib_id.hh"
 #include "BKE_library.hh"
+#include "BKE_maya_constraints.hh"
 #include "BKE_object.hh"
+#include "BKE_object_transform_maya.hh"
 #include "BKE_pointcache.h"
+#include "BKE_report.hh"
 #include "BKE_rigidbody.h"
 #include "BKE_scene.hh"
 
@@ -45,6 +51,31 @@ namespace blender::ed::transform {
 /** \name Object Mode Custom Data
  * \{ */
 
+struct MayaTransDataState {
+  Object *object = nullptr;
+
+  MayaObjectTransform initial_transform;
+  double4x4 initial_channel_matrix;
+  double4x4 initial_dag_local_matrix;
+  double4x4 initial_world_matrix;
+  double4x4 parent_effect_matrix;
+
+  float location_proxy[3];
+  float rotation_proxy[3];
+  float scale_proxy[3];
+
+  float initial_location_proxy[3];
+  float initial_rotation_proxy[3];
+  float initial_scale_proxy[3];
+
+  float location_mtx[3][3];
+  float location_smtx[3][3];
+  float rotation_mtx[3][3];
+  float rotation_smtx[3][3];
+
+  bool active = false;
+};
+
 struct TransDataObject {
 
   /**
@@ -60,6 +91,9 @@ struct TransDataObject {
    * - The value is #XFormObjectSkipChild.
    */
   object::XFormObjectSkipChild_Container *xcs;
+
+  MayaTransDataState *maya_states;
+  int maya_states_num;
 };
 
 static void freeTransObjectCustomData(TransInfo *t,
@@ -76,6 +110,7 @@ static void freeTransObjectCustomData(TransInfo *t,
   if (t->options & CTX_OBMODE_XFORM_SKIP_CHILDREN) {
     object::object_xform_skip_child_container_destroy(tdo->xcs);
   }
+  MEM_SAFE_DELETE(tdo->maya_states);
   MEM_delete(tdo);
 }
 
@@ -139,13 +174,233 @@ static void trans_obchild_in_obmode_update_all(TransInfo *t)
 /**
  * Transcribe given object into TransData for Transforming.
  */
-static void ObjectToTransData(TransInfo *t, TransData *td, TransDataExtension *td_ext, Object *ob)
+static bool maya_transform_mode_supported(const TransInfo *t, const Object &object)
+{
+  if (!BKE_object_uses_maya_transform(&object)) {
+    return true;
+  }
+  if (!ELEM(t->mode, TFM_DUMMY, TFM_TRANSLATION, TFM_ROTATION, TFM_TRACKBALL, TFM_RESIZE)) {
+    BKE_report(t->reports, RPT_WARNING, "This transform mode is not supported for Maya objects");
+    return false;
+  }
+  if (t->flag & T_PROP_EDIT) {
+    BKE_report(
+        t->reports, RPT_WARNING, "Proportional object editing is not supported for Maya objects");
+    return false;
+  }
+  if (t->options & CTX_OBMODE_XFORM_OBDATA) {
+    BKE_report(t->reports, RPT_WARNING, "Affect Only Origins is not supported for Maya objects");
+    return false;
+  }
+  if (t->scene->toolsettings->transform_flag & SCE_XFORM_AXIS_ALIGN) {
+    BKE_report(t->reports, RPT_WARNING, "Affect Only Locations is not supported for Maya objects");
+    return false;
+  }
+  if (t->flag & T_V3D_ALIGN) {
+    BKE_report(
+        t->reports, RPT_WARNING, "Align Rotation to Target is not supported for Maya objects");
+    return false;
+  }
+  if (object.constraints.first != nullptr) {
+    BKE_report(t->reports,
+               RPT_WARNING,
+               "Interactive transforms with constraints are not supported for Maya objects");
+    return false;
+  }
+  if (object.rigidbody_object != nullptr &&
+      BKE_rigidbody_check_sim_running(t->scene->rigidbody_world, BKE_scene_ctime_get(t->scene)))
+  {
+    BKE_report(t->reports,
+               RPT_WARNING,
+               "Active rigid body simulation is not supported for Maya object transforms");
+    return false;
+  }
+  return true;
+}
+
+static double4x4 maya_parent_effect_matrix_get(const Object &object)
+{
+  if (object.parent == nullptr) {
+    return double4x4::identity();
+  }
+  float parent_effect[4][4];
+  BKE_object_get_parent_matrix(&object, object.parent, parent_effect);
+  return double4x4(float4x4(parent_effect));
+}
+
+static void copy_v3_float_double(float destination[3], const double3 &source)
+{
+  for (int axis = 0; axis < 3; axis++) {
+    destination[axis] = float(source[axis]);
+  }
+}
+
+static bool maya_trans_data_state_initialize(TransInfo *t,
+                                             TransData *td,
+                                             TransDataExtension *td_ext,
+                                             Object &object,
+                                             MayaTransDataState &state)
+{
+  state.object = &object;
+  state.initial_transform = *object.maya_transform;
+  state.initial_channel_matrix = BKE_maya_transform_channel_matrix(state.initial_transform);
+  state.initial_dag_local_matrix = BKE_maya_transform_dag_local_matrix(state.initial_transform);
+  state.initial_world_matrix = double4x4(object.object_to_world());
+  state.parent_effect_matrix = maya_parent_effect_matrix_get(object);
+
+  for (int axis = 0; axis < 3; axis++) {
+    state.location_proxy[axis] = float(state.initial_transform.translation[axis]);
+    state.rotation_proxy[axis] = float(state.initial_transform.rotation[axis]);
+    state.scale_proxy[axis] = float(state.initial_transform.scale[axis]);
+  }
+  copy_v3_v3(state.initial_location_proxy, state.location_proxy);
+  copy_v3_v3(state.initial_rotation_proxy, state.rotation_proxy);
+  copy_v3_v3(state.initial_scale_proxy, state.scale_proxy);
+
+  const double4x4 parent_prefix = state.initial_transform.inherits_transform ?
+                                      state.parent_effect_matrix *
+                                          double4x4(state.initial_transform.offset_parent_matrix) :
+                                      double4x4(state.initial_transform.offset_parent_matrix);
+  const float3x3 location_mtx = float3x3(double3x3(parent_prefix));
+  copy_m3_m3(state.location_mtx, location_mtx.ptr());
+  if (!invert_m3_m3(state.location_smtx, state.location_mtx)) {
+    BKE_report(t->reports,
+               RPT_WARNING,
+               "A singular Maya parent or offset matrix prevents interactive translation");
+    return false;
+  }
+  if (!BKE_object_maya_parent_axis_world_get(
+          object, state.parent_effect_matrix, state.rotation_mtx) ||
+      !invert_m3_m3(state.rotation_smtx, state.rotation_mtx))
+  {
+    BKE_report(t->reports,
+               RPT_WARNING,
+               "A singular Maya orientation prefix prevents interactive rotation");
+    return false;
+  }
+
+  td->flag |= TD_MAYA_TRANSFORM;
+  td->loc = state.location_proxy;
+  copy_v3_v3(td->iloc, state.initial_location_proxy);
+  td_ext->rot = state.rotation_proxy;
+  td_ext->quat = nullptr;
+  td_ext->rotAxis = nullptr;
+  td_ext->rotAngle = nullptr;
+  copy_v3_v3(td_ext->irot, state.initial_rotation_proxy);
+  zero_v3(td_ext->drot);
+  td_ext->rotOrder = BKE_maya_rotation_order_to_blender(state.initial_transform.rotation_order);
+
+  td_ext->scale = state.scale_proxy;
+  copy_v3_v3(td_ext->iscale, state.initial_scale_proxy);
+  copy_v3_fl(td_ext->dscale, 1.0f);
+
+  copy_m3_m3(td->mtx, state.location_mtx);
+  copy_m3_m3(td->smtx, state.location_smtx);
+  copy_m3_m3(td_ext->r_mtx, state.rotation_mtx);
+  copy_m3_m3(td_ext->r_smtx, state.rotation_smtx);
+  copy_m4_m4(td_ext->obmat, object.object_to_world().ptr());
+
+  if (ELEM(t->mode, TFM_ROTATION, TFM_TRACKBALL)) {
+    copy_v3_float_double(
+        td->center, BKE_object_maya_rotate_pivot_world_get(object, state.parent_effect_matrix));
+  }
+  else if (t->mode == TFM_RESIZE) {
+    copy_v3_float_double(
+        td->center, BKE_object_maya_scale_pivot_world_get(object, state.parent_effect_matrix));
+  }
+  else {
+    copy_v3_v3(td->center, object.object_to_world().location());
+  }
+
+  if (!BKE_object_maya_local_axis_world_get(object, state.parent_effect_matrix, td->axismtx)) {
+    unit_m3(td->axismtx);
+  }
+  if (t->orient_type_mask & (1 << V3D_ORIENT_GIMBAL)) {
+    if (!BKE_object_maya_gimbal_axis_world_get(
+            object, state.parent_effect_matrix, td_ext->axismtx_gimbal))
+    {
+      copy_m3_m3(td_ext->axismtx_gimbal, td->axismtx);
+    }
+  }
+
+  state.active = true;
+  return true;
+}
+
+static bool float_v3_equal(const float a[3], const float b[3])
+{
+  return a[0] == b[0] && a[1] == b[1] && a[2] == b[2];
+}
+
+static bool maya_transform_proxy_flush(MayaTransDataState &state, const bool canceled)
+{
+  if (!state.active) {
+    return true;
+  }
+  if (canceled) {
+    *state.object->maya_transform = state.initial_transform;
+    BKE_object_maya_evaluated_channels_invalidate(*state.object);
+    return true;
+  }
+
+  MayaObjectTransform result = state.initial_transform;
+  for (int axis = 0; axis < 3; axis++) {
+    const double delta = double(state.location_proxy[axis] - state.initial_location_proxy[axis]);
+    result.translation[axis] = state.initial_transform.translation[axis] + delta;
+  }
+
+  if (!float_v3_equal(state.rotation_proxy, state.initial_rotation_proxy)) {
+    float initial_rotation[3][3];
+    float result_rotation[3][3];
+    float initial_rotation_inverse[3][3];
+    float proxy_delta[3][3];
+    eulO_to_mat3(initial_rotation,
+                 state.initial_rotation_proxy,
+                 BKE_maya_rotation_order_to_blender(state.initial_transform.rotation_order));
+    eulO_to_mat3(result_rotation,
+                 state.rotation_proxy,
+                 BKE_maya_rotation_order_to_blender(state.initial_transform.rotation_order));
+    if (!invert_m3_m3(initial_rotation_inverse, initial_rotation)) {
+      return false;
+    }
+    mul_m3_m3m3(proxy_delta, result_rotation, initial_rotation_inverse);
+    const double3x3 exact_rotation = double3x3(float3x3(proxy_delta)) *
+                                     BKE_maya_transform_rotation_matrix(state.initial_transform);
+    if (!BKE_maya_transform_set_rotation_matrix(result, exact_rotation, true)) {
+      return false;
+    }
+  }
+
+  for (int axis = 0; axis < 3; axis++) {
+    if (state.scale_proxy[axis] == state.initial_scale_proxy[axis]) {
+      continue;
+    }
+    if (std::abs(state.initial_scale_proxy[axis]) > 1.0e-8f) {
+      const double ratio = double(state.scale_proxy[axis]) /
+                           double(state.initial_scale_proxy[axis]);
+      result.scale[axis] = state.initial_transform.scale[axis] * ratio;
+    }
+    else {
+      result.scale[axis] = double(state.scale_proxy[axis]);
+    }
+  }
+
+  *state.object->maya_transform = result;
+  BKE_object_maya_evaluated_channels_invalidate(*state.object);
+  return true;
+}
+
+static void ObjectToTransData(TransInfo *t,
+                              TransData *td,
+                              TransDataExtension *td_ext,
+                              Object *ob,
+                              MayaTransDataState *maya_state)
 {
   Scene *scene = t->scene;
   bool constinv;
   bool skip_invert = false;
 
-  if (t->mode != TFM_DUMMY && ob->rigidbody_object) {
+  if (!BKE_object_uses_maya_transform(ob) && t->mode != TFM_DUMMY && ob->rigidbody_object) {
     float rot[3][3], scale[3];
     float ctime = BKE_scene_ctime_get(scene);
 
@@ -224,6 +479,13 @@ static void ObjectToTransData(TransInfo *t, TransData *td, TransDataExtension *t
   ob->transflag |= (object_eval->transflag & OB_NEG_SCALE);
 
   td->extra = ob;
+  if (maya_state != nullptr && BKE_object_uses_maya_transform(ob)) {
+    if (!maya_trans_data_state_initialize(t, td, td_ext, *ob, *maya_state)) {
+      td->flag |= TD_SKIP;
+    }
+    return;
+  }
+
   td->loc = ob->loc;
   copy_v3_v3(td->iloc, td->loc);
 
@@ -550,6 +812,10 @@ static void createTransObject(bContext *C, TransInfo *t)
   TransDataObject *tdo = MEM_new_zeroed<TransDataObject>(__func__);
   t->custom.type.data = tdo;
   t->custom.type.free_cb = freeTransObjectCustomData;
+  tdo->maya_states_num = tc->data_len;
+  /* Not trivially constructible (#MayaObjectTransform and #double4x4 members), so the array cannot
+   * be zeroed memory. #MEM_new_array value-initializes each element instead. */
+  tdo->maya_states = MEM_new_array<MayaTransDataState>(tc->data_len, __func__);
 
   if (t->options & CTX_OBMODE_XFORM_OBDATA) {
     tdo->xds = object::data_xform_container_create();
@@ -560,6 +826,28 @@ static void createTransObject(bContext *C, TransInfo *t)
 
     td->flag = TD_SELECTED;
     td->protectflag = ob->protectflag;
+    if (BKE_object_uses_maya_transform(ob)) {
+      const Object *ob_eval = DEG_get_evaluated(t->depsgraph, ob);
+      if (ob_eval != nullptr) {
+        for (int axis = 0; axis < 3; axis++) {
+          if (BKE_object_maya_channel_is_driven(
+                  *ob_eval, MAYA_TRANSFORM_CHANNEL_TRANSLATION, axis))
+          {
+            td->protectflag |= OB_LOCK_LOCX << axis;
+          }
+          if (BKE_object_maya_channel_is_driven(
+                  *ob_eval, MAYA_TRANSFORM_CHANNEL_ROTATION, axis))
+          {
+            td->protectflag |= OB_LOCK_ROTX << axis;
+          }
+          if (BKE_object_maya_channel_is_driven(
+                  *ob_eval, MAYA_TRANSFORM_CHANNEL_SCALE, axis))
+          {
+            td->protectflag |= OB_LOCK_SCALEX << axis;
+          }
+        }
+      }
+    }
     tx->rotOrder = ob->rotmode;
 
     if (base->flag_legacy & BA_TRANSFORM_CHILD) {
@@ -590,7 +878,11 @@ static void createTransObject(bContext *C, TransInfo *t)
       }
     }
 
-    ObjectToTransData(t, td, tx, ob);
+    MayaTransDataState *maya_state = &tdo->maya_states[td - tc->data];
+    if (!maya_transform_mode_supported(t, *ob)) {
+      td->flag |= TD_SKIP;
+    }
+    ObjectToTransData(t, td, tx, ob, maya_state);
     td->val = nullptr;
     td++;
     tx++;
@@ -615,7 +907,11 @@ static void createTransObject(bContext *C, TransInfo *t)
         td->protectflag = ob->protectflag;
         tx->rotOrder = ob->rotmode;
 
-        ObjectToTransData(t, td, tx, ob);
+        MayaTransDataState *maya_state = &tdo->maya_states[td - tc->data];
+        if (!maya_transform_mode_supported(t, *ob)) {
+          td->flag |= TD_SKIP;
+        }
+        ObjectToTransData(t, td, tx, ob, maya_state);
         td->val = nullptr;
         td++;
         tx++;
@@ -789,7 +1085,7 @@ static Vector<RNAPath> get_affected_rna_paths_from_transform_mode(
     Scene *scene,
     ViewLayer *view_layer,
     Object *ob,
-    const StringRef rotation_path,
+    const object::ObjectTransformRNAPaths &transform_paths,
     const bool transforming_more_than_one_object)
 {
   Vector<RNAPath> rna_paths;
@@ -799,41 +1095,41 @@ static Vector<RNAPath> get_affected_rna_paths_from_transform_mode(
   if (scene->toolsettings->transform_pivot_point == V3D_AROUND_ACTIVE) {
     BKE_view_layer_synced_ensure(bmain, scene, view_layer);
     if (ob != BKE_view_layer_active_object_get(view_layer)) {
-      rna_paths.append({"location"});
+      rna_paths.append({transform_paths.translation});
     }
   }
   else if (transforming_more_than_one_object &&
            scene->toolsettings->transform_pivot_point != V3D_AROUND_LOCAL_ORIGINS)
   {
-    rna_paths.append({"location"});
+    rna_paths.append({transform_paths.translation});
   }
   else if (scene->toolsettings->transform_pivot_point == V3D_AROUND_CURSOR) {
-    rna_paths.append({"location"});
+    rna_paths.append({transform_paths.translation});
   }
 
   /* Handle the transform-mode-specific cases. */
   switch (tmode) {
     case TFM_TRANSLATION:
-      rna_paths.append_non_duplicates({"location"});
+      rna_paths.append_non_duplicates({transform_paths.translation});
       break;
 
     case TFM_ROTATION:
     case TFM_TRACKBALL:
       if ((scene->toolsettings->transform_flag & SCE_XFORM_AXIS_ALIGN) == 0) {
-        rna_paths.append({rotation_path});
+        rna_paths.append({transform_paths.rotation});
       }
       break;
 
     case TFM_RESIZE:
       if ((scene->toolsettings->transform_flag & SCE_XFORM_AXIS_ALIGN) == 0) {
-        rna_paths.append({"scale"});
+        rna_paths.append({transform_paths.scale});
       }
       break;
 
     default:
-      rna_paths.append_non_duplicates({"location"});
-      rna_paths.append({rotation_path});
-      rna_paths.append({"scale"});
+      rna_paths.append_non_duplicates({transform_paths.translation});
+      rna_paths.append({transform_paths.rotation});
+      rna_paths.append({transform_paths.scale});
   }
 
   return rna_paths;
@@ -847,15 +1143,16 @@ static void autokeyframe_object(bContext *C,
 {
   Vector<RNAPath> rna_paths;
   ViewLayer *view_layer = CTX_data_view_layer(C);
-  const StringRefNull rotation_path = animrig::get_rotation_mode_path(eRotationModes(ob->rotmode));
+  const object::ObjectTransformRNAPaths transform_paths = object::transform_rna_paths_get(*ob);
 
   if (animrig::is_keying_flag(scene, AUTOKEY_FLAG_INSERTNEEDED)) {
     const Main *bmain = CTX_data_main(C);
     rna_paths = get_affected_rna_paths_from_transform_mode(
-        *bmain, tmode, scene, view_layer, ob, rotation_path, transforming_more_than_one_object);
+        *bmain, tmode, scene, view_layer, ob, transform_paths, transforming_more_than_one_object);
   }
   else {
-    rna_paths = {{"location"}, {rotation_path}, {"scale"}};
+    rna_paths = {
+        {transform_paths.translation}, {transform_paths.rotation}, {transform_paths.scale}};
   }
   animrig::autokeyframe_object(C, scene, ob, rna_paths.as_span());
 }
@@ -867,12 +1164,16 @@ static void recalcData_objects(TransInfo *t)
   }
 
   FOREACH_TRANS_DATA_CONTAINER (t, tc) {
+    TransDataObject *tdo = static_cast<TransDataObject *>(t->custom.type.data);
     TransData *td = tc->data;
 
     for (int i = 0; i < tc->data_len; i++, td++) {
       Object *ob = static_cast<Object *>(td->extra);
       if (td->flag & TD_SKIP) {
         continue;
+      }
+      if (i < tdo->maya_states_num) {
+        maya_transform_proxy_flush(tdo->maya_states[i], t->state == TRANS_CANCEL);
       }
 
       /* If animtimer is running, and the object already has animation data,
@@ -932,6 +1233,10 @@ static void special_aftertrans_update__object(bContext *C, TransInfo *t)
     if (td->flag & TD_SKIP) {
       continue;
     }
+    TransDataObject *tdo = static_cast<TransDataObject *>(t->custom.type.data);
+    if (i < tdo->maya_states_num) {
+      maya_transform_proxy_flush(tdo->maya_states[i], canceled);
+    }
 
     /* Flag object caches as outdated. */
     BKE_ptcache_ids_from_object(&pidlist, ob, t->scene, MAX_DUPLI_RECUR);
@@ -962,7 +1267,7 @@ static void special_aftertrans_update__object(bContext *C, TransInfo *t)
     motionpath_update |= motionpath_need_update_object(t->scene, ob);
 
     /* Restore rigid body transform. */
-    if (ob->rigidbody_object && canceled) {
+    if (!BKE_object_uses_maya_transform(ob) && ob->rigidbody_object && canceled) {
       float ctime = BKE_scene_ctime_get(t->scene);
       if (BKE_rigidbody_check_sim_running(t->scene->rigidbody_world, ctime)) {
         BKE_rigidbody_aftertrans_update(

@@ -8,12 +8,18 @@
 
 #include "MEM_guardedalloc.h"
 
+#include <climits>
+#include <memory>
+
 #include "DNA_curve_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_view3d_types.h"
 
 #include "BLI_math_matrix.h"
+#include "BLI_math_quaternion.hh"
 #include "BLI_math_vector.h"
+#include "BLI_math_vector.hh"
 #include "BLI_time.h"
 #include "BLI_utildefines.h"
 
@@ -40,6 +46,8 @@
 
 #include "ED_screen.hh"
 #include "ED_maya.hh"
+#include "ED_transform_snap_object_context.hh"
+#include "ED_view3d.hh"
 /** For #USE_LOOPSLIDE_HACK only. */
 #include "ED_mesh.hh"
 
@@ -196,29 +204,38 @@ static bool transform_maya_snap_event(const bContext *C,
     t->redraw |= TREDRAW_HARD;
     return false;
   }
-  if (!ELEM(event->type, EVT_XKEY, EVT_CKEY, EVT_VKEY, EVT_JKEY) ||
-      !ELEM(event->val, KM_PRESS, KM_RELEASE) ||
-      (event->val == KM_PRESS &&
-       (event->modifier & (KM_CTRL | KM_ALT | KM_OSKEY)) != 0) ||
-      (event->val == KM_PRESS && event->type != EVT_JKEY &&
-       (event->modifier & KM_SHIFT) != 0))
+  /* The modal keymap rewrites matched keys into #EVT_MODAL_MAP before the operator sees them and
+   * keeps the physical key in `prev_type`/`prev_val`. Without resolving it back, `X` would arrive
+   * as `AXIS_X` and `C` as `CONS_OFF`, so Maya's grid and curve snapping would never trigger
+   * during a running transform. Maya owns these keys, so snapping wins over the modal map. */
+  wmEventType key_type = event->type;
+  short key_val = event->val;
+  if (event->type == EVT_MODAL_MAP) {
+    key_type = event->prev_type;
+    key_val = event->prev_val;
+  }
+
+  if (!ELEM(key_type, EVT_XKEY, EVT_CKEY, EVT_VKEY, EVT_JKEY) ||
+      !ELEM(key_val, KM_PRESS, KM_RELEASE) ||
+      (key_val == KM_PRESS && (event->modifier & (KM_CTRL | KM_ALT | KM_OSKEY)) != 0) ||
+      (key_val == KM_PRESS && key_type != EVT_JKEY && (event->modifier & KM_SHIFT) != 0))
   {
     return false;
   }
 
   ed::maya::MayaSnapMode mode = ed::maya::MayaSnapMode::Grid;
-  if (event->type == EVT_CKEY) {
+  if (key_type == EVT_CKEY) {
     mode = ed::maya::MayaSnapMode::Curve;
   }
-  else if (event->type == EVT_VKEY) {
+  else if (key_type == EVT_VKEY) {
     mode = ed::maya::MayaSnapMode::Point;
   }
-  else if (event->type == EVT_JKEY) {
-    mode = event->val == KM_RELEASE || (event->modifier & KM_SHIFT) == 0 ?
+  else if (key_type == EVT_JKEY) {
+    mode = key_val == KM_RELEASE || (event->modifier & KM_SHIFT) == 0 ?
                ed::maya::MayaSnapMode::StepAbsolute :
                ed::maya::MayaSnapMode::StepRelative;
   }
-  ED_maya_snap_override_set(C, mode, event->val == KM_PRESS);
+  ED_maya_snap_override_set(C, mode, key_val == KM_PRESS);
   transform_maya_snap_apply(C, t, op, true);
   t->redraw |= TREDRAW_HARD;
   return true;
@@ -1815,6 +1832,180 @@ static void TRANSFORM_OT_maya_snap_toggle(wmOperatorType *ot)
       ot->srna, "mode", maya_snap_toggle_mode_items, MAYA_SNAP_TOGGLE_POINT, "Mode", "");
 }
 
+static wmOperatorStatus maya_pivot_click_exec(bContext *C, wmOperator *op)
+{
+  ARegion *region = CTX_wm_region(C);
+  View3D *view = CTX_wm_view3d(C);
+  RegionView3D *region_view = region != nullptr ?
+                                 static_cast<RegionView3D *>(region->regiondata) :
+                                 nullptr;
+  if (ED_maya_pivot_edit_target_get(C) == ed::maya::MayaPivotEditTarget::None ||
+      region == nullptr || region->regiontype != RGN_TYPE_WINDOW || view == nullptr ||
+      region_view == nullptr)
+  {
+    return OPERATOR_CANCELLED;
+  }
+
+  int mouse[2];
+  RNA_int_get_array(op->ptr, "mouse", mouse);
+  const bool shift = RNA_boolean_get(op->ptr, "shift");
+  const bool ctrl = RNA_boolean_get(op->ptr, "ctrl");
+  const bool position_only = shift && !ctrl;
+  const bool orientation_only = ctrl && !shift;
+  const bool aim_axis = ctrl && shift;
+
+  std::unique_ptr<ed::maya::MayaPivotEditTargetBackend> target =
+      ED_maya_pivot_edit_target_create(C);
+  if (!target) {
+    return OPERATOR_CANCELLED;
+  }
+  ed::maya::MayaPivotFrame frame = target->frame_get();
+  frame.position_valid = true;
+
+  ed::transform::SnapObjectContext *snap_context =
+      ed::transform::snap_object_context_create();
+  if (snap_context == nullptr) {
+    return OPERATOR_CANCELLED;
+  }
+  ed::transform::SnapObjectParams snap_params{};
+  snap_params.snap_target_select = SCE_SNAP_TARGET_ALL;
+  snap_params.edit_mode_type = CTX_data_mode_enum(C) == CTX_MODE_EDIT_MESH ?
+                                   ed::transform::SNAP_GEOM_EDIT :
+                                   ed::transform::SNAP_GEOM_FINAL;
+  snap_params.occlusion_test = ed::transform::SNAP_OCCLUSION_AS_SEEM;
+  snap_params.ignore_editmode_filtering = true;
+
+  float hit_position[3] = {};
+  float hit_normal[3] = {};
+  float hit_face_normal[3] = {};
+  float hit_object_matrix[4][4] = {};
+  int hit_index = -1;
+  const Object *hit_object = nullptr;
+  const float mouse_float[2] = {float(mouse[0]), float(mouse[1])};
+  const float previous_position[3] = {float(frame.position_world.x),
+                                      float(frame.position_world.y),
+                                      float(frame.position_world.z)};
+  float snap_distance = 24.0f * U.pixelsize;
+  const eSnapMode hit_type = ed::transform::snap_object_project_view3d_ex(
+      snap_context,
+      CTX_data_ensure_evaluated_depsgraph(C),
+      region,
+      view,
+      eSnapMode(SCE_SNAP_TO_VERTEX | SCE_SNAP_TO_EDGE | SCE_SNAP_TO_FACE),
+      &snap_params,
+      nullptr,
+      mouse_float,
+      previous_position,
+      &snap_distance,
+      hit_position,
+      hit_normal,
+      &hit_index,
+      &hit_object,
+      hit_object_matrix,
+      hit_face_normal);
+  ed::transform::snap_object_context_destroy(snap_context);
+
+  bool has_position = hit_type != SCE_SNAP_TO_NONE;
+  if (!is_zero_v3(hit_face_normal)) {
+    copy_v3_v3(hit_normal, hit_face_normal);
+  }
+  const bool has_orientation = has_position && !is_zero_v3(hit_normal);
+
+  ed::maya::MayaPivotSnapResult snap_result;
+  if (has_position) {
+    snap_result.position_world = double3(hit_position);
+    snap_result.type = hit_type & SCE_SNAP_TO_VERTEX ?
+                           ed::maya::MayaPivotSnapTargetType::Vertex :
+                           (hit_type & SCE_SNAP_TO_EDGE ?
+                                ed::maya::MayaPivotSnapTargetType::Edge :
+                                ed::maya::MayaPivotSnapTargetType::Face);
+    snap_result.object = const_cast<Object *>(hit_object);
+    snap_result.component_index = hit_index;
+  }
+  if (!has_position && position_only) {
+    const float pivot_depth[3] = {float(frame.position_world.x),
+                                  float(frame.position_world.y),
+                                  float(frame.position_world.z)};
+    ED_view3d_win_to_3d_int(view, region, pivot_depth, mouse, hit_position);
+    has_position = true;
+    snap_result.position_world = double3(hit_position);
+    snap_result.type = ed::maya::MayaPivotSnapTargetType::ViewPlane;
+  }
+  if (!has_position || (orientation_only && !has_orientation)) {
+    return OPERATOR_CANCELLED;
+  }
+
+  ed::maya::MayaPivotToolSettings settings;
+  if (!ED_maya_pivot_tool_settings_get(C, settings)) {
+    return OPERATOR_CANCELLED;
+  }
+  const bool apply_position = !orientation_only && !aim_axis && settings.snap_position;
+  bool apply_orientation = !position_only && settings.snap_orientation;
+  if (apply_orientation) {
+    apply_orientation = aim_axis || has_orientation;
+    if (apply_orientation) {
+      const double3 orientation_target = aim_axis ?
+                                             double3(hit_position) :
+                                             frame.position_world + double3(hit_normal);
+      if (!ED_maya_pivot_orientation_aim(frame,
+                                         orientation_target,
+                                         aim_axis ? settings.active_axis : 2,
+                                         double3(region_view->viewinv[1])))
+      {
+        apply_orientation = false;
+      }
+      else {
+        snap_result.orientation_world = frame.orientation_world;
+      }
+    }
+  }
+  if (!apply_position && !apply_orientation) {
+    return OPERATOR_FINISHED;
+  }
+
+  ED_maya_pivot_undo_begin(C);
+  bool changed = true;
+  if (apply_position) {
+    changed = target->position_set(*snap_result.position_world, true);
+  }
+  if (changed && apply_orientation) {
+    changed = target->orientation_set(*snap_result.orientation_world, false);
+  }
+  if (!changed) {
+    target->cancel();
+    ED_maya_undo_step_clear(C);
+    return OPERATOR_CANCELLED;
+  }
+
+  target->commit();
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+  return OPERATOR_FINISHED;
+}
+
+static void TRANSFORM_OT_maya_pivot_click(wmOperatorType *ot)
+{
+  ot->name = "Maya Pivot Component Click";
+  ot->description = "Apply a Maya custom-pivot component click workflow";
+  ot->idname = "TRANSFORM_OT_maya_pivot_click";
+  ot->exec = maya_pivot_click_exec;
+  ot->poll = maya_snap_toggle_poll;
+  ot->flag = OPTYPE_UNDO | OPTYPE_INTERNAL;
+
+  PropertyRNA *property = RNA_def_int_vector(ot->srna,
+                                             "mouse",
+                                             2,
+                                             nullptr,
+                                             INT_MIN,
+                                             INT_MAX,
+                                             "Mouse",
+                                             "Region-space mouse position",
+                                             INT_MIN,
+                                             INT_MAX);
+  RNA_def_property_flag(property, PROP_HIDDEN | PROP_SKIP_SAVE);
+  RNA_def_boolean(ot->srna, "shift", false, "Shift", "");
+  RNA_def_boolean(ot->srna, "ctrl", false, "Ctrl", "");
+}
+
 void transform_operatortypes()
 {
   TransformModeItem *tmode;
@@ -1831,6 +2022,7 @@ void transform_operatortypes()
 
   WM_operatortype_append(TRANSFORM_OT_from_gizmo);
   WM_operatortype_append(TRANSFORM_OT_maya_snap_toggle);
+  WM_operatortype_append(TRANSFORM_OT_maya_pivot_click);
 }
 
 void keymap_transform(wmKeyConfig *keyconf)

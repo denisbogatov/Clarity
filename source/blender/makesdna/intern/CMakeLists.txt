@@ -113,7 +113,10 @@ add_custom_command(
     ${CMAKE_CURRENT_BINARY_DIR}/dna_struct_ids.cc
     ${CMAKE_CURRENT_BINARY_DIR}/dna_defaults.cc
     ${CMAKE_SOURCE_DIR}/source/blender/makesdna/
-  DEPENDS makesdna
+  # `makesdna` parses the DNA headers at run time, so they are inputs of this command. Without
+  # listing them the generated SDNA is only refreshed when the executable itself changes, which
+  # silently leaves `dna.cc` stale after a DNA edit.
+  DEPENDS makesdna ${SRC_DNA_INC}
 )
 
 

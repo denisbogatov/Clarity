@@ -82,8 +82,10 @@ struct SnapObjectParams {
    *
    * \note Use with care: multiple calls to the snap-context may crash.
    * See #148788.
-   */
+  */
   bool ignore_editmode_filtering : 1;
+  /** Optional world-space point to exclude from object-pivot candidates. */
+  const float *excluded_object_pivot_location;
 };
 
 struct SnapObjectContext;

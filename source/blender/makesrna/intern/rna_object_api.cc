@@ -837,6 +837,16 @@ void RNA_api_object(StructRNA *srna)
   FunctionRNA *func;
   PropertyRNA *parm;
 
+  func = RNA_def_function(srna, "custom_pivot_ensure", "rna_Object_custom_pivot_ensure");
+  RNA_def_function_ui_description(
+      func, "Create custom pivot data explicitly and return it without changing object transforms");
+  parm = RNA_def_pointer(
+      func, "pivot", "ObjectCustomPivot", "Custom Pivot", "The ensured custom pivot data");
+  RNA_def_function_return(func, parm);
+
+  func = RNA_def_function(srna, "custom_pivot_reset", "rna_Object_custom_pivot_reset");
+  RNA_def_function_ui_description(func, "Remove all custom pivot data from the object");
+
   static const EnumPropertyItem mesh_type_items[] = {
       {eModifierMode_Realtime, "PREVIEW", 0, "Preview", "Apply modifier preview settings"},
       {eModifierMode_Render, "RENDER", 0, "Render", "Apply modifier render settings"},

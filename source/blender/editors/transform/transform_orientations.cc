@@ -37,6 +37,8 @@
 #include "BKE_curve.hh"
 #include "BKE_editmesh.hh"
 #include "BKE_layer.hh"
+#include "BKE_object.hh"
+#include "BKE_object_transform_maya.hh"
 #include "BKE_report.hh"
 #include "BKE_scene.hh"
 
@@ -319,6 +321,16 @@ bool gimbal_axis_pose(Object *ob, const bPoseChannel *pchan, float gmat[3][3])
 
 bool gimbal_axis_object(Object *ob, float gmat[3][3])
 {
+  if (BKE_object_uses_maya_transform(ob)) {
+    double4x4 parent_effect = double4x4::identity();
+    if (ob->parent != nullptr) {
+      float parent_effect_float[4][4];
+      BKE_object_get_parent_matrix(ob, ob->parent, parent_effect_float);
+      parent_effect = double4x4(float4x4(parent_effect_float));
+    }
+    return BKE_object_maya_gimbal_axis_world_get(*ob, parent_effect, gmat);
+  }
+
   if (test_rotmode_euler(ob->rotmode)) {
     eulO_to_gimbal_axis(gmat, ob->rot, ob->rotmode);
   }
@@ -655,6 +667,19 @@ static void handle_armature_parent_orientation(Object *ob, float r_mat[3][3])
 
 static void handle_object_parent_orientation(Object *ob, float r_mat[3][3])
 {
+  if (BKE_object_uses_maya_transform(ob)) {
+    if (ob->parent == nullptr) {
+      unit_m3(r_mat);
+      return;
+    }
+    float parent_effect[4][4];
+    BKE_object_get_parent_matrix(ob, ob->parent, parent_effect);
+    if (!BKE_maya_matrix_orthonormalize(double3x3(float4x4(parent_effect)), r_mat)) {
+      unit_m3(r_mat);
+    }
+    return;
+  }
+
   /* If object has parent, then orient to parent. */
   if (ob->parent) {
     transform_orientations_create_from_axis(r_mat, UNPACK3(ob->parent->object_to_world().ptr()));
@@ -728,7 +753,20 @@ short calc_orientation_from_type_ex(const Main &bmain,
               bmain, scene, view_layer, v3d, ob, obedit, pivot_point, r_mat);
         }
         else {
-          transform_orientations_create_from_axis(r_mat, UNPACK3(ob->object_to_world().ptr()));
+          if (BKE_object_uses_maya_transform(ob)) {
+            double4x4 parent_effect = double4x4::identity();
+            if (ob->parent != nullptr) {
+              float parent_effect_float[4][4];
+              BKE_object_get_parent_matrix(ob, ob->parent, parent_effect_float);
+              parent_effect = double4x4(float4x4(parent_effect_float));
+            }
+            if (!BKE_object_maya_local_axis_world_get(*ob, parent_effect, r_mat)) {
+              unit_m3(r_mat);
+            }
+          }
+          else {
+            transform_orientations_create_from_axis(r_mat, UNPACK3(ob->object_to_world().ptr()));
+          }
         }
         break;
       }
@@ -777,9 +815,16 @@ short transform_orientation_matrix_get(bContext *C,
                                        const float custom[3][3],
                                        float r_spacemtx[3][3])
 {
-  float maya_pivot_matrix[4][4];
-  if (ED_maya_pivot_custom_matrix_get(C, maya_pivot_matrix)) {
-    copy_m3_m4(r_spacemtx, maya_pivot_matrix);
+  /* Translation is included on purpose: the manipulator is drawn in the pivot orientation, so the
+   * drag has to follow the same axes. Without this the arrows point along the pivot while the
+   * transform still runs in the scene orientation, and dragging an axis moves in another
+   * direction. The pivot position still does not affect translation, that is decided separately in
+   * #createTransInfo. */
+  float maya_pivot_orientation[3][3];
+  if (ELEM(t->mode, TFM_TRANSLATION, TFM_ROTATION, TFM_TRACKBALL, TFM_RESIZE) &&
+      ED_maya_pivot_custom_orientation_get(C, maya_pivot_orientation))
+  {
+    copy_m3_m3(r_spacemtx, maya_pivot_orientation);
     return V3D_ORIENT_CUSTOM_MATRIX;
   }
 
