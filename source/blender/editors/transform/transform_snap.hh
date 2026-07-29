@@ -41,6 +41,23 @@ bool transform_snap_is_active(const TransInfo *t);
 
 bool validSnap(const TransInfo *t);
 
+/**
+ * Point that #SCE_SNAP_SOURCE_CENTER moves onto the snap target.
+ *
+ * Maya moves the visible pivot, so while Maya snapping is active the pivot captured by
+ * #initSnapping wins over the center of the selection.
+ */
+void transform_snap_source_center_calc(const TransSnap &tsnap,
+                                       const float center_global[3],
+                                       float r_source[3]);
+
+/**
+ * Pivot location that must never be offered as a snap target: it is where the snap source sits, so
+ * snapping to it would only produce a dead zone in which the data snaps onto itself.
+ */
+const float *transform_snap_excluded_pivot_get(const TransSnap &tsnap,
+                                               const float center_global[3]);
+
 void transform_snap_grid_init(const TransInfo *t, float r_snap[3], float *r_snap_precision);
 void transform_snap_reset_from_mode(TransInfo *t, wmOperator *op);
 void transform_snap_callbacks_update(TransInfo *t);

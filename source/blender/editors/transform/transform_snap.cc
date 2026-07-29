@@ -1066,6 +1066,22 @@ void initSnapping(TransInfo *t, wmOperator *op)
   transform_snap_grid_init(t, t->snap_spatial, &t->snap_spatial_precision);
   setSnappingCallback(t);
 
+  /* Capture the visible pivot before anything moved: Maya snaps that pivot onto the target, and
+   * during the drag the pivot itself follows the data. Editing the pivot is excluded, there the
+   * pivot is already the transform center. */
+  t->tsnap.maya_pivot_source_valid = false;
+  if (t->spacetype == SPACE_VIEW3D && t->context != nullptr &&
+      (t->options & CTX_MAYA_PIVOT) == 0)
+  {
+    float pivot_matrix[4][4];
+    if (ED_maya_pivot_custom_matrix_get(
+            t->context, ed::maya::MayaPivotUsage::Display, pivot_matrix))
+    {
+      copy_v3_v3(t->tsnap.maya_pivot_source, pivot_matrix[3]);
+      t->tsnap.maya_pivot_source_valid = true;
+    }
+  }
+
   if (t->spacetype == SPACE_VIEW3D) {
     if (t->tsnap.object_context == nullptr) {
       SET_FLAG_FROM_TEST(t->tsnap.flag, snap_use_backface_culling(t), SCE_SNAP_BACKFACE_CULLING);
@@ -1494,11 +1510,29 @@ void tranform_snap_target_median_calc(const TransInfo *t, float r_median[3])
   mul_v3_fl(r_median, 1.0 / i_accum);
 }
 
+void transform_snap_source_center_calc(const TransSnap &tsnap,
+                                       const float center_global[3],
+                                       float r_source[3])
+{
+  if (tsnap.maya_mode_active && tsnap.maya_pivot_source_valid) {
+    /* Maya moves the visible pivot onto the target, not the center of the selection. */
+    copy_v3_v3(r_source, tsnap.maya_pivot_source);
+    return;
+  }
+  copy_v3_v3(r_source, center_global);
+}
+
+const float *transform_snap_excluded_pivot_get(const TransSnap &tsnap,
+                                               const float center_global[3])
+{
+  return tsnap.maya_pivot_source_valid ? tsnap.maya_pivot_source : center_global;
+}
+
 static void snap_source_center_fn(TransInfo *t)
 {
   /* Only need to calculate once. */
   if ((t->tsnap.status & SNAP_SOURCE_FOUND) == 0) {
-    copy_v3_v3(t->tsnap.snap_source, t->center_global);
+    transform_snap_source_center_calc(t->tsnap, t->center_global, t->tsnap.snap_source);
 
     t->tsnap.status |= SNAP_SOURCE_FOUND;
     t->tsnap.source_type = SCE_SNAP_TO_NONE;
@@ -1660,8 +1694,11 @@ static eSnapMode snapObjectsTransform(
   snap_object_params.use_backface_culling = (t->tsnap.flag & SCE_SNAP_BACKFACE_CULLING) != 0;
   snap_object_params.curve_targets_only = t->tsnap.maya_curve_targets_only;
   snap_object_params.include_object_pivots = t->tsnap.maya_include_object_pivots;
-  snap_object_params.excluded_object_pivot_location =
-      (t->options & CTX_MAYA_PIVOT) != 0 ? t->center_global : nullptr;
+  /* Maya never snaps the moved data onto the pivot it is being moved by, so the pivot that acts as
+   * the snap source is excluded from the pivot targets in every mode, not only while the pivot
+   * itself is edited. */
+  snap_object_params.excluded_object_pivot_location = transform_snap_excluded_pivot_get(
+      t->tsnap, t->center_global);
 
   float *prev_co = (t->tsnap.status & SNAP_SOURCE_FOUND) ? t->tsnap.snap_source : t->center_global;
   float *grid_co = nullptr, grid_co_stack[3];
@@ -1686,27 +1723,9 @@ static eSnapMode snapObjectsTransform(
                                                                dist_px,
                                                                r_loc,
                                                                r_no);
-  if (t->tsnap.maya_include_object_pivots && t->context != nullptr &&
-      (t->options & CTX_MAYA_PIVOT) == 0)
-  {
-    float pivot_matrix[4][4];
-    float pivot_screen[2];
-    /* Snap to the pivot the user actually sees. */
-    if (ED_maya_pivot_custom_matrix_get(
-            t->context, ed::maya::MayaPivotUsage::Display, pivot_matrix) &&
-        ED_view3d_project_float_global(
-            t->region, pivot_matrix[3], pivot_screen, V3D_PROJ_TEST_CLIP_DEFAULT) ==
-            V3D_PROJ_RET_OK)
-    {
-      const float pivot_dist_px = len_v2v2(mval, pivot_screen);
-      if (pivot_dist_px < *dist_px) {
-        *dist_px = pivot_dist_px;
-        copy_v3_v3(r_loc, pivot_matrix[3]);
-        zero_v3(r_no);
-        result = SCE_SNAP_TO_POINT;
-      }
-    }
-  }
+  /* The visible pivot of the moved selection is deliberately not added as a target here: it is the
+   * snap source, so offering it created a dead zone around the manipulator in which the selection
+   * snapped onto itself. Pivots of other objects still come from #include_object_pivots. */
   return result;
 }
 

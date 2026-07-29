@@ -120,8 +120,11 @@ static void gizmo_primitive_draw_geom(PrimitiveGizmo3D *gz_prim,
     immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
   }
 
+  const bool draw_plane = gz_prim->draw_style == ED_GIZMO_PRIMITIVE_STYLE_PLANE ||
+                          gz_prim->draw_style == ED_GIZMO_PRIMITIVE_STYLE_PLANE_CIRCLE;
+
   if (draw_inner) {
-    if (gz_prim->draw_style == ED_GIZMO_PRIMITIVE_STYLE_PLANE) {
+    if (draw_plane) {
       wm_gizmo_vec_draw(col_inner, verts_plane, ARRAY_SIZE(verts_plane), pos, GPU_PRIM_TRI_FAN);
     }
     else {
@@ -152,8 +155,13 @@ static void gizmo_primitive_draw_geom(PrimitiveGizmo3D *gz_prim,
                  (gz_prim->gizmo.line_width * U.pixelsize) + WM_gizmo_select_bias(select));
   }
 
-  if (gz_prim->draw_style == ED_GIZMO_PRIMITIVE_STYLE_PLANE) {
+  if (draw_plane) {
     wm_gizmo_vec_draw(col_outer, verts_plane, ARRAY_SIZE(verts_plane), pos, GPU_PRIM_LINE_LOOP);
+    if (gz_prim->draw_style == ED_GIZMO_PRIMITIVE_STYLE_PLANE_CIRCLE) {
+      /* Circumscribes the plane with a small gap; the plane's half diagonal is `sqrt(2)`. */
+      immUniformColor4fv(col_outer);
+      imm_draw_circle_wire_3d(pos, 0.0f, 0.0f, 1.7f, nsegments);
+    }
   }
   else {
     immUniformColor4fv(col_outer);
@@ -287,6 +295,7 @@ static void GIZMO_GT_primitive_3d(wmGizmoType *gzt)
       {ED_GIZMO_PRIMITIVE_STYLE_CIRCLE, "CIRCLE", 0, "Circle", ""},
       {ED_GIZMO_PRIMITIVE_STYLE_ANNULUS, "ANNULUS", 0, "Annulus", ""},
       {ED_GIZMO_PRIMITIVE_STYLE_CUBE, "CUBE", 0, "Cube", ""},
+      {ED_GIZMO_PRIMITIVE_STYLE_PLANE_CIRCLE, "PLANE_CIRCLE", 0, "Plane and Circle", ""},
       {0, nullptr, 0, nullptr, nullptr},
   };
 

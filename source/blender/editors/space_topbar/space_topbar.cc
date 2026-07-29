@@ -10,11 +10,13 @@
 #include <cstdio>
 #include <cstring>
 #include <optional>
+#include <string>
 
 #include "MEM_guardedalloc.h"
 
 #include "BLI_listbase.h"
 #include "BLI_math_color.h"
+#include "BLI_rect.h"
 #include "BLI_string_utf8.h"
 #include "BLI_uuid.h"
 #include "BLI_utildefines.h"
@@ -24,11 +26,14 @@
 #include "BKE_context.hh"
 #include "BKE_screen.hh"
 #include "BKE_undo_system.hh"
+#include "BKE_wm_runtime.hh"
 
 #include "DNA_windowmanager_types.h"
 
 #include "ED_screen.hh"
 #include "ED_space_api.hh"
+
+#include "GPU_state.hh"
 
 #include "UI_interface.hh"
 #include "UI_interface_layout.hh"
@@ -122,6 +127,84 @@ static SpaceLink *topbar_duplicate(SpaceLink *sl)
   return reinterpret_cast<SpaceLink *>(stopbarn);
 }
 
+/**
+ * Live state of a Maya-shelf icon drag, resolved from the buttons that are really laid out so the
+ * insertion marker and the drop position always agree with the cursor.
+ *
+ * `TOPBAR_OT_maya_shelf_drag` drives this by calling `TOPBAR_OT_maya_shelf_drag_probe` from its
+ * modal handler. It cannot be driven from the shelf region event handlers instead: a modal
+ * operator returning `RUNNING_MODAL | PASS_THROUGH` still yields `WM_HANDLER_BREAK`, and
+ * `wm_event_do_handlers` skips every region handler once that flag is set.
+ */
+struct ShelfDragRuntime {
+  bool active = false;
+  /** Region the drop would happen in, null while the cursor is over no shelf. */
+  const ARegion *target_region = nullptr;
+  /** False together with a non-null region means the shelf holds no entry to align to. */
+  bool target_valid = false;
+  bool target_after = false;
+  std::string target_item_id;
+  /** Window space bounds of the target entry. */
+  rctf target_rect = {0.0f, 0.0f, 0.0f, 0.0f};
+};
+
+static ShelfDragRuntime shelf_drag_runtime;
+
+static void shelf_drag_runtime_clear()
+{
+  shelf_drag_runtime.active = false;
+  shelf_drag_runtime.target_region = nullptr;
+  shelf_drag_runtime.target_valid = false;
+  shelf_drag_runtime.target_after = false;
+  shelf_drag_runtime.target_item_id.clear();
+  BLI_rctf_init(&shelf_drag_runtime.target_rect, 0.0f, 0.0f, 0.0f, 0.0f);
+}
+
+/** Every shelf surface shows the marker, so a drag between them cannot leave a stale one behind. */
+static void topbar_shelf_areas_tag_redraw(const bContext *C)
+{
+  wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm == nullptr) {
+    return;
+  }
+  for (wmWindow &window : wm->windows) {
+    for (ScrArea &area : window.global_areas.areabase) {
+      if (area.spacetype == SPACE_TOPBAR) {
+        ED_area_tag_redraw(&area);
+      }
+    }
+    bScreen *screen = WM_window_get_active_screen(&window);
+    if (screen == nullptr) {
+      continue;
+    }
+    for (ScrArea &area : screen->areabase) {
+      if (area.spacetype == SPACE_SHELF) {
+        ED_area_tag_redraw(&area);
+      }
+    }
+  }
+}
+
+/**
+ * Hand the entry under the cursor to the running drag operator, which owns the reorder.
+ * `found` is false while the cursor is over no shelf at all, which cancels the drop.
+ */
+static void topbar_shelf_drag_hover_notify(bContext *C,
+                                           const ui::ShelfDropTarget *target,
+                                           const bool found)
+{
+  wmOperatorType *ot = WM_operatortype_find("TOPBAR_OT_maya_shelf_drag_hover", true);
+  if (ot == nullptr) {
+    return;
+  }
+  PointerRNA properties = WM_operator_properties_create_ptr(ot);
+  RNA_boolean_set(&properties, "found", found);
+  RNA_string_set(&properties, "item_id", target != nullptr ? target->item_id.c_str() : "");
+  RNA_boolean_set(&properties, "after", target != nullptr && target->after);
+  WM_operator_name_call_ptr(C, ot, wm::OpCallContext::ExecDefault, &properties, nullptr);
+  WM_operator_properties_free(&properties);
+}
+
 static int topbar_shelf_region_event_handler(bContext *C,
                                              const wmEvent *event,
                                              void * /*user_data*/)
@@ -179,7 +262,205 @@ static int topbar_shelf_region_event_handler(bContext *C,
   const wmOperatorStatus status = WM_operator_name_call_ptr(
       C, ot, wm::OpCallContext::InvokeDefault, &properties, event);
   WM_operator_properties_free(&properties);
-  return (status & OPERATOR_RUNNING_MODAL) ? WM_UI_HANDLER_BREAK : WM_UI_HANDLER_CONTINUE;
+  if (status & OPERATOR_RUNNING_MODAL) {
+    shelf_drag_runtime_clear();
+    shelf_drag_runtime.active = true;
+    return WM_UI_HANDLER_BREAK;
+  }
+  return WM_UI_HANDLER_CONTINUE;
+}
+
+/** Shelf region under `xy`, plus the area owning it. */
+static ARegion *topbar_shelf_region_find_at(bContext *C, const int xy[2], ScrArea **r_area)
+{
+  wmWindow *window = CTX_wm_window(C);
+  if (window == nullptr) {
+    return nullptr;
+  }
+
+  auto shelf_region_at = [&](ScrArea *area) -> ARegion * {
+    for (ARegion &region : area->regionbase) {
+      if (!ELEM(region.regiontype, RGN_TYPE_WINDOW, RGN_TYPE_FOOTER) ||
+          (region.flag & RGN_FLAG_HIDDEN) != 0)
+      {
+        continue;
+      }
+      if (BLI_rcti_isect_pt_v(&region.winrct, xy)) {
+        *r_area = area;
+        return &region;
+      }
+    }
+    return nullptr;
+  };
+
+  for (ScrArea &area : window->global_areas.areabase) {
+    if (area.spacetype != SPACE_TOPBAR) {
+      continue;
+    }
+    if (ARegion *region = shelf_region_at(&area)) {
+      return region;
+    }
+  }
+  bScreen *screen = WM_window_get_active_screen(window);
+  if (screen != nullptr) {
+    for (ScrArea &area : screen->areabase) {
+      if (area.spacetype != SPACE_SHELF) {
+        continue;
+      }
+      if (ARegion *region = shelf_region_at(&area)) {
+        return region;
+      }
+    }
+  }
+  return nullptr;
+}
+
+static wmOperatorStatus shelf_drag_probe_exec(bContext *C, wmOperator * /*op*/)
+{
+  if (!shelf_drag_runtime.active) {
+    return OPERATOR_CANCELLED;
+  }
+  const wmWindow *window = CTX_wm_window(C);
+  if (window == nullptr || window->runtime == nullptr ||
+      window->runtime->eventstate == nullptr)
+  {
+    return OPERATOR_CANCELLED;
+  }
+
+  const int *xy = window->runtime->eventstate->xy;
+  ScrArea *area = nullptr;
+  ARegion *region = topbar_shelf_region_find_at(C, xy, &area);
+  std::optional<ui::ShelfDropTarget> target;
+  if (region != nullptr) {
+    target = ui::shelf_drop_target_find(region, xy);
+  }
+
+  const bool valid = target.has_value();
+  const std::string item_id = valid ? std::string(target->item_id) : std::string();
+  const bool after = valid && target->after;
+  /* The marker snaps to entry boundaries, so it only needs a redraw once the boundary or the
+   * hovered region changes rather than on every pixel of motion. */
+  if (region != shelf_drag_runtime.target_region || valid != shelf_drag_runtime.target_valid ||
+      item_id != shelf_drag_runtime.target_item_id || after != shelf_drag_runtime.target_after)
+  {
+    shelf_drag_runtime.target_region = region;
+    shelf_drag_runtime.target_valid = valid;
+    shelf_drag_runtime.target_item_id = item_id;
+    shelf_drag_runtime.target_after = after;
+    if (valid) {
+      shelf_drag_runtime.target_rect = target->rect;
+    }
+    topbar_shelf_areas_tag_redraw(C);
+  }
+
+  if (region == nullptr) {
+    topbar_shelf_drag_hover_notify(C, nullptr, false);
+    return OPERATOR_CANCELLED;
+  }
+
+  /* The hover operator derives the shelf scope and row from the context, so point it at the
+   * hovered shelf rather than at the region the drag started in. */
+  ScrArea *area_prev = CTX_wm_area(C);
+  ARegion *region_prev = CTX_wm_region(C);
+  CTX_wm_area_set(C, area);
+  CTX_wm_region_set(C, region);
+  topbar_shelf_drag_hover_notify(C, valid ? &*target : nullptr, true);
+  CTX_wm_area_set(C, area_prev);
+  CTX_wm_region_set(C, region_prev);
+  return OPERATOR_FINISHED;
+}
+
+static void TOPBAR_OT_maya_shelf_drag_probe(wmOperatorType *ot)
+{
+  ot->name = "Probe Shelf Drop Target";
+  ot->idname = "TOPBAR_OT_maya_shelf_drag_probe";
+  ot->description = "Resolve the shelf entry under the cursor for the running drag";
+  ot->exec = shelf_drag_probe_exec;
+  ot->flag = OPTYPE_INTERNAL;
+}
+
+/**
+ * Draw the insertion marker of a running shelf drag: a caret at the boundary the entry snaps to
+ * once the middle mouse button is released. The target comes from the last probe so the marker
+ * cannot disagree with where the drop will actually go.
+ */
+static void topbar_shelf_drag_marker_draw(const bContext * /*C*/, const ARegion *region)
+{
+  if (!shelf_drag_runtime.active || shelf_drag_runtime.target_region != region) {
+    return;
+  }
+
+  const float scale = UI_SCALE_FAC;
+  const float half_width = std::max(1.5f * scale, 1.0f);
+  rctf marker;
+  if (shelf_drag_runtime.target_valid) {
+    const rctf &rect = shelf_drag_runtime.target_rect;
+    const float boundary = shelf_drag_runtime.target_after ? rect.xmax : rect.xmin;
+    marker.xmin = boundary - half_width;
+    marker.xmax = boundary + half_width;
+    /* Overshoot the entry a little so the caret reads as a gap rather than as an icon border. */
+    marker.ymin = rect.ymin - 2.0f * scale;
+    marker.ymax = rect.ymax + 2.0f * scale;
+  }
+  else {
+    /* An empty shelf has no entry to align to, mark its first slot instead. */
+    marker.xmin = float(region->winrct.xmin) + 3.0f * scale;
+    marker.xmax = marker.xmin + 2.0f * half_width;
+    marker.ymin = float(region->winrct.ymin) + 3.0f * scale;
+    marker.ymax = float(region->winrct.ymax) - 3.0f * scale;
+  }
+  BLI_rctf_translate(&marker, -region->winrct.xmin, -region->winrct.ymin);
+  /* Keep the caret inside the region when the target sits against one of its edges. */
+  const float overflow_left = -marker.xmin;
+  const float overflow_right = marker.xmax - float(BLI_rcti_size_x(&region->winrct));
+  if (overflow_left > 0.0f) {
+    BLI_rctf_translate(&marker, overflow_left, 0.0f);
+  }
+  else if (overflow_right > 0.0f) {
+    BLI_rctf_translate(&marker, -overflow_right, 0.0f);
+  }
+  marker.ymin = std::max(marker.ymin, 0.0f);
+  marker.ymax = std::min(marker.ymax, float(BLI_rcti_size_y(&region->winrct)));
+
+  /* An I-beam rather than a plain bar: the serifs read as "the icon goes between these two"
+   * even when the caret lands right against an icon edge. */
+  const float serif_half_width = std::max(4.5f * scale, 3.0f);
+  const float serif_height = std::max(2.0f * scale, 1.0f);
+  /* Left at the caret center even next to a region edge: the region clips the overhang, and a
+   * serif shifted off the bar would read worse than a clipped one. */
+  const float serif_x = BLI_rctf_cent_x(&marker);
+  rctf serif_top = {serif_x - serif_half_width,
+                    serif_x + serif_half_width,
+                    marker.ymax - serif_height,
+                    marker.ymax};
+  rctf serif_bottom = {serif_x - serif_half_width,
+                       serif_x + serif_half_width,
+                       marker.ymin,
+                       marker.ymin + serif_height};
+
+  const float color[4] = {0.16f, 0.52f, 1.0f, 1.0f};
+  GPU_blend(GPU_BLEND_ALPHA);
+  ui::draw_roundbox_corner_set(ui::CNR_ALL);
+  ui::draw_roundbox_aa(&marker, true, BLI_rctf_size_x(&marker) * 0.5f, color);
+  ui::draw_roundbox_aa(&serif_top, true, serif_height * 0.5f, color);
+  ui::draw_roundbox_aa(&serif_bottom, true, serif_height * 0.5f, color);
+  GPU_blend(GPU_BLEND_NONE);
+}
+
+static wmOperatorStatus shelf_drag_end_exec(bContext *C, wmOperator * /*op*/)
+{
+  shelf_drag_runtime_clear();
+  topbar_shelf_areas_tag_redraw(C);
+  return OPERATOR_FINISHED;
+}
+
+static void TOPBAR_OT_maya_shelf_drag_end(wmOperatorType *ot)
+{
+  ot->name = "End Shelf Icon Drag";
+  ot->idname = "TOPBAR_OT_maya_shelf_drag_end";
+  ot->description = "Stop tracking the shelf drag insertion marker";
+  ot->exec = shelf_drag_end_exec;
+  ot->flag = OPTYPE_INTERNAL;
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
@@ -270,6 +551,13 @@ static void topbar_shelf_region_draw(const bContext *C, ARegion *region)
   ui::theme::theme_set(SPACE_OUTLINER, RGN_TYPE_WINDOW);
   ED_region_header_draw(C, region);
   ui::theme::theme_restore(&theme_state);
+  topbar_shelf_drag_marker_draw(C, region);
+}
+
+static void shelf_main_region_draw(const bContext *C, ARegion *region)
+{
+  ED_region_panels_draw(C, region);
+  topbar_shelf_drag_marker_draw(C, region);
 }
 
 static void shelf_main_region_layout(const bContext *C, ARegion *region)
@@ -306,6 +594,8 @@ static void TOPBAR_OT_shelf_global_redraw(wmOperatorType *ot)
 static void topbar_operatortypes()
 {
   WM_operatortype_append(TOPBAR_OT_shelf_global_redraw);
+  WM_operatortype_append(TOPBAR_OT_maya_shelf_drag_probe);
+  WM_operatortype_append(TOPBAR_OT_maya_shelf_drag_end);
 }
 
 static void topbar_keymap(wmKeyConfig * /*keyconf*/) {}
@@ -588,7 +878,7 @@ void ED_spacetype_shelf()
   art->regionid = RGN_TYPE_WINDOW;
   art->init = shelf_main_region_init;
   art->layout = shelf_main_region_layout;
-  art->draw = ED_region_panels_draw;
+  art->draw = shelf_main_region_draw;
   art->listener = topbar_main_region_listener;
   art->prefsizex = UI_UNIT_X * 5;
   art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_HEADER;

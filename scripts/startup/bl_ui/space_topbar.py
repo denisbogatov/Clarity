@@ -14,6 +14,7 @@ import tokenize
 import traceback
 import uuid
 from bpy.props import (
+    BoolProperty,
     CollectionProperty,
     EnumProperty,
     FloatVectorProperty,
@@ -748,28 +749,16 @@ _MAYA_SHELF_INVALID_STORAGE_BASELINE = object()
 _maya_shelf_config_cache = None
 _maya_shelf_active_scope = "TOPBAR"
 _maya_shelf_drag_state = None
+# Entry under the cursor, pushed in by the C++ shelf region handler while a drag runs.
+_maya_shelf_drag_hover = None
 _maya_shelf_previews = None
 _maya_shelf_row_cache = {}
 _maya_shelf_custom_icon_cache = {}
 _maya_shelf_future_scope_storage = {}
 _maya_shelf_future_storage = None
-_maya_shelf_topbar_view_state = {}
 _maya_shelf_scope_baselines = {}
 _maya_shelf_storage_baseline_content = None
 _maya_shelf_pending_scopes = set()
-
-# Top Bar row metrics, in unscaled pixels.
-_MAYA_SHELF_LEFT_MARGIN = 4.0
-_MAYA_SHELF_SLOT_WIDTH = 35.0
-_MAYA_SHELF_SEPARATOR_WIDTH = 13.2
-_MAYA_SHELF_TOPBAR_LOWER_HEIGHT = 36.0
-_MAYA_SHELF_TOPBAR_UPPER_HEIGHT = 35.0
-
-# Shelf editor grid metrics, in unscaled pixels. These mirror the cell sizes the
-# `grid_flow` layout in `_maya_shelf_draw_adaptive` ends up with.
-_MAYA_SHELF_GRID_MARGIN = 8.0
-_MAYA_SHELF_GRID_CELL_WIDTH = 32.5
-_MAYA_SHELF_GRID_CELL_HEIGHT = 36.0
 
 _MAYA_SHELF_ROW_COUNT = 2
 
@@ -779,7 +768,6 @@ _MAYA_SHELF_STORAGE_VERSION = 1
 _MAYA_SHELF_DEFAULT_BACKGROUND_COLOR = (0.18, 0.18, 0.18, 1.0)
 _MAYA_SHELF_DEFAULT_ICON_COLOR = (1.0, 1.0, 1.0, 1.0)
 _MAYA_SHELF_DRAG_SOURCE_COLOR = (0.08, 0.32, 0.68, 1.0)
-_MAYA_SHELF_DROP_TARGET_COLOR = (0.12, 0.48, 0.24, 1.0)
 _MAYA_SHELF_CUSTOM_ICON_RECHECK_SECONDS = 1.0
 _MAYA_SHELF_SAVE_LOCK_TIMEOUT = 0.75
 _MAYA_SHELF_STALE_LOCK_SECONDS = 30.0
@@ -788,6 +776,7 @@ _MAYA_SHELF_STALE_LOCK_SECONDS = 30.0
 def unregister_runtime():
     global _maya_shelf_previews
     global _maya_shelf_drag_state
+    global _maya_shelf_drag_hover
     global _maya_shelf_config_cache
     global _maya_shelf_future_storage
     global _maya_shelf_storage_baseline_content
@@ -795,6 +784,7 @@ def unregister_runtime():
         bpy.utils.previews.remove(_maya_shelf_previews)
         _maya_shelf_previews = None
     _maya_shelf_drag_state = None
+    _maya_shelf_drag_hover = None
     # The config is written out on every change, so dropping it here only forces
     # a reload. Icon ids belong to the previews collection freed above.
     _maya_shelf_config_cache = None
@@ -804,37 +794,8 @@ def unregister_runtime():
     _maya_shelf_catalog_cache.clear()
     _maya_shelf_row_cache.clear()
     _maya_shelf_future_scope_storage.clear()
-    _maya_shelf_topbar_view_state.clear()
     _maya_shelf_scope_baselines.clear()
     _maya_shelf_pending_scopes.clear()
-
-
-def _maya_shelf_ui_scale(context):
-    return getattr(context.preferences.system, "ui_scale", 1.0)
-
-
-def _maya_shelf_record_topbar_view(context, row_index):
-    """Remember global Top Bar geometry for drags that start in a Shelf editor."""
-    region = context.region
-    window = context.window
-    if region is None or window is None:
-        return
-    view2d = getattr(region, "view2d", None)
-    if view2d is not None:
-        view_left, _view_y = view2d.region_to_view(0.0, 0.0)
-        view_right, _view_y = view2d.region_to_view(float(region.width), 0.0)
-    else:
-        view_left = 0.0
-        view_right = float(region.width)
-    _maya_shelf_topbar_view_state.setdefault(window.as_pointer(), {})[row_index] = {
-        "bounds": (region.x, region.y, region.width, region.height),
-        "view_left": view_left,
-        "view_right": view_right,
-    }
-
-
-def _maya_shelf_item_slot_width(_item):
-    return _MAYA_SHELF_SLOT_WIDTH
 
 
 def _maya_shelf_preview_icon(name, filename, *, force_reload=False):
@@ -2092,54 +2053,6 @@ def _maya_shelf_sort_separators(tab):
     )
 
 
-def _maya_shelf_row_boundaries(tab, row_index, ui_scale, scope=None):
-    """Visual insertion boundaries of one Top Bar row, in view-space pixels."""
-    positions = [0.0]
-    position = 0.0
-    for entry_type, entry in _maya_shelf_row_entries(tab, row_index, scope):
-        if entry_type == "SEPARATOR":
-            position += _MAYA_SHELF_SEPARATOR_WIDTH * ui_scale
-        else:
-            position += _maya_shelf_item_slot_width(entry) * ui_scale
-        positions.append(position)
-    return positions
-
-
-def _maya_shelf_grid_drop_index(context, event, region, entry_count):
-    """Insertion index under the mouse in the Shelf editor's grid layout."""
-    ui_scale = _maya_shelf_ui_scale(context)
-    margin = _MAYA_SHELF_GRID_MARGIN * ui_scale
-    cell_width = _MAYA_SHELF_GRID_CELL_WIDTH * ui_scale
-    cell_height = _MAYA_SHELF_GRID_CELL_HEIGHT * ui_scale
-    region_x = event.mouse_x - region.x
-    region_y = event.mouse_y - region.y
-    view2d = getattr(region, "view2d", None)
-    if view2d is not None:
-        mouse_view_x, mouse_view_y = view2d.region_to_view(region_x, region_y)
-        left_view_x, _view_y = view2d.region_to_view(0.0, 0.0)
-        right_view_x, _view_y = view2d.region_to_view(float(region.width), 0.0)
-        visible_width = abs(right_view_x - left_view_x)
-        # Panel View2D coordinates start at (0, 0) and extend downwards on -Y.
-        mouse_x = mouse_view_x - margin
-        mouse_y = -mouse_view_y - margin
-    else:
-        visible_width = region.width
-        mouse_x = region_x - margin
-        mouse_y = region.height - region_y - margin
-
-    content_width = max(visible_width - margin * 2.0, cell_width)
-    columns = max(int(content_width / cell_width), 1)
-    actual_cell_width = content_width / columns
-    mouse_x = min(max(mouse_x, 0.0), content_width)
-    mouse_y = max(mouse_y, 0.0)
-    column = min(int(mouse_x / actual_cell_width), columns - 1)
-    row = max(int(mouse_y / cell_height), 0)
-    index = row * columns + column
-    if mouse_x - column * actual_cell_width > actual_cell_width * 0.5:
-        index += 1
-    return min(max(index, 0), entry_count)
-
-
 def _maya_shelf_invalidate_layout():
     """Drop cached row grouping after the config object graph changes."""
     _maya_shelf_row_cache.clear()
@@ -2849,119 +2762,91 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
             context.region.type in {'WINDOW', 'FOOTER'}
         )
 
-    def _drop_target(self, context, event):
+    @staticmethod
+    def _probe():
+        """Refresh `_maya_shelf_drag_hover` from the real button layout.
+
+        The hit test has to live in C++, because only it can see the rectangles the layout
+        engine produced, and it has to be pulled from here rather than pushed from a shelf
+        region handler: a modal operator returning `PASS_THROUGH` still yields
+        `WM_HANDLER_BREAK`, and `wm_event_do_handlers` then skips every region handler.
+        """
+        bpy.ops.topbar.maya_shelf_drag_probe()
+
+    def _drop_target(self, context, _event):
         """Where the dragged entry would land: (scope, adaptive, row, index).
 
-        Scope is None when the mouse is over neither a Shelf editor nor the Top Bar.
+        Scope is None when the cursor is over no shelf. Everything is derived from the
+        last probe, so the drop cannot disagree with the marker the user sees.
         """
-        for area in context.screen.areas:
-            if area.type != 'SHELF':
-                continue
-            region = next(
-                (candidate for candidate in area.regions if candidate.type == 'WINDOW'),
-                None,
-            )
-            if (
-                region is None or
-                not region.x <= event.mouse_x < region.x + region.width or
-                not region.y <= event.mouse_y < region.y + region.height
-            ):
-                continue
-            scope = _maya_shelf_layout_scope_key(context, area)
-            if not scope:
-                continue
-            tab = _maya_shelf_active_tab_for_scope(scope)
-            index = _maya_shelf_grid_drop_index(
-                context, event, region, len(_maya_shelf_adaptive_entries(tab, scope)),
-            )
-            return scope, True, 0, index
+        hover = _maya_shelf_drag_hover
+        if hover is None:
+            return None, None, None, None
 
-        latest_topbar_state = _maya_shelf_topbar_view_state.get(
-            context.window.as_pointer(),
+        scope = hover["scope"]
+        adaptive = hover["adaptive"]
+        row = hover["row"]
+        tab = _maya_shelf_active_tab_for_scope(scope)
+        if adaptive:
+            entries = _maya_shelf_adaptive_entries(tab, scope)
+        else:
+            entries = _maya_shelf_row_entries(tab, row, scope)
+
+        index = next(
+            (
+                entry_index
+                for entry_index, (_entry_type, entry) in enumerate(entries)
+                if entry["id"] == hover["item_id"]
+            ),
+            None,
         )
-        if latest_topbar_state:
-            self._topbar_view_state = dict(latest_topbar_state)
-            self._topbar_region_bounds = {
-                row_index: view_state["bounds"]
-                for row_index, view_state in self._topbar_view_state.items()
-            }
-        topbar_bounds = self._topbar_region_bounds
-        if not topbar_bounds:
-            ui_scale = _maya_shelf_ui_scale(context)
-            screen_top = max(
-                (area.y + area.height for area in context.screen.areas),
-                default=0,
-            )
-            lower_height = _MAYA_SHELF_TOPBAR_LOWER_HEIGHT * ui_scale
-            upper_height = _MAYA_SHELF_TOPBAR_UPPER_HEIGHT * ui_scale
-            window_width = max(
-                (area.x + area.width for area in context.screen.areas),
-                default=0,
-            )
-            topbar_bounds = {
-                1: (0, screen_top, window_width, lower_height),
-                0: (0, screen_top + lower_height, window_width, upper_height),
-            }
-
-        for row, bounds in topbar_bounds.items():
+        if index is None:
+            # An empty shelf reports no entry, so append. On the source surface that cannot
+            # happen, and staying put is the safe answer there.
             if (
-                bounds[0] <= event.mouse_x < bounds[0] + bounds[2] and
-                bounds[1] <= event.mouse_y < bounds[1] + bounds[3]
+                scope == self._source_scope and
+                adaptive == self._adaptive and
+                row == self._source_row
             ):
-                ui_scale = _maya_shelf_ui_scale(context)
-                tab = _maya_shelf_active_tab_for_scope("TOPBAR")
-                view_state = self._topbar_view_state.get(row)
-                if view_state is not None and bounds[2] > 0:
-                    region_factor = (event.mouse_x - bounds[0]) / bounds[2]
-                    relative_x = (
-                        view_state["view_left"] +
-                        region_factor * (
-                            view_state["view_right"] - view_state["view_left"]
-                        )
-                    )
-                else:
-                    relative_x = event.mouse_x - bounds[0]
-                relative_x -= _MAYA_SHELF_LEFT_MARGIN * ui_scale
-                boundaries = _maya_shelf_row_boundaries(
-                    tab, row, ui_scale, scope="TOPBAR",
-                )
-                index = min(
-                    range(len(boundaries)),
-                    key=lambda column: abs(relative_x - boundaries[column]),
-                )
-                return "TOPBAR", False, row, index
-        return None, None, None, None
+                return scope, adaptive, row, self._source_index
+            return scope, adaptive, row, len(entries)
+        return scope, adaptive, row, index + (1 if hover["after"] else 0)
 
     def _preview_begin(self, context):
         global _maya_shelf_drag_state
+        global _maya_shelf_drag_hover
         self._preview_active = True
+        _maya_shelf_drag_hover = None
         _maya_shelf_drag_state = {
             "kind": "separator" if self._drag_separator else "icon",
             "item_id": self.item_id,
             "source_scope": self._source_scope,
             "source_row": self._source_row,
             "source_index": self._source_index,
-            "target_row": self._target_row,
-            "target_index": self._target_index,
-            "target_scope": self._target_scope,
-            "adaptive": self._target_adaptive,
         }
-
-    def _preview_update(self):
-        if _maya_shelf_drag_state is not None:
-            _maya_shelf_drag_state["target_row"] = self._target_row
-            _maya_shelf_drag_state["target_index"] = self._target_index
-            _maya_shelf_drag_state["target_scope"] = self._target_scope
-            _maya_shelf_drag_state["adaptive"] = self._target_adaptive
 
     def _preview_end(self, context):
         global _maya_shelf_drag_state
+        global _maya_shelf_drag_hover
         if not getattr(self, "_preview_active", False):
             return
         self._preview_active = False
         _maya_shelf_drag_state = None
+        _maya_shelf_drag_hover = None
+        # Stops the C++ side from hit testing and drawing the insertion marker.
+        if hasattr(bpy.ops.topbar, "maya_shelf_drag_end"):
+            bpy.ops.topbar.maya_shelf_drag_end()
 
     def invoke(self, context, _event):
+        if not hasattr(bpy.ops.topbar, "maya_shelf_drag_probe"):
+            # Without the hit test there is no way to tell where the icon would land, and a
+            # silent no-op would look like a broken shelf.
+            self.report(
+                {'ERROR'},
+                "Shelf drag needs a rebuilt Blender: topbar.maya_shelf_drag_probe is missing",
+            )
+            return {'CANCELLED'}
+
         tab = _maya_shelf_active_tab(context)
         self._source_scope = _maya_shelf_active_scope
         self._adaptive = context.area.type == 'SHELF'
@@ -2994,18 +2879,6 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
 
         self._source_row = row
         self._source_index = index
-        self._target_row = row
-        self._target_index = index
-        self._target_scope = self._source_scope
-        self._target_adaptive = self._adaptive
-        window_key = context.window.as_pointer()
-        self._topbar_view_state = dict(
-            _maya_shelf_topbar_view_state.get(window_key, {}),
-        )
-        self._topbar_region_bounds = {
-            row_index: view_state["bounds"]
-            for row_index, view_state in self._topbar_view_state.items()
-        }
         self._preview_begin(context)
         context.window_manager.modal_handler_add(self)
         _maya_shelf_redraw(context)
@@ -3014,24 +2887,14 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
     def modal(self, context, event):
         _maya_shelf_config(context)
         if event.type == 'MOUSEMOVE':
-            scope, adaptive, row, index = self._drop_target(context, event)
-            target = (scope, adaptive, row, index)
-            current = (
-                self._target_scope,
-                self._target_adaptive,
-                self._target_row,
-                self._target_index,
-            )
-            if target != current:
-                self._target_scope = scope
-                self._target_adaptive = adaptive
-                self._target_row = row
-                self._target_index = index
-                self._preview_update()
-                _maya_shelf_redraw(context)
+            # The probe also tags the redraw that moves the insertion marker, but only when
+            # the target boundary actually changes.
+            self._probe()
             return {'RUNNING_MODAL', 'PASS_THROUGH'}
 
         if event.type == 'MIDDLEMOUSE' and event.value == 'RELEASE':
+            # Probe again so the drop never depends on the last motion event having arrived.
+            self._probe()
             scope, adaptive, row, index = self._drop_target(context, event)
             if scope is None:
                 self._preview_end(context)
@@ -3111,6 +2974,51 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
     def cancel(self, context):
         self._preview_end(context)
         _maya_shelf_redraw(context)
+
+
+class TOPBAR_OT_maya_shelf_drag_hover(Operator):
+    """Record which shelf entry the drag cursor is over.
+
+    Called by `topbar.maya_shelf_drag_probe`, which owns the hit test because only C++ can
+    see the button rectangles the layout engine produced. It runs this with the hovered
+    shelf pushed into the context, so the scope and row are read from there.
+    """
+    bl_idname = "topbar.maya_shelf_drag_hover"
+    bl_label = "Shelf Drag Hover"
+    bl_options = {'INTERNAL'}
+
+    found: BoolProperty(default=True)
+    item_id: StringProperty()
+    after: BoolProperty(default=False)
+
+    def execute(self, context):
+        global _maya_shelf_drag_hover
+        area = getattr(context, "area", None)
+        region = getattr(context, "region", None)
+        if not self.found or area is None or area.type not in {'TOPBAR', 'SHELF'}:
+            _maya_shelf_drag_hover = None
+            return {'CANCELLED'}
+
+        if area.type == 'SHELF':
+            scope = _maya_shelf_layout_scope_key(context, area)
+            adaptive = True
+            row = 0
+        else:
+            scope = "TOPBAR"
+            adaptive = False
+            row = 0 if (region is not None and region.type == 'FOOTER') else 1
+        if not scope:
+            _maya_shelf_drag_hover = None
+            return {'CANCELLED'}
+
+        _maya_shelf_drag_hover = {
+            "scope": scope,
+            "adaptive": adaptive,
+            "row": row,
+            "item_id": self.item_id,
+            "after": self.after,
+        }
+        return {'FINISHED'}
 
 
 _MAYA_SHELF_EDITOR_AREA_TYPES = {
@@ -4195,7 +4103,6 @@ def _maya_shelf_draw_separator_button(
         units_x=None,
         scale_y=None,
         enabled=True,
-        drop_side="",
 ):
     divider = container.row(align=True)
     if units_x is not None:
@@ -4207,18 +4114,10 @@ def _maya_shelf_draw_separator_button(
     divider.context_string_set("maya_shelf_separator", "1")
     divider.context_string_set(
         "maya_shelf_background_color",
-        _maya_shelf_color_string(
-            _MAYA_SHELF_DROP_TARGET_COLOR if drop_side else (0.0, 0.0, 0.0, 0.0),
-        ),
+        _maya_shelf_color_string((0.0, 0.0, 0.0, 0.0)),
     )
     divider.enabled = enabled
-    operator_args = {
-        "text": "" if drop_side else "|",
-        "emboss": bool(drop_side),
-    }
-    if drop_side:
-        operator_args["icon"] = 'TRIA_LEFT' if drop_side == 'BEFORE' else 'TRIA_RIGHT'
-    props = divider.operator("topbar.maya_shelf_action", **operator_args)
+    props = divider.operator("topbar.maya_shelf_action", text="|", emboss=False)
     props.item_id = separator["id"]
 
 
@@ -4229,7 +4128,6 @@ def _maya_shelf_draw_item_button(
         button_units_x,
         icon_scale_y,
         label_scale_y,
-        drop_side="",
 ):
     """Draw one shelf icon plus its short label into `cell`.
 
@@ -4242,19 +4140,13 @@ def _maya_shelf_draw_item_button(
     button = icon_line.row(align=True)
     button.ui_units_x = button_units_x
 
-    custom_icon = (
-        0 if drop_side
-        else _maya_shelf_custom_icon(item.get("custom_icon", ""))
-    )
+    custom_icon = _maya_shelf_custom_icon(item.get("custom_icon", ""))
     background_color = item.get(
         "background_color", _MAYA_SHELF_DEFAULT_BACKGROUND_COLOR,
     )
     icon_color = item.get("icon_color", _MAYA_SHELF_DEFAULT_ICON_COLOR)
     is_drag_source = _maya_shelf_is_drag_source(item["id"])
-    if drop_side:
-        background_color = _MAYA_SHELF_DROP_TARGET_COLOR
-        icon_color = _MAYA_SHELF_DEFAULT_ICON_COLOR
-    elif is_drag_source:
+    if is_drag_source:
         background_color = _MAYA_SHELF_DRAG_SOURCE_COLOR
     if custom_icon:
         # A user image carries its own colors, only its opacity is configurable.
@@ -4270,9 +4162,7 @@ def _maya_shelf_draw_item_button(
     )
 
     operator_args = {"text": "", "emboss": True}
-    if drop_side:
-        operator_args["icon"] = 'TRIA_LEFT' if drop_side == 'BEFORE' else 'TRIA_RIGHT'
-    elif custom_icon:
+    if custom_icon:
         operator_args["icon_value"] = custom_icon
     else:
         operator_args["icon"] = item.get("icon", 'NONE')
@@ -4288,32 +4178,7 @@ def _maya_shelf_draw_item_button(
     label_line.label(text=item.get("short_text", ""))
 
 
-def _maya_shelf_drop_side(target_index, entry_index, entry_count):
-    if target_index == entry_index:
-        return 'BEFORE'
-    if target_index == entry_count and entry_index == entry_count - 1:
-        return 'AFTER'
-    return ""
-
-
-def _maya_shelf_draw_empty_drop_target(container, *, units_x):
-    target = container.row(align=True)
-    target.ui_units_x = units_x
-    target.context_string_set(
-        "maya_shelf_background_color",
-        _maya_shelf_color_string(_MAYA_SHELF_DROP_TARGET_COLOR),
-    )
-    target.enabled = False
-    target.operator(
-        "topbar.maya_shelf_action",
-        text="",
-        icon='TRIA_RIGHT',
-        emboss=True,
-    )
-
-
 def _maya_shelf_draw_icon_row(layout, row_index, context):
-    _maya_shelf_record_topbar_view(context, row_index)
     tab = _maya_shelf_active_tab(context)
     row = layout.row(align=False)
     row.alignment = 'LEFT'
@@ -4321,30 +4186,13 @@ def _maya_shelf_draw_icon_row(layout, row_index, context):
     row.scale_y = 1.0
 
     entries = _maya_shelf_row_entries(tab, row_index)
-    target_index = None
-    if (
-        _maya_shelf_drag_state is not None and
-        _maya_shelf_drag_state.get("target_scope") == _maya_shelf_active_scope and
-        not _maya_shelf_drag_state.get("adaptive") and
-        _maya_shelf_drag_state["target_row"] == row_index
-    ):
-        target_index = min(
-            max(_maya_shelf_drag_state["target_index"], 0),
-            len(entries),
-        )
-
-    if target_index == 0 and not entries:
-        _maya_shelf_draw_empty_drop_target(row, units_x=1.45)
-    for index in range(len(entries)):
-        entry_type, entry = entries[index]
-        drop_side = _maya_shelf_drop_side(target_index, index, len(entries))
+    for entry_type, entry in entries:
         if entry_type == "SEPARATOR":
             _maya_shelf_draw_separator_button(
                 row,
                 entry,
                 units_x=0.55,
                 enabled=False,
-                drop_side=drop_side,
             )
             continue
 
@@ -4357,7 +4205,6 @@ def _maya_shelf_draw_icon_row(layout, row_index, context):
             button_units_x=0.85,
             icon_scale_y=0.82,
             label_scale_y=0.68,
-            drop_side=drop_side,
         )
 
     if entries and entries[-1][0] == "SEPARATOR":
@@ -4402,24 +4249,9 @@ def _maya_shelf_draw_adaptive(layout, context):
     flow.scale_x = 1.05
     flow.scale_y = 1.0
 
-    entries = _maya_shelf_adaptive_entries(tab)
-    target_index = None
-    if (
-        _maya_shelf_drag_state is not None and
-        _maya_shelf_drag_state.get("target_scope") == _maya_shelf_active_scope and
-        _maya_shelf_drag_state.get("adaptive")
-    ):
-        target_index = min(
-            max(_maya_shelf_drag_state["target_index"], 0),
-            len(entries),
-        )
-
-    if target_index == 0 and not entries:
-        _maya_shelf_draw_empty_drop_target(flow, units_x=1.55)
-    for index, (entry_type, entry) in enumerate(entries):
+    for entry_type, entry in _maya_shelf_adaptive_entries(tab):
         cell = flow.column(align=True)
         cell.ui_units_x = 1.55
-        drop_side = _maya_shelf_drop_side(target_index, index, len(entries))
 
         cell.context_string_set("maya_shelf_item_id", entry["id"])
         if entry_type == "SEPARATOR":
@@ -4427,7 +4259,6 @@ def _maya_shelf_draw_adaptive(layout, context):
                 cell,
                 entry,
                 scale_y=1.6,
-                drop_side=drop_side,
             )
             continue
 
@@ -4437,7 +4268,6 @@ def _maya_shelf_draw_adaptive(layout, context):
             button_units_x=0.95,
             icon_scale_y=0.9,
             label_scale_y=0.7,
-            drop_side=drop_side,
         )
 
 
@@ -5301,6 +5131,7 @@ classes = (
     TOPBAR_OT_maya_shelf_separator_add,
     TOPBAR_OT_maya_shelf_context_menu,
     TOPBAR_OT_maya_shelf_drag,
+    TOPBAR_OT_maya_shelf_drag_hover,
     TOPBAR_OT_maya_shelf_action,
     TOPBAR_OT_maya_shelf_action_undo,
     TOPBAR_OT_maya_shelf_preview,

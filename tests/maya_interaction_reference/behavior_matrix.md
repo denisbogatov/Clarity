@@ -79,6 +79,28 @@ on until it is toggled off. Holding a key is not part of the model.
 | Object, Edit Pivot | Edit Pivot | `V` hold | LMB drag | unchanged | pivot snapped to vertex | Edit Pivot | vertex snap while held | pivot restored | pivot restored |
 | Object, one object | Rotate / Scale | `X` / `C` / `V` hold | gizmo drag | unchanged | unchanged | Rotate / Scale | out of scope until the Maya reference is captured — must not be guessed | n/a | n/a |
 
+## Manipulator persistence and snap source
+
+The manipulator is never rebuilt or hidden by a drag or by a snap key: it stays on screen, follows
+the transform and only changes what is drawn inside it. The snap source is the pivot the user sees,
+so that pivot lands exactly on the target.
+
+Automated coverage (`editor_transform` suite): `transform_snap_test.cc` pins the snap-source and
+excluded-pivot decisions, `transform_gizmo_3d_test.cc` pins which handles a drag keeps on screen and
+the centre glyph of each preset. What stays manual is only whether the result looks right on screen
+— the headless runner has no persistent View3D gizmo group to render.
+
+| Start mode | Tool before | Keys | Mouse | Expected manipulator | Expected snap result | Cancel |
+| --- | --- | --- | --- | --- | --- | --- |
+| Object, one object | Move | none | drag the centre square | whole manipulator stays visible and follows the object; the centre square becomes a circle | n/a | manipulator restored, centre square back |
+| Object, one object | Move | none | drag an axis handle | whole manipulator stays visible; the centre square becomes a circle for the duration of the drag | n/a | as above |
+| Object, one object | Move | `V` hold | drag the centre square | manipulator never disappears; only the centre glyph changes | the visible pivot lands on the target vertex, not the centre of the selection | transform and glyph restored |
+| Object, custom pivot offset from the origin | Move | `V` hold | drag | unchanged | pivot lands on the target; the offset between pivot and geometry is preserved | as above |
+| Object, one object | Move | `V` hold | pointer still over the manipulator | unchanged | no snap onto the selection's own pivot — no dead zone around the manipulator | n/a |
+| Object, Edit Pivot on | Move | `D` | none | yellow square inside a circle in the centre for as long as the mode is on — that pair is the indicator that Edit Pivot is active | n/a | n/a |
+| Object, Edit Pivot on | Move | `D`, then `V` hold | LMB drag | manipulator is not rebuilt; the square and circle stay exactly as they were, the circle is indication only | pivot snapped to the target vertex | pivot restored |
+| Object, Edit Pivot on | Move | `D` / `Insert` / `W`, `E`, `R` | none | switching the mode or the tool must not make the manipulator flicker: the layout and the centre glyph change in the same redraw | n/a | n/a |
+
 ## Active-axis MMB drag
 
 Plain `MMB` starts the active transform tool constrained to the axis handle used most recently

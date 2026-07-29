@@ -244,6 +244,8 @@ enum {
   ED_GIZMO_PRIMITIVE_STYLE_CIRCLE,
   ED_GIZMO_PRIMITIVE_STYLE_ANNULUS,
   ED_GIZMO_PRIMITIVE_STYLE_CUBE,
+  /** A plane with a circle around it, used as the Maya Edit Pivot mode indicator. */
+  ED_GIZMO_PRIMITIVE_STYLE_PLANE_CIRCLE,
 };
 
 /* -------------------------------------------------------------------- */

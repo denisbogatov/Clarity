@@ -558,6 +558,13 @@ struct TransSnap {
   float maya_view_plane_normal[3];
   /** Use deterministic front/back depth pairing for Maya Mesh Center Snap. */
   bool maya_mesh_center;
+  /**
+   * World-space position of the visible Maya pivot, captured before the transform moved anything.
+   * Maya puts that pivot onto the snap target, so it is the snap source instead of the center of
+   * the selection. Captured once because the pivot itself travels with the data during the drag.
+   */
+  bool maya_pivot_source_valid;
+  float maya_pivot_source[3];
   /* Part of source to snap to target. */
   eSnapSourceOP source_operation;
   /* Determines which objects are possible target. */

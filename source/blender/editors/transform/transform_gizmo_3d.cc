@@ -105,47 +105,8 @@ static struct {
     {0.175f, 0.25f},
 };
 
-/* Axes as index. */
-enum {
-  MAN_AXIS_TRANS_X = 0,
-  MAN_AXIS_TRANS_Y,
-  MAN_AXIS_TRANS_Z,
-  MAN_AXIS_TRANS_C,
-
-  MAN_AXIS_TRANS_XY,
-  MAN_AXIS_TRANS_YZ,
-  MAN_AXIS_TRANS_ZX,
-#define MAN_AXIS_RANGE_TRANS_START MAN_AXIS_TRANS_X
-#define MAN_AXIS_RANGE_TRANS_END (MAN_AXIS_TRANS_ZX + 1)
-
-  MAN_AXIS_ROT_X,
-  MAN_AXIS_ROT_Y,
-  MAN_AXIS_ROT_Z,
-  MAN_AXIS_ROT_C,
-  MAN_AXIS_ROT_T, /* Trackball rotation. */
-#define MAN_AXIS_RANGE_ROT_START MAN_AXIS_ROT_X
-#define MAN_AXIS_RANGE_ROT_END (MAN_AXIS_ROT_T + 1)
-
-  MAN_AXIS_SCALE_X,
-  MAN_AXIS_SCALE_Y,
-  MAN_AXIS_SCALE_Z,
-  MAN_AXIS_SCALE_C,
-  MAN_AXIS_SCALE_XY,
-  MAN_AXIS_SCALE_YZ,
-  MAN_AXIS_SCALE_ZX,
-#define MAN_AXIS_RANGE_SCALE_START MAN_AXIS_SCALE_X
-#define MAN_AXIS_RANGE_SCALE_END (MAN_AXIS_SCALE_ZX + 1)
-
-  MAN_AXIS_LAST = MAN_AXIS_SCALE_ZX + 1,
-};
-
-/* Axis types. */
-enum {
-  MAN_AXES_ALL = 0,
-  MAN_AXES_TRANSLATE,
-  MAN_AXES_ROTATE,
-  MAN_AXES_SCALE,
-};
+/* The axis index and axis type enums live in `transform_gizmo.hh` so the drag display rules can be
+ * tested without a window manager. */
 
 struct GizmoGroup {
   bool all_hidden;
@@ -156,6 +117,7 @@ struct GizmoGroup {
   int twtype_prev;
   int use_twtype_refresh;
   bool use_maya_center_style;
+  bool use_maya_edit_pivot_style;
 
   /* Only for view orientation. */
   struct {
@@ -204,6 +166,46 @@ static short gizmo_get_axis_type(const int axis_idx)
   }
   BLI_assert(0);
   return -1;
+}
+
+bool gizmo_3d_axis_visible_during_drag(const bool use_maya_style,
+                                       const int axis_idx_active,
+                                       const int axis_idx,
+                                       const bool visible_before_drag)
+{
+  if (axis_idx == axis_idx_active) {
+    return true;
+  }
+  /* Arrows are used for visual reference, so keep all visible. */
+  if (gizmo_get_axis_type(axis_idx_active) == MAN_AXES_TRANSLATE &&
+      IN_RANGE_INCL(axis_idx, MAN_AXIS_TRANS_X, MAN_AXIS_TRANS_Z))
+  {
+    return true;
+  }
+  /* Maya never takes the manipulator apart while it is used. */
+  return use_maya_style && visible_before_drag;
+}
+
+int gizmo_3d_translate_center_style_get(const bool use_maya_style,
+                                       const bool is_dragging,
+                                       const bool is_edit_pivot)
+{
+  if (!use_maya_style) {
+    return ED_GIZMO_PRIMITIVE_STYLE_CIRCLE;
+  }
+  if (is_edit_pivot) {
+    /* The square inside a circle says "Edit Pivot is on", so the drag must not change it. */
+    return ED_GIZMO_PRIMITIVE_STYLE_PLANE_CIRCLE;
+  }
+  return is_dragging ? ED_GIZMO_PRIMITIVE_STYLE_CIRCLE : ED_GIZMO_PRIMITIVE_STYLE_PLANE;
+}
+
+int gizmo_3d_scale_center_style_get(const bool use_maya_style, const bool is_dragging)
+{
+  if (use_maya_style) {
+    return ED_GIZMO_PRIMITIVE_STYLE_CUBE;
+  }
+  return is_dragging ? ED_GIZMO_PRIMITIVE_STYLE_CIRCLE : ED_GIZMO_PRIMITIVE_STYLE_ANNULUS;
 }
 
 static uint gizmo_orientation_axis(const int axis_idx, bool *r_is_plane)
@@ -2013,20 +2015,46 @@ static void gizmogroup_refresh_from_matrix(wmGizmoGroup *gzgroup,
   MAN_ITER_AXES_END;
 }
 
-static void gizmogroup_apply_maya_center_style(GizmoGroup *ggd, const bool use_maya_style)
+/**
+ * The manipulator is one system: every pass that can change its appearance recomputes the same two
+ * inputs and reapplies the whole style, so no redraw can show a half-updated manipulator.
+ */
+static bool gizmogroup_maya_style_calc(const wmGizmoGroup *gzgroup, const View3D *v3d)
+{
+  return gzgroup->type == g_GGT_xform_gizmo_context && (v3d->gizmo_flag & V3D_GIZMO_HIDE_TOOL) != 0;
+}
+
+/** Manipulator layout of the current mode; Edit Pivot owns translate and rotate. */
+static int gizmogroup_twtype_calc(const bContext *C,
+                                  const GizmoGroup *ggd,
+                                  const View3D *v3d,
+                                  bool *r_maya_edit_pivot)
+{
+  const bool maya_edit_pivot = ED_maya_pivot_edit_target_get(C) !=
+                               ed::maya::MayaPivotEditTarget::None;
+  if (r_maya_edit_pivot != nullptr) {
+    *r_maya_edit_pivot = maya_edit_pivot;
+  }
+  if (maya_edit_pivot) {
+    return V3D_GIZMO_SHOW_OBJECT_TRANSLATE | V3D_GIZMO_SHOW_OBJECT_ROTATE;
+  }
+  return v3d->gizmo_show_object & ggd->twtype_init;
+}
+
+static void gizmogroup_apply_maya_center_style(GizmoGroup *ggd,
+                                               const bool use_maya_style,
+                                               const bool use_edit_pivot_style)
 {
   wmGizmo *translate_center = ggd->gizmos[MAN_AXIS_TRANS_C];
   RNA_enum_set(translate_center->ptr,
                "draw_style",
-               use_maya_style ? ED_GIZMO_PRIMITIVE_STYLE_PLANE :
-                                ED_GIZMO_PRIMITIVE_STYLE_CIRCLE);
+               gizmo_3d_translate_center_style_get(use_maya_style, false, use_edit_pivot_style));
   RNA_boolean_set(translate_center->ptr, "draw_inner", false);
 
   wmGizmo *scale_center = ggd->gizmos[MAN_AXIS_SCALE_C];
   RNA_enum_set(scale_center->ptr,
                "draw_style",
-               use_maya_style ? ED_GIZMO_PRIMITIVE_STYLE_CUBE :
-                                ED_GIZMO_PRIMITIVE_STYLE_ANNULUS);
+               gizmo_3d_scale_center_style_get(use_maya_style, false));
   RNA_boolean_set(scale_center->ptr, "draw_inner", false);
   WM_gizmo_set_scale(scale_center, use_maya_style ? 0.065f : 0.2f);
   if (wmGizmoOpElem *gzop = WM_gizmo_operator_get(scale_center, 0)) {
@@ -2034,6 +2062,7 @@ static void gizmogroup_apply_maya_center_style(GizmoGroup *ggd, const bool use_m
   }
 
   ggd->use_maya_center_style = use_maya_style;
+  ggd->use_maya_edit_pivot_style = use_edit_pivot_style;
 }
 
 static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
@@ -2054,21 +2083,18 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
     return;
   }
 
-  const bool maya_edit_pivot =
-      ED_maya_pivot_edit_target_get(C) != ed::maya::MayaPivotEditTarget::None;
+  bool maya_edit_pivot;
+  const int twtype = gizmogroup_twtype_calc(C, ggd, v3d, &maya_edit_pivot);
   if (ggd->use_twtype_refresh) {
-    ggd->twtype = maya_edit_pivot ?
-                      (V3D_GIZMO_SHOW_OBJECT_TRANSLATE | V3D_GIZMO_SHOW_OBJECT_ROTATE) :
-                      (v3d->gizmo_show_object & ggd->twtype_init);
+    ggd->twtype = twtype;
     if (ggd->twtype != ggd->twtype_prev) {
       ggd->twtype_prev = ggd->twtype;
       gizmogroup_init_properties_from_twtype(gzgroup);
     }
   }
 
-  const bool use_maya_style = gzgroup->type == g_GGT_xform_gizmo_context &&
-                              (v3d->gizmo_flag & V3D_GIZMO_HIDE_TOOL);
-  gizmogroup_apply_maya_center_style(ggd, use_maya_style);
+  gizmogroup_apply_maya_center_style(
+      ggd, gizmogroup_maya_style_calc(gzgroup, v3d), maya_edit_pivot);
 
   const int orient_index = BKE_scene_orientation_get_index_from_flag(scene, ggd->twtype_init);
 
@@ -2120,31 +2146,32 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
   View3D *v3d = static_cast<View3D *>(area->spacedata.first);
   RegionView3D *rv3d = static_cast<RegionView3D *>(region->regiondata);
 
-  if ((rv3d->rflag & RV3D_NAVIGATING) == 0 && ggd->use_twtype_refresh) {
-    const bool maya_edit_pivot =
-        ED_maya_pivot_edit_target_get(C) != ed::maya::MayaPivotEditTarget::None;
-    const int twtype = maya_edit_pivot ?
-                           (V3D_GIZMO_SHOW_OBJECT_TRANSLATE |
-                            V3D_GIZMO_SHOW_OBJECT_ROTATE) :
-                           (v3d->gizmo_show_object & ggd->twtype_init);
-    if (ggd->twtype != twtype) {
+  /* Re-calculate hidden unless modal. */
+  const bool is_modal = WM_gizmo_group_is_modal(gzgroup);
+
+  const bool use_maya_palette = gizmogroup_maya_style_calc(gzgroup, v3d);
+  if ((rv3d->rflag & RV3D_NAVIGATING) == 0) {
+    bool maya_edit_pivot;
+    const int twtype = gizmogroup_twtype_calc(C, ggd, v3d, &maya_edit_pivot);
+    if (ggd->use_twtype_refresh && ggd->twtype != twtype) {
       ggd->twtype = twtype;
       ggd->twtype_prev = twtype;
       gizmogroup_init_properties_from_twtype(gzgroup);
-      gizmogroup_apply_maya_center_style(ggd, ggd->use_maya_center_style);
+    }
+    if (!is_modal) {
+      /* Reapplied on every pass rather than only on a change: switching mode or tool rebuilds the
+       * gizmo properties, and a single redraw that saw the previous style made the manipulator
+       * flicker. A drag owns its own styles, so it is left alone. */
+      gizmogroup_apply_maya_center_style(ggd, use_maya_palette, maya_edit_pivot);
     }
   }
 
-  const bool use_maya_palette = ggd->use_maya_center_style;
   if (use_maya_palette) {
     WM_gizmo_set_scale(ggd->gizmos[MAN_AXIS_SCALE_C], 0.065f);
   }
   float viewinv_m3[3][3];
   copy_m3_m4(viewinv_m3, rv3d->viewinv);
   float idot[3];
-
-  /* Re-calculate hidden unless modal. */
-  const bool is_modal = WM_gizmo_group_is_modal(gzgroup);
 
   /* When looking through a selected camera, the gizmo can be at the
    * exact same position as the view, skip so we don't break selection. */
@@ -2228,18 +2255,47 @@ static void gizmo_3d_draw_invoke(wmGizmoGroup *gzgroup,
 
   const short axis_active_type = gizmo_get_axis_type(axis_idx_active);
 
-  /* Display only the active gizmo. */
-  gizmogroup_hide_all(ggd);
-  WM_gizmo_set_flag(axis_active, WM_GIZMO_HIDDEN, false);
-  gizmo_refresh_from_matrix(axis_active, axis_idx_active, ggd->twtype, rv3d->twmat, nullptr);
+  /* Maya keeps the whole manipulator on screen for the duration of the drag: it follows the
+   * transform and only the centre handle changes its glyph. Hiding everything but the dragged
+   * handle made the pivot look like it disappeared, which is most visible while a snap key is
+   * held and the centre handle itself is the one being dragged. */
+  const bool use_maya_style = ggd->use_maya_center_style;
+
+  MAN_ITER_AXES_BEGIN (axis, axis_idx) {
+    const bool visible_before_drag = (axis->flag & WM_GIZMO_HIDDEN) == 0;
+    WM_gizmo_set_flag(
+        axis,
+        WM_GIZMO_HIDDEN,
+        !gizmo_3d_axis_visible_during_drag(
+            use_maya_style, axis_idx_active, axis_idx, visible_before_drag));
+  }
+  MAN_ITER_AXES_END;
+
+  if (use_maya_style) {
+    gizmogroup_refresh_from_matrix(gzgroup, rv3d->twmat, nullptr, true);
+  }
+  else {
+    gizmo_refresh_from_matrix(axis_active, axis_idx_active, ggd->twtype, rv3d->twmat, nullptr);
+  }
 
   if (ELEM(axis_idx_active, MAN_AXIS_TRANS_C, MAN_AXIS_SCALE_C, MAN_AXIS_ROT_C, MAN_AXIS_ROT_T)) {
     WM_gizmo_set_matrix_rotation_from_z_axis(axis_active, rv3d->viewinv[2]);
   }
 
   gizmo_3d_setup_draw_modal(axis_active, axis_idx_active, ggd->twtype);
-  if (axis_idx_active == MAN_AXIS_SCALE_C && ggd->use_maya_center_style) {
-    RNA_enum_set(axis_active->ptr, "draw_style", ED_GIZMO_PRIMITIVE_STYLE_CUBE);
+  if (use_maya_style) {
+    if (axis_idx_active == MAN_AXIS_SCALE_C) {
+      RNA_enum_set(axis_active->ptr,
+                   "draw_style",
+                   gizmo_3d_scale_center_style_get(use_maya_style, true));
+    }
+    /* The translate centre square becomes a circle while the drag runs, and goes back to a square
+     * in #gizmogroup_apply_maya_center_style once it ended. In Edit Pivot the square inside a
+     * circle is the mode indicator, so there the drag changes nothing. */
+    RNA_enum_set(
+        ggd->gizmos[MAN_AXIS_TRANS_C]->ptr,
+        "draw_style",
+        gizmo_3d_translate_center_style_get(use_maya_style, true, ggd->use_maya_edit_pivot_style));
   }
 
   if (axis_active_type == MAN_AXES_TRANSLATE) {

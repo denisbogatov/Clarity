@@ -8,12 +8,16 @@
  * Utilities to inspect the interface, extract information.
  */
 
+#include <algorithm>
+#include <utility>
+
 #include "BLI_listbase.h"
 #include "BLI_math_rotation.h"
 #include "BLI_math_vector.h"
 #include "BLI_rect.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
+#include "BLI_vector.hh"
 
 #include "DNA_screen_types.h"
 
@@ -383,6 +387,66 @@ Button *but_find_mouse_over(const ARegion *region, const wmEvent *event)
 {
   return button_find_mouse_over_ex(
       region, event->xy, event->modifier & KM_CTRL, false, nullptr, nullptr);
+}
+
+std::optional<ShelfDropTarget> shelf_drop_target_find(const ARegion *region, const int xy[2])
+{
+  if (region == nullptr || region->runtime == nullptr) {
+    return std::nullopt;
+  }
+
+  /* The icon and the label of one shelf entry are separate buttons sharing the entry id, so
+   * collect the union of their bounds to get the full cell the cursor is compared against. */
+  Vector<std::pair<StringRefNull, rctf>> cells;
+  for (Block &block : region->runtime->uiblocks) {
+    for (Button &but : block.buttons()) {
+      const std::optional<StringRefNull> item_id = button_context_string_get(&but,
+                                                                            "maya_shelf_item_id");
+      if (!item_id || item_id->is_empty()) {
+        continue;
+      }
+      rctf rect;
+      block_to_window_rctf(region, &block, &rect, &but.rect);
+      std::pair<StringRefNull, rctf> *cell = nullptr;
+      for (std::pair<StringRefNull, rctf> &candidate : cells) {
+        if (candidate.first == *item_id) {
+          cell = &candidate;
+          break;
+        }
+      }
+      if (cell != nullptr) {
+        BLI_rctf_union(&cell->second, &rect);
+      }
+      else {
+        cells.append({*item_id, rect});
+      }
+    }
+  }
+  if (cells.is_empty()) {
+    return std::nullopt;
+  }
+
+  const float mouse_x = float(xy[0]);
+  const float mouse_y = float(xy[1]);
+  const std::pair<StringRefNull, rctf> *nearest = nullptr;
+  float nearest_dist_sq = 0.0f;
+  for (const std::pair<StringRefNull, rctf> &cell : cells) {
+    const float delta_x = std::max(std::max(cell.second.xmin - mouse_x, mouse_x - cell.second.xmax),
+                                   0.0f);
+    const float delta_y = std::max(std::max(cell.second.ymin - mouse_y, mouse_y - cell.second.ymax),
+                                   0.0f);
+    const float dist_sq = delta_x * delta_x + delta_y * delta_y;
+    if (nearest == nullptr || dist_sq < nearest_dist_sq) {
+      nearest = &cell;
+      nearest_dist_sq = dist_sq;
+    }
+  }
+
+  ShelfDropTarget target;
+  target.item_id = nearest->first;
+  target.rect = nearest->second;
+  target.after = mouse_x > BLI_rctf_cent_x(&nearest->second);
+  return target;
 }
 
 Button *button_find_rect_over(const ARegion *region, const rcti *rect_px)

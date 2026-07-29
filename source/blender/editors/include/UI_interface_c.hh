@@ -883,6 +883,24 @@ bool block_has_active_default_button(const Block *block);
  */
 Button *but_find_mouse_over(const ARegion *region, const wmEvent *event) ATTR_WARN_UNUSED_RESULT;
 
+/** An insertion position for a Maya-style shelf drag, see #shelf_drop_target_find. */
+struct ShelfDropTarget {
+  /** `maya_shelf_item_id` of the shelf entry nearest to the cursor. */
+  StringRefNull item_id;
+  /** Insert after `item_id` rather than before it. */
+  bool after;
+  /** Window space bounds of that entry, used to place the insertion marker. */
+  rctf rect;
+};
+
+/**
+ * Find where a dragged shelf entry would be inserted, based on the buttons actually laid out in
+ * `region` rather than on estimated cell sizes. Returns nothing when the region holds no shelf
+ * entry, which means the shelf is empty.
+ */
+std::optional<ShelfDropTarget> shelf_drop_target_find(const ARegion *region, const int xy[2])
+    ATTR_WARN_UNUSED_RESULT;
+
 uiList *uilist_find_mouse_over(const ARegion *region, const wmEvent *event);
 
 /* `interface_region_menu_popup.cc` */

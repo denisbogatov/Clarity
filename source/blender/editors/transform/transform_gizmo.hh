@@ -28,6 +28,48 @@ struct wmMsgBus;
 
 namespace ed::transform {
 
+/* Axes as index. */
+enum {
+  MAN_AXIS_TRANS_X = 0,
+  MAN_AXIS_TRANS_Y,
+  MAN_AXIS_TRANS_Z,
+  MAN_AXIS_TRANS_C,
+
+  MAN_AXIS_TRANS_XY,
+  MAN_AXIS_TRANS_YZ,
+  MAN_AXIS_TRANS_ZX,
+#define MAN_AXIS_RANGE_TRANS_START MAN_AXIS_TRANS_X
+#define MAN_AXIS_RANGE_TRANS_END (MAN_AXIS_TRANS_ZX + 1)
+
+  MAN_AXIS_ROT_X,
+  MAN_AXIS_ROT_Y,
+  MAN_AXIS_ROT_Z,
+  MAN_AXIS_ROT_C,
+  MAN_AXIS_ROT_T, /* Trackball rotation. */
+#define MAN_AXIS_RANGE_ROT_START MAN_AXIS_ROT_X
+#define MAN_AXIS_RANGE_ROT_END (MAN_AXIS_ROT_T + 1)
+
+  MAN_AXIS_SCALE_X,
+  MAN_AXIS_SCALE_Y,
+  MAN_AXIS_SCALE_Z,
+  MAN_AXIS_SCALE_C,
+  MAN_AXIS_SCALE_XY,
+  MAN_AXIS_SCALE_YZ,
+  MAN_AXIS_SCALE_ZX,
+#define MAN_AXIS_RANGE_SCALE_START MAN_AXIS_SCALE_X
+#define MAN_AXIS_RANGE_SCALE_END (MAN_AXIS_SCALE_ZX + 1)
+
+  MAN_AXIS_LAST = MAN_AXIS_SCALE_ZX + 1,
+};
+
+/* Axis types. */
+enum {
+  MAN_AXES_ALL = 0,
+  MAN_AXES_TRANSLATE,
+  MAN_AXES_ROTATE,
+  MAN_AXES_SCALE,
+};
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -37,6 +79,34 @@ namespace ed::transform {
 /* `transform_gizmo_3d.cc` */
 
 #define GIZMO_AXIS_LINE_WIDTH 2.0f
+
+/**
+ * Whether \a axis_idx is still drawn while \a axis_idx_active is being dragged.
+ *
+ * Maya keeps the whole manipulator on screen for the duration of the drag, so a handle that was
+ * visible stays visible; Blender shows only the dragged handle, plus the translate arrows as a
+ * visual reference. \a visible_before_drag keeps the handles that the view-alignment rules had
+ * already hidden out of the way.
+ */
+bool gizmo_3d_axis_visible_during_drag(bool use_maya_style,
+                                       int axis_idx_active,
+                                       int axis_idx,
+                                       bool visible_before_drag);
+
+/**
+ * Draw style (`ED_GIZMO_PRIMITIVE_STYLE_*`) of the translate center handle. Maya draws a square
+ * that becomes a circle for the duration of the drag; Blender draws a circle either way.
+ *
+ * Edit Pivot is the exception: the square inside a circle is the indicator that the mode is on, so
+ * it is drawn as long as the mode lasts, the drag included.
+ */
+int gizmo_3d_translate_center_style_get(bool use_maya_style, bool is_dragging, bool is_edit_pivot);
+
+/**
+ * Draw style (`ED_GIZMO_PRIMITIVE_STYLE_*`) of the scale center handle. Maya draws a cube that the
+ * drag keeps, Blender an annulus that the drag turns into a circle.
+ */
+int gizmo_3d_scale_center_style_get(bool use_maya_style, bool is_dragging);
 
 void gizmo_prepare_mat(const bContext *C, RegionView3D *rv3d, const TransformBounds *tbounds);
 void gizmo_xform_message_subscribe(wmGizmoGroup *gzgroup,
