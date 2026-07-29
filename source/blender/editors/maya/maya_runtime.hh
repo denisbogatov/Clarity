@@ -117,6 +117,14 @@ struct MayaPivotEditState {
   bool follow_transform = false;
   float follow_location_initial[3] = {};
   float follow_translation_previous[3] = {};
+  /**
+   * Element under the mouse while a snap key is held, so the overlay can preview where a click
+   * would put the pivot. #MayaPivotSnapTargetType::None means there is nothing to draw.
+   */
+  MayaPivotSnapResult snap_preview;
+  /** Region-space mouse the preview was computed for, so a resting pointer costs nothing. */
+  int2 snap_preview_mouse = int2(0);
+  bool snap_preview_queried = false;
 };
 
 struct MayaTemporaryOverrides {
@@ -199,6 +207,15 @@ MayaDispatchResult pivot_edit_click_handle_action(bContext *C,
                                                    MayaWindowRuntime &runtime,
                                                    const MayaInputAction &action);
 void pivot_edit_selection_changed(bContext *C, MayaWindowRuntime &runtime);
+/**
+ * Refresh the hovered snap target used by the pivot snap preview. Clears the target unless Edit
+ * Pivot owns a manipulator, a temporary snap key is held and no transform is running, and skips
+ * the query while the pointer rests on the position it was last computed for.
+ */
+void pivot_edit_snap_preview_update(const bContext *C,
+                                    MayaWindowRuntime &runtime,
+                                    const int2 &mouse_region);
+void pivot_edit_snap_preview_clear(MayaWindowRuntime &runtime);
 void pivot_edit_input_reset(bContext *C, MayaWindowRuntime &runtime);
 void pivot_edit_validate(bContext *C, MayaWindowRuntime &runtime);
 void pivot_edit_end(bContext *C, MayaWindowRuntime &runtime);

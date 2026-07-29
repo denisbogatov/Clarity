@@ -635,6 +635,27 @@ def _maya_shelf_action_category(action, label):
     return _maya_shelf_category_by_tab_action().get(action, 'OTHER')
 
 
+def _maya_shelf_action_rows():
+    """Picker rows: (identifier, label, icon, category, sort_key).
+
+    Precomputed because the action picker is refilled from scratch every time a dialog
+    opens, and `sort_key` keeps the per-redraw sort in `TOPBAR_UL_maya_shelf_actions`
+    down to one string compare per entry instead of a category lookup plus a casefold.
+    """
+    rows = _maya_shelf_catalog_cache.get("action_rows")
+    if rows is not None:
+        return rows
+    unknown_order = len(_MAYA_SHELF_ACTION_CATEGORY_ORDER)
+    rows = []
+    for action, label, _description, icon, _index in _maya_shelf_builtin_actions():
+        category = _maya_shelf_action_category(action, label)
+        order = _MAYA_SHELF_ACTION_CATEGORY_ORDER.get(category, unknown_order)
+        rows.append((action, label, icon, category, "{:02d}{:s}".format(order, label.casefold())))
+    rows = tuple(rows)
+    _maya_shelf_catalog_cache["action_rows"] = rows
+    return rows
+
+
 _maya_shelf_config_cache = None
 _maya_shelf_active_scope = "TOPBAR"
 _maya_shelf_drag_state = None
@@ -656,6 +677,9 @@ _MAYA_SHELF_GRID_CELL_WIDTH = 32.5
 _MAYA_SHELF_GRID_CELL_HEIGHT = 36.0
 
 _MAYA_SHELF_ROW_COUNT = 2
+
+# Schema version of a single shelf config, see `_maya_shelf_migrate_config`.
+_MAYA_SHELF_VERSION = 3
 _MAYA_SHELF_DEFAULT_BACKGROUND_COLOR = (0.18, 0.18, 0.18, 1.0)
 _MAYA_SHELF_DEFAULT_ICON_COLOR = (1.0, 1.0, 1.0, 1.0)
 _MAYA_SHELF_DRAG_SOURCE_COLOR = (0.08, 0.32, 0.68, 1.0)
@@ -767,6 +791,8 @@ class TOPBAR_PG_maya_shelf_action(PropertyGroup):
     label: StringProperty()
     icon: StringProperty()
     category: StringProperty()
+    # Category order and lowercased label, joined so sorting is a plain string compare.
+    sort_key: StringProperty()
 
 
 class TOPBAR_UL_maya_shelf_icons(UIList):
@@ -806,20 +832,11 @@ class TOPBAR_UL_maya_shelf_actions(UIList):
 
         sort_mode = getattr(data, "action_sort", 'CATEGORY')
         if sort_mode == 'CATEGORY':
-            sort_data = [
-                (
-                    index,
-                    _MAYA_SHELF_ACTION_CATEGORY_ORDER.get(
-                        action.category,
-                        len(_MAYA_SHELF_ACTION_CATEGORY_ORDER),
-                    ),
-                    action.label.casefold(),
-                )
-                for index, action in enumerate(actions)
-            ]
+            # `sort_key` already carries the category order and the lowercased label,
+            # so this stays one property read per entry on a list thousands of rows long.
             indices = bpy.types.UI_UL_list.sort_items_helper(
-                sort_data,
-                lambda entry: (entry[1], entry[2]),
+                [(index, action.sort_key) for index, action in enumerate(actions)],
+                lambda entry: entry[1],
             )
         elif sort_mode == 'NAME' or self.use_filter_sort_alpha:
             indices = bpy.types.UI_UL_list.sort_items_by_name(actions, "label")
@@ -859,16 +876,15 @@ def _maya_shelf_icon_list_fill(operator, selected_icon):
 def _maya_shelf_action_list_fill(operator, selected_action):
     operator.actions.clear()
     selected_index = 0
-    for index, enum_item in enumerate(_maya_shelf_builtin_actions()):
+    for index, row in enumerate(_maya_shelf_action_rows()):
+        identifier, label, icon, category, sort_key = row
         action = operator.actions.add()
-        action.identifier = enum_item[0]
-        action.label = enum_item[1]
-        action.icon = enum_item[3]
-        action.category = _maya_shelf_action_category(
-            action.identifier,
-            action.label,
-        )
-        if action.identifier == selected_action:
+        action.identifier = identifier
+        action.label = label
+        action.icon = icon
+        action.category = category
+        action.sort_key = sort_key
+        if identifier == selected_action:
             selected_index = index
     operator.action_index = selected_index
 
@@ -951,7 +967,7 @@ def _maya_shelf_default_config():
                 "row": 0 if index < split else 1,
             })
         tabs.append({"name": tab_name, "items": items, "separators": []})
-    return {"version": 3, "active": "Modeling", "tabs": tabs}
+    return {"version": _MAYA_SHELF_VERSION, "active": "Modeling", "tabs": tabs}
 
 
 def _maya_shelf_config_clone(source):
@@ -1057,7 +1073,8 @@ def _maya_shelf_scope_key(context):
 def _maya_shelf_migrate_config(config):
     """Bring one shelf config up to the current version. Returns True when changed."""
     migrated = False
-    if config.get("version", 1) < 2:
+    version = _maya_shelf_clamped_int(config.get("version", 1), 1, _MAYA_SHELF_VERSION)
+    if version < 2:
         modeling = next(
             (
                 tab for tab in config["tabs"]
@@ -1086,7 +1103,7 @@ def _maya_shelf_migrate_config(config):
         )
         config["version"] = 2
         migrated = True
-    if config.get("version", 1) < 3:
+    if version < 3:
         # Alpha 0 used to mean "no override"; opaque is what those items meant.
         for tab in config["tabs"]:
             for item in tab["items"]:
@@ -1095,6 +1112,10 @@ def _maya_shelf_migrate_config(config):
                     if color and len(color) == 4 and color[3] == 0.0:
                         item[key] = [color[0], color[1], color[2], 1.0]
         config["version"] = 3
+        migrated = True
+    if config.get("version") != _MAYA_SHELF_VERSION:
+        # A hand-edited or future version lands here; store the one we just produced.
+        config["version"] = _MAYA_SHELF_VERSION
         migrated = True
     return migrated
 
@@ -1129,16 +1150,27 @@ def _maya_shelf_load():
             shelves = stored_config["shelves"]
             if not isinstance(shelves, dict):
                 raise ValueError("Shelf storage is invalid")
-            if "TOPBAR" not in shelves:
-                raise ValueError("Top Bar shelf is missing")
             storage = stored_config
         else:
             # Storage version 0 held a single Top Bar shelf at the top level.
             storage = {"storage_version": 1, "shelves": {"TOPBAR": stored_config}}
             migrated = True
-        for config in storage["shelves"].values():
-            _maya_shelf_normalize_config(config)
-            migrated |= _maya_shelf_migrate_config(config)
+        if "TOPBAR" not in storage["shelves"]:
+            # Every other scope is cloned from the Top Bar shelf, so it has to exist.
+            storage["shelves"]["TOPBAR"] = _maya_shelf_default_config()
+            migrated = True
+        # Repair one scope at a time: a single unreadable shelf must not cost the user
+        # every other shelf they set up.
+        for scope in list(storage["shelves"]):
+            try:
+                config = storage["shelves"][scope]
+                _maya_shelf_normalize_config(config)
+                migrated |= _maya_shelf_migrate_config(config)
+            except (AttributeError, ValueError, TypeError) as ex:
+                print("Maya shelf: resetting unreadable shelf {:s}: {:s}".format(
+                    scope, str(ex)))
+                storage["shelves"][scope] = _maya_shelf_default_config()
+                migrated = True
         _maya_shelf_config_cache = storage
     except (OSError, AttributeError, ValueError, TypeError, json.JSONDecodeError) as ex:
         if not isinstance(ex, FileNotFoundError):
@@ -1148,6 +1180,7 @@ def _maya_shelf_load():
             "shelves": {"TOPBAR": _maya_shelf_default_config()},
         }
         migrated = True
+    _maya_shelf_invalidate_layout()
     if migrated:
         _maya_shelf_save()
 
@@ -1165,13 +1198,14 @@ def _maya_shelf_scope_config(scope, uuid_scope=None):
     if uuid_scope is not None and uuid_scope in shelves:
         # Shelf areas used to be keyed by their `shelf_id`; adopt that config.
         shelves[scope] = shelves.pop(uuid_scope)
-        return shelves[scope], True
-    source = shelves.get("TOPBAR")
-    shelves[scope] = (
-        _maya_shelf_config_clone(source)
-        if source is not None
-        else _maya_shelf_default_config()
-    )
+    else:
+        source = shelves.get("TOPBAR")
+        shelves[scope] = (
+            _maya_shelf_config_clone(source)
+            if source is not None
+            else _maya_shelf_default_config()
+        )
+    _maya_shelf_invalidate_layout()
     return shelves[scope], True
 
 
@@ -1302,10 +1336,20 @@ def _maya_shelf_grid_drop_index(context, event, region, entry_count):
     return min(max(index, 0), entry_count)
 
 
-def _maya_shelf_redraw(context):
+def _maya_shelf_invalidate_layout():
+    """Drop cached row layouts.
+
+    `_maya_shelf_row_data` keys its cache on the revision, so every path that can
+    change the config object graph has to come through here: mutations by the shelf
+    operators, a reload from disk, and a scope being created or migrated.
+    """
     global _maya_shelf_layout_revision
     _maya_shelf_layout_revision += 1
     _maya_shelf_row_cache.clear()
+
+
+def _maya_shelf_redraw(context):
+    _maya_shelf_invalidate_layout()
 
     context_area = getattr(context, "area", None)
     if context_area is not None and context_area.type in {'TOPBAR', 'SHELF'}:
@@ -1326,6 +1370,7 @@ def _maya_shelf_reorder(item_id, target_row, target_index):
     item = _maya_shelf_find_item(tab, item_id)
     if item is None:
         return False
+    target_row = min(max(target_row, 0), _MAYA_SHELF_ROW_COUNT - 1)
     source_row = item.get("row", 0)
     source_index = _maya_shelf_row_items(tab, source_row).index(item)
     rows = {
@@ -1486,7 +1531,7 @@ class TOPBAR_OT_maya_shelf_tab_rename(Operator):
     def execute(self, context):
         name = self.name.strip()
         config = _maya_shelf_config(context)
-        tab = _maya_shelf_active_tab()
+        tab = _maya_shelf_tab_for_config(config)
         if not name or any(item is not tab and item["name"] == name for item in config["tabs"]):
             self.report({'WARNING'}, "Enter a unique shelf name")
             return {'CANCELLED'}
@@ -1506,7 +1551,7 @@ class TOPBAR_OT_maya_shelf_tab_remove(Operator):
         if len(config["tabs"]) == 1:
             self.report({'WARNING'}, "At least one shelf tab is required")
             return {'CANCELLED'}
-        tab = _maya_shelf_active_tab()
+        tab = _maya_shelf_tab_for_config(config)
         config["tabs"].remove(tab)
         config["active"] = config["tabs"][0]["name"]
         _maya_shelf_save()
@@ -1530,7 +1575,7 @@ class _MayaShelfItemDialog:
     # Fallback for the selected action when `actions` was never filled, which happens
     # when the operator runs without its dialog. The catalog is too large to expose as
     # an enum: building it would cost every startup, dialog or not.
-    builtin_action: StringProperty(options={'HIDDEN', 'SKIP_SAVE'})
+    builtin_action: StringProperty(default="cube", options={'HIDDEN', 'SKIP_SAVE'})
     actions: CollectionProperty(type=TOPBAR_PG_maya_shelf_action)
     action_index: IntProperty(
         name="Built-in Action",
@@ -1667,10 +1712,17 @@ class _MayaShelfItemDialog:
             command["action"] = _maya_shelf_selected_action(self)
         return command, ""
 
-    def _validated_appearance(self):
+    def _validated_appearance(self, command):
         """Return (appearance values, error) for the icon and color properties."""
-        if not self.icons or not 0 <= self.icon_index < len(self.icons):
+        if self.icons and 0 <= self.icon_index < len(self.icons):
+            icon = self.icons[self.icon_index].identifier
+        else:
+            # Run without its dialog, so the icon list was never filled. A built-in
+            # action still knows which icon it wants.
+            icon = _maya_shelf_builtin_action_icons().get(command["action"], "")
+        if not icon:
             return None, "Select a Blender icon"
+
         custom_icon = self.custom_icon.strip()
         if custom_icon:
             custom_icon = os.path.abspath(bpy.path.abspath(custom_icon))
@@ -1679,7 +1731,7 @@ class _MayaShelfItemDialog:
             if not _maya_shelf_custom_icon(custom_icon):
                 return None, "Unsupported custom icon image"
         return {
-            "icon": self.icons[self.icon_index].identifier,
+            "icon": icon,
             "custom_icon": custom_icon,
             "background_color": list(self.background_color),
             "icon_color": list(self.icon_color),
@@ -1714,12 +1766,12 @@ class TOPBAR_OT_maya_shelf_item_add(_MayaShelfItemDialog, Operator):
         return context.window_manager.invoke_props_dialog(self, width=600)
 
     def execute(self, context):
-        _maya_shelf_config(context)
+        tab = _maya_shelf_active_tab(context)
         command, error = self._validated_command()
         if error:
             self.report({'WARNING'}, error)
             return {'CANCELLED'}
-        appearance, error = self._validated_appearance()
+        appearance, error = self._validated_appearance(command)
         if error:
             self.report({'WARNING'}, error)
             return {'CANCELLED'}
@@ -1728,7 +1780,7 @@ class TOPBAR_OT_maya_shelf_item_add(_MayaShelfItemDialog, Operator):
         if not label or label == "New Command":
             label = self._default_label(command)
 
-        _maya_shelf_active_tab()["items"].append({
+        tab["items"].append({
             "id": uuid.uuid4().hex,
             "label": label,
             "row": self.row,
@@ -1747,8 +1799,7 @@ class TOPBAR_OT_maya_shelf_item_edit(_MayaShelfItemDialog, Operator):
     item_id: StringProperty(options={'SKIP_SAVE'})
 
     def invoke(self, context, _event):
-        _maya_shelf_config(context)
-        item = _maya_shelf_find_item(_maya_shelf_active_tab(), self.item_id)
+        item = _maya_shelf_find_item(_maya_shelf_active_tab(context), self.item_id)
         if item is None:
             return {'CANCELLED'}
         self.operator_id = item.get("operator", "")
@@ -1776,8 +1827,7 @@ class TOPBAR_OT_maya_shelf_item_edit(_MayaShelfItemDialog, Operator):
         return context.window_manager.invoke_props_dialog(self, width=600)
 
     def execute(self, context):
-        _maya_shelf_config(context)
-        item = _maya_shelf_find_item(_maya_shelf_active_tab(), self.item_id)
+        item = _maya_shelf_find_item(_maya_shelf_active_tab(context), self.item_id)
         if item is None:
             return {'CANCELLED'}
 
@@ -1785,7 +1835,7 @@ class TOPBAR_OT_maya_shelf_item_edit(_MayaShelfItemDialog, Operator):
         if error:
             self.report({'WARNING'}, error)
             return {'CANCELLED'}
-        appearance, error = self._validated_appearance()
+        appearance, error = self._validated_appearance(command)
         if error:
             self.report({'WARNING'}, error)
             return {'CANCELLED'}
@@ -1807,8 +1857,7 @@ class TOPBAR_OT_maya_shelf_item_remove_id(Operator):
     item_id: StringProperty()
 
     def execute(self, context):
-        _maya_shelf_config(context)
-        tab = _maya_shelf_active_tab()
+        tab = _maya_shelf_active_tab(context)
         entry_type, _entry = _maya_shelf_entry_remove(tab, self.item_id)
         if entry_type is None:
             return {'CANCELLED'}
@@ -1828,8 +1877,7 @@ class TOPBAR_OT_maya_shelf_separator_add(Operator):
     )
 
     def execute(self, context):
-        _maya_shelf_config(context)
-        tab = _maya_shelf_active_tab()
+        tab = _maya_shelf_active_tab(context)
         column = self.column
         if column < 0:
             column = len(_maya_shelf_row_items(tab, self.row))
@@ -1977,6 +2025,10 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
         return row, index
 
     def _drop_target(self, context, event):
+        """Where the dragged entry would land: (scope, adaptive, row, index).
+
+        Scope is None when the mouse is over neither a Shelf editor nor the Top Bar.
+        """
         for area in context.screen.areas:
             if area.type != 'SHELF':
                 continue
@@ -2021,14 +2073,12 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
                 bounds[0] <= event.mouse_x < bounds[0] + bounds[2] and
                 bounds[1] <= event.mouse_y < bounds[1] + bounds[3]
             ):
+                ui_scale = _maya_shelf_ui_scale(context)
                 tab = _maya_shelf_active_tab_for_scope("TOPBAR")
                 relative_x = (
-                    event.mouse_x - bounds[0] -
-                    _MAYA_SHELF_LEFT_MARGIN * _maya_shelf_ui_scale(context)
+                    event.mouse_x - bounds[0] - _MAYA_SHELF_LEFT_MARGIN * ui_scale
                 )
-                boundaries, _tail = _maya_shelf_row_boundaries(
-                    tab, row, _maya_shelf_ui_scale(context),
-                )
+                boundaries, _tail = _maya_shelf_row_boundaries(tab, row, ui_scale)
                 index = min(
                     range(len(boundaries)),
                     key=lambda column: abs(relative_x - boundaries[column]),
@@ -2121,10 +2171,9 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
         _maya_shelf_drag_state = None
 
     def invoke(self, context, event):
-        _maya_shelf_config(context)
-        self._source_scope = _maya_shelf_scope_key(context)
+        tab = _maya_shelf_active_tab(context)
+        self._source_scope = _maya_shelf_active_scope
         self._adaptive = context.area.type == 'SHELF'
-        tab = _maya_shelf_active_tab()
         source_separator = _maya_shelf_find_separator(tab, self.item_id)
         self._drag_separator = source_separator is not None
         if source_separator is not None:
@@ -2592,8 +2641,7 @@ class TOPBAR_OT_maya_shelf_action(Operator):
         return properties.tooltip
 
     def execute(self, context):
-        _maya_shelf_config(context)
-        tab = _maya_shelf_active_tab()
+        tab = _maya_shelf_active_tab(context)
         if _maya_shelf_find_separator(tab, self.item_id) is not None:
             return {'CANCELLED'}
 
@@ -2625,28 +2673,47 @@ class TOPBAR_OT_maya_shelf_action(Operator):
         return {'FINISHED'}
 
     def _run_action(self, context, area):
+        """Dispatch one built-in action. Raises with a user-facing message on failure.
+
+        The order matters: a tool wins over a handler, a handler over a plain operator
+        call, and an explicit `operator_id` only applies when there is no action at all.
+        """
         tool_actions, operators, invoke_operators = self._action_tables()
         action = self.action
-        if action in tool_actions:
-            bpy.ops.wm.tool_set_by_id(name=tool_actions[action])
+
+        tool = tool_actions.get(action)
+        if tool is not None:
+            bpy.ops.wm.tool_set_by_id(name=tool)
             return
+
         handler = _MAYA_SHELF_ACTION_HANDLERS.get(action)
         if handler is not None:
             handler(context, area, action)
             return
-        if action in invoke_operators:
-            idname, properties = invoke_operators[action]
-            _maya_shelf_call_operator(idname, properties, invoke=True)
+
+        entry = invoke_operators.get(action)
+        if entry is not None:
+            _maya_shelf_call_operator(entry[0], entry[1], invoke=True)
             return
+
         if action.startswith("operator__"):
-            _prefix, module, name = action.split("__", 2)
-            getattr(getattr(bpy.ops, module), name)('INVOKE_DEFAULT')
+            parts = action.split("__", 2)
+            if len(parts) != 3 or not all(parts[1:]):
+                raise RuntimeError("Malformed shelf operator: {:s}".format(action))
+            _maya_shelf_call_operator(
+                "{:s}.{:s}".format(parts[1], parts[2]), {}, invoke=True,
+            )
             return
+
         if self.operator_id:
             _maya_shelf_call_operator(self.operator_id, {})
             return
-        idname, properties = operators[action]
-        _maya_shelf_call_operator(idname, properties)
+
+        entry = operators.get(action)
+        if entry is None:
+            raise RuntimeError(
+                "Unknown shelf action: {:s}".format(action or "(none)"))
+        _maya_shelf_call_operator(entry[0], entry[1])
 
     @staticmethod
     def _action_tables():
@@ -2916,205 +2983,9 @@ class TOPBAR_OT_maya_shelf_action(Operator):
             "link_file": ("wm.link", {}),
         }
 
-        try:
-            with context.temp_override(**override):
-                if self.action in tool_actions:
-                    bpy.ops.wm.tool_set_by_id(name=tool_actions[self.action])
-                elif self.action == "material":
-                    obj = context.active_object
-                    if obj is None:
-                        raise RuntimeError("Select an object first")
-                    material = bpy.data.materials.new(name="Material")
-                    obj.data.materials.append(material)
-                elif self.action in {"graph_editor", "dope_sheet", "nla_editor"}:
-                    area.type = {
-                        "graph_editor": 'GRAPH_EDITOR',
-                        "dope_sheet": 'DOPESHEET_EDITOR',
-                        "nla_editor": 'NLA_EDITOR',
-                    }[self.action]
-                elif self.action in {"select_all", "select_none", "select_inverse"}:
-                    selection_action = {
-                        "select_all": 'SELECT',
-                        "select_none": 'DESELECT',
-                        "select_inverse": 'INVERT',
-                    }[self.action]
-                    obj = context.active_object
-                    if obj is not None and obj.type == 'MESH' and obj.mode == 'EDIT':
-                        bpy.ops.mesh.select_all(action=selection_action)
-                    else:
-                        bpy.ops.object.select_all(action=selection_action)
-                elif self.action in {
-                    "view_wireframe",
-                    "view_solid",
-                    "view_material",
-                    "view_rendered",
-                }:
-                    area.spaces.active.shading.type = {
-                        "view_wireframe": 'WIREFRAME',
-                        "view_solid": 'SOLID',
-                        "view_material": 'MATERIAL',
-                        "view_rendered": 'RENDERED',
-                    }[self.action]
-                elif self.action == "xray_toggle":
-                    shading = area.spaces.active.shading
-                    shading.show_xray = not shading.show_xray
-                elif self.action == "toggle_overlays":
-                    overlay = area.spaces.active.overlay
-                    overlay.show_overlays = not overlay.show_overlays
-                elif self.action == "toggle_grid":
-                    overlay = area.spaces.active.overlay
-                    overlay.show_floor = not overlay.show_floor
-                elif self.action == "toggle_wire_overlay":
-                    overlay = area.spaces.active.overlay
-                    overlay.show_wireframes = not overlay.show_wireframes
-                elif self.action == "toggle_face_orientation":
-                    overlay = area.spaces.active.overlay
-                    overlay.show_face_orientation = not overlay.show_face_orientation
-                elif self.action == "toggle_statistics":
-                    overlay = area.spaces.active.overlay
-                    overlay.show_stats = not overlay.show_stats
-                elif self.action == "toggle_gizmos":
-                    space = area.spaces.active
-                    space.show_gizmo = not space.show_gizmo
-                elif self.action == "toggle_camera_lock":
-                    space = area.spaces.active
-                    space.lock_camera = not space.lock_camera
-                elif self.action == "apply_active_modifier":
-                    obj = context.active_object
-                    if obj is None or not obj.modifiers:
-                        raise RuntimeError("The active object has no modifiers")
-                    modifier = obj.modifiers.active or obj.modifiers[-1]
-                    bpy.ops.object.modifier_apply(modifier=modifier.name)
-                elif self.action == "apply_all_modifiers":
-                    obj = context.active_object
-                    if obj is None or not obj.modifiers:
-                        raise RuntimeError("The active object has no modifiers")
-                    while obj.modifiers:
-                        bpy.ops.object.modifier_apply(modifier=obj.modifiers[0].name)
-                elif self.action == "apply_selected_modifiers":
-                    objects = [
-                        obj for obj in context.selected_editable_objects
-                        if obj.modifiers
-                    ]
-                    if not objects:
-                        raise RuntimeError("Selected objects have no modifiers")
-                    active_object = context.view_layer.objects.active
-                    try:
-                        for obj in objects:
-                            context.view_layer.objects.active = obj
-                            while obj.modifiers:
-                                bpy.ops.object.modifier_apply(
-                                    modifier=obj.modifiers[0].name
-                                )
-                    finally:
-                        context.view_layer.objects.active = active_object
-                elif self.action == "clear_constraints":
-                    obj = context.active_object
-                    if obj is None:
-                        raise RuntimeError("Select an object first")
-                    if obj.mode == 'POSE' and context.active_pose_bone is not None:
-                        context.active_pose_bone.constraints.clear()
-                    else:
-                        obj.constraints.clear()
-                elif self.action in {
-                    "duplicate_keyframes",
-                    "interpolation_constant",
-                    "interpolation_linear",
-                    "interpolation_bezier",
-                }:
-                    if area.type == 'GRAPH_EDITOR':
-                        module = bpy.ops.graph
-                    elif area.type == 'DOPESHEET_EDITOR':
-                        module = bpy.ops.action
-                    else:
-                        raise RuntimeError("Open a Dope Sheet or Graph Editor first")
-                    if self.action == "duplicate_keyframes":
-                        module.duplicate_move('INVOKE_DEFAULT')
-                    else:
-                        interpolation = {
-                            "interpolation_constant": 'CONSTANT',
-                            "interpolation_linear": 'LINEAR',
-                            "interpolation_bezier": 'BEZIER',
-                        }[self.action]
-                        module.interpolation_type(type=interpolation)
-                elif self.action == "toggle_motion_paths":
-                    obj = context.active_object
-                    if obj is None:
-                        raise RuntimeError("Select an object first")
-                    if obj.motion_path is None:
-                        bpy.ops.object.paths_calculate()
-                    else:
-                        bpy.ops.object.paths_clear(only_selected=False)
-                elif self.action == "set_preview_range":
-                    bpy.ops.anim.previewrange_set('INVOKE_DEFAULT')
-                elif self.action == "multires_subdivide":
-                    obj = context.active_object
-                    modifier = next(
-                        (
-                            modifier for modifier in obj.modifiers
-                            if modifier.type == 'MULTIRES'
-                        ),
-                        None,
-                    ) if obj is not None else None
-                    if modifier is None:
-                        raise RuntimeError("Add a Multires modifier first")
-                    bpy.ops.object.multires_subdivide(
-                        modifier=modifier.name,
-                        mode='CATMULL_CLARK',
-                    )
-                elif self.action == "incremental_save":
-                    if not bpy.data.filepath:
-                        bpy.ops.wm.save_as_mainfile('INVOKE_DEFAULT')
-                    else:
-                        bpy.ops.wm.save_mainfile(incremental=True)
-                elif self.action == "render_selected":
-                    selected = set(context.selected_objects)
-                    if not selected:
-                        raise RuntimeError("Select at least one object")
-                    render_states = {
-                        obj: obj.hide_render for obj in context.scene.objects
-                    }
-                    try:
-                        for obj in context.scene.objects:
-                            obj.hide_render = obj not in selected
-                        bpy.ops.render.render()
-                    finally:
-                        for obj, hide_render in render_states.items():
-                            obj.hide_render = hide_render
-                elif self.action == "open_render_result":
-                    image = bpy.data.images.get("Render Result")
-                    if image is None:
-                        raise RuntimeError("No Render Result is available")
-                    area.type = 'IMAGE_EDITOR'
-                    area.spaces.active.image = image
-                elif self.action == "purge_orphans":
-                    bpy.data.orphans_purge(do_recursive=True)
-                elif self.action == "auto_key_toggle":
-                    tool_settings = context.scene.tool_settings
-                    tool_settings.use_keyframe_insert_auto = (
-                        not tool_settings.use_keyframe_insert_auto
-                    )
-                elif self.action in invoke_operators:
-                    idname, properties = invoke_operators[self.action]
-                    module, name = idname.split(".", 1)
-                    getattr(getattr(bpy.ops, module), name)(
-                        'INVOKE_DEFAULT',
-                        **properties,
-                    )
-                elif self.action.startswith("operator__"):
-                    _prefix, module, name = self.action.split("__", 2)
-                    getattr(getattr(bpy.ops, module), name)('INVOKE_DEFAULT')
-                elif self.operator_id:
-                    module, name = self.operator_id.split(".", 1)
-                    getattr(getattr(bpy.ops, module), name)()
-                else:
-                    idname, properties = operators[self.action]
-                    module, name = idname.split(".", 1)
-                    getattr(getattr(bpy.ops, module), name)(**properties)
-        except Exception as ex:
-            self.report({'WARNING'}, str(ex))
-            return {'CANCELLED'}
-        return {'FINISHED'}
+        tables = (tool_actions, operators, invoke_operators)
+        _maya_shelf_catalog_cache["action_tables"] = tables
+        return tables
 
 
 class TOPBAR_OT_maya_shelf_preview(Operator):
@@ -3127,62 +2998,61 @@ class TOPBAR_OT_maya_shelf_preview(Operator):
 
 
 class WM_MT_button_context(Menu):
+    """Shelf entries appended to the right-click menu of any button.
+
+    `bl_ui.__init__` draws the contents of this legacy class inside the regular
+    button context menu, so the shelf items are only added for shelf buttons.
+    """
+
     bl_label = "Button Context Menu"
 
     def draw(self, context):
-        _maya_shelf_config(context)
         button_operator = getattr(context, "button_operator", None)
         item_id = getattr(button_operator, "item_id", "") if button_operator else ""
-        if item_id:
-            tab = _maya_shelf_active_tab()
-            item = next(
-                (
-                    item for item in tab["items"]
-                    if item["id"] == item_id
-                ),
-                None,
-            )
-            separator = next(
-                (
-                    separator for separator in tab.setdefault("separators", [])
-                    if separator["id"] == item_id
-                ),
-                None,
-            )
-            self.layout.separator()
-            props = self.layout.operator(
-                "topbar.maya_shelf_item_add",
-                text="Add Shelf Icon",
-                icon='ADD',
-            )
-            props.row = item.get("row", 0) if item else 0
-            props = self.layout.operator(
-                "topbar.maya_shelf_separator_add",
-                text="Add Separator",
-                icon='SPLIT_VERTICAL',
-            )
-            if item is not None:
-                row_items = [
-                    candidate for candidate in tab["items"]
-                    if candidate.get("row", 0) == item.get("row", 0)
-                ]
-                props.column = row_items.index(item) + 1
-                props.row = item.get("row", 0)
-            elif separator is not None:
-                props.column = separator.get("column", 0) + 1
-                props.row = separator.get("row", 0)
-            props = self.layout.operator(
-                "topbar.maya_shelf_item_remove_id",
-                text="Remove Separator" if separator is not None else "Remove from Shelf",
-                icon='TRASH',
-            )
-            props.item_id = item_id
+        if not item_id:
+            return
+
+        layout = self.layout
+        tab = _maya_shelf_active_tab(context)
+        item = _maya_shelf_find_item(tab, item_id)
+        separator = _maya_shelf_find_separator(tab, item_id)
+        row = (
+            item.get("row", 0) if item is not None
+            else separator.get("row", 0) if separator is not None
+            else 0
+        )
+
+        layout.separator()
+        props = layout.operator(
+            "topbar.maya_shelf_item_add",
+            text="Add Shelf Icon",
+            icon='ADD',
+        )
+        props.row = row
+        props = layout.operator(
+            "topbar.maya_shelf_separator_add",
+            text="Add Separator",
+            icon='SPLIT_VERTICAL',
+        )
+        props.column = _maya_shelf_separator_insert_column(tab, item, separator, row)
+        props.row = row
+        props = layout.operator(
+            "topbar.maya_shelf_item_remove_id",
+            text="Remove Separator" if separator is not None else "Remove from Shelf",
+            icon='TRASH',
+        )
+        props.item_id = item_id
 
 
 def _maya_shelf_row_data(tab, row_index):
+    """Items and separators of one Top Bar row, cached per layout revision.
+
+    Header draw code runs on every redraw, so the per-row grouping is memoized.
+    `_maya_shelf_redraw` bumps the revision and clears the cache on every change.
+    """
     cache_key = (
         _maya_shelf_active_scope,
-        id(tab),
+        tab["name"],
         row_index,
         _maya_shelf_layout_revision,
     )
@@ -3190,30 +3060,115 @@ def _maya_shelf_row_data(tab, row_index):
     if cached is not None:
         return cached
 
-    items = tuple(
-        item
-        for item in tab["items"]
-        if item.get("row", 0) == row_index
-    )
+    items = tuple(_maya_shelf_row_items(tab, row_index))
     separators_by_column = {}
-    for separator in tab.setdefault("separators", []):
+    for separator in tab["separators"]:
         if separator.get("row", 0) != row_index:
             continue
         column = max(separator.get("column", 0), 0)
         separators_by_column.setdefault(column, []).append(separator)
-    separators_by_column = {
-        column: tuple(separators)
-        for column, separators in separators_by_column.items()
-    }
-    cached = (items, separators_by_column)
+    cached = (
+        items,
+        {
+            column: tuple(separators)
+            for column, separators in separators_by_column.items()
+        },
+    )
     _maya_shelf_row_cache[cache_key] = cached
     return cached
 
 
+def _maya_shelf_is_drag_source(item_id):
+    return (
+        _maya_shelf_drag_state is not None and
+        _maya_shelf_drag_state.get("kind") == "icon" and
+        _maya_shelf_drag_state.get("source_scope") == _maya_shelf_active_scope and
+        _maya_shelf_drag_state.get("item_id") == item_id
+    )
+
+
+def _maya_shelf_draw_marker(container, *, units_x=None, scale_y=None):
+    """Insertion marker shown at the drop position while dragging."""
+    marker = container.row(align=True)
+    if units_x is not None:
+        marker.ui_units_x = units_x
+    if scale_y is not None:
+        marker.alignment = 'CENTER'
+        marker.scale_y = scale_y
+    marker.label(text="", icon_value=_maya_shelf_marker_icon())
+
+
+def _maya_shelf_draw_separator_button(
+        container, separator, *, units_x=None, scale_y=None, enabled=True,
+):
+    divider = container.row(align=True)
+    if units_x is not None:
+        divider.ui_units_x = units_x
+    if scale_y is not None:
+        divider.alignment = 'CENTER'
+        divider.scale_y = scale_y
+    divider.context_string_set("maya_shelf_item_id", separator["id"])
+    divider.context_string_set("maya_shelf_separator", "1")
+    divider.context_string_set("maya_shelf_background_color", "0,0,0,0")
+    divider.enabled = enabled
+    props = divider.operator("topbar.maya_shelf_action", text="|", emboss=False)
+    props.item_id = separator["id"]
+
+
+def _maya_shelf_draw_item_button(
+        cell, item, *, button_units_x, icon_scale_y, label_scale_y,
+):
+    """Draw one shelf icon plus its short label into `cell`.
+
+    The colors travel to the C++ widget code as button context strings, which
+    `topbar_shelf_button_colors_apply` reads back when laying the region out.
+    """
+    icon_line = cell.row(align=True)
+    icon_line.alignment = 'CENTER'
+    icon_line.scale_y = icon_scale_y
+    button = icon_line.row(align=True)
+    button.ui_units_x = button_units_x
+
+    custom_icon = _maya_shelf_custom_icon(item.get("custom_icon", ""))
+    background_color = item.get(
+        "background_color", _MAYA_SHELF_DEFAULT_BACKGROUND_COLOR,
+    )
+    icon_color = item.get("icon_color", _MAYA_SHELF_DEFAULT_ICON_COLOR)
+    is_drag_source = _maya_shelf_is_drag_source(item["id"])
+    if is_drag_source:
+        background_color = _MAYA_SHELF_DRAG_SOURCE_COLOR
+    if custom_icon:
+        # A user image carries its own colors, only its opacity is configurable.
+        icon_color = (1.0, 1.0, 1.0, icon_color[3])
+    button.context_string_set(
+        "maya_shelf_drag_source", "1" if is_drag_source else "0",
+    )
+    button.context_string_set(
+        "maya_shelf_background_color", _maya_shelf_color_string(background_color),
+    )
+    button.context_string_set(
+        "maya_shelf_icon_color", _maya_shelf_color_string(icon_color),
+    )
+
+    operator_args = {"text": "", "emboss": True}
+    if custom_icon:
+        operator_args["icon_value"] = custom_icon
+    else:
+        operator_args["icon"] = item.get("icon", 'NONE')
+    props = button.operator("topbar.maya_shelf_action", **operator_args)
+    props.action = item.get("action", "")
+    props.operator_id = item.get("operator", "")
+    props.item_id = item["id"]
+    props.tooltip = item.get("label", "Shelf Command")
+
+    label_line = cell.row(align=True)
+    label_line.alignment = 'CENTER'
+    label_line.scale_y = label_scale_y
+    label_line.label(text=item.get("short_text", ""))
+
+
 def _maya_shelf_draw_icon_row(layout, row_index, context):
-    config = _maya_shelf_config(context)
-    tab = _maya_shelf_active_tab()
-    selected = config.get("selected", "")
+    tab = _maya_shelf_active_tab(context)
     row = layout.row(align=False)
     row.alignment = 'LEFT'
     row.scale_x = 1.2
@@ -3234,25 +3189,6 @@ def _maya_shelf_draw_icon_row(layout, row_index, context):
         else:
             marker_index = min(max(marker_index, 0), len(items))
 
-    def draw_marker():
-        marker = row.row(align=True)
-        marker.ui_units_x = 0.55
-        marker.label(text="", icon_value=_maya_shelf_marker_icon())
-
-    def draw_separator(separator):
-        divider = row.row(align=True)
-        divider.ui_units_x = 0.55
-        divider.context_string_set("maya_shelf_item_id", separator["id"])
-        divider.context_string_set("maya_shelf_separator", "1")
-        divider.context_string_set("maya_shelf_background_color", "0,0,0,0")
-        divider.enabled = False
-        props = divider.operator(
-            "topbar.maya_shelf_action",
-            text="|",
-            emboss=False,
-        )
-        props.item_id = separator["id"]
-
     last_column = max(
         len(items),
         max(separators_by_column, default=-1),
@@ -3260,67 +3196,25 @@ def _maya_shelf_draw_icon_row(layout, row_index, context):
     )
     for column in range(last_column + 1):
         if marker_index == column:
-            draw_marker()
+            _maya_shelf_draw_marker(row, units_x=0.55)
         for separator in separators_by_column.get(column, ()):
-            draw_separator(separator)
+            _maya_shelf_draw_separator_button(
+                row, separator, units_x=0.55, enabled=False,
+            )
         if marker_after_end_separator and column == len(items):
-            draw_marker()
+            _maya_shelf_draw_marker(row, units_x=0.55)
         if column < len(items):
             item = items[column]
             item_column = row.column(align=True)
             item_column.ui_units_x = 1.45
             item_column.context_string_set("maya_shelf_item_id", item["id"])
-            icon_line = item_column.row(align=True)
-            icon_line.alignment = 'CENTER'
-            icon_line.scale_y = 0.82
-            button = icon_line.row(align=True)
-            button.ui_units_x = 0.85
-            custom_icon = _maya_shelf_custom_icon(item.get("custom_icon", ""))
-            background_color = item.get(
-                "background_color",
-                (0.18, 0.18, 0.18, 1.0),
+            _maya_shelf_draw_item_button(
+                item_column,
+                item,
+                button_units_x=0.85,
+                icon_scale_y=0.82,
+                label_scale_y=0.68,
             )
-            icon_color = item.get("icon_color", (1.0, 1.0, 1.0, 1.0))
-            is_drag_source = (
-                _maya_shelf_drag_state is not None and
-                _maya_shelf_drag_state.get("kind") == "icon" and
-                _maya_shelf_drag_state.get("source_scope") == _maya_shelf_active_scope and
-                _maya_shelf_drag_state.get("item_id") == item["id"]
-            )
-            if is_drag_source:
-                background_color = (0.08, 0.32, 0.68, 1.0)
-            button.context_string_set(
-                "maya_shelf_drag_source",
-                "1" if is_drag_source else "0",
-            )
-            if custom_icon:
-                icon_color = (1.0, 1.0, 1.0, icon_color[3])
-            button.context_string_set(
-                "maya_shelf_background_color",
-                ",".join(f"{component:.6f}" for component in background_color),
-            )
-            button.context_string_set(
-                "maya_shelf_icon_color",
-                ",".join(f"{component:.6f}" for component in icon_color),
-            )
-            operator_args = {
-                "text": "",
-                "emboss": True,
-                "depress": item["id"] == selected,
-            }
-            if custom_icon:
-                operator_args["icon_value"] = custom_icon
-            else:
-                operator_args["icon"] = item["icon"]
-            props = button.operator("topbar.maya_shelf_action", **operator_args)
-            props.action = item.get("action", "")
-            props.operator_id = item.get("operator", "")
-            props.item_id = item["id"]
-            props.tooltip = item.get("label", "Shelf Command")
-            label_line = item_column.row(align=True)
-            label_line.alignment = 'CENTER'
-            label_line.scale_y = 0.68
-            label_line.label(text=item.get("short_text", ""))
         elif column < last_column:
             placeholder = row.row(align=True)
             placeholder.ui_units_x = _MAYA_SHELF_SLOT_WIDTH / 20.0
@@ -3348,15 +3242,12 @@ class TOPBAR_HT_maya_shelf_lower(Header):
 
 
 def _maya_shelf_adaptive_entries(tab):
+    """Flatten a tab into the single ordered list the Shelf editor lays out."""
     entries = []
-    for row_index in (0, 1):
-        items = [
-            item
-            for item in tab["items"]
-            if item.get("row", 0) == row_index
-        ]
+    for row_index in range(_MAYA_SHELF_ROW_COUNT):
+        items = _maya_shelf_row_items(tab, row_index)
         separators_by_column = {}
-        for separator in tab.setdefault("separators", []):
+        for separator in tab["separators"]:
             if separator.get("row", 0) != row_index:
                 continue
             column = max(separator.get("column", 0), 0)
@@ -3372,9 +3263,7 @@ def _maya_shelf_adaptive_entries(tab):
 
 
 def _maya_shelf_draw_adaptive(layout, context):
-    config = _maya_shelf_config(context)
-    tab = _maya_shelf_active_tab()
-    selected = config.get("selected", "")
+    tab = _maya_shelf_active_tab(context)
     flow = layout.grid_flow(
         row_major=True,
         columns=0,
@@ -3398,80 +3287,21 @@ def _maya_shelf_draw_adaptive(layout, context):
         cell = flow.column(align=True)
         cell.ui_units_x = 1.55
         if entry_type == "MARKER":
-            marker = cell.row(align=True)
-            marker.alignment = 'CENTER'
-            marker.scale_y = 1.6
-            marker.label(text="", icon_value=_maya_shelf_marker_icon())
+            _maya_shelf_draw_marker(cell, scale_y=1.6)
             continue
 
         cell.context_string_set("maya_shelf_item_id", entry["id"])
-
         if entry_type == "SEPARATOR":
-            divider = cell.row(align=True)
-            divider.alignment = 'CENTER'
-            divider.scale_y = 1.6
-            divider.context_string_set("maya_shelf_separator", "1")
-            divider.context_string_set("maya_shelf_background_color", "0,0,0,0")
-            props = divider.operator(
-                "topbar.maya_shelf_action",
-                text="|",
-                emboss=False,
-            )
-            props.item_id = entry["id"]
+            _maya_shelf_draw_separator_button(cell, entry, scale_y=1.6)
             continue
 
-        icon_line = cell.row(align=True)
-        icon_line.alignment = 'CENTER'
-        icon_line.scale_y = 0.9
-        button = icon_line.row(align=True)
-        button.ui_units_x = 0.95
-        custom_icon = _maya_shelf_custom_icon(entry.get("custom_icon", ""))
-        background_color = entry.get(
-            "background_color",
-            (0.18, 0.18, 0.18, 1.0),
+        _maya_shelf_draw_item_button(
+            cell,
+            entry,
+            button_units_x=0.95,
+            icon_scale_y=0.9,
+            label_scale_y=0.7,
         )
-        icon_color = entry.get("icon_color", (1.0, 1.0, 1.0, 1.0))
-        is_drag_source = (
-            _maya_shelf_drag_state is not None and
-            _maya_shelf_drag_state.get("kind") == "icon" and
-            _maya_shelf_drag_state.get("source_scope") == _maya_shelf_active_scope and
-            _maya_shelf_drag_state.get("item_id") == entry["id"]
-        )
-        if is_drag_source:
-            background_color = (0.08, 0.32, 0.68, 1.0)
-        button.context_string_set(
-            "maya_shelf_drag_source",
-            "1" if is_drag_source else "0",
-        )
-        if custom_icon:
-            icon_color = (1.0, 1.0, 1.0, icon_color[3])
-        button.context_string_set(
-            "maya_shelf_background_color",
-            ",".join(f"{component:.6f}" for component in background_color),
-        )
-        button.context_string_set(
-            "maya_shelf_icon_color",
-            ",".join(f"{component:.6f}" for component in icon_color),
-        )
-        operator_args = {
-            "text": "",
-            "emboss": True,
-            "depress": entry["id"] == selected,
-        }
-        if custom_icon:
-            operator_args["icon_value"] = custom_icon
-        else:
-            operator_args["icon"] = entry["icon"]
-        props = button.operator("topbar.maya_shelf_action", **operator_args)
-        props.action = entry.get("action", "")
-        props.operator_id = entry.get("operator", "")
-        props.item_id = entry["id"]
-        props.tooltip = entry.get("label", "Shelf Command")
-
-        label_line = cell.row(align=True)
-        label_line.alignment = 'CENTER'
-        label_line.scale_y = 0.7
-        label_line.label(text=entry.get("short_text", ""))
 
 
 class SHELF_MT_tabs(Menu):
@@ -3480,7 +3310,7 @@ class SHELF_MT_tabs(Menu):
     def draw(self, context):
         layout = self.layout
         config = _maya_shelf_config(context)
-        active_tab = _maya_shelf_active_tab()
+        active_tab = _maya_shelf_tab_for_config(config)
         for tab in config["tabs"]:
             props = layout.operator(
                 "topbar.maya_shelf_tab",

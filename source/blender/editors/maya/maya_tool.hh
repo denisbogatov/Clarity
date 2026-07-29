@@ -49,6 +49,15 @@ struct MayaManipulatorPivotState {
   bool show_orientation_handle = true;
   MayaObjectRuntimeRef last_object;
   int active_axis = 0;
+  /**
+   * Orientation the manipulator had the last time it was derived from a world matrix. An
+   * orthonormalized basis has several valid solutions that differ by a half turn, and the raw
+   * choice can flip between entries on mirrored or negatively scaled objects. Keeping the previous
+   * result lets the closest solution win, so the handles stay where the user left them.
+   */
+  math::QuaternionBase<double> previous_world_orientation =
+      math::QuaternionBase<double>::identity();
+  bool previous_world_orientation_valid = false;
 };
 
 struct MayaToolState {

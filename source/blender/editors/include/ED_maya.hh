@@ -205,6 +205,17 @@ void ED_maya_pivot_reset_orientation(bContext *C);
 void ED_maya_pivot_reset_all(bContext *C, ed::maya::eMayaPivotResetMode mode);
 void ED_maya_pivot_undo_begin(const bContext *C);
 bool ED_maya_pivot_bake(bContext *C, ed::maya::eMayaPivotBakeMode mode);
+/**
+ * Read-only world-space frame of the runtime pivot manipulator of the context window. Returns
+ * false when the window has no Maya runtime yet; the validity flags of \a r_frame tell whether the
+ * position and the orientation carry a pivot the user actually authored.
+ */
+bool ED_maya_pivot_manipulator_state_get(const bContext *C, ed::maya::MayaPivotFrame &r_frame);
+/**
+ * Element the pivot would snap to if the user clicked now. Only filled while Edit Pivot is active
+ * and a temporary snap key is held, so a false return means the overlay has nothing to draw.
+ */
+bool ED_maya_pivot_snap_preview_get(const bContext *C, ed::maya::MayaPivotSnapResult &r_result);
 bool ED_maya_pivot_tool_settings_get(const bContext *C,
                                      ed::maya::MayaPivotToolSettings &r_settings);
 bool ED_maya_pivot_tool_settings_set(const bContext *C,

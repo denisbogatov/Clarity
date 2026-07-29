@@ -60,6 +60,7 @@
 #include "ED_maya.hh"
 #include "ED_object.hh"
 #include "ED_screen.hh"
+#include "ED_transform_snap_object_context.hh"
 #include "ED_undo.hh"
 #include "ED_view3d.hh"
 
@@ -1287,6 +1288,39 @@ static void manipulator_pivot_sync_from_component(MayaWindowRuntime &runtime,
                           MayaObjectRuntimeRef{};
 }
 
+/**
+ * Pick the orthonormalized solution closest to  previous. Rotating a basis by a half turn about
+ * one of its own axes yields another valid basis for the same mirrored matrix, so the raw result can
+ * differ by 180 degrees between two entries into the mode. Sign is normalized as well, since q and
+ * -q describe the same rotation but not the same interpolation.
+ */
+static math::QuaternionBase<double> orientation_nearest_to_previous(
+    const math::QuaternionBase<double> &orientation,
+    const math::QuaternionBase<double> &previous)
+{
+  const math::QuaternionBase<double> half_turns[4] = {
+      math::QuaternionBase<double>::identity(),
+      math::QuaternionBase<double>(0.0, 1.0, 0.0, 0.0),
+      math::QuaternionBase<double>(0.0, 0.0, 1.0, 0.0),
+      math::QuaternionBase<double>(0.0, 0.0, 0.0, 1.0),
+  };
+  math::QuaternionBase<double> best = orientation;
+  double best_dot = -1.0;
+  for (const math::QuaternionBase<double> &half_turn : half_turns) {
+    const math::QuaternionBase<double> candidate = math::normalize(orientation * half_turn);
+    const double candidate_dot = std::abs(math::dot(candidate, previous));
+    if (candidate_dot > best_dot) {
+      best_dot = candidate_dot;
+      best = candidate;
+    }
+  }
+  /* Keep the hemisphere of the previous orientation. */
+  if (math::dot(best, previous) < 0.0) {
+    best = math::QuaternionBase<double>(-best.w, -best.x, -best.y, -best.z);
+  }
+  return best;
+}
+
 static bool manipulator_pivot_sync_from_object(MayaWindowRuntime &runtime, Object &object)
 {
   const MayaTransformCapabilities capabilities = BKE_maya_transform_capabilities_get(object);
@@ -1304,9 +1338,17 @@ static bool manipulator_pivot_sync_from_object(MayaWindowRuntime &runtime, Objec
     position_world = double3(object.object_to_world().location());
   }
   pivot.position_world = position_world;
-  if (!BKE_object_custom_pivot_orientation_world_get(object, pivot.orientation_world)) {
+  math::QuaternionBase<double> orientation_world;
+  if (!BKE_object_custom_pivot_orientation_world_get(object, orientation_world)) {
     return false;
   }
+  if (pivot.previous_world_orientation_valid) {
+    orientation_world = orientation_nearest_to_previous(orientation_world,
+                                                        pivot.previous_world_orientation);
+  }
+  pivot.orientation_world = orientation_world;
+  pivot.previous_world_orientation = orientation_world;
+  pivot.previous_world_orientation_valid = true;
   pivot.position_valid = true;
   pivot.orientation_valid = true;
   pivot.last_object = ED_maya_object_runtime_ref_create(object);
@@ -1587,6 +1629,146 @@ class MayaComponentPivotEditTarget final : public MayaPivotEditTargetBackend {
   void commit() override {}
 };
 
+/**
+ * Region-space pointer of the context window. #wmEvent::mval is only meaningful while an event is
+ * being handled, so callers outside the dispatcher have to derive it from the window event state.
+ */
+static int2 pointer_region_position_get(const bContext *C)
+{
+  const wmWindow *win = CTX_wm_window(C);
+  const ARegion *region = CTX_wm_region(C);
+  if (win == nullptr || win->runtime == nullptr || win->runtime->eventstate == nullptr ||
+      region == nullptr)
+  {
+    return int2(0);
+  }
+  return int2(win->runtime->eventstate->xy[0] - region->winrct.xmin,
+              win->runtime->eventstate->xy[1] - region->winrct.ymin);
+}
+
+/**
+ * Snap query behind the pivot snap preview. #maya_pivot_click_exec runs the same query when the
+ * user clicks and keeps its own copy for now, so both have to be updated together.
+ *
+ * \a r_result is reset first, so a miss leaves #MayaPivotSnapTargetType::None behind.
+ */
+static void pivot_snap_target_query(const bContext *C,
+                                    const ARegion &region,
+                                    const View3D &view,
+                                    const int2 &mouse_region,
+                                    const double3 &previous_position,
+                                    MayaPivotSnapResult &r_result)
+{
+  r_result = {};
+  ed::transform::SnapObjectContext *snap_context = ed::transform::snap_object_context_create();
+  if (snap_context == nullptr) {
+    return;
+  }
+  ed::transform::SnapObjectParams snap_params{};
+  snap_params.snap_target_select = SCE_SNAP_TARGET_ALL;
+  snap_params.edit_mode_type = CTX_data_mode_enum(C) == CTX_MODE_EDIT_MESH ?
+                                   ed::transform::SNAP_GEOM_EDIT :
+                                   ed::transform::SNAP_GEOM_FINAL;
+  snap_params.occlusion_test = ed::transform::SNAP_OCCLUSION_AS_SEEM;
+  snap_params.ignore_editmode_filtering = true;
+
+  float hit_position[3] = {};
+  float hit_normal[3] = {};
+  float hit_face_normal[3] = {};
+  float hit_object_matrix[4][4] = {};
+  int hit_index = -1;
+  const Object *hit_object = nullptr;
+  const float mouse_float[2] = {float(mouse_region.x), float(mouse_region.y)};
+  const float previous[3] = {float(previous_position.x),
+                             float(previous_position.y),
+                             float(previous_position.z)};
+  float snap_distance = 24.0f * U.pixelsize;
+  const eSnapMode hit_type = ed::transform::snap_object_project_view3d_ex(
+      snap_context,
+      CTX_data_ensure_evaluated_depsgraph(C),
+      &region,
+      &view,
+      eSnapMode(SCE_SNAP_TO_VERTEX | SCE_SNAP_TO_EDGE | SCE_SNAP_TO_FACE),
+      &snap_params,
+      nullptr,
+      mouse_float,
+      previous,
+      &snap_distance,
+      hit_position,
+      hit_normal,
+      &hit_index,
+      &hit_object,
+      hit_object_matrix,
+      hit_face_normal);
+  ed::transform::snap_object_context_destroy(snap_context);
+  if (hit_type == SCE_SNAP_TO_NONE) {
+    return;
+  }
+
+  r_result.position_world = double3(hit_position);
+  r_result.type = hit_type & SCE_SNAP_TO_VERTEX ?
+                      MayaPivotSnapTargetType::Vertex :
+                      (hit_type & SCE_SNAP_TO_EDGE ? MayaPivotSnapTargetType::Edge :
+                                                     MayaPivotSnapTargetType::Face);
+  r_result.object = const_cast<Object *>(hit_object);
+  r_result.component_index = hit_index;
+  /* The orientation a click would apply depends on its modifier keys, so the preview deliberately
+   * reports only which element is under the mouse. */
+}
+
+void pivot_edit_snap_preview_clear(MayaWindowRuntime &runtime)
+{
+  MayaPivotEditState &state = runtime.pivot_edit;
+  state.snap_preview = {};
+  state.snap_preview_mouse = int2(0);
+  state.snap_preview_queried = false;
+}
+
+void pivot_edit_snap_preview_update(const bContext *C,
+                                    MayaWindowRuntime &runtime,
+                                    const int2 &mouse_region)
+{
+  MayaPivotEditState &state = runtime.pivot_edit;
+  /* The preview exists only as feedback for the snap key the user is holding right now. A running
+   * drag has no hover target either, and its snapping must not pull an extra depsgraph evaluation
+   * into the modal loop. */
+  if (state.target == MayaPivotEditTarget::None || runtime.transform_active ||
+      runtime.temporary.snap_stack.is_empty())
+  {
+    pivot_edit_snap_preview_clear(runtime);
+    return;
+  }
+  if (state.snap_preview_queried && state.snap_preview_mouse == mouse_region) {
+    return;
+  }
+
+  ARegion *region = CTX_wm_region(C);
+  const View3D *view = CTX_wm_view3d(C);
+  if (region == nullptr || region->regiontype != RGN_TYPE_WINDOW || view == nullptr) {
+    pivot_edit_snap_preview_clear(runtime);
+    return;
+  }
+
+  const MayaPivotSnapTargetType previous_type = state.snap_preview.type;
+  const Object *previous_object = state.snap_preview.object;
+  const int previous_index = state.snap_preview.component_index;
+  state.snap_preview_mouse = mouse_region;
+  state.snap_preview_queried = true;
+  pivot_snap_target_query(C,
+                          *region,
+                          *view,
+                          mouse_region,
+                          runtime.tool.manipulator_pivot.position_world,
+                          state.snap_preview);
+
+  /* Redrawing only on a different element keeps plain pointer motion out of the draw loop. */
+  if (state.snap_preview.type != previous_type || state.snap_preview.object != previous_object ||
+      state.snap_preview.component_index != previous_index)
+  {
+    ED_region_tag_redraw(region);
+  }
+}
+
 void pivot_edit_end(bContext *C, MayaWindowRuntime &runtime)
 {
   manipulator_pivot_last_object_resolve(C, runtime);
@@ -1606,6 +1788,7 @@ void pivot_edit_end(bContext *C, MayaWindowRuntime &runtime)
   state.exit_after_drag = false;
   state.restart_after_drag = false;
   runtime.temporary.edit_pivot = false;
+  pivot_edit_snap_preview_clear(runtime);
 
   if (C != nullptr && ended_target != MayaPivotEditTarget::None) {
     ED_workspace_status_text(C, nullptr);
@@ -1818,6 +2001,8 @@ void pivot_edit_input_reset(bContext *C, MayaWindowRuntime &runtime)
   if (wmWindowManager *wm = CTX_wm_manager(C); wm != nullptr && wm->runtime != nullptr) {
     wm->runtime->maya_snap_temporary_mode = uint8_t(MayaSnapMode::None);
   }
+  /* The snap keys are considered released, so the hovered target they previewed is gone too. */
+  pivot_edit_snap_preview_clear(runtime);
 
   /* Losing focus must not turn the toggle off: like in Maya, Edit Pivot survives leaving and
    * re-entering the window. Only the transient input overlays are dropped, and a drag that was
@@ -1851,7 +2036,7 @@ void pivot_edit_validate(bContext *C, MayaWindowRuntime &runtime)
   if (context_changed) {
     if (runtime.transform_active) {
       state.restart_after_drag = true;
-          state.phase = MayaPivotEditPhase::PivotCommitPending;
+      state.phase = MayaPivotEditPhase::PivotCommitPending;
       return;
     }
 
@@ -2161,6 +2346,33 @@ void ED_maya_pivot_undo_begin(const bContext *C)
   if (ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_ensure(C)) {
     ed::maya::pivot_undo_step_begin(C, *runtime);
   }
+}
+
+bool ED_maya_pivot_manipulator_state_get(const bContext *C, ed::maya::MayaPivotFrame &r_frame)
+{
+  const ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
+  if (runtime == nullptr) {
+    return false;
+  }
+  const ed::maya::MayaManipulatorPivotState &pivot = runtime->tool.manipulator_pivot;
+  r_frame.position_world = pivot.position_world;
+  r_frame.orientation_world = pivot.orientation_world;
+  r_frame.position_valid = pivot.position_valid;
+  r_frame.orientation_valid = pivot.orientation_valid;
+  return true;
+}
+
+bool ED_maya_pivot_snap_preview_get(const bContext *C,
+                                    ed::maya::MayaPivotSnapResult &r_result)
+{
+  const ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
+  if (runtime == nullptr ||
+      runtime->pivot_edit.snap_preview.type == ed::maya::MayaPivotSnapTargetType::None)
+  {
+    return false;
+  }
+  r_result = runtime->pivot_edit.snap_preview;
+  return true;
 }
 
 bool ED_maya_pivot_tool_settings_get(const bContext *C,
@@ -2517,6 +2729,14 @@ bool ED_maya_snap_override_set(const bContext *C,
   if (wm != nullptr) {
     wm->runtime->maya_snap_temporary_mode = uint8_t(
         stack.is_empty() ? ed::maya::MayaSnapMode::None : stack.last());
+  }
+  /* The snap preview lives and dies with the held keys, so it follows the same stack. */
+  if (stack.is_empty()) {
+    ed::maya::pivot_edit_snap_preview_clear(*runtime);
+  }
+  else {
+    ed::maya::pivot_edit_snap_preview_update(
+        C, *runtime, ed::maya::pointer_region_position_get(C));
   }
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
   return true;

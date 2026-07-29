@@ -81,6 +81,11 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     ed::maya::MayaWindowRuntime &runtime,
     const ed::maya::MayaInputAction &action)
 {
+  /* Keep the snap preview under the cursor. The update itself is a no-op unless Edit Pivot owns a
+   * manipulator and a snap key is held, and it skips the query while the pointer has not moved, so
+   * running it for every action costs nothing measurable. */
+  ed::maya::pivot_edit_snap_preview_update(C, runtime, action.mouse_region);
+
   const ed::maya::MayaDispatchResult pivot_click_result =
       ed::maya::pivot_edit_click_handle_action(C, runtime, action);
   if (pivot_click_result != ed::maya::MayaDispatchResult::PassThrough) {

@@ -648,8 +648,10 @@ const EnumPropertyItem rna_enum_wm_report_items[] = {
 #  include "DNA_ID.h"
 #  include "DNA_workspace_types.h"
 
+#  include "BKE_context.hh"
 #  include "BKE_global.hh"
 
+#  include "ED_maya.hh"
 #  include "ED_screen.hh"
 
 #  include "UI_interface.hh"
@@ -1598,6 +1600,75 @@ static int rna_WindowManager_maya_snap_temporary_mode_get(PointerRNA *ptr)
 {
   const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
   return wm->runtime->maya_snap_temporary_mode;
+}
+
+struct MayaPivotStateSnapshot {
+  ed::maya::MayaPivotFrame frame;
+  bool edit_active = false;
+  bool pinned = false;
+};
+
+/**
+ * The pivot manipulator lives in the per-window Maya editor runtime while RNA getters run without
+ * a context, so the read-only queries below run on a throwaway context around the active window.
+ * These properties exist for measurement and UI feedback, so the active window is the right scope.
+ */
+static MayaPivotStateSnapshot rna_WindowManager_maya_pivot_state(PointerRNA *ptr)
+{
+  MayaPivotStateSnapshot snapshot;
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  if (wm->runtime == nullptr || wm->runtime->winactive == nullptr) {
+    return snapshot;
+  }
+  bContext *C = CTX_create();
+  CTX_wm_manager_set(C, wm);
+  CTX_wm_window_set(C, wm->runtime->winactive);
+  ED_maya_pivot_manipulator_state_get(C, snapshot.frame);
+  snapshot.edit_active = ED_maya_pivot_edit_target_get(C) != ed::maya::MayaPivotEditTarget::None;
+  ed::maya::MayaPivotToolSettings settings;
+  if (ED_maya_pivot_tool_settings_get(C, settings)) {
+    snapshot.pinned = settings.pin_component_pivot;
+  }
+  CTX_free(C);
+  return snapshot;
+}
+
+static bool rna_WindowManager_maya_pivot_edit_active_get(PointerRNA *ptr)
+{
+  return rna_WindowManager_maya_pivot_state(ptr).edit_active;
+}
+
+static bool rna_WindowManager_maya_pivot_position_valid_get(PointerRNA *ptr)
+{
+  return rna_WindowManager_maya_pivot_state(ptr).frame.position_valid;
+}
+
+static bool rna_WindowManager_maya_pivot_orientation_valid_get(PointerRNA *ptr)
+{
+  return rna_WindowManager_maya_pivot_state(ptr).frame.orientation_valid;
+}
+
+static bool rna_WindowManager_maya_pivot_pinned_get(PointerRNA *ptr)
+{
+  return rna_WindowManager_maya_pivot_state(ptr).pinned;
+}
+
+static void rna_WindowManager_maya_pivot_position_get(PointerRNA *ptr, float *values)
+{
+  const double3 position = rna_WindowManager_maya_pivot_state(ptr).frame.position_world;
+  values[0] = float(position.x);
+  values[1] = float(position.y);
+  values[2] = float(position.z);
+}
+
+static void rna_WindowManager_maya_pivot_orientation_get(PointerRNA *ptr, float *values)
+{
+  const math::QuaternionBase<double> orientation =
+      rna_WindowManager_maya_pivot_state(ptr).frame.orientation_world;
+  values[0] = float(orientation.w);
+  values[1] = float(orientation.x);
+  values[2] = float(orientation.y);
+  values[3] = float(orientation.z);
 }
 
 static PointerRNA rna_WindowManager_xr_session_state_get(PointerRNA *ptr)
@@ -3115,6 +3186,55 @@ static void rna_def_windowmanager(BlenderRNA *brna)
       prop, "rna_WindowManager_maya_snap_temporary_mode_get", nullptr, nullptr);
   RNA_def_property_ui_text(
       prop, "Temporary Maya Snap Mode", "Last pressed temporary Maya snapping override");
+
+  prop = RNA_def_property(srna, "maya_pivot_edit_active", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_boolean_funcs(prop, "rna_WindowManager_maya_pivot_edit_active_get", nullptr);
+  RNA_def_property_ui_text(prop,
+                           "Maya Edit Pivot Active",
+                           "Edit Pivot owns a pivot manipulator in the active window");
+
+  prop = RNA_def_property(srna, "maya_pivot_position", PROP_FLOAT, PROP_TRANSLATION);
+  RNA_def_property_array(prop, 3);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_float_funcs(
+      prop, "rna_WindowManager_maya_pivot_position_get", nullptr, nullptr);
+  RNA_def_property_ui_text(
+      prop, "Maya Pivot Position", "World-space position of the Maya pivot manipulator");
+
+  prop = RNA_def_property(srna, "maya_pivot_orientation", PROP_FLOAT, PROP_QUATERNION);
+  RNA_def_property_array(prop, 4);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_float_funcs(
+      prop, "rna_WindowManager_maya_pivot_orientation_get", nullptr, nullptr);
+  RNA_def_property_ui_text(
+      prop, "Maya Pivot Orientation", "World-space orientation of the Maya pivot manipulator");
+
+  prop = RNA_def_property(srna, "maya_pivot_position_valid", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_boolean_funcs(
+      prop, "rna_WindowManager_maya_pivot_position_valid_get", nullptr);
+  RNA_def_property_ui_text(prop,
+                           "Maya Pivot Position Valid",
+                           "The pivot manipulator position was authored and overrides the "
+                           "regular transform center");
+
+  prop = RNA_def_property(srna, "maya_pivot_orientation_valid", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_boolean_funcs(
+      prop, "rna_WindowManager_maya_pivot_orientation_valid_get", nullptr);
+  RNA_def_property_ui_text(prop,
+                           "Maya Pivot Orientation Valid",
+                           "The pivot manipulator orientation was authored and overrides the "
+                           "regular transform orientation");
+
+  prop = RNA_def_property(srna, "maya_pivot_pinned", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_boolean_funcs(prop, "rna_WindowManager_maya_pivot_pinned_get", nullptr);
+  RNA_def_property_ui_text(
+      prop,
+      "Maya Pivot Pinned",
+      "The component pivot stays where it was authored instead of following the selection");
 
   RNA_api_wm(srna);
   RNA_api_asset_library_loading_status(srna);
