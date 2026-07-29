@@ -2277,6 +2277,21 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
   GizmoGroup *ggd = static_cast<GizmoGroup *>(gzgroup->customdata);
   const int axis_idx = BLI_array_findindex(ggd->gizmos, ARRAY_SIZE(ggd->gizmos), &gz);
 
+  if (ED_maya_interaction_enabled(C) &&
+      ELEM(axis_idx,
+           MAN_AXIS_TRANS_X,
+           MAN_AXIS_TRANS_Y,
+           MAN_AXIS_TRANS_Z,
+           MAN_AXIS_ROT_X,
+           MAN_AXIS_ROT_Y,
+           MAN_AXIS_ROT_Z,
+           MAN_AXIS_SCALE_X,
+           MAN_AXIS_SCALE_Y,
+           MAN_AXIS_SCALE_Z))
+  {
+    ED_maya_pivot_active_axis_set(C, gizmo_orientation_axis(axis_idx, nullptr));
+  }
+
   const float mval[2] = {float(event->mval[0]), float(event->mval[1])};
   gizmo_3d_draw_invoke(gzgroup, CTX_wm_region(C), axis_idx, mval);
 

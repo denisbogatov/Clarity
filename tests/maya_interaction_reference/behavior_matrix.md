@@ -57,7 +57,9 @@ on until it is toggled off. Holding a key is not part of the model.
 | Object, Edit Pivot on | Move | `Insert` | none | unchanged | Edit Pivot off | Move stays active | unchanged | n/a | n/a |
 | Object, Edit Pivot on | Move | `Esc` | none | unchanged | Edit Pivot off | Move stays active | unchanged | n/a | n/a |
 | Object, Edit Pivot on | Move | `D` held down (key repeat) | none | unchanged | stays on — repeats must not flip the mode | Move stays active | unchanged | n/a | n/a |
-| Object, Edit Pivot on | Move | switch window and back | none | unchanged | TODO — record whether Maya keeps the mode across focus loss | Move stays active | unchanged | n/a | n/a |
+| Object, Edit Pivot on | Move | switch window and back | none | unchanged | Edit Pivot stays on; transient snap and hover state is cleared; TODO — verify Maya 2025 parity | Move stays active | temporary snapping is released | n/a | n/a |
+| Object, Edit Pivot dragging | Move | `D` / `Insert` press | finish or cancel the running LMB drag | unchanged | current drag owns its tail, then Edit Pivot turns off (`exit_after_drag`) | Move stays active | unchanged | pivot restored, then Edit Pivot turns off | TODO |
+| Object, Edit Pivot dragging | Move | switch window during drag | LMB drag interrupted by focus loss | unchanged | Edit Pivot stays requested and the manipulator is rebuilt after the transform tail (`restart_after_drag`); TODO — verify Maya 2025 parity | Move stays active | temporary snapping and hover preview clear | pivot restored, Edit Pivot stays on | TODO |
 | Object, Edit Pivot on | Move | object deleted | none | object gone | Edit Pivot off, no stale object reference | Move stays active | unchanged | n/a | deletion undone, Edit Pivot still off |
 | Object, Edit Pivot on | Move | `Ctrl+Z` | none | TODO | TODO | Move stays active | unchanged | n/a | TODO |
 | Object → Edit Mesh, Edit Pivot on | Move | `Tab` | none | unchanged | switches to the component pivot | Move stays active | unchanged | n/a | TODO |
@@ -76,6 +78,38 @@ on until it is toggled off. Holding a key is not part of the model.
 | Edit Mesh | Move | `V` hold | gizmo drag | unchanged | unchanged | Move | vertex snap while held | as above | as above |
 | Object, Edit Pivot | Edit Pivot | `V` hold | LMB drag | unchanged | pivot snapped to vertex | Edit Pivot | vertex snap while held | pivot restored | pivot restored |
 | Object, one object | Rotate / Scale | `X` / `C` / `V` hold | gizmo drag | unchanged | unchanged | Rotate / Scale | out of scope until the Maya reference is captured — must not be guessed | n/a | n/a |
+
+## Active-axis MMB drag
+
+Plain `MMB` starts the active transform tool constrained to the axis handle used most recently
+(X before any handle has been used). The constraint follows the displayed Maya/custom orientation.
+Releasing `MMB` confirms; `Esc` or `RMB` cancels the transform and its single undo step. `Alt+MMB`
+remains viewport navigation and must never enter this path. Edit Pivot supports Move and Rotate;
+Scale is consumed without starting a transform so it cannot accidentally affect the object.
+
+| Start mode | Tool before | Last active axis | Mouse | Expected transform | Tool after | Cancel | Undo |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Object, one object | Move | X | plain `MMB` drag | translation constrained to the displayed X axis | Move stays active | transform restored, Move stays active | transform restored |
+| Object, one object | Rotate | Y | plain `MMB` drag | rotation constrained to the displayed Y axis | Rotate stays active | transform restored, Rotate stays active | transform restored |
+| Object, one object | Scale | Z | plain `MMB` drag | Maya scale behavior constrained to the displayed Z axis | Scale stays active | transform restored, Scale stays active | transform restored |
+| Object, Edit Pivot on | Move | X / Y / Z | plain `MMB` drag | pivot translation constrained to the displayed active axis; object unchanged | Move and Edit Pivot stay active | pivot restored, Edit Pivot stays active | pivot restored |
+| Object, Edit Pivot on | Rotate | X / Y / Z | plain `MMB` drag | pivot rotation constrained to the displayed active axis; object unchanged | Rotate and Edit Pivot stay active | pivot restored, Edit Pivot stays active | pivot restored |
+| Object, Edit Pivot on | Scale | any | plain `MMB` drag | no transform starts; pivot and object remain unchanged | Scale and Edit Pivot stay active | n/a | no undo step |
+| Object, one object | Move / Rotate / Scale | any | `Alt+MMB` drag | viewport pans; no transform starts | tool unchanged | view restored | no undo step |
+| Object, one object | Select | any | plain `MMB` drag | no transform starts and selection is unchanged | Select stays active | n/a | no undo step |
+
+## Edit Pivot snap-target preview overlay
+
+The preview is feedback only: it does not author the pivot or change selection. It uses
+`rgba(0.15, 1.0, 0.35, 1.0)`, distinct from selection colors, and is visible only while Edit Pivot
+has a valid hovered preview, a temporary snap key is held, and no transform is active.
+
+| Start mode | Keys / state | Pointer target | Expected overlay | Pivot / selection | Clear condition |
+| --- | --- | --- | --- | --- | --- |
+| Object or Edit Mesh, Edit Pivot on | `X` / `C` / `V` held, no transform | vertex | bright green point on the target vertex | unchanged / unchanged | snap-key release, Edit Pivot exit, transform begin, or miss |
+| Object or Edit Mesh, Edit Pivot on | `X` / `C` / `V` held, no transform | edge | bright green point at the snap position plus a line over the complete target edge | unchanged / unchanged | as above |
+| Object or Edit Mesh, Edit Pivot on | `X` / `C` / `V` held, no transform | face | bright green point at the snap position plus a closed outline around the target polygon | unchanged / unchanged | as above |
+| Object or Edit Mesh, Edit Pivot on | temporary snap key held | no valid target | no preview geometry | unchanged / unchanged | remains hidden until a valid target is hovered |
 
 ## Navigation (task item 8)
 

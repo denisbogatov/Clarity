@@ -8,7 +8,10 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
+
+#include "BLI_math_matrix.hh"
 
 #include "BKE_customdata.hh"
 #include "BKE_editmesh.hh"
@@ -25,6 +28,7 @@
 #include "DNA_mesh_types.h"
 #include "DNA_userdef_types.h"
 
+#include "ED_maya.hh"
 #include "ED_view3d.hh"
 
 #include "GPU_capabilities.hh"
@@ -45,6 +49,219 @@ inline bool maya_face_centers_visible(const Object &object)
   const Object *object_orig = DEG_get_original(&object);
   return object_orig != nullptr && (object_orig->dtx & OB_DRAW_FACE_CENTERS) != 0;
 }
+
+/**
+ * Highlight the mesh component under the pointer while Maya Edit Pivot snapping is active.
+ */
+class MayaPivotSnapPreview : Overlay {
+ private:
+  PassSimple ps_ = {"Maya Pivot Snap Preview"};
+  LinePrimitiveBuf lines_;
+  StorageVectorBuffer<VertexData> points_ = {"maya_pivot_snap_preview_points"};
+
+  ed::maya::MayaPivotSnapResult target_;
+  float4 color_ = float4(0.15f, 1.0f, 0.35f, 1.0f);
+  bool object_synced_ = false;
+  bool in_front_ = false;
+
+  static bool object_matches(const Object &object, const Object &target)
+  {
+    if (&object == &target) {
+      return true;
+    }
+    return DEG_get_original(&object) == DEG_get_original(&target);
+  }
+
+  std::optional<float4x4> matching_object_to_world(const ObjectRef &ob_ref) const
+  {
+    if (target_.object == nullptr || !object_matches(*ob_ref.object, *target_.object)) {
+      return std::nullopt;
+    }
+    if (!target_.object_to_world.has_value()) {
+      return ob_ref.object_to_world(0);
+    }
+    for (const int instance : IndexRange(ob_ref.instances_count())) {
+      const float4x4 matrix = ob_ref.object_to_world(instance);
+      if (math::is_equal(matrix, *target_.object_to_world, 1.0e-5f)) {
+        return matrix;
+      }
+    }
+    return std::nullopt;
+  }
+
+ public:
+  MayaPivotSnapPreview(const SelectionType selection_type)
+      : lines_(selection_type, "maya_pivot_snap_preview_lines")
+  {
+  }
+
+  void begin_sync(Resources &res, const State &state) final
+  {
+    target_ = {};
+    object_synced_ = false;
+    in_front_ = false;
+    lines_.clear();
+    points_.clear();
+
+    enabled_ = state.is_space_v3d() && !state.hide_overlays && !state.is_depth_only_drawing &&
+               !res.is_selection();
+    if (!enabled_) {
+      return;
+    }
+
+    const DRWContext *draw_ctx = DRW_context_get();
+    enabled_ = draw_ctx != nullptr && draw_ctx->evil_C != nullptr &&
+               ED_maya_pivot_snap_preview_get(draw_ctx->evil_C, target_) &&
+               target_.position_world.has_value() &&
+               ELEM(target_.type,
+                    ed::maya::MayaPivotSnapTargetType::Vertex,
+                    ed::maya::MayaPivotSnapTargetType::Edge,
+                    ed::maya::MayaPivotSnapTargetType::Face);
+    if (!enabled_) {
+      return;
+    }
+
+    const double3 &position = *target_.position_world;
+    points_.append(
+        VertexData{float4(float(position.x), float(position.y), float(position.z), 0.0f), color_});
+  }
+
+  void object_sync(Manager & /*manager*/,
+                   const ObjectRef &ob_ref,
+                   Resources & /*res*/,
+                   const State &state) final
+  {
+    if (!enabled_ || object_synced_ || ob_ref.object->type != OB_MESH) {
+      return;
+    }
+
+    const std::optional<float4x4> object_to_world = matching_object_to_world(ob_ref);
+    if (!object_to_world.has_value()) {
+      return;
+    }
+    object_synced_ = true;
+    in_front_ = state.use_in_front && (ob_ref.object->dtx & OB_DRAW_IN_FRONT);
+
+    if (target_.type == ed::maya::MayaPivotSnapTargetType::Vertex ||
+        target_.component_index < 0)
+    {
+      return;
+    }
+
+    const auto position_world = [&](const float3 &position) {
+      return math::transform_point(*object_to_world, position);
+    };
+
+    Object *object_orig = DEG_get_original(ob_ref.object);
+    BMEditMesh *edit_mesh = object_orig != nullptr ? BKE_editmesh_from_object(object_orig) :
+                                                    nullptr;
+    if (edit_mesh != nullptr) {
+      if (target_.type == ed::maya::MayaPivotSnapTargetType::Edge) {
+        const BMEdge *edge = BM_edge_at_index_find(edit_mesh->bm, target_.component_index);
+        if (edge != nullptr) {
+          lines_.append(position_world(float3(edge->v1->co)),
+                        position_world(float3(edge->v2->co)),
+                        color_);
+        }
+        return;
+      }
+
+      const BMFace *face = BM_face_at_index_find(edit_mesh->bm, target_.component_index);
+      if (face == nullptr || face->len < 2) {
+        return;
+      }
+      const BMLoop *loop_first = BM_FACE_FIRST_LOOP(face);
+      const BMLoop *loop = loop_first;
+      do {
+        lines_.append(position_world(float3(loop->v->co)),
+                      position_world(float3(loop->next->v->co)),
+                      color_);
+        loop = loop->next;
+      } while (loop != loop_first);
+      return;
+    }
+
+    Mesh &mesh = DRW_object_get_data_for_drawing<Mesh>(*ob_ref.object);
+    const Span<float3> positions = mesh.vert_positions();
+    if (target_.type == ed::maya::MayaPivotSnapTargetType::Edge) {
+      const Span<int2> edges = mesh.edges();
+      if (!edges.index_range().contains(target_.component_index)) {
+        return;
+      }
+      const int2 edge = edges[target_.component_index];
+      if (!positions.index_range().contains(edge.x) || !positions.index_range().contains(edge.y)) {
+        return;
+      }
+      lines_.append(position_world(positions[edge.x]), position_world(positions[edge.y]), color_);
+      return;
+    }
+
+    const OffsetIndices<int> faces = mesh.faces();
+    if (!faces.index_range().contains(target_.component_index)) {
+      return;
+    }
+    const Span<int> corner_verts = mesh.corner_verts();
+    const IndexRange face = faces[target_.component_index];
+    if (face.size() < 2) {
+      return;
+    }
+    for (const int i : IndexRange(face.size())) {
+      const int vert = corner_verts[face[i]];
+      const int vert_next = corner_verts[face[(i + 1) % face.size()]];
+      if (!positions.index_range().contains(vert) ||
+          !positions.index_range().contains(vert_next))
+      {
+        continue;
+      }
+      lines_.append(position_world(positions[vert]), position_world(positions[vert_next]), color_);
+    }
+  }
+
+  void end_sync(Resources &res, const State &state) final
+  {
+    if (!enabled_) {
+      return;
+    }
+
+    ps_.init();
+    ps_.bind_ubo(OVERLAY_GLOBALS_SLOT, &res.globals_buf);
+    ps_.bind_ubo(DRW_CLIPPING_UBO_SLOT, &res.clip_planes_buf);
+    {
+      PassSimple::Sub &sub = ps_.sub("component_outline");
+      sub.state_set(DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH |
+                        DRW_STATE_DEPTH_LESS_EQUAL,
+                    state.clipping_plane_count);
+      sub.shader_set(res.shaders->armature_wire.get());
+      sub.push_constant("alpha", 1.0f);
+      lines_.end_sync(sub);
+    }
+    {
+      PassSimple::Sub &sub = ps_.sub("snap_position");
+      sub.state_set(DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH |
+                        DRW_STATE_DEPTH_LESS_EQUAL | DRW_STATE_BLEND_ALPHA,
+                    state.clipping_plane_count);
+      sub.shader_set(res.shaders->extra_point.get());
+      points_.push_update();
+      sub.bind_ssbo("data_buf", &points_);
+      sub.draw_procedural(GPU_PRIM_POINTS, 1, points_.size());
+    }
+  }
+
+  void draw_line(Framebuffer &framebuffer, Manager &manager, View &view) final
+  {
+    if (!enabled_) {
+      return;
+    }
+
+    GPU_framebuffer_bind(framebuffer);
+    manager.submit(ps_, view);
+  }
+
+  bool is_in_front() const
+  {
+    return in_front_;
+  }
+};
 
 /**
  * Draw edit mesh overlays.

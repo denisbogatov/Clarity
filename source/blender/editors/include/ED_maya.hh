@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 
+#include "BLI_math_matrix_types.hh"
 #include "BLI_math_quaternion_types.hh"
 #include "BLI_math_vector_types.hh"
 
@@ -94,6 +95,7 @@ struct MayaPivotSnapResult {
   std::optional<math::QuaternionBase<double>> orientation_world;
   MayaPivotSnapTargetType type = MayaPivotSnapTargetType::None;
   Object *object = nullptr;
+  std::optional<float4x4> object_to_world;
   int component_index = -1;
 };
 

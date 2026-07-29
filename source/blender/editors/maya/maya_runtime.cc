@@ -1711,6 +1711,7 @@ static void pivot_snap_target_query(const bContext *C,
                       (hit_type & SCE_SNAP_TO_EDGE ? MayaPivotSnapTargetType::Edge :
                                                      MayaPivotSnapTargetType::Face);
   r_result.object = const_cast<Object *>(hit_object);
+  r_result.object_to_world = float4x4(hit_object_matrix);
   r_result.component_index = hit_index;
   /* The orientation a click would apply depends on its modifier keys, so the preview deliberately
    * reports only which element is under the mouse. */
@@ -1749,9 +1750,7 @@ void pivot_edit_snap_preview_update(const bContext *C,
     return;
   }
 
-  const MayaPivotSnapTargetType previous_type = state.snap_preview.type;
-  const Object *previous_object = state.snap_preview.object;
-  const int previous_index = state.snap_preview.component_index;
+  const bool had_preview = state.snap_preview.type != MayaPivotSnapTargetType::None;
   state.snap_preview_mouse = mouse_region;
   state.snap_preview_queried = true;
   pivot_snap_target_query(C,
@@ -1761,10 +1760,9 @@ void pivot_edit_snap_preview_update(const bContext *C,
                           runtime.tool.manipulator_pivot.position_world,
                           state.snap_preview);
 
-  /* Redrawing only on a different element keeps plain pointer motion out of the draw loop. */
-  if (state.snap_preview.type != previous_type || state.snap_preview.object != previous_object ||
-      state.snap_preview.component_index != previous_index)
-  {
+  /* Edge and face snap positions can move within the same component, so every valid hover update
+   * needs a redraw. A miss after a hit also redraws once to remove the previous preview. */
+  if (had_preview || state.snap_preview.type != MayaPivotSnapTargetType::None) {
     ED_region_tag_redraw(region);
   }
 }
@@ -2816,6 +2814,7 @@ void ED_maya_transform_begin(const bContext *C,
   ed::maya::pivot_undo_step_begin(C, *runtime);
   runtime->transform_active = true;
   ed::maya::MayaPivotEditState &pivot = runtime->pivot_edit;
+  ed::maya::pivot_edit_snap_preview_clear(*runtime);
   if (pivot.target != ed::maya::MayaPivotEditTarget::None &&
       (pivot.target == ed::maya::MayaPivotEditTarget::ObjectOrigin ||
        is_maya_pivot_transform))

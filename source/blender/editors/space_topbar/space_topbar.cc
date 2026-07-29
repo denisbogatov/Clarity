@@ -203,6 +203,11 @@ static void shelf_main_region_init(wmWindowManager *wm, ARegion *region)
 {
   region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_VERTICAL_HIDE;
   ED_region_panels_init(wm, region);
+  WM_event_remove_ui_handler(&region->runtime->handlers,
+                             topbar_shelf_region_event_handler,
+                             nullptr,
+                             nullptr,
+                             false);
   WM_event_add_ui_handler(nullptr,
                           &region->runtime->handlers,
                           topbar_shelf_region_event_handler,
@@ -276,11 +281,13 @@ static void shelf_main_region_layout(const bContext *C, ARegion *region)
 
 static wmOperatorStatus shelf_global_redraw_exec(bContext *C, wmOperator * /*op*/)
 {
-  wmWindow *window = CTX_wm_window(C);
-  if (window != nullptr) {
-    for (ScrArea &area : window->global_areas.areabase) {
-      if (area.spacetype == SPACE_TOPBAR) {
-        ED_area_tag_redraw(&area);
+  wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm != nullptr) {
+    for (wmWindow &window : wm->windows) {
+      for (ScrArea &area : window.global_areas.areabase) {
+        if (area.spacetype == SPACE_TOPBAR) {
+          ED_area_tag_redraw(&area);
+        }
       }
     }
   }

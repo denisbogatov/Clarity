@@ -22,6 +22,7 @@
 #include "BLI_listbase_iterator.hh"
 #include "BLI_map.hh"
 #include "BLI_index_range.hh"
+#include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
@@ -1101,6 +1102,107 @@ MayaDispatchResult selection_handle_action(bContext *C,
   }
 
   return MayaDispatchResult::PassThrough;
+}
+
+bool middle_mouse_axis_drag_handle(bContext *C,
+                                   MayaWindowRuntime &runtime,
+                                   const MayaInputAction &action)
+{
+  const wmEvent *event = action.source_event;
+  const wmWindow *window = CTX_wm_window(C);
+  /* Maya dispatch runs after WM's synthetic drag probe. This flag identifies its one threshold
+   * crossing and is cleared before the next mouse-move event. */
+  if (runtime.transform_active || action.id != MayaActionID::PointerMove ||
+      action.phase != MayaActionPhase::Update || action.alt || event == nullptr ||
+      window == nullptr || !window->event_queue_check_drag_handled ||
+      event->type != MOUSEMOVE || event->prev_press_type != MIDDLEMOUSE ||
+      (event->prev_press_modifier & KM_ALT) != 0 ||
+      ((event->flag & WM_EVENT_FORCE_DRAG_THRESHOLD) == 0 &&
+       !WM_event_drag_test(event, event->prev_press_xy)))
+  {
+    return false;
+  }
+
+  const char *operator_id = nullptr;
+  switch (runtime.tool.active) {
+    case MayaToolID::Move:
+      operator_id = "TRANSFORM_OT_translate";
+      break;
+    case MayaToolID::Rotate:
+      operator_id = "TRANSFORM_OT_rotate";
+      break;
+    case MayaToolID::Scale:
+      operator_id = "TRANSFORM_OT_resize";
+      break;
+    default:
+      /* The original MMB press was consumed before regional keymaps. Consume its synthetic drag
+       * too, so Select and other tools cannot inherit an unrelated MMB binding. */
+      return true;
+  }
+
+  const int active_axis = runtime.tool.manipulator_pivot.active_axis;
+  if (active_axis < 0 || active_axis > 2) {
+    return true;
+  }
+
+  wmOperatorType *ot = WM_operatortype_find(operator_id, true);
+  if (ot == nullptr) {
+    return true;
+  }
+  PointerRNA ptr = WM_operator_properties_create_ptr(ot);
+
+  const bool edit_pivot = runtime.pivot_edit.target != MayaPivotEditTarget::None;
+  PropertyRNA *maya_pivot_transform = RNA_struct_find_property(&ptr, "maya_pivot_transform");
+  if (edit_pivot && maya_pivot_transform == nullptr) {
+    /* Edit Pivot must never fall back to transforming the object. */
+    WM_operator_properties_free(&ptr);
+    return true;
+  }
+  if (maya_pivot_transform != nullptr) {
+    RNA_property_boolean_set(&ptr, maya_pivot_transform, edit_pivot);
+  }
+
+  bool constraint_axis[3] = {false, false, false};
+  constraint_axis[active_axis] = true;
+  RNA_boolean_set_array(&ptr, "constraint_axis", constraint_axis);
+  RNA_boolean_set(&ptr, "release_confirm", true);
+
+  float pivot_matrix[4][4];
+  const bool has_custom_pivot_matrix = ED_maya_pivot_custom_matrix_get(
+      C, MayaPivotUsage::Display, pivot_matrix);
+  if (has_custom_pivot_matrix) {
+    float orient_matrix[3][3];
+    copy_m3_m4(orient_matrix, pivot_matrix);
+    /* With orient_type left unset, a supplied matrix is the transform API's custom-matrix
+     * orientation. This keeps the constraint on the visible Maya pivot axis. */
+    RNA_float_set_array(&ptr, "orient_matrix", &orient_matrix[0][0]);
+  }
+
+  if (runtime.tool.active == MayaToolID::Scale) {
+    const RegionView3D *region_view = CTX_wm_region_view3d(C);
+    const float (*display_matrix)[4] = nullptr;
+    if (has_custom_pivot_matrix) {
+      display_matrix = pivot_matrix;
+    }
+    else if (region_view != nullptr) {
+      display_matrix = region_view->twmat;
+    }
+    if (display_matrix != nullptr) {
+      RNA_float_set_array(&ptr, "mouse_dir_constraint", display_matrix[active_axis]);
+      RNA_boolean_set(&ptr, "use_maya_scale_behavior", true);
+    }
+  }
+
+  wmEvent invoke_event = *event;
+  invoke_event.type = MIDDLEMOUSE;
+  invoke_event.val = KM_PRESS_DRAG;
+  invoke_event.modifier = event->prev_press_modifier;
+  invoke_event.keymodifier = event->prev_press_keymodifier;
+  WM_operator_name_call_ptr(C, ot, wm::OpCallContext::InvokeDefault, &ptr, &invoke_event);
+  WM_operator_properties_free(&ptr);
+  /* Once the press was claimed, never let a cancelled operator fall through to regional MMB
+   * keymaps and start a different action. */
+  return true;
 }
 
 static Vector<Object *> selected_objects_get(const bContext *C)

@@ -95,4 +95,40 @@ TEST(object_custom_pivot, RotateAndScaleValidityAreIndependent)
   MEM_delete(object.runtime);
 }
 
+TEST(object_custom_pivot, MirroredMatrixRoundTripKeepsQuaternionHemisphere)
+{
+  Object object{};
+  object.runtime = MEM_new<ObjectRuntime>(__func__);
+  object.runtime->object_to_world = float4x4::identity();
+  object.runtime->object_to_world[0][0] = -1.5f;
+  object.runtime->object_to_world[0][1] = 0.25f;
+  object.runtime->object_to_world[1][0] = 0.4f;
+  object.runtime->object_to_world[1][1] = 2.0f;
+  object.runtime->object_to_world[2][0] = -0.1f;
+  object.runtime->object_to_world[2][2] = 0.75f;
+  object.runtime->object_to_world.location() = float3(-5.0f, 3.0f, 7.0f);
+
+  const double3 position_world(2.5, -4.0, 9.0);
+  EXPECT_TRUE(BKE_object_custom_pivot_position_world_set(object, false, position_world));
+  double3 position_result;
+  EXPECT_TRUE(BKE_object_custom_pivot_position_world_get(object, false, position_result));
+  EXPECT_NEAR(math::distance(position_result, position_world), 0.0, 1.0e-6);
+
+  const math::QuaternionBase<double> orientation_world = math::normalize(
+      math::QuaternionBase<double>(0.2157, -0.5292, 0.7651, 0.2969));
+  EXPECT_TRUE(BKE_object_custom_pivot_orientation_world_set(object, orientation_world));
+
+  math::QuaternionBase<double> first_result;
+  EXPECT_TRUE(BKE_object_custom_pivot_orientation_world_get(object, first_result));
+  EXPECT_GT(math::dot(orientation_world, first_result), 1.0 - 1.0e-6);
+
+  EXPECT_TRUE(BKE_object_custom_pivot_orientation_world_set(object, first_result));
+  math::QuaternionBase<double> second_result;
+  EXPECT_TRUE(BKE_object_custom_pivot_orientation_world_get(object, second_result));
+  EXPECT_GT(math::dot(first_result, second_result), 1.0 - 1.0e-6);
+
+  BKE_object_custom_pivot_reset(object);
+  MEM_delete(object.runtime);
+}
+
 }  // namespace blender::bke::tests

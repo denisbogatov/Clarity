@@ -4,6 +4,7 @@
 
 #include "testing/testing.h"
 
+#include "BKE_context.hh"
 #include "BKE_lib_id.hh"
 #include "BKE_main.hh"
 #include "BKE_object.hh"
@@ -69,6 +70,83 @@ TEST(maya_runtime, TransformTransactionRestoresObjectsAndRuntime)
   EXPECT_EQ(runtime_state.position_world, runtime_before.position_world);
   EXPECT_EQ(runtime_state.position_valid, runtime_before.position_valid);
   BKE_main_free(bmain);
+}
+
+TEST(maya_runtime, PivotEditTogglePersistsWithoutHostContext)
+{
+  bContext *C = CTX_create();
+  MayaWindowRuntime runtime;
+
+  EXPECT_FALSE(runtime.pivot_edit.persistent);
+  EXPECT_EQ(runtime.pivot_edit.phase, MayaPivotEditPhase::Normal);
+
+  EXPECT_TRUE(pivot_edit_toggle_persistent(C, runtime));
+  EXPECT_TRUE(runtime.pivot_edit.persistent);
+  EXPECT_EQ(runtime.pivot_edit.phase, MayaPivotEditPhase::PersistentPivot);
+  EXPECT_EQ(runtime.pivot_edit.target, MayaPivotEditTarget::None);
+
+  EXPECT_TRUE(pivot_edit_toggle_persistent(C, runtime));
+  EXPECT_FALSE(runtime.pivot_edit.persistent);
+  EXPECT_EQ(runtime.pivot_edit.phase, MayaPivotEditPhase::Normal);
+  EXPECT_EQ(runtime.pivot_edit.target, MayaPivotEditTarget::None);
+
+  CTX_free(C);
+}
+
+TEST(maya_runtime, PivotEditDragTailDefersExitOrFocusRestart)
+{
+  bContext *C = CTX_create();
+
+  MayaWindowRuntime exit_runtime;
+  exit_runtime.transform_active = true;
+  exit_runtime.pivot_edit.persistent = true;
+  exit_runtime.pivot_edit.target = MayaPivotEditTarget::ObjectOrigin;
+  exit_runtime.pivot_edit.phase = MayaPivotEditPhase::PivotDragging;
+
+  EXPECT_TRUE(pivot_edit_toggle_persistent(C, exit_runtime));
+  EXPECT_FALSE(exit_runtime.pivot_edit.persistent);
+  EXPECT_TRUE(exit_runtime.pivot_edit.exit_after_drag);
+  EXPECT_FALSE(exit_runtime.pivot_edit.restart_after_drag);
+  EXPECT_EQ(exit_runtime.pivot_edit.phase, MayaPivotEditPhase::PivotCommitPending);
+  EXPECT_EQ(exit_runtime.pivot_edit.target, MayaPivotEditTarget::ObjectOrigin);
+
+  MayaWindowRuntime focus_runtime;
+  focus_runtime.pivot_edit.persistent = true;
+  focus_runtime.pivot_edit.target = MayaPivotEditTarget::ObjectOrigin;
+  focus_runtime.pivot_edit.phase = MayaPivotEditPhase::PersistentPivot;
+
+  pivot_edit_input_reset(C, focus_runtime);
+  EXPECT_TRUE(focus_runtime.pivot_edit.persistent);
+  EXPECT_FALSE(focus_runtime.pivot_edit.exit_after_drag);
+  EXPECT_FALSE(focus_runtime.pivot_edit.restart_after_drag);
+  EXPECT_EQ(focus_runtime.pivot_edit.phase, MayaPivotEditPhase::PersistentPivot);
+  EXPECT_EQ(focus_runtime.pivot_edit.target, MayaPivotEditTarget::ObjectOrigin);
+
+  MayaWindowRuntime restart_runtime;
+  restart_runtime.transform_active = true;
+  restart_runtime.pivot_edit.persistent = true;
+  restart_runtime.pivot_edit.target = MayaPivotEditTarget::ObjectOrigin;
+  restart_runtime.pivot_edit.phase = MayaPivotEditPhase::PivotDragging;
+  restart_runtime.temporary.snap_stack.append(MayaSnapMode::Point);
+  restart_runtime.pivot_edit.snap_preview.type = MayaPivotSnapTargetType::Vertex;
+  restart_runtime.pivot_edit.snap_preview.object_to_world = float4x4::identity();
+  restart_runtime.pivot_edit.snap_preview.component_index = 7;
+  restart_runtime.pivot_edit.snap_preview_mouse = int2(12, 34);
+  restart_runtime.pivot_edit.snap_preview_queried = true;
+
+  pivot_edit_input_reset(C, restart_runtime);
+  EXPECT_TRUE(restart_runtime.pivot_edit.persistent);
+  EXPECT_FALSE(restart_runtime.pivot_edit.exit_after_drag);
+  EXPECT_TRUE(restart_runtime.pivot_edit.restart_after_drag);
+  EXPECT_EQ(restart_runtime.pivot_edit.phase, MayaPivotEditPhase::PivotCommitPending);
+  EXPECT_EQ(restart_runtime.pivot_edit.target, MayaPivotEditTarget::ObjectOrigin);
+  EXPECT_TRUE(restart_runtime.temporary.snap_stack.is_empty());
+  EXPECT_EQ(restart_runtime.pivot_edit.snap_preview.type, MayaPivotSnapTargetType::None);
+  EXPECT_FALSE(restart_runtime.pivot_edit.snap_preview.object_to_world.has_value());
+  EXPECT_EQ(restart_runtime.pivot_edit.snap_preview_mouse, int2(0));
+  EXPECT_FALSE(restart_runtime.pivot_edit.snap_preview_queried);
+
+  CTX_free(C);
 }
 
 }  // namespace blender::ed::maya::tests

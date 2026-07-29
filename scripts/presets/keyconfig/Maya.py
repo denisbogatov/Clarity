@@ -19,6 +19,23 @@ industry_compatible = bpy.utils.execfile(
 )
 
 
+def remove_edit_pivot_key_conflicts(keyconfig_data):
+    for _keymap_name, _keymap_args, keymap_content in keyconfig_data:
+        items = keymap_content["items"]
+        items[:] = [
+            item for item in items
+            if not (
+                item[0] == "wm.tool_set_by_id"
+                and item[1].get("type") == 'D'
+                and not any(
+                    item[1].get(modifier, False)
+                    for modifier in ("shift", "ctrl", "alt", "oskey")
+                )
+                and ("name", "builtin.annotate") in (item[2] or {}).get("properties", ())
+            )
+        ]
+
+
 def load():
     from sys import platform
     from bl_keymap_utils.io import keyconfig_init_from_data
@@ -29,6 +46,7 @@ def load():
         use_mouse_emulate_3_button=prefs.inputs.use_mouse_emulate_3_button
     )
     keyconfig_data = industry_compatible.generate_keymaps(params)
+    remove_edit_pivot_key_conflicts(keyconfig_data)
 
     if platform == "darwin":
         from bl_keymap_utils.platform_helpers import keyconfig_data_oskey_from_ctrl_for_macos

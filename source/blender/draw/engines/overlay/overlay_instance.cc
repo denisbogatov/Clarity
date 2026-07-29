@@ -477,6 +477,7 @@ void Instance::begin_sync()
   motion_paths.begin_sync(resources, state);
   origins.begin_sync(resources, state);
   outline.begin_sync(resources, state);
+  maya_pivot_snap_preview.begin_sync(resources, state);
 
   auto begin_sync_layer = [&](OverlayLayer &layer) {
     layer.armatures.begin_sync(resources, state);
@@ -531,6 +532,7 @@ void Instance::object_sync(ObjectRef &ob_ref, Manager &manager)
 
   OverlayLayer &layer = object_is_in_front(ob_ref.object, state) ? infront : regular;
 
+  maya_pivot_snap_preview.object_sync(manager, ob_ref, resources, state);
   layer.mode_transfer.object_sync(manager, ob_ref, resources, state);
 
   if (needs_prepass) {
@@ -710,6 +712,7 @@ void Instance::object_sync(ObjectRef &ob_ref, Manager &manager)
 void Instance::end_sync()
 {
   origins.end_sync(resources, state);
+  maya_pivot_snap_preview.end_sync(resources, state);
   resources.end_sync();
 
   auto end_sync_layer = [&](OverlayLayer &layer) {
@@ -999,6 +1002,11 @@ void Instance::draw_v3d(Manager &manager, View &view)
 
     regular.meshes.draw_line(resources.overlay_line_fb, manager, view);
     infront.meshes.draw_line(resources.overlay_line_in_front_fb, manager, view);
+    maya_pivot_snap_preview.draw_line(maya_pivot_snap_preview.is_in_front() ?
+                                          resources.overlay_line_in_front_fb :
+                                          resources.overlay_line_fb,
+                                      manager,
+                                      view);
 
     draw_color_only(regular, resources.overlay_color_only_fb);
     draw_color_only(infront, resources.overlay_color_only_fb);

@@ -72,6 +72,7 @@ class Instance : public DrawEngine {
   Outline outline;
   MotionPath motion_paths;
   Cursor cursor;
+  MayaPivotSnapPreview maya_pivot_snap_preview = {selection_type_};
 
   struct OverlayLayer {
     const SelectionType selection_type_;

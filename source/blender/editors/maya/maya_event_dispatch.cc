@@ -81,6 +81,10 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     ed::maya::MayaWindowRuntime &runtime,
     const ed::maya::MayaInputAction &action)
 {
+  if (ed::maya::middle_mouse_axis_drag_handle(C, runtime, action)) {
+    return ed::maya::MayaDispatchResult::Handled;
+  }
+
   /* Keep the snap preview under the cursor. The update itself is a no-op unless Edit Pivot owns a
    * manipulator and a snap key is held, and it skips the query while the pointer has not moved, so
    * running it for every action costs nothing measurable. */
