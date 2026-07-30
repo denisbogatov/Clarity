@@ -45,6 +45,10 @@ enum class MayaActionID : uint16_t {
   FaceCenters,
   WireframeOnShaded,
   ComponentMarkingMenu,
+  /** The marking menu of a transform tool: hold its key and press `LMB`, or `Ctrl+Shift+RMB`. */
+  ToolMarkingMenu,
+  /** Polygon component selection marking menu: `Ctrl+RMB` over a component selection. */
+  SelectionMarkingMenu,
   EditPivotKeyPressed,
   EditPivotKeyReleased,
   TogglePersistentPivot,
@@ -57,9 +61,8 @@ enum class MayaActionID : uint16_t {
   SelectAdd,
   SelectRemove,
   SelectToggle,
-  SelectMarquee,
-  SelectLoop,
-  SelectPath,
+  /** Double click. The modifiers decide the set operation, the mesh decides loop versus path. */
+  SelectTopology,
   SelectGrow,
   SelectShrink,
 

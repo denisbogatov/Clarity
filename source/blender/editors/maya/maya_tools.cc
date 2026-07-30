@@ -18,6 +18,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_view3d_types.h"
+#include "DNA_windowmanager_types.h"
 
 #include "BLI_listbase_iterator.hh"
 #include "BLI_map.hh"
@@ -44,6 +45,7 @@
 #include "ED_object.hh"
 #include "ED_screen.hh"
 #include "ED_select_utils.hh"
+#include "ED_undo.hh"
 #include "ED_view3d.hh"
 
 #include "RNA_access.hh"
@@ -948,7 +950,89 @@ static MayaEdgePathPick edge_path_pick_from_event(bContext *C, const wmEvent &ev
   return result;
 }
 
-static wmOperatorStatus select_path_call(bContext *C, const MayaInputAction &action)
+MayaTopologySelectOp topology_select_op_from_action(const MayaInputAction &action)
+{
+  if (action.ctrl && action.shift) {
+    return MayaTopologySelectOp::Add;
+  }
+  if (action.ctrl) {
+    return MayaTopologySelectOp::Subtract;
+  }
+  if (action.shift) {
+    return MayaTopologySelectOp::Toggle;
+  }
+  return MayaTopologySelectOp::Replace;
+}
+
+/**
+ * Whether a previously selected component can act as the start of a path.
+ *
+ * Maya takes the last selected component as the beginning of the gesture. Without one there is
+ * nothing to walk towards, and the very same double click selects the whole loop instead, which is
+ * what a bare `MESH_OT_shortest_path_pick` gets wrong: with no active element it toggles the single
+ * component under the pointer.
+ */
+static bool has_path_source_component(bContext *C)
+{
+  Object *object = CTX_data_edit_object(C);
+  BMEditMesh *em = object != nullptr ? BKE_editmesh_from_object(object) : nullptr;
+  if (em == nullptr || em->bm == nullptr) {
+    return false;
+  }
+  const BMElem *active = BM_mesh_active_elem_get(em->bm);
+  if (active == nullptr) {
+    return false;
+  }
+  switch (active->head.htype) {
+    case BM_VERT:
+      return (em->selectmode & SCE_SELECT_VERTEX) != 0;
+    case BM_EDGE:
+      return (em->selectmode & SCE_SELECT_EDGE) != 0;
+    case BM_FACE:
+      return (em->selectmode & SCE_SELECT_FACE) != 0;
+    default:
+      return false;
+  }
+}
+
+/** Selected components across every mesh being edited: the cheapest measure of what an operator did. */
+static int edit_mesh_selected_count(bContext *C)
+{
+  int count = 0;
+  for (Object *object : edit_mesh_objects_get(C)) {
+    const BMEditMesh *em = BKE_editmesh_from_object(object);
+    if (em == nullptr || em->bm == nullptr) {
+      continue;
+    }
+    count += em->bm->totvertsel + em->bm->totedgesel + em->bm->totfacesel;
+  }
+  return count;
+}
+
+/** Set the three selection properties every loop and ring operator shares. */
+static void topology_select_op_properties_set(PointerRNA *ptr, const MayaTopologySelectOp op)
+{
+  RNA_boolean_set(ptr, "extend", op == MayaTopologySelectOp::Add);
+  RNA_boolean_set(ptr, "deselect", op == MayaTopologySelectOp::Subtract);
+  RNA_boolean_set(ptr, "toggle", op == MayaTopologySelectOp::Toggle);
+}
+
+static wmOperatorStatus select_loop_call(bContext *C,
+                                         const MayaInputAction &action,
+                                         const MayaTopologySelectOp op)
+{
+  wmOperatorType *ot = WM_operatortype_find("MESH_OT_loop_select", true);
+  PointerRNA ptr = WM_operator_properties_create_ptr(ot);
+  topology_select_op_properties_set(&ptr, op);
+  const wmOperatorStatus status = WM_operator_name_call_ptr(
+      C, ot, wm::OpCallContext::InvokeDefault, &ptr, action.source_event);
+  WM_operator_properties_free(&ptr);
+  return status;
+}
+
+static wmOperatorStatus select_path_call(bContext *C,
+                                         const MayaInputAction &action,
+                                         const MayaTopologySelectOp op)
 {
   MayaEdgePathPick edge_pick = edge_path_pick_from_event(C, *action.source_event);
   if (edge_pick.edit_mesh != nullptr &&
@@ -956,7 +1040,7 @@ static wmOperatorStatus select_path_call(bContext *C, const MayaInputAction &act
   {
     wmOperatorType *ot = WM_operatortype_find("MESH_OT_edgering_select", true);
     PointerRNA ptr = WM_operator_properties_create_ptr(ot);
-    RNA_boolean_set(&ptr, "extend", true);
+    topology_select_op_properties_set(&ptr, op);
     const wmOperatorStatus status = WM_operator_name_call_ptr(
         C, ot, wm::OpCallContext::InvokeDefault, &ptr, action.source_event);
     WM_operator_properties_free(&ptr);
@@ -985,8 +1069,43 @@ static wmOperatorStatus select_path_call(bContext *C, const MayaInputAction &act
   PointerRNA ptr = WM_operator_properties_create_ptr(ot);
   RNA_boolean_set(&ptr, "use_fill", false);
   RNA_boolean_set(&ptr, "use_face_step", use_face_step);
-  const wmOperatorStatus status = WM_operator_name_call_ptr(
+
+  /* This operator only toggles: it selects the path unless every one of its components is already
+   * selected, in which case it deselects the whole path. It has no extend, deselect or toggle
+   * property to ask for something else.
+   *
+   * Two toggles of one path therefore always end on "all deselected", and returning from there ends
+   * on "all selected", which is exactly the guaranteed remove and the guaranteed add Maya offers. The
+   * second call walks the very same path because `track_active` stays off, so the active element the
+   * path starts from is left where it was.
+   *
+   * The undo push of both calls is suppressed and replaced with a single step: one gesture must cost
+   * the user one undo. */
+  wmWindowManager *wm = CTX_wm_manager(C);
+  const bool needs_second_call = ELEM(op, MayaTopologySelectOp::Add, MayaTopologySelectOp::Subtract);
+  const int selected_before = needs_second_call ? edit_mesh_selected_count(C) : 0;
+  if (needs_second_call && wm != nullptr) {
+    wm->op_undo_depth++;
+  }
+  wmOperatorStatus status = WM_operator_name_call_ptr(
       C, ot, wm::OpCallContext::InvokeDefault, &ptr, action.source_event);
+  if (needs_second_call && (status & OPERATOR_FINISHED)) {
+    const int selected_after = edit_mesh_selected_count(C);
+    const bool path_was_fully_selected = selected_after < selected_before;
+    const bool toggle_went_the_wrong_way = op == MayaTopologySelectOp::Add ?
+                                               path_was_fully_selected :
+                                               !path_was_fully_selected;
+    if (toggle_went_the_wrong_way) {
+      status = WM_operator_name_call_ptr(
+          C, ot, wm::OpCallContext::InvokeDefault, &ptr, action.source_event);
+    }
+  }
+  if (needs_second_call && wm != nullptr) {
+    wm->op_undo_depth--;
+    if (status & OPERATOR_FINISHED) {
+      ED_undo_push(C, op == MayaTopologySelectOp::Add ? "Add Select Path" : "Remove Select Path");
+    }
+  }
   WM_operator_properties_free(&ptr);
   return status;
 }
@@ -1003,9 +1122,7 @@ MayaDispatchResult selection_handle_action(bContext *C,
            MayaActionID::SelectAdd,
            MayaActionID::SelectRemove,
            MayaActionID::SelectToggle,
-           MayaActionID::SelectMarquee,
-           MayaActionID::SelectLoop,
-           MayaActionID::SelectPath))
+           MayaActionID::SelectTopology))
   {
     return MayaDispatchResult::PassThrough;
   }
@@ -1066,26 +1183,14 @@ MayaDispatchResult selection_handle_action(bContext *C,
     return MayaDispatchResult::Handled;
   }
 
-  if (action.id == MayaActionID::SelectMarquee) {
-    const wmOperatorStatus status = select_marquee_call(C, action);
-    return (status & OPERATOR_CANCELLED) ? MayaDispatchResult::PassThrough :
-                                          MayaDispatchResult::Handled;
-  }
-
-  if (action.id == MayaActionID::SelectLoop && is_mesh_component_context(C)) {
-    wmOperatorType *ot = WM_operatortype_find("MESH_OT_loop_select", true);
-    PointerRNA ptr = WM_operator_properties_create_ptr(ot);
-    RNA_boolean_set(&ptr, "extend", action.shift);
-    RNA_boolean_set(&ptr, "deselect", action.ctrl && !action.shift);
-    const wmOperatorStatus status = WM_operator_name_call_ptr(
-        C, ot, wm::OpCallContext::InvokeDefault, &ptr, action.source_event);
-    WM_operator_properties_free(&ptr);
-    return (status & OPERATOR_CANCELLED) ? MayaDispatchResult::PassThrough :
-                                          MayaDispatchResult::Handled;
-  }
-
-  if (action.id == MayaActionID::SelectPath && is_mesh_component_context(C)) {
-    const wmOperatorStatus status = select_path_call(C, action);
+  if (action.id == MayaActionID::SelectTopology && is_mesh_component_context(C)) {
+    const MayaTopologySelectOp op = topology_select_op_from_action(action);
+    /* Replacing the selection has no start component to walk from by definition, so a plain double
+     * click is always the whole loop. Every other operation continues the gesture from the component
+     * selected before it, and only falls back to the loop when there is none. */
+    const bool use_path = op != MayaTopologySelectOp::Replace && has_path_source_component(C);
+    const wmOperatorStatus status = use_path ? select_path_call(C, action, op) :
+                                              select_loop_call(C, action, op);
     return (status & OPERATOR_CANCELLED) ? MayaDispatchResult::PassThrough :
                                           MayaDispatchResult::Handled;
   }
@@ -1104,24 +1209,71 @@ MayaDispatchResult selection_handle_action(bContext *C,
   return MayaDispatchResult::PassThrough;
 }
 
+/**
+ * Whether this motion event is the one crossing of the drag threshold that belongs to \a button.
+ *
+ * Blender never queues a #KM_PRESS_DRAG event: it synthesizes one inside #wm_handlers_do, hands it to
+ * that handler list and restores the event before returning, all of which happens after this
+ * dispatcher has already seen the plain motion. What survives is
+ * #wmWindow::event_queue_check_drag_handled, set on the single threshold crossing and cleared before
+ * the next motion event, so it is what identifies a drag here.
+ */
+static bool is_drag_threshold_crossing(const MayaWindowRuntime &runtime,
+                                       const MayaInputAction &action,
+                                       const bContext *C,
+                                       const wmEventType button)
+{
+  const wmEvent *event = action.source_event;
+  const wmWindow *window = CTX_wm_window(C);
+  return !runtime.transform_active && action.id == MayaActionID::PointerMove &&
+         action.phase == MayaActionPhase::Update && !action.alt && event != nullptr &&
+         window != nullptr && window->event_queue_check_drag_handled &&
+         event->type == MOUSEMOVE && event->prev_press_type == button &&
+         (event->prev_press_modifier & KM_ALT) == 0 &&
+         ((event->flag & WM_EVENT_FORCE_DRAG_THRESHOLD) != 0 ||
+          WM_event_drag_test(event, event->prev_press_xy));
+}
+
+bool left_mouse_marquee_drag_handle(bContext *C,
+                                    MayaWindowRuntime &runtime,
+                                    const MayaInputAction &action)
+{
+  if (!is_drag_threshold_crossing(runtime, action, C, LEFTMOUSE)) {
+    return false;
+  }
+  /* Edit Pivot owns the left button while it is active: its click operator places the pivot, and a
+   * drag there must not start selecting instead. */
+  if (runtime.pivot_edit.target != MayaPivotEditTarget::None) {
+    return false;
+  }
+  const ARegion *region = CTX_wm_region(C);
+  if (region == nullptr || region->regiontype != RGN_TYPE_WINDOW) {
+    return false;
+  }
+
+  /* Maya reads the modifiers of the press that started the drag, not of the motion that happens to
+   * cross the threshold. */
+  MayaInputAction drag = action;
+  const wmEventModifierFlag modifier = action.source_event->prev_press_modifier;
+  drag.shift = (modifier & KM_SHIFT) != 0;
+  drag.ctrl = (modifier & KM_CTRL) != 0;
+  drag.alt = false;
+
+  /* The drag is consumed whatever the marquee answers: otherwise the tool keymap of Move, Rotate or
+   * Scale inherits it and starts a transform where Maya draws a selection rectangle. */
+  select_marquee_call(C, drag);
+  return true;
+}
+
 bool middle_mouse_axis_drag_handle(bContext *C,
                                    MayaWindowRuntime &runtime,
                                    const MayaInputAction &action)
 {
-  const wmEvent *event = action.source_event;
-  const wmWindow *window = CTX_wm_window(C);
-  /* Maya dispatch runs after WM's synthetic drag probe. This flag identifies its one threshold
-   * crossing and is cleared before the next mouse-move event. */
-  if (runtime.transform_active || action.id != MayaActionID::PointerMove ||
-      action.phase != MayaActionPhase::Update || action.alt || event == nullptr ||
-      window == nullptr || !window->event_queue_check_drag_handled ||
-      event->type != MOUSEMOVE || event->prev_press_type != MIDDLEMOUSE ||
-      (event->prev_press_modifier & KM_ALT) != 0 ||
-      ((event->flag & WM_EVENT_FORCE_DRAG_THRESHOLD) == 0 &&
-       !WM_event_drag_test(event, event->prev_press_xy)))
-  {
+  if (!is_drag_threshold_crossing(runtime, action, C, MIDDLEMOUSE)) {
     return false;
   }
+  /* The threshold check already refused an action without one, so this is never null. */
+  const wmEvent *event = action.source_event;
 
   const char *operator_id = nullptr;
   switch (runtime.tool.active) {
@@ -1225,8 +1377,9 @@ static bool shift_transform_is_gizmo_drag(const MayaWindowRuntime &runtime,
                                           wmOperator *op,
                                           const wmEvent &event)
 {
-  if (!runtime.selection_settings.shift_drag_duplicate || runtime.pivot_edit.target !=
-                                                               MayaPivotEditTarget::None)
+  if ((!runtime.selection_settings.shift_extrude &&
+       !runtime.selection_settings.shift_duplicate) ||
+      runtime.pivot_edit.target != MayaPivotEditTarget::None)
   {
     return false;
   }
@@ -1367,15 +1520,21 @@ bool shift_transform_prepare(bContext *C, wmOperator *op, const wmEvent *event)
   state->scene = CTX_data_scene(C);
   state->view_layer = CTX_data_view_layer(C);
 
+  /* Which of the two settings has a say depends on what the drag would create, so the gate sits
+   * here and not in #shift_transform_is_gizmo_drag, which runs before that is known. */
   bool prepared = false;
   Object *edit_object = CTX_data_edit_object(C);
   if (edit_object != nullptr && edit_object->type == OB_MESH) {
-    state->kind = MayaShiftTransformState::Kind::ComponentExtrude;
-    prepared = shift_transform_component_extrude(C, *runtime, *state);
+    if (runtime->selection_settings.shift_extrude) {
+      state->kind = MayaShiftTransformState::Kind::ComponentExtrude;
+      prepared = shift_transform_component_extrude(C, *runtime, *state);
+    }
   }
   else if (CTX_data_mode_enum(C) == CTX_MODE_OBJECT) {
-    state->kind = MayaShiftTransformState::Kind::ObjectDuplicate;
-    prepared = shift_transform_object_duplicate(C, *runtime, *state);
+    if (runtime->selection_settings.shift_duplicate) {
+      state->kind = MayaShiftTransformState::Kind::ObjectDuplicate;
+      prepared = shift_transform_object_duplicate(C, *runtime, *state);
+    }
   }
 
   if (prepared) {

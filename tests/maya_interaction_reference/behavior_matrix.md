@@ -159,6 +159,8 @@ and perspective view, two Blender windows, two 3D View areas.
 | Object | Select | `Shift` | LMB on object | TODO — add or toggle, must match Maya | unchanged | Select | unchanged | n/a | TODO |
 | Object | Select | `Ctrl` | LMB on object | TODO — remove or toggle | unchanged | Select | unchanged | n/a | TODO |
 | Object | Select | none | LMB drag marquee | replaces selection | unchanged | Select | unchanged | marquee cancelled, selection unchanged | previous selection restored |
+| Object | Move / Rotate / Scale | none | LMB drag from empty space | draws the marquee — the tool key-map must not inherit the drag and start a transform | unchanged | unchanged | unchanged | marquee cancelled | previous selection restored |
+| Object | Select | `Ctrl` / `Shift` / `Ctrl` `Shift` | LMB drag marquee | removes / toggles / adds, from the modifiers of the **press** that started the drag | unchanged | Select | unchanged | selection unchanged | previous selection restored |
 | Object | Select | `Shift` | LMB drag marquee | TODO | unchanged | Select | unchanged | TODO | TODO |
 | Object | Select | `Ctrl` | LMB drag marquee | TODO | unchanged | Select | unchanged | TODO | TODO |
 | Object | Select | none | LMB on already selected object | selection unchanged | unchanged | Select | unchanged | n/a | no undo step |
@@ -168,6 +170,33 @@ and perspective view, two Blender windows, two 3D View areas.
 
 The last row is the double-event guard: a pivot click must never also change the
 selection.
+
+## Topological selection
+
+| Start mode | Tool before | Keys | Mouse | Selection | Pivot | Tool after | Snapping | Cancel | Undo |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Edit Mesh, edge mode | Select | none | LMB double click on an edge | replaces selection with the edge loop; the loop stops at poles, triangles, n-gons and open boundaries | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh, face mode | Select | none | LMB double click on a face | replaces selection with the face loop | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh, vertex mode | Select | none | LMB double click on a vertex | replaces selection with the vertex loop | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh, edge mode, one edge selected | Select | `Shift` | LMB double click on a second edge along the topology | **adds** the partial edge loop between the two | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh, edge mode, one edge selected | Select | `Shift` | LMB double click on the opposite edge of a quad | **adds** the edge ring | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh, face mode, one face selected | Select | `Shift` | LMB double click on a second face | **adds** the face loop or path between the two | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh, vertex mode, one vertex selected | Select | `Shift` | LMB double click on a second vertex | **adds** the vertex loop or path between the two | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh, any component mode | Select | `Shift` `.` | none | grows the selection by one topological level; repeats | unchanged | Select | unchanged | n/a | one level restored per undo step |
+| Edit Mesh, any component mode | Select | `Shift` `,` | none | shrinks the selection by one outer layer; repeats | unchanged | Select | unchanged | n/a | one level restored per undo step |
+| Object | Select | `Shift` `.` / `Shift` `,` | none | **unchanged** — topological growth has no meaning between objects | unchanged | Select | unchanged | n/a | no undo step |
+| Edit Mesh, edge mode | Select | none | LMB double click, then release the button | selection **stays** the loop — the release must not also count as a click | unchanged | Select | unchanged | n/a | previous selection restored |
+
+The last row is the double-event guard of this section: a handled button event
+must not be followed by a synthesized click. Blender clears that pending click
+when a key-map handles the button; the Maya dispatcher runs before the key-maps,
+so `wm_event_do_handlers` clears it there too.
+
+These gestures are dispatched by the Maya interaction model before any keymap
+runs, so the keymap must not carry a second binding for them. `Maya.py` drops the
+base `mesh.loop_select` and `mesh.edgering_select` double-click items for exactly
+that reason, and `Shift` `.` / `Shift` `,` are left unbound by the base keymap.
+`Alt` stays reserved for navigation: `Alt` double click selects nothing.
 
 ## Pivot usage (task items 3, 4, 10, 12)
 

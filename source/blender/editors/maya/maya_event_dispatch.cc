@@ -88,11 +88,61 @@ static ed::maya::MayaDispatchResult maya_dispatch_to_active_session(
   return ed::maya::MayaDispatchResult::PassThrough;
 }
 
+/**
+ * Menu a marking-menu action asks for, or null when this fork has none for it yet.
+ *
+ * Maya has a marking menu per transform tool; only the Move one is implemented here, so holding
+ * another tool key falls through to whatever the event would otherwise do instead of opening a
+ * menu that would be a lie.
+ */
+static const char *maya_marking_menu_idname(const ed::maya::MayaWindowRuntime &runtime,
+                                            const ed::maya::MayaInputAction &action)
+{
+  if (action.id == ed::maya::MayaActionID::ComponentMarkingMenu) {
+    return "VIEW3D_MT_maya_component_marking_menu";
+  }
+  if (action.id == ed::maya::MayaActionID::SelectionMarkingMenu) {
+    return "VIEW3D_MT_maya_selection_marking_menu";
+  }
+  const ed::maya::MayaToolID tool = action.tool != ed::maya::MayaToolID::None ? action.tool :
+                                                                                runtime.tool.active;
+  return tool == ed::maya::MayaToolID::Move ? "VIEW3D_MT_maya_move_marking_menu" : nullptr;
+}
+
+static ed::maya::MayaDispatchResult maya_marking_menu_open(
+    bContext *C,
+    const ed::maya::MayaWindowRuntime &runtime,
+    const ed::maya::MayaInputAction &action)
+{
+  const char *idname = maya_marking_menu_idname(runtime, action);
+  if (idname == nullptr) {
+    return ed::maya::MayaDispatchResult::PassThrough;
+  }
+
+  /* The menu owns the keyboard until it closes, so a snap key released over it never reaches the
+   * dispatcher. Letting the held keys go with the menu is the only state that stays truthful. */
+  ED_maya_snap_override_release_all(C);
+
+  /* Maya's own numbers: a small dead zone so a resting pointer selects nothing, a ring close enough
+   * that the boxes read as a legend for the directions, and `MarkingMenuPopupDelay`, which is what
+   * lets a practised stroke run without the menu ever being drawn. */
+  ui::MarkingMenuStyle style;
+  style.threshold = 10.0f;
+  style.radius = 76.0f;
+  style.popup_delay = 0.3f;
+  const wmOperatorStatus status = ui::marking_menu_invoke(C, idname, action.source_event, style);
+  return (status & OPERATOR_INTERFACE) ? ed::maya::MayaDispatchResult::Handled :
+                                        ed::maya::MayaDispatchResult::PassThrough;
+}
+
 static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     bContext *C,
     ed::maya::MayaWindowRuntime &runtime,
     const ed::maya::MayaInputAction &action)
 {
+  if (ed::maya::left_mouse_marquee_drag_handle(C, runtime, action)) {
+    return ed::maya::MayaDispatchResult::Handled;
+  }
   if (ed::maya::middle_mouse_axis_drag_handle(C, runtime, action)) {
     return ed::maya::MayaDispatchResult::Handled;
   }
@@ -237,18 +287,12 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
                           nullptr);
     return ed::maya::MayaDispatchResult::Handled;
   }
-  if (action.id == ed::maya::MayaActionID::ComponentMarkingMenu) {
-    /* The menu owns the keyboard until it closes, so a snap key released over it never reaches the
-     * dispatcher. Letting the held keys go with the menu is the only state that stays truthful. */
-    ED_maya_snap_override_release_all(C);
-    constexpr float maya_component_menu_threshold = 32.0f;
-    const wmOperatorStatus status = ui::pie_menu_invoke_with_threshold(
-        C,
-        "VIEW3D_MT_maya_component_marking_menu",
-        action.source_event,
-        maya_component_menu_threshold);
-    return (status & OPERATOR_INTERFACE) ? ed::maya::MayaDispatchResult::Handled :
-                                          ed::maya::MayaDispatchResult::PassThrough;
+  if (ELEM(action.id,
+           ed::maya::MayaActionID::ComponentMarkingMenu,
+           ed::maya::MayaActionID::ToolMarkingMenu,
+           ed::maya::MayaActionID::SelectionMarkingMenu))
+  {
+    return maya_marking_menu_open(C, runtime, action);
   }
 
   std::optional<ed::maya::MayaNavigationMode> navigation_mode;

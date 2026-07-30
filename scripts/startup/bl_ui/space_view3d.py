@@ -6630,15 +6630,19 @@ class VIEW3D_PT_maya_interaction(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "View"
-    bl_label = "Maya Interaction"
+    bl_label = "Interaction Preset: Maya"
     bl_parent_id = "VIEW3D_PT_view3d_properties"
 
     @classmethod
     def poll(cls, context):
         return context.preferences.inputs.interaction_preset == 'MAYA'
 
-    def draw(self, context):
-        self.layout.label(text="Interaction Preset: Maya", icon='PREFERENCES')
+    def draw_header(self, _context):
+        self.layout.label(text="", icon='PREFERENCES')
+
+    def draw(self, _context):
+        # The panel says which preset is active and holds the sub-panels; it has no body of its own.
+        pass
 
 
 class VIEW3D_PT_maya_pivot_settings(Panel):

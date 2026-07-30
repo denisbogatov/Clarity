@@ -811,7 +811,9 @@ Block *popup_block_refresh(bContext *C, PopupBlockHandle *handle, ARegion *butre
 
       block_translate(block, x_offset, y_offset);
 
-      if (U.pie_initial_timeout > 0) {
+      /* A marking menu measures the mark from where the items actually are, so a menu pushed away
+       * from a screen edge must not keep aiming at the point it was spawned on. */
+      if (U.pie_initial_timeout > 0 && !(block->pie_data->flags & PIE_MARKING_STYLE)) {
         block->pie_data->flags |= PIE_INITIAL_DIRECTION;
       }
     }
@@ -824,7 +826,7 @@ Block *popup_block_refresh(bContext *C, PopupBlockHandle *handle, ARegion *butre
     block_calc_pie_segment(block, block->pie_data->pie_center_init);
 
     /* lastly set the buttons at the center of the pie menu, ready for animation */
-    if (U.pie_animation_timeout > 0) {
+    if (U.pie_animation_timeout > 0 && !(block->pie_data->flags & PIE_MARKING_STYLE)) {
       for (Button &but_iter : block->buttons()) {
         if (but_iter.pie_dir != UI_RADIAL_NONE) {
           BLI_rctf_recenter(&but_iter.rect, UNPACK2(block->pie_data->pie_center_spawned));

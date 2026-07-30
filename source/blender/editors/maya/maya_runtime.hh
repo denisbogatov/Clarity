@@ -16,6 +16,7 @@
 #include "BLI_math_vector_types.hh"
 #include "BLI_vector.hh"
 
+#include "maya_marking_menu.hh"
 #include "maya_navigation.hh"
 #include "maya_tool.hh"
 
@@ -239,13 +240,20 @@ struct MayaTemporaryOverrides {
 
 struct MayaSelectionSettings {
   bool preserve_component_selection = true;
-  bool shift_drag_duplicate = true;
+  /**
+   * Maya keeps these apart, and so does its Move Tool marking menu: one decides whether a `Shift`
+   * drag extrudes components, the other whether it duplicates objects.
+   */
+  bool shift_extrude = true;
+  bool shift_duplicate = true;
   bool shift_duplicate_linked = false;
   bool keep_faces_together = true;
   float click_box_size = 4.0f;
   float manipulation_box_size = 10.0f;
   MayaCameraBasedSelection camera_based_selection = MayaCameraBasedSelection::Off;
   bool highlight_backfaces = true;
+  /** Maya `polySelectConstraint`: global, and shown by more than one marking menu. */
+  MayaSelectionConstraint selection_constraint = MayaSelectionConstraint::Off;
 };
 
 struct MayaWindowRuntime {
@@ -263,6 +271,7 @@ struct MayaWindowRuntime {
   MayaPivotEditState pivot_edit;
   std::unique_ptr<MayaPivotUndoState> pivot_undo;
   MayaSelectionSettings selection_settings;
+  MayaMoveToolSettings move_tool_settings;
 
   std::unique_ptr<MayaInteractionSession> active_session;
   std::shared_ptr<MayaSelectionMemory> selection_memory;

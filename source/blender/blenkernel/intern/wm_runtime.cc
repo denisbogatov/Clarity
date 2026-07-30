@@ -37,6 +37,8 @@ WindowManagerRuntime::WindowManagerRuntime()
    * surprising, and Maya's own value is what it is turned on with. */
   this->maya_snap_use_tolerance = true;
   this->maya_snap_tolerance = 10;
+  /* Maya's own default angle tolerance for the Angle selection constraint. */
+  this->maya_selection_constraint_angle = DEG2RADF(45.0f);
   this->maya_interaction_revision = 0;
   BKE_reports_init(&this->reports, RPT_STORE);
 }

@@ -179,6 +179,21 @@ enum {
   PIE_ANIMATION_FINISHED = (1 << 5),
   /** Pie gesture selection has been done, now wait for mouse motion to end. */
   PIE_GESTURE_END_WAIT = (1 << 6),
+  /**
+   * Maya marking menu: the items appear at their final place at once, the box under the pointer is
+   * what gets highlighted, and only a mark that leaves the ring lets the direction decide. Nothing
+   * fires before the button that opened the menu is released.
+   */
+  PIE_MARKING_STYLE = (1 << 7),
+  /**
+   * The marking menu is still inside its popup delay, so only the mark is drawn.
+   *
+   * This is what makes a marking menu a marking menu: a stroke that is finished before the delay
+   * runs out never shows a menu at all, so the gesture stops being a way to read the menu quickly
+   * and becomes the way the command is given. The items are live the whole time; only the drawing
+   * waits.
+   */
+  PIE_MARKING_HIDDEN = (1 << 8),
 };
 
 #define PIE_CLICK_THRESHOLD_SQ 50.0f
@@ -626,12 +641,23 @@ struct PieMenuData {
   /** A mask combining the directions of all buttons in the pie menu (excluding separators). */
   int pie_dir_mask = 0;
   float pie_dir[2] = {};
+  /** Distance of the pointer from the center the direction was measured from. */
+  float pie_dist = 0.0f;
   float pie_center_init[2] = {};
   float pie_center_spawned[2] = {};
   float last_pos[2] = {};
   double duration_gesture = 0.0;
   /** Optional per-menu dead-zone radius in unscaled pixels. Zero uses the user preference. */
   float threshold = 0.0f;
+  /** Optional per-menu ring radius in unscaled pixels. Zero uses the user preference. */
+  float radius = 0.0f;
+  /** Seconds a marking menu stays invisible after it opens. Zero draws it right away. */
+  float popup_delay = 0.0f;
+  /**
+   * The linear part of a marking menu, relative to #pie_center_spawned. A radial direction never
+   * wins inside it, so the list keeps the pointer that reaches it. Empty when there is no list.
+   */
+  rctf list_rect = {1.0f, -1.0f, 1.0f, -1.0f};
   int flags = 0;
   /** Initial event used to fire the pie menu, store here so we can query for release */
   short event_type = 0;
@@ -1378,6 +1404,18 @@ void button_text_password_hide(std::string &password_str, Button *but, bool rest
 Button *button_find_select_in_enum(Button *but, int direction);
 bool button_is_editing(const Button *but);
 float block_calc_pie_segment(Block *block, const float event_xy[2]);
+/**
+ * Dead-zone and ring radius of a pie block in block-space pixels. Both honor the per-menu override
+ * a marking menu sets, so layout, hit testing and drawing cannot drift apart.
+ */
+float block_pie_threshold_px(const Block *block);
+float block_pie_radius_px(const Block *block);
+/**
+ * Whether \a but belongs to a Maya marking menu. Those draw their buttons with the regular emboss
+ * instead of the pull-down one, so anything that keys off #EmbossType::Pulldown to decide that a
+ * button is part of a menu has to ask this as well.
+ */
+bool button_is_marking_menu_item(const Button *but);
 
 /* XXX, this code will shorten any allocated string to 'UI_MAX_NAME_STR'
  * since this is really long its unlikely to be an issue,

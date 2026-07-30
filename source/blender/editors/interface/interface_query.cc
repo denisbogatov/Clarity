@@ -206,6 +206,33 @@ void button_pie_dir(RadialDirection dir, float vec[2])
   vec[1] = sinf(angle);
 }
 
+/**
+ * Whether the direction of the mark may decide for \a block at the given block-space point.
+ *
+ * In Maya the mark is the interaction: past the dead zone the item the stroke points at is the
+ * selected one, at any distance, and the boxes are a legend for the directions rather than targets
+ * that have to be hit. The one place that is not true is the linear part under the wheel, which is
+ * an ordinary list and keeps the pointer that lands inside it.
+ */
+static bool pie_direction_decides(const Block *block, const float mx, const float my)
+{
+  if (!(block->pie_data->flags & PIE_MARKING_STYLE)) {
+    return true;
+  }
+
+  const float offset[2] = {
+      mx - block->pie_data->pie_center_spawned[0],
+      my - block->pie_data->pie_center_spawned[1],
+  };
+  return !BLI_rctf_isect_pt(&block->pie_data->list_rect, offset[0], offset[1]);
+}
+
+bool button_is_marking_menu_item(const Button *but)
+{
+  return but->block != nullptr && but->block->pie_data &&
+         (but->block->pie_data->flags & PIE_MARKING_STYLE) != 0;
+}
+
 static bool but_isect_pie_seg(const Block *block, const Button *but)
 {
   if (block->pie_data->flags & PIE_INVALID_DIR) {
@@ -281,7 +308,7 @@ bool button_contains_point_px(const Button *but, const ARegion *region, const in
   window_to_block_fl(region, block, &mx, &my);
 
   if (but->pie_dir != UI_RADIAL_NONE) {
-    if (!but_isect_pie_seg(block, but)) {
+    if (!pie_direction_decides(block, mx, my) || !but_isect_pie_seg(block, but)) {
       return false;
     }
   }
@@ -353,13 +380,15 @@ Button *button_find_mouse_over_ex(const ARegion *region,
     {
       continue;
     }
+    const bool direction_decides = block.pie_data == nullptr ||
+                                   pie_direction_decides(&block, mx, my);
     for (Button &but : block.buttons() | std::views::reverse) {
       if (find_poll && find_poll(&but, find_custom_data) == false) {
         continue;
       }
       if (button_is_interactive_ex(&but, labeledit, for_tooltip)) {
         if (but.pie_dir != UI_RADIAL_NONE) {
-          if (but_isect_pie_seg(&block, &but)) {
+          if (direction_decides && but_isect_pie_seg(&block, &but)) {
             butover = &but;
             break;
           }

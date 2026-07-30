@@ -55,6 +55,12 @@ struct MayaSnapPlanInput {
   bool is_rotation = false;
   bool orientation_is_global = true;
   bool space_is_view3d = true;
+  /**
+   * Maya's `snapComponentsRelative`, from the Move Tool marking menu. On, the pivot is what lands
+   * on the target and the selection keeps its internal spacing; off, the snap aims at the selection
+   * itself, so the part of it nearest the target is what reaches it.
+   */
+  bool keep_spacing = true;
   ed::maya::MayaStepSnapSettings step;
 };
 

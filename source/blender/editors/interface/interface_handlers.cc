@@ -11396,6 +11396,20 @@ static int handle_menu_button(bContext *C, const wmEvent *event, PopupBlockHandl
   return retval;
 }
 
+float block_pie_threshold_px(const Block *block)
+{
+  const float threshold = block->pie_data->threshold > 0.0f ? block->pie_data->threshold :
+                                                              float(U.pie_menu_threshold);
+  return threshold * UI_SCALE_FAC;
+}
+
+float block_pie_radius_px(const Block *block)
+{
+  const float radius = block->pie_data->radius > 0.0f ? block->pie_data->radius :
+                                                        float(U.pie_menu_radius);
+  return radius * UI_SCALE_FAC;
+}
+
 float block_calc_pie_segment(Block *block, const float event_xy[2])
 {
   float seg1[2];
@@ -11411,11 +11425,9 @@ float block_calc_pie_segment(Block *block, const float event_xy[2])
   sub_v2_v2v2(seg2, event_xy, seg1);
 
   const float len = normalize_v2_v2(block->pie_data->pie_dir, seg2);
-  const float pie_threshold = block->pie_data->threshold > 0.0f ?
-                                  block->pie_data->threshold :
-                                  U.pie_menu_threshold;
+  block->pie_data->pie_dist = len;
 
-  if (len < pie_threshold * UI_SCALE_FAC) {
+  if (len < block_pie_threshold_px(block)) {
     block->pie_data->flags |= PIE_INVALID_DIR;
   }
   else {
@@ -12396,6 +12408,8 @@ static int pie_handler(bContext *C, const wmEvent *event, PopupBlockHandle *menu
   Block *block = static_cast<Block *>(region->runtime->uiblocks.first);
 
   const bool is_click_style = (block->pie_data->flags & PIE_CLICK_STYLE);
+  /* Maya never commits on distance alone: the item is decided when the button is let go. */
+  const bool is_marking_style = (block->pie_data->flags & PIE_MARKING_STYLE);
 
   /* if there's an active modal button, don't check events or outside, except for search menu */
   Button *but_active = region_find_active_but(region);
@@ -12424,6 +12438,15 @@ static int pie_handler(bContext *C, const wmEvent *event, PopupBlockHandle *menu
         /* deactivate initial direction after a while */
         if (duration > 0.01 * U.pie_initial_timeout) {
           block->pie_data->flags &= ~PIE_INITIAL_DIRECTION;
+        }
+
+        /* A mark that outlives the popup delay was not a gesture after all, so the menu shows
+         * itself and the user can read what the directions mean. */
+        if ((block->pie_data->flags & PIE_MARKING_HIDDEN) &&
+            duration > double(block->pie_data->popup_delay))
+        {
+          block->pie_data->flags &= ~PIE_MARKING_HIDDEN;
+          ED_region_tag_redraw(region);
         }
 
         /* handle animation */
@@ -12500,15 +12523,15 @@ static int pie_handler(bContext *C, const wmEvent *event, PopupBlockHandle *menu
       else {
         if ((duration < 0.01 * U.pie_tap_timeout) && !(block->pie_data->flags & PIE_DRAG_STYLE)) {
           block->pie_data->flags |= PIE_CLICK_STYLE;
+          /* A tap asks to see the menu, whatever is left of the popup delay. */
+          block->pie_data->flags &= ~PIE_MARKING_HIDDEN;
+          ED_region_tag_redraw(region);
         }
         else {
           Button *but = region_find_active_but(menu->region);
 
-          const float pie_threshold = block->pie_data->threshold > 0.0f ?
-                                          block->pie_data->threshold :
-                                          U.pie_menu_threshold;
-          if (but && (U.pie_menu_confirm > 0) &&
-              (dist >= UI_SCALE_FAC * (pie_threshold + U.pie_menu_confirm)))
+          if (but && !is_marking_style && (U.pie_menu_confirm > 0) &&
+              (dist >= block_pie_threshold_px(block) + UI_SCALE_FAC * U.pie_menu_confirm))
           {
             return but_pie_menu_apply(C, menu, but, true);
           }
@@ -12533,11 +12556,8 @@ static int pie_handler(bContext *C, const wmEvent *event, PopupBlockHandle *menu
 
             /* here instead, we use the offset location to account for the initial
              * direction timeout */
-            const float pie_threshold = block->pie_data->threshold > 0.0f ?
-                                            block->pie_data->threshold :
-                                            U.pie_menu_threshold;
-            if ((U.pie_menu_confirm > 0) &&
-                (dist >= UI_SCALE_FAC * (pie_threshold + U.pie_menu_confirm)))
+            if (!is_marking_style && (U.pie_menu_confirm > 0) &&
+                (dist >= block_pie_threshold_px(block) + UI_SCALE_FAC * U.pie_menu_confirm))
             {
               block->pie_data->flags |= PIE_GESTURE_END_WAIT;
               copy_v2_v2(block->pie_data->last_pos, event_xy);
@@ -12674,8 +12694,12 @@ static int handle_menus_recursive(bContext *C,
     const bool is_menu = block_is_menu(block);
     bool inside = false;
     /* root pie menus accept the key that spawned
-     * them as double click to improve responsiveness */
+     * them as double click to improve responsiveness.
+     *
+     * A marking menu is the exception: its submenus are meant to be entered while the button that
+     * opened the menu is still down, so that button's release has to reach the open submenu. */
     const bool do_recursion = (!(block->flag & BLOCK_PIE_MENU) ||
+                               (block->pie_data->flags & PIE_MARKING_STYLE) ||
                                event->type != block->pie_data->event_type);
 
     if (do_recursion) {

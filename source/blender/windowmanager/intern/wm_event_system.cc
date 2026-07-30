@@ -4380,6 +4380,15 @@ void wm_event_do_handlers(bContext *C)
         const ed::maya::MayaDispatchResult maya_result = ED_maya_event_dispatch(C, event);
         if (maya_result != ed::maya::MayaDispatchResult::PassThrough) {
           action |= WM_HANDLER_BREAK;
+          /* A button event consumed here must not also become a click or a drag, exactly as
+           * #wm_handlers_do gives up on both once a key-map handled one. The pending click is what
+           * outlived a handled double click: `event_state->val` keeps the #KM_PRESS the double click
+           * was promoted from, so the release passed the click test and selected the single component
+           * under the pointer, throwing away the loop that the double click had just selected. */
+          if (ISMOUSE_BUTTON(event->type)) {
+            win.event_queue_check_click = false;
+            win.event_queue_check_drag = false;
+          }
         }
       }
 

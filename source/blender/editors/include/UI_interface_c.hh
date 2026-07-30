@@ -1001,6 +1001,33 @@ wmOperatorStatus pie_menu_invoke_with_threshold(bContext *C,
                                                 const char *idname,
                                                 const wmEvent *event,
                                                 float threshold);
+/**
+ * Geometry and behavior of a Maya marking menu.
+ *
+ * Zero keeps the matching user preference, so a caller only has to name what it wants to differ
+ * from a stock pie.
+ */
+struct MarkingMenuStyle {
+  /** Dead zone around the spawn point, in unscaled pixels. */
+  float threshold = 0.0f;
+  /** Ring the radial items sit on, in unscaled pixels. */
+  float radius = 0.0f;
+  /**
+   * Seconds the menu stays invisible after it opens, so a stroke that is finished inside that time
+   * never draws a menu at all. Maya's own `MarkingMenuPopupDelay`. Zero draws it right away.
+   */
+  float popup_delay = 0.0f;
+};
+
+/**
+ * Open \a idname as a marking menu: the items are placed at once instead of animating outwards,
+ * the box under the pointer is what highlights, a mark that leaves the ring lets the direction
+ * decide, and the choice is committed when the button that opened the menu is released.
+ */
+wmOperatorStatus marking_menu_invoke(bContext *C,
+                                     const char *idname,
+                                     const wmEvent *event,
+                                     const MarkingMenuStyle &style);
 
 PieMenu *pie_menu_begin(bContext *C, const char *title, int icon, const wmEvent *event)
     ATTR_NONNULL();

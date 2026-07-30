@@ -291,6 +291,12 @@ ed::maya::MayaSnapMode ED_maya_snap_mode_get(const bContext *C);
 ed::maya::MayaStepSnapSettings ED_maya_snap_step_settings_get(const bContext *C);
 ed::maya::MayaSnapToleranceSettings ED_maya_snap_tolerance_settings_get(const bContext *C);
 /**
+ * Maya's `snapComponentsRelative`, from the Move Tool marking menu. On, the whole selection travels
+ * to the snap target as one and keeps its internal spacing; off, the snap aims at the selection
+ * itself. Defaults to on when there is no window runtime.
+ */
+bool ED_maya_move_keep_spacing_get(const bContext *C);
+/**
  * Radius in pixels a Maya snap target has to be inside of, derived from the tolerance settings.
  * \a region_size_px is what an unlimited tolerance resolves to, so the caller decides what
  * "anything viewable" means for its own query.

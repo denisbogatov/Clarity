@@ -683,6 +683,9 @@ MayaSnapPlan transform_snap_maya_plan_get(const MayaSnapPlanInput &input)
       BLI_assert_unreachable();
       break;
   }
+  /* Keep Spacing off takes the pivot out of the decision, which is what leaves the selection to
+   * reach the target with the part of it that is nearest. */
+  plan.source_is_center = plan.source_is_center && input.keep_spacing;
   return plan;
 }
 

@@ -18,6 +18,7 @@
 
 #include "maya_input.hh"
 #include "maya_runtime.hh"
+#include "maya_tools.hh"
 
 namespace blender::ed::maya::tests {
 
@@ -139,6 +140,33 @@ TEST(maya_snap_tolerance, LimitedToleranceScalesWithTheInterfaceAndOffMeansTheWh
   EXPECT_FLOAT_EQ(snap_tolerance_radius_px(settings, 0, 0.0f), 1.0f);
   settings.limited = false;
   EXPECT_FLOAT_EQ(snap_tolerance_radius_px(settings, 0, 1.0f), 1.0f);
+}
+
+/**
+ * Maya's topological double click: the modifiers pick the set operation and nothing else. Deriving
+ * the operation from the gesture instead is what made `Ctrl+Shift` add a full loop where a path was
+ * asked for, and `Shift` unable to remove anything.
+ */
+TEST(maya_topology_select, ModifiersPickTheSetOperation)
+{
+  MayaInputAction action;
+
+  EXPECT_EQ(topology_select_op_from_action(action), MayaTopologySelectOp::Replace);
+
+  action.shift = true;
+  EXPECT_EQ(topology_select_op_from_action(action), MayaTopologySelectOp::Toggle);
+
+  action.shift = false;
+  action.ctrl = true;
+  EXPECT_EQ(topology_select_op_from_action(action), MayaTopologySelectOp::Subtract);
+
+  action.shift = true;
+  EXPECT_EQ(topology_select_op_from_action(action), MayaTopologySelectOp::Add);
+
+  /* `Alt` belongs to viewport navigation, so it never reaches this table; if it does, it changes
+   * nothing about the operation. */
+  action.alt = true;
+  EXPECT_EQ(topology_select_op_from_action(action), MayaTopologySelectOp::Add);
 }
 
 /** The key table is the only place that decides which key holds which mode. */

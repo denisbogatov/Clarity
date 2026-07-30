@@ -145,6 +145,14 @@ struct WindowManagerRuntime {
   /** Maya's "Use snap tolerance" and "Snap tolerance" in pixels. */
   bool maya_snap_use_tolerance;
   int maya_snap_tolerance;
+  /**
+   * Angle tolerance of Maya's `polySelectConstraint -a`, in radians.
+   *
+   * Global, like the constraint itself, and settable from the marking menu, so it lives here rather
+   * than in a per-window runtime: a slider needs an RNA property, and this is the runtime an RNA
+   * property can reach.
+   */
+  float maya_selection_constraint_angle;
   uint64_t maya_interaction_revision;
 
   WindowManagerRuntime();

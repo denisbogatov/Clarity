@@ -217,17 +217,50 @@ std::optional<ed::maya::MayaInputAction> ED_maya_input_translate(
     action.id = ed::maya::MayaActionID::ComponentMarkingMenu;
     action.phase = ed::maya::MayaActionPhase::Begin;
   }
+  else if (event.type == LEFTMOUSE && event.val == KM_PRESS && !action.shift && !action.ctrl &&
+           !action.alt &&
+           ELEM(event.keymodifier, EVT_QKEY, EVT_WKEY, EVT_EKEY, EVT_RKEY))
+  {
+    /* Maya opens a tool's marking menu by holding its key and pressing the left button. The held
+     * key is the one the window reports as the key modifier, which is also the only place a key
+     * that is down without generating events can be read from. */
+    if (event.keymodifier == EVT_QKEY) {
+      action.tool = ed::maya::MayaToolID::Select;
+    }
+    else if (event.keymodifier == EVT_WKEY) {
+      action.tool = ed::maya::MayaToolID::Move;
+    }
+    else if (event.keymodifier == EVT_EKEY) {
+      action.tool = ed::maya::MayaToolID::Rotate;
+    }
+    else {
+      action.tool = ed::maya::MayaToolID::Scale;
+    }
+    action.id = ed::maya::MayaActionID::ToolMarkingMenu;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == RIGHTMOUSE && event.val == KM_PRESS && action.ctrl && action.shift &&
+           !action.alt)
+  {
+    /* The same menu for whichever transform tool is active, so it is reachable without holding a
+     * key. #MayaToolID::None means "the active one" here. */
+    action.id = ed::maya::MayaActionID::ToolMarkingMenu;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
+  else if (event.type == RIGHTMOUSE && event.val == KM_PRESS && action.ctrl && !action.shift &&
+           !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::SelectionMarkingMenu;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
   else if (event.type == LEFTMOUSE && event.val == KM_DBL_CLICK && !action.alt) {
-    /* Shift alone selects the partial path. Ctrl+Shift is reserved for additive full-loop
-     * selection, so it must not be consumed by the partial-path gesture. */
-    action.id = action.shift && !action.ctrl ? ed::maya::MayaActionID::SelectPath :
-                                              ed::maya::MayaActionID::SelectLoop;
+    /* One action for every modifier combination: whether this selects a loop or a path depends on
+     * the mesh, which only the handler can see. `Alt` stays with viewport navigation. */
+    action.id = ed::maya::MayaActionID::SelectTopology;
     action.phase = ed::maya::MayaActionPhase::Begin;
   }
-  else if (event.type == LEFTMOUSE && event.val == KM_PRESS_DRAG && !action.alt) {
-    action.id = ed::maya::MayaActionID::SelectMarquee;
-    action.phase = ed::maya::MayaActionPhase::Begin;
-  }
+  /* The marquee has no entry here on purpose: Blender never queues a #KM_PRESS_DRAG event, so it is
+   * recognized from the motion that crosses the drag threshold. See #left_mouse_marquee_drag_handle. */
   else if (event.type == LEFTMOUSE && event.val == KM_CLICK && !action.alt) {
     if (action.ctrl && action.shift) {
       action.id = ed::maya::MayaActionID::SelectAdd;

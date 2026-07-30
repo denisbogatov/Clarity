@@ -1328,9 +1328,21 @@ static void widget_draw_preview_icon(BIFIconID icon,
   }
 }
 
+/** The linear part of a marking menu: a plain column of buttons under the wheel. */
+static bool but_is_marking_menu_list_item(const Button *but)
+{
+  return button_is_marking_menu_item(but) && but->pie_dir == UI_RADIAL_NONE;
+}
+
 static int but_draw_menu_icon(const Button *but)
 {
-  return (but->flag & BUT_ICON_SUBMENU) && (but->emboss == EmbossType::Pulldown);
+  if ((but->flag & BUT_ICON_SUBMENU) == 0) {
+    return false;
+  }
+  /* Marking menu rows are drawn as buttons rather than as pull-down entries, and the arrow is the
+   * only thing that tells the user a row leads somewhere, so it has to survive the regular
+   * emboss. */
+  return (but->emboss == EmbossType::Pulldown) || button_is_marking_menu_item(but);
 }
 
 /* icons have been standardized... and this call draws in untransformed coordinates */
@@ -5598,6 +5610,12 @@ void draw_button(const bContext *C, ARegion *region, uiStyle *style, Button *but
   }
   else if (but->emboss == EmbossType::PieMenu) {
     wt = widget_type(WidgetStyle::MenuItemPie);
+    if (button_is_marking_menu_item(but)) {
+      /* Maya's marking menu items are the same grey buttons as the rows stacked under the wheel,
+       * not the near-black plates a Blender pie menu uses. Taking the colors from the regular
+       * button set is also what keeps the two halves of the menu looking like one menu. */
+      wt->wcol_theme = &tui->wcol_tool;
+    }
   }
   else {
     BLI_assert(but->emboss == EmbossType::Emboss);
@@ -5710,6 +5728,11 @@ void draw_button(const bContext *C, ARegion *region, uiStyle *style, Button *but
         if (but->flag & BUT_NODE_LINK) {
           /* new node-link button, not active yet XXX */
           wt = widget_type(WidgetStyle::MenuNodeLink);
+        }
+        else if (but_is_marking_menu_list_item(but)) {
+          /* Same look as the commands it is stacked with: in a marking menu every row of the list
+           * is one kind of target, and only the arrow says that this one opens a submenu. */
+          wt = widget_type(WidgetStyle::Exec);
         }
         else {
           /* Popover button. */
@@ -6151,19 +6174,83 @@ static void draw_disk_shaded(float start,
   immUnbindProgram();
 }
 
+/**
+ * The origin of a marking menu and the mark drawn from it.
+ *
+ * Maya shows where the menu was opened and the stroke the pointer has made since, not a ring with a
+ * lit wedge: the wedge is what suggests that the direction is the only thing that selects, which is
+ * exactly the impression this menu must not give.
+ */
+static void draw_marking_menu_center(Block *block)
+{
+  bTheme *btheme = theme::theme_get();
+  const float cx = block->pie_data->pie_center_spawned[0];
+  const float cy = block->pie_data->pie_center_spawned[1];
+  const float *pie_dir = block->pie_data->pie_dir;
+  const float dot_radius = 3.0f * UI_SCALE_FAC;
+
+  GPU_matrix_push();
+  GPU_matrix_translate_2f(cx, cy);
+  GPU_blend(GPU_BLEND_ALPHA);
+
+  GPUVertFormat *format = immVertexFormat();
+  const uint pos = GPU_vertformat_attr_add(format, "pos", gpu::VertAttrType::SFLOAT_32_32);
+  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+
+  /* The whole stroke, not a stub reaching the ring: the mark is what the user is aiming with, and
+   * seeing all of it is what makes the direction readable without looking at the boxes. */
+  const float mark_length = block->pie_data->pie_dist;
+  bool draw_mark = !(block->pie_data->flags & (PIE_INVALID_DIR | PIE_CLICK_STYLE)) &&
+                   mark_length > dot_radius;
+  if (draw_mark) {
+    /* The mark belongs to the wheel. Once the pointer has moved into the linear part, or rests on
+     * a row whose submenu is open, the direction has stopped deciding anything and the stroke is
+     * just a line left lying across the menu. */
+    const float tip[2] = {pie_dir[0] * mark_length, pie_dir[1] * mark_length};
+    draw_mark = !BLI_rctf_isect_pt(&block->pie_data->list_rect, tip[0], tip[1]);
+  }
+  if (draw_mark) {
+    for (const Button &but : block->buttons()) {
+      if ((but.flag & UI_HOVER) && but.pie_dir == UI_RADIAL_NONE) {
+        draw_mark = false;
+        break;
+      }
+    }
+  }
+  if (draw_mark) {
+    immUniformColor4ubv(btheme->tui.wcol_pie_menu.outline);
+    GPU_line_width(1.0f * UI_SCALE_FAC);
+    immBegin(GPU_PRIM_LINES, 2);
+    immVertex2f(pos, 0.0f, 0.0f);
+    immVertex2f(pos, pie_dir[0] * mark_length, pie_dir[1] * mark_length);
+    immEnd();
+  }
+
+  immUniformColor4ubv(btheme->tui.wcol_pie_menu.inner);
+  imm_draw_circle_fill_2d(pos, 0.0f, 0.0f, dot_radius, 12);
+  immUniformColor4ubv(btheme->tui.wcol_pie_menu.outline);
+  imm_draw_circle_wire_2d(pos, 0.0f, 0.0f, dot_radius, 12);
+
+  immUnbindProgram();
+  GPU_blend(GPU_BLEND_NONE);
+  GPU_matrix_pop();
+}
+
 void draw_pie_center(Block *block)
 {
+  if (block->pie_data->flags & PIE_MARKING_STYLE) {
+    draw_marking_menu_center(block);
+    return;
+  }
+
   bTheme *btheme = theme::theme_get();
   const float cx = block->pie_data->pie_center_spawned[0];
   const float cy = block->pie_data->pie_center_spawned[1];
 
   const float *pie_dir = block->pie_data->pie_dir;
 
-  const float pie_threshold = block->pie_data->threshold > 0.0f ?
-                                  block->pie_data->threshold :
-                                  U.pie_menu_threshold;
-  const float pie_radius_internal = UI_SCALE_FAC * pie_threshold;
-  const float pie_radius_external = UI_SCALE_FAC * (pie_threshold + 7.0f);
+  const float pie_radius_internal = block_pie_threshold_px(block);
+  const float pie_radius_external = pie_radius_internal + 7.0f * UI_SCALE_FAC;
 
   const int subd = 40;
 

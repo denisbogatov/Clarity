@@ -4109,7 +4109,7 @@ void LayoutRadial::resolve_impl()
    * for radiation, see http://mattebb.com/weblog/radiation/
    * also the old code at #5103. */
 
-  const int pie_radius = U.pie_menu_radius * UI_SCALE_FAC;
+  const int pie_radius = block_pie_radius_px(this->block());
 
   const int x = x_;
   const int y = y_;
@@ -4199,8 +4199,40 @@ void LayoutRootPieMenu::resolve_impl()
 
     const int2 size = item->size();
 
-    item_position(
-        item, x - size.x / 2, y + UI_SCALE_FAC * (U.pie_menu_threshold + 9.0f), size.x, size.y);
+    const int title_y = y + int(block_pie_threshold_px(this->block()) + 9.0f * UI_SCALE_FAC);
+    item_position(item, x - size.x / 2, title_y, size.x, size.y);
+  }
+
+  /* A marking menu may carry a linear part under the wheel: everything the menu put in the root
+   * next to the title and the wheel is stacked there, centered on the point the menu was opened
+   * on. The wheel keeps its own geometry, so the two parts never have to agree on a width. */
+  const int radial_height = int(UI_UNIT_Y * 1.5f);
+  int list_y = y_ - int(block_pie_radius_px(this->block())) - radial_height -
+               int(UI_UNIT_Y * 0.6f);
+  rctf list_rect;
+  BLI_rctf_init_minmax(&list_rect);
+
+  for (Item *root_item : this->items()) {
+    if (root_item == item || root_item->type() == ItemType::LayoutRadial) {
+      continue;
+    }
+    const int2 size = root_item->size();
+    if (size.x <= 0 || size.y <= 0) {
+      continue;
+    }
+    const int list_x = x_ - size.x / 2;
+    item_position(root_item, list_x, list_y - size.y, size.x, size.y);
+    const float corner_min[2] = {float(list_x), float(list_y - size.y)};
+    const float corner_max[2] = {float(list_x + size.x), float(list_y)};
+    BLI_rctf_do_minmax_v(&list_rect, corner_min);
+    BLI_rctf_do_minmax_v(&list_rect, corner_max);
+    list_y -= size.y;
+  }
+
+  if (!BLI_rctf_is_empty(&list_rect)) {
+    /* Relative to the center: the block is translated onto the spawn point after this runs. */
+    BLI_rctf_translate(&list_rect, -x_, -y_);
+    this->block()->pie_data->list_rect = list_rect;
   }
 }
 

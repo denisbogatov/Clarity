@@ -88,7 +88,8 @@ static float pie_menu_title_width(const char *name, int icon)
   return (fontstyle_string_width(fstyle, name) + (UI_UNIT_X * (1.50f + (icon ? 0.25f : 0.0f))));
 }
 
-PieMenu *pie_menu_begin(bContext *C, const char *title, int icon, const wmEvent *event)
+static PieMenu *pie_menu_begin_ex(
+    bContext *C, const char *title, int icon, const wmEvent *event, const bool marking)
 {
   const uiStyle *style = style_get_dpi();
   short event_type;
@@ -105,9 +106,23 @@ PieMenu *pie_menu_begin(bContext *C, const char *title, int icon, const wmEvent 
   pie->pie_block->flag |= BLOCK_PIE_MENU;
   pie->pie_block->pie_data = std::make_unique<PieMenuData>();
 
+  if (marking) {
+    /* Maya draws the menu where it will stay and waits for the release, so the item positions the
+     * pointer is aimed at are the ones the hit test sees from the first mouse move on. */
+    pie->pie_block->pie_data->flags |= PIE_MARKING_STYLE | PIE_ANIMATION_FINISHED;
+    pie->pie_block->pie_data->alphafac = 1.0f;
+  }
+
   /* if pie is spawned by a left click, release or click event,
-   * it is always assumed to be click style */
-  if (event->type == LEFTMOUSE || ELEM(event->val, KM_RELEASE, KM_CLICK)) {
+   * it is always assumed to be click style.
+   *
+   * A marking menu is the exception for a press: `LMB` is how Maya opens it, and the whole
+   * interaction is press, mark, release. Only a real release or click event still opens it in the
+   * style that waits for a second click. */
+  const bool click_style_event = marking ? ELEM(event->val, KM_RELEASE, KM_CLICK) :
+                                           (event->type == LEFTMOUSE ||
+                                            ELEM(event->val, KM_RELEASE, KM_CLICK));
+  if (click_style_event) {
     pie->pie_block->pie_data->flags |= PIE_CLICK_STYLE;
     pie->pie_block->pie_data->event_type = EVENT_NONE;
     win->pie_event_type_lock = EVENT_NONE;
@@ -163,6 +178,11 @@ PieMenu *pie_menu_begin(bContext *C, const char *title, int icon, const wmEvent 
   return pie;
 }
 
+PieMenu *pie_menu_begin(bContext *C, const char *title, int icon, const wmEvent *event)
+{
+  return pie_menu_begin_ex(C, title, icon, event, false);
+}
+
 void pie_menu_end(bContext *C, PieMenu *pie)
 {
   wmWindow *window = CTX_wm_window(C);
@@ -186,7 +206,10 @@ Layout *pie_menu_layout(PieMenu *pie)
 static wmOperatorStatus pie_menu_invoke_ex(bContext *C,
                                            const char *idname,
                                            const wmEvent *event,
-                                           const float threshold)
+                                           const float threshold,
+                                           const float radius,
+                                           const float popup_delay,
+                                           const bool marking)
 {
   MenuType *mt = WM_menutype_find(idname, true);
 
@@ -200,9 +223,14 @@ static wmOperatorStatus pie_menu_invoke_ex(bContext *C,
     return (OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH);
   }
 
-  PieMenu *pie = pie_menu_begin(
-      C, CTX_IFACE_(mt->translation_context, mt->label), ICON_NONE, event);
+  PieMenu *pie = pie_menu_begin_ex(
+      C, CTX_IFACE_(mt->translation_context, mt->label), ICON_NONE, event, marking);
   pie->pie_block->pie_data->threshold = threshold;
+  pie->pie_block->pie_data->radius = radius;
+  pie->pie_block->pie_data->popup_delay = popup_delay;
+  if (popup_delay > 0.0f && !(pie->pie_block->pie_data->flags & PIE_CLICK_STYLE)) {
+    pie->pie_block->pie_data->flags |= PIE_MARKING_HIDDEN;
+  }
   Layout *layout = pie_menu_layout(pie);
 
   menutype_draw(C, mt, layout);
@@ -214,7 +242,7 @@ static wmOperatorStatus pie_menu_invoke_ex(bContext *C,
 
 wmOperatorStatus pie_menu_invoke(bContext *C, const char *idname, const wmEvent *event)
 {
-  return pie_menu_invoke_ex(C, idname, event, 0.0f);
+  return pie_menu_invoke_ex(C, idname, event, 0.0f, 0.0f, 0.0f, false);
 }
 
 wmOperatorStatus pie_menu_invoke_with_threshold(bContext *C,
@@ -222,7 +250,16 @@ wmOperatorStatus pie_menu_invoke_with_threshold(bContext *C,
                                                 const wmEvent *event,
                                                 const float threshold)
 {
-  return pie_menu_invoke_ex(C, idname, event, threshold);
+  return pie_menu_invoke_ex(C, idname, event, threshold, 0.0f, 0.0f, false);
+}
+
+wmOperatorStatus marking_menu_invoke(bContext *C,
+                                     const char *idname,
+                                     const wmEvent *event,
+                                     const MarkingMenuStyle &style)
+{
+  return pie_menu_invoke_ex(
+      C, idname, event, style.threshold, style.radius, style.popup_delay, true);
 }
 
 /** \} */

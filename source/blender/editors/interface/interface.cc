@@ -2311,9 +2311,14 @@ void block_draw(const bContext *C, Block *block)
     const int ymin = rect.ymin + ((block->flag & BLOCK_CLIPBOTTOM) ? arrow_size : 0.0f);
     GPU_scissor(rect.xmin, ymin, BLI_rcti_size_x(&rect), ymax - ymin);
   }
+  /* A marking menu inside its popup delay draws its mark and nothing else. The buttons stay live,
+   * so a stroke finished before the menu ever appears still picks the item it points at. */
+  const bool pie_items_hidden = block->pie_data &&
+                                (block->pie_data->flags & PIE_MARKING_HIDDEN);
+
   /* widgets */
   for (Button &but : block->buttons()) {
-    if (but.flag & (UI_HIDDEN | UI_SCROLLED)) {
+    if (pie_items_hidden || (but.flag & (UI_HIDDEN | UI_SCROLLED))) {
       continue;
     }
 
@@ -5030,7 +5035,9 @@ static Button *def_but_rna(Block *block,
   }
 
   if (type == ButtonType::Menu) {
-    if (but->emboss == EmbossType::Pulldown) {
+    /* A marking menu draws its rows as regular buttons, so the arrow that tells a row leading to a
+     * submenu apart from a command has to be enabled for the emboss it actually uses. */
+    if (but->emboss == EmbossType::Pulldown || button_is_marking_menu_item(but)) {
       but_submenu_enable(block, but);
     }
   }
