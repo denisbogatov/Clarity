@@ -4,6 +4,8 @@
 
 #include "testing/testing.h"
 
+#include "DNA_view3d_types.h"
+
 #include "ED_gizmo_library.hh"
 
 #include "transform_gizmo.hh"
@@ -80,6 +82,42 @@ TEST(transform_gizmo_3d, MayaTranslateCenterSquareBecomesCircleWhileDragging)
   /* The square is restored once the drag ended. */
   EXPECT_EQ(gizmo_3d_translate_center_style_get(maya, false, no_edit_pivot),
             ED_GIZMO_PRIMITIVE_STYLE_PLANE);
+}
+
+/** Edit Pivot adds the rotation rings on top of the layout the active tool asked for. */
+TEST(transform_gizmo_3d, EditPivotAddsRotationToTheActiveToolLayout)
+{
+  EXPECT_EQ(gizmo_3d_twtype_resolve(edit_pivot, V3D_GIZMO_SHOW_OBJECT_TRANSLATE),
+            V3D_GIZMO_SHOW_OBJECT_TRANSLATE | V3D_GIZMO_SHOW_OBJECT_ROTATE);
+  EXPECT_EQ(gizmo_3d_twtype_resolve(edit_pivot, V3D_GIZMO_SHOW_OBJECT_ROTATE),
+            V3D_GIZMO_SHOW_OBJECT_ROTATE);
+  /* A tool with no manipulator of its own still gets handles to drag the pivot by. */
+  EXPECT_EQ(gizmo_3d_twtype_resolve(edit_pivot, 0),
+            V3D_GIZMO_SHOW_OBJECT_TRANSLATE | V3D_GIZMO_SHOW_OBJECT_ROTATE);
+  /* With the mode off the layout is the tool's, untouched. */
+  EXPECT_EQ(gizmo_3d_twtype_resolve(no_edit_pivot, V3D_GIZMO_SHOW_OBJECT_TRANSLATE),
+            V3D_GIZMO_SHOW_OBJECT_TRANSLATE);
+  EXPECT_EQ(gizmo_3d_twtype_resolve(no_edit_pivot, 0), 0);
+}
+
+/**
+ * The rings surround the translate handles instead of rearranging them: feeding a rotate layout to
+ * the arrows shortened them, took their stems away and hid the plane handles, which is what made
+ * turning the mode on look like the manipulator was rebuilt.
+ */
+TEST(transform_gizmo_3d, MayaTranslateHandlesIgnoreTheRotationLayout)
+{
+  const int with_rings = V3D_GIZMO_SHOW_OBJECT_TRANSLATE | V3D_GIZMO_SHOW_OBJECT_ROTATE;
+  EXPECT_EQ(gizmo_3d_translate_layout_twtype_get(maya, with_rings),
+            V3D_GIZMO_SHOW_OBJECT_TRANSLATE);
+  /* Which is the very layout the tool has without the mode, so nothing about them changes. */
+  EXPECT_EQ(gizmo_3d_translate_layout_twtype_get(maya, with_rings),
+            gizmo_3d_translate_layout_twtype_get(maya, V3D_GIZMO_SHOW_OBJECT_TRANSLATE));
+  /* Scale is not a rotation layout and is left alone. */
+  EXPECT_EQ(gizmo_3d_translate_layout_twtype_get(maya, V3D_GIZMO_SHOW_OBJECT_SCALE),
+            V3D_GIZMO_SHOW_OBJECT_SCALE);
+  /* Outside the Maya preset the layout reaches the handles unchanged. */
+  EXPECT_EQ(gizmo_3d_translate_layout_twtype_get(blender_default, with_rings), with_rings);
 }
 
 /**

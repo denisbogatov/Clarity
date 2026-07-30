@@ -13,6 +13,7 @@
 #include "DNA_userdef_types.h"
 
 #include "BLI_assert.h"
+#include "BLI_path_utils.hh"
 #include "BLI_time.h"
 #include "BLI_utildefines.h"
 
@@ -34,14 +35,25 @@
 
 namespace blender {
 
+bool ED_maya_gizmo_trace_enabled()
+{
+  static const bool enabled = BLI_getenv("BLENDER_MAYA_GIZMO_TRACE") != nullptr;
+  return enabled;
+}
+
+bool ED_maya_interaction_preset_enabled(const bContext *C)
+{
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  const bke::WindowManagerRuntime *wm_runtime = wm != nullptr ? wm->runtime : nullptr;
+  return wm_runtime != nullptr && U.interaction_preset == INTERACTION_PRESET_MAYA &&
+         wm_runtime->maya_interaction_enabled;
+}
+
 bool ED_maya_interaction_enabled(const bContext *C)
 {
   const ScrArea *area = CTX_wm_area(C);
-  const wmWindowManager *wm = CTX_wm_manager(C);
-  const bke::WindowManagerRuntime *wm_runtime = wm != nullptr ? wm->runtime : nullptr;
-  return area != nullptr && area->spacetype == SPACE_VIEW3D && wm_runtime != nullptr &&
-         U.interaction_preset == INTERACTION_PRESET_MAYA &&
-         wm_runtime->maya_interaction_enabled;
+  return area != nullptr && area->spacetype == SPACE_VIEW3D &&
+         ED_maya_interaction_preset_enabled(C);
 }
 
 static ed::maya::MayaDispatchResult maya_dispatch_to_active_session(
@@ -308,9 +320,17 @@ ed::maya::MayaDispatchResult ED_maya_event_dispatch(bContext *C, const wmEvent *
         runtime->active_session->cancel(C);
         runtime->active_session.reset();
       }
-      /* Leaving the Maya preset must drop the mode, unlike merely losing window focus. */
-      ed::maya::pivot_edit_input_reset(C, *runtime);
-      ed::maya::pivot_edit_end(C, *runtime);
+      if (ED_maya_interaction_preset_enabled(C)) {
+        /* The Maya model is still active, the pointer just is not over a 3D View. Only the keys can
+         * be wrong here: their release will never be delivered to us, so temporary snapping has to
+         * be let go of, while Edit Pivot survives the trip outside the viewport. */
+        ED_maya_snap_override_release_all(C);
+      }
+      else {
+        /* Leaving the Maya preset must drop the mode, unlike merely losing window focus. */
+        ed::maya::pivot_edit_input_reset(C, *runtime);
+        ed::maya::pivot_edit_end(C, *runtime);
+      }
     }
     return ed::maya::MayaDispatchResult::PassThrough;
   }

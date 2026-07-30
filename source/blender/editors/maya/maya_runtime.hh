@@ -127,8 +127,98 @@ struct MayaPivotEditState {
   bool snap_preview_queried = false;
 };
 
+/**
+ * Momentary snap modes and the keys that hold them.
+ *
+ * Temporary snapping is driven by physical keys, and every event has to reach exactly one entry
+ * point here. Appending to a bare stack from several call sites is what let a mode stay held after
+ * its key was already up — a repeated press stacked a second copy, and a release that never arrived
+ * (a popup or another editor swallowed it) left the mode on with no way back.
+ *
+ * Pure state, so the rules are unit tested without a window manager.
+ */
+class MayaSnapOverride {
+ public:
+  /** `Shift+J` and `J` are the same physical key, so the two step modes never stack. */
+  static bool modes_share_key(MayaSnapMode a, MayaSnapMode b)
+  {
+    if (a == b) {
+      return true;
+    }
+    const auto is_step = [](const MayaSnapMode mode) {
+      return ELEM(mode, MayaSnapMode::StepAbsolute, MayaSnapMode::StepRelative);
+    };
+    return is_step(a) && is_step(b);
+  }
+
+  /** Key down. False when the state was already what the press asks for, a key repeat included. */
+  bool press(const MayaSnapMode mode)
+  {
+    if (mode == MayaSnapMode::None || holds_key_of(mode)) {
+      return false;
+    }
+    held_.append(mode);
+    return true;
+  }
+
+  /** Key up. Drops every mode the key owns, so a stray release cannot corrupt the stack. */
+  bool release(const MayaSnapMode mode)
+  {
+    if (mode == MayaSnapMode::None) {
+      return false;
+    }
+    bool changed = false;
+    for (int64_t i = held_.size() - 1; i >= 0; i--) {
+      if (modes_share_key(held_[i], mode)) {
+        held_.remove(i);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  /** Every key is considered released: lost focus, a preset change, a mode rebuild. */
+  bool clear()
+  {
+    if (held_.is_empty()) {
+      return false;
+    }
+    held_.clear();
+    return true;
+  }
+
+  /** The mode that wins: the most recently pressed key. */
+  MayaSnapMode active() const
+  {
+    return held_.is_empty() ? MayaSnapMode::None : held_.last();
+  }
+
+  bool is_empty() const
+  {
+    return held_.is_empty();
+  }
+
+  int64_t held_num() const
+  {
+    return held_.size();
+  }
+
+ private:
+  bool holds_key_of(const MayaSnapMode mode) const
+  {
+    for (const MayaSnapMode held : held_) {
+      if (modes_share_key(held, mode)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Vector<MayaSnapMode, 5> held_;
+};
+
 struct MayaTemporaryOverrides {
-  Vector<MayaSnapMode, 5> snap_stack;
+  MayaSnapOverride snap;
   bool edit_pivot = false;
 };
 
@@ -216,6 +306,8 @@ void pivot_edit_snap_preview_update(const bContext *C,
                                     MayaWindowRuntime &runtime,
                                     const int2 &mouse_region);
 void pivot_edit_snap_preview_clear(MayaWindowRuntime &runtime);
+void snap_override_mirror_sync(const bContext *C, const MayaWindowRuntime &runtime);
+void snap_override_revision_reconcile(const bContext *C, MayaWindowRuntime &runtime);
 void pivot_edit_input_reset(bContext *C, MayaWindowRuntime &runtime);
 void pivot_edit_validate(bContext *C, MayaWindowRuntime &runtime);
 void pivot_edit_end(bContext *C, MayaWindowRuntime &runtime);

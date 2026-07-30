@@ -184,7 +184,19 @@ enum class MayaNavigationDebugStage : uint8_t {
 
 }  // namespace ed::maya
 
+/**
+ * Whether the temporary manipulator trace is on, set by the `BLENDER_MAYA_GIZMO_TRACE` environment
+ * variable. Remove together with the trace once the manipulator lifecycle is settled.
+ */
+bool ED_maya_gizmo_trace_enabled();
+
 bool ED_maya_interaction_enabled(const bContext *C);
+/**
+ * Whether the Maya interaction model owns this session at all, regardless of what the pointer
+ * happens to be over. #ED_maya_interaction_enabled additionally requires a 3D View, so it answers
+ * "may this event be interpreted here", not "is the Maya model active".
+ */
+bool ED_maya_interaction_preset_enabled(const bContext *C);
 ed::maya::MayaObjectRuntimeRef ED_maya_object_runtime_ref_create(const Object &object);
 Object *ED_maya_object_runtime_ref_resolve(
     Main &bmain, const ed::maya::MayaObjectRuntimeRef &reference);
@@ -228,6 +240,12 @@ bool ED_maya_pivot_orientation_aim(ed::maya::MayaPivotFrame &frame,
                                    int active_axis,
                                    const double3 &view_up);
 bool ED_maya_snap_override_set(const bContext *C, ed::maya::MayaSnapMode mode, bool enabled);
+/**
+ * Treat every momentary snap key as released. For the cases where the release itself can never
+ * reach the dispatcher — the pointer left the 3D View, a popup swallowed the event — which is what
+ * used to leave temporary snapping stuck on.
+ */
+bool ED_maya_snap_override_release_all(const bContext *C);
 ed::maya::MayaSnapMode ED_maya_snap_override_get(const bContext *C);
 bool ED_maya_snap_mode_set(const bContext *C, ed::maya::MayaSnapMode mode);
 ed::maya::MayaSnapMode ED_maya_snap_mode_get(const bContext *C);

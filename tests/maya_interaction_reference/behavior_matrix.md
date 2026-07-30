@@ -97,7 +97,7 @@ the centre glyph of each preset. What stays manual is only whether the result lo
 | Object, one object | Move | `V` hold | drag the centre square | manipulator never disappears; only the centre glyph changes | the visible pivot lands on the target vertex, not the centre of the selection | transform and glyph restored |
 | Object, custom pivot offset from the origin | Move | `V` hold | drag | unchanged | pivot lands on the target; the offset between pivot and geometry is preserved | as above |
 | Object, one object | Move | `V` hold | pointer still over the manipulator | unchanged | no snap onto the selection's own pivot — no dead zone around the manipulator | n/a |
-| Object, Edit Pivot on | Move | `D` | none | yellow square inside a circle in the centre for as long as the mode is on — that pair is the indicator that Edit Pivot is active | n/a | n/a |
+| Object, Edit Pivot on | Move | `D` | none | rotation rings and a light blue view aligned circle appear *around* the Move handles; arrows keep their stems, length and position, plane handles stay; the centre square gains a circle and a diamond inside it for as long as the mode is on | n/a | n/a |
 | Object, Edit Pivot on | Move | `D`, then `V` hold | LMB drag | manipulator is not rebuilt; the square and circle stay exactly as they were, the circle is indication only | pivot snapped to the target vertex | pivot restored |
 | Object, Edit Pivot on | Move | `D` / `Insert` / `W`, `E`, `R` | none | switching the mode or the tool must not make the manipulator flicker: the layout and the centre glyph change in the same redraw | n/a | n/a |
 

@@ -1257,7 +1257,14 @@ bool WM_gizmo_group_type_poll(const bContext *C, const wmGizmoGroupType *gzgt)
 void WM_gizmo_group_refresh(const bContext *C, wmGizmoGroup *gzgroup)
 {
   const wmGizmoGroupType *gzgt = gzgroup->type;
-  if (gzgt->flag & WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK) {
+  /* Delaying the refresh hides the whole group for the duration of a click-drag, so that a gizmo
+   * cannot pop up under the cursor and swallow a selection drag. Maya's manipulator is the pivot the
+   * user aims with: it has to stay on screen and follow the drag. Hiding it is what made the pivot
+   * disappear while dragging or snapping, and flash when Edit Pivot was toggled right after a
+   * click. */
+  const bool delay_refresh_for_tweak = (gzgt->flag & WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK) &&
+                                       !ED_maya_interaction_enabled(C);
+  if (delay_refresh_for_tweak) {
     wmGizmoMap *gzmap = gzgroup->parent_gzmap;
     wmGizmo *gz = nullptr;
     /* Without the check for refresh, any highlighted gizmo will prevent hiding
@@ -1277,9 +1284,20 @@ void WM_gizmo_group_refresh(const bContext *C, wmGizmoGroup *gzgroup)
         gzgroup->init_flag &= ~WM_GIZMOGROUP_INIT_REFRESH;
         WM_gizmomap_tag_refresh_drawstep(gzmap, WM_gizmomap_drawstep_from_gizmo_group(gzgroup));
         gzgroup->hide.delay_refresh_for_tweak = true;
+        if (ED_maya_gizmo_trace_enabled()) {
+          fprintf(stderr,
+                  "GZTRACE %.3f group_hidden_for_tweak: %s\n",
+                  BLI_time_now_seconds(),
+                  gzgt->idname);
+          fflush(stderr);
+        }
         return;
       }
     }
+    gzgroup->hide.delay_refresh_for_tweak = false;
+  }
+  else if (gzgt->flag & WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK) {
+    /* A group that an earlier tweak hid must not stay hidden once Maya owns the manipulator. */
     gzgroup->hide.delay_refresh_for_tweak = false;
   }
 

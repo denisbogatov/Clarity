@@ -1734,7 +1734,7 @@ void pivot_edit_snap_preview_update(const bContext *C,
    * drag has no hover target either, and its snapping must not pull an extra depsgraph evaluation
    * into the modal loop. */
   if (state.target == MayaPivotEditTarget::None || runtime.transform_active ||
-      runtime.temporary.snap_stack.is_empty())
+      runtime.temporary.snap.is_empty())
   {
     pivot_edit_snap_preview_clear(runtime);
     return;
@@ -1993,12 +1993,38 @@ void pivot_edit_selection_changed(bContext *C, MayaWindowRuntime &runtime)
   }
 }
 
+/**
+ * Mirror the UI reads. Written from one place only, so it can never disagree with the held keys.
+ */
+void snap_override_mirror_sync(const bContext *C, const MayaWindowRuntime &runtime)
+{
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm != nullptr && wm->runtime != nullptr) {
+    wm->runtime->maya_snap_temporary_mode = uint8_t(runtime.temporary.snap.active());
+  }
+}
+
+/**
+ * Leaving or re-entering the Maya preset bumps the interaction revision. A key held across that
+ * boundary will never deliver its release to us, so the override starts from empty.
+ */
+void snap_override_revision_reconcile(const bContext *C, MayaWindowRuntime &runtime)
+{
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm == nullptr || wm->runtime == nullptr ||
+      runtime.interaction_revision_seen == wm->runtime->maya_interaction_revision)
+  {
+    return;
+  }
+  runtime.interaction_revision_seen = wm->runtime->maya_interaction_revision;
+  runtime.temporary.snap.clear();
+  snap_override_mirror_sync(C, runtime);
+}
+
 void pivot_edit_input_reset(bContext *C, MayaWindowRuntime &runtime)
 {
-  runtime.temporary.snap_stack.clear();
-  if (wmWindowManager *wm = CTX_wm_manager(C); wm != nullptr && wm->runtime != nullptr) {
-    wm->runtime->maya_snap_temporary_mode = uint8_t(MayaSnapMode::None);
-  }
+  runtime.temporary.snap.clear();
+  snap_override_mirror_sync(C, runtime);
   /* The snap keys are considered released, so the hovered target they previewed is gone too. */
   pivot_edit_snap_preview_clear(runtime);
 
@@ -2687,49 +2713,17 @@ bool ED_maya_snap_override_set(const bContext *C,
     return false;
   }
 
-  Vector<ed::maya::MayaSnapMode, 5> &stack = runtime->temporary.snap_stack;
-  wmWindowManager *wm = CTX_wm_manager(C);
-  if (wm != nullptr &&
-      runtime->interaction_revision_seen != wm->runtime->maya_interaction_revision)
-  {
-    runtime->interaction_revision_seen = wm->runtime->maya_interaction_revision;
-    stack.clear();
-    wm->runtime->maya_snap_temporary_mode = uint8_t(ed::maya::MayaSnapMode::None);
-  }
-  const auto remove_mode = [&](const ed::maya::MayaSnapMode mode_to_remove) {
-    int64_t index;
-    while ((index = stack.as_span().first_index_try(mode_to_remove)) != -1) {
-      stack.remove(index);
-    }
-  };
-  const bool is_step_mode = ELEM(mode,
-                                 ed::maya::MayaSnapMode::StepAbsolute,
-                                 ed::maya::MayaSnapMode::StepRelative);
-  if (!enabled && is_step_mode)
-  {
-    remove_mode(ed::maya::MayaSnapMode::StepAbsolute);
-    remove_mode(ed::maya::MayaSnapMode::StepRelative);
-  }
-  else if (!enabled) {
-    remove_mode(mode);
-  }
-  else if (stack.as_span().contains(mode) ||
-           (is_step_mode &&
-            (stack.as_span().contains(ed::maya::MayaSnapMode::StepAbsolute) ||
-             stack.as_span().contains(ed::maya::MayaSnapMode::StepRelative))))
-  {
+  ed::maya::snap_override_revision_reconcile(C, *runtime);
+  ed::maya::MayaSnapOverride &snap = runtime->temporary.snap;
+  const bool changed = enabled ? snap.press(mode) : snap.release(mode);
+  ed::maya::snap_override_mirror_sync(C, *runtime);
+  if (!changed) {
+    /* A key repeat or a release of a key that is not held: consumed, nothing to redraw. */
     return true;
   }
-  else {
-    stack.append(mode);
-  }
 
-  if (wm != nullptr) {
-    wm->runtime->maya_snap_temporary_mode = uint8_t(
-        stack.is_empty() ? ed::maya::MayaSnapMode::None : stack.last());
-  }
-  /* The snap preview lives and dies with the held keys, so it follows the same stack. */
-  if (stack.is_empty()) {
+  /* The snap preview lives and dies with the held keys, so it follows the same state. */
+  if (snap.is_empty()) {
     ed::maya::pivot_edit_snap_preview_clear(*runtime);
   }
   else {
@@ -2740,24 +2734,31 @@ bool ED_maya_snap_override_set(const bContext *C,
   return true;
 }
 
+bool ED_maya_snap_override_release_all(const bContext *C)
+{
+  ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
+  if (runtime == nullptr) {
+    return false;
+  }
+  ed::maya::snap_override_revision_reconcile(C, *runtime);
+  if (!runtime->temporary.snap.clear()) {
+    return false;
+  }
+  ed::maya::snap_override_mirror_sync(C, *runtime);
+  ed::maya::pivot_edit_snap_preview_clear(*runtime);
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+  return true;
+}
+
 ed::maya::MayaSnapMode ED_maya_snap_override_get(const bContext *C)
 {
   ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
   if (runtime == nullptr) {
     return ed::maya::MayaSnapMode::None;
   }
-  const wmWindowManager *wm = CTX_wm_manager(C);
-  const bool interaction_enabled = ED_maya_interaction_enabled(C);
-  if (wm != nullptr &&
-      runtime->interaction_revision_seen != wm->runtime->maya_interaction_revision)
-  {
-    runtime->interaction_revision_seen = wm->runtime->maya_interaction_revision;
-    runtime->temporary.snap_stack.clear();
-    wm->runtime->maya_snap_temporary_mode = uint8_t(ed::maya::MayaSnapMode::None);
-  }
-  return interaction_enabled && !runtime->temporary.snap_stack.is_empty() ?
-             runtime->temporary.snap_stack.last() :
-             ed::maya::MayaSnapMode::None;
+  ed::maya::snap_override_revision_reconcile(C, *runtime);
+  return ED_maya_interaction_enabled(C) ? runtime->temporary.snap.active() :
+                                          ed::maya::MayaSnapMode::None;
 }
 
 bool ED_maya_snap_mode_set(const bContext *C, const ed::maya::MayaSnapMode mode)

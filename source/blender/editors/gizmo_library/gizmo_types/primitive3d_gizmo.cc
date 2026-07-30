@@ -45,6 +45,19 @@ static float verts_plane[4][3] = {
     {-1, 1, 0},
 };
 
+/**
+ * Inner marks of #ED_GIZMO_PRIMITIVE_STYLE_PLANE_CIRCLE, in units of the plane's half width. Both
+ * sit inside the plane, matching the proportions of Maya's Edit Pivot centre handle.
+ */
+static float verts_diamond[4][3] = {
+    {-0.3f, 0, 0},
+    {0, -0.3f, 0},
+    {0.3f, 0, 0},
+    {0, 0.3f, 0},
+};
+
+static const float plane_circle_radius = 0.5f;
+
 struct PrimitiveGizmo3D {
   wmGizmo gizmo;
 
@@ -157,10 +170,13 @@ static void gizmo_primitive_draw_geom(PrimitiveGizmo3D *gz_prim,
 
   if (draw_plane) {
     wm_gizmo_vec_draw(col_outer, verts_plane, ARRAY_SIZE(verts_plane), pos, GPU_PRIM_LINE_LOOP);
-    if (gz_prim->draw_style == ED_GIZMO_PRIMITIVE_STYLE_PLANE_CIRCLE) {
-      /* Circumscribes the plane with a small gap; the plane's half diagonal is `sqrt(2)`. */
+    /* The diamond and the circle are decoration: drawing them into the selection buffer would grow
+     * the clickable area of the handle they mark. */
+    if (gz_prim->draw_style == ED_GIZMO_PRIMITIVE_STYLE_PLANE_CIRCLE && !select) {
+      wm_gizmo_vec_draw(
+          col_outer, verts_diamond, ARRAY_SIZE(verts_diamond), pos, GPU_PRIM_LINE_LOOP);
       immUniformColor4fv(col_outer);
-      imm_draw_circle_wire_3d(pos, 0.0f, 0.0f, 1.7f, nsegments);
+      imm_draw_circle_wire_3d(pos, 0.0f, 0.0f, plane_circle_radius, nsegments);
     }
   }
   else {

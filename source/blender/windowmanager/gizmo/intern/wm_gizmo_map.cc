@@ -426,6 +426,14 @@ static void gizmomap_prepare_drawing(wmGizmoMap *gzmap,
 
     /* Check after ensure which can run refresh and update this value. */
     if (gzgroup.hide.any != 0) {
+      if (ED_maya_gizmo_trace_enabled()) {
+        fprintf(stderr,
+                "GZTRACE %.3f group_skipped: %s hide_any=%d\n",
+                BLI_time_now_seconds(),
+                gzgroup.type->idname,
+                int(gzgroup.hide.any));
+        fflush(stderr);
+      }
       continue;
     }
 

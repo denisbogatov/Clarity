@@ -5,6 +5,7 @@
 #include "testing/testing.h"
 
 #include "BKE_context.hh"
+#include "BKE_gtest_base.hh"
 #include "BKE_lib_id.hh"
 #include "BKE_main.hh"
 #include "BKE_object.hh"
@@ -16,7 +17,100 @@
 
 namespace blender::ed::maya::tests {
 
-TEST(maya_runtime, ObjectRuntimeReferenceRejectsDeletedOrReusedObject)
+/**
+ * Allocating an ID needs the ID type table, so every test in this file runs on the shared Blender
+ * fixture. Without it #BKE_object_add_only_object asserts in #BKE_libblock_alloc_notest and takes
+ * the whole test binary down with it.
+ */
+class MayaRuntimeTest : public bke::BlenderGTestBase {};
+
+/** Momentary snap keys: the state machine behind temporary snapping getting stuck. */
+TEST(maya_snap_override, HeldKeysStackAndTheLastOneWins)
+{
+  MayaSnapOverride snap;
+  EXPECT_TRUE(snap.is_empty());
+  EXPECT_EQ(snap.active(), MayaSnapMode::None);
+
+  EXPECT_TRUE(snap.press(MayaSnapMode::Point));
+  EXPECT_EQ(snap.active(), MayaSnapMode::Point);
+  EXPECT_TRUE(snap.press(MayaSnapMode::Grid));
+  EXPECT_EQ(snap.active(), MayaSnapMode::Grid);
+
+  /* Releasing the newer key falls back to the one still held, it does not clear everything. */
+  EXPECT_TRUE(snap.release(MayaSnapMode::Grid));
+  EXPECT_EQ(snap.active(), MayaSnapMode::Point);
+  EXPECT_TRUE(snap.release(MayaSnapMode::Point));
+  EXPECT_TRUE(snap.is_empty());
+}
+
+/** Key repeats used to stack a second copy, so one release could not end the mode. */
+TEST(maya_snap_override, RepeatedPressDoesNotStackAndOneReleaseEndsIt)
+{
+  MayaSnapOverride snap;
+  EXPECT_TRUE(snap.press(MayaSnapMode::Point));
+  EXPECT_FALSE(snap.press(MayaSnapMode::Point));
+  EXPECT_FALSE(snap.press(MayaSnapMode::Point));
+  EXPECT_EQ(snap.held_num(), 1);
+
+  EXPECT_TRUE(snap.release(MayaSnapMode::Point));
+  EXPECT_TRUE(snap.is_empty());
+  EXPECT_EQ(snap.active(), MayaSnapMode::None);
+}
+
+/** A release for a key that is not held must change nothing at all. */
+TEST(maya_snap_override, StrayReleaseLeavesTheHeldKeysAlone)
+{
+  MayaSnapOverride snap;
+  EXPECT_TRUE(snap.press(MayaSnapMode::Curve));
+
+  EXPECT_FALSE(snap.release(MayaSnapMode::Point));
+  EXPECT_FALSE(snap.release(MayaSnapMode::None));
+  EXPECT_EQ(snap.active(), MayaSnapMode::Curve);
+  EXPECT_EQ(snap.held_num(), 1);
+}
+
+/** `J` and `Shift+J` are one key: they never stack, and either release frees it. */
+TEST(maya_snap_override, StepModesShareTheirKey)
+{
+  EXPECT_TRUE(MayaSnapOverride::modes_share_key(MayaSnapMode::StepAbsolute,
+                                                MayaSnapMode::StepRelative));
+  EXPECT_FALSE(
+      MayaSnapOverride::modes_share_key(MayaSnapMode::Point, MayaSnapMode::Grid));
+
+  MayaSnapOverride snap;
+  EXPECT_TRUE(snap.press(MayaSnapMode::StepAbsolute));
+  EXPECT_FALSE(snap.press(MayaSnapMode::StepRelative));
+  EXPECT_EQ(snap.held_num(), 1);
+  EXPECT_EQ(snap.active(), MayaSnapMode::StepAbsolute);
+
+  /* The release reports the absolute variant even when the key went down with Shift. */
+  EXPECT_TRUE(snap.release(MayaSnapMode::StepAbsolute));
+  EXPECT_TRUE(snap.is_empty());
+
+  MayaSnapOverride relative;
+  EXPECT_TRUE(relative.press(MayaSnapMode::StepRelative));
+  EXPECT_TRUE(relative.release(MayaSnapMode::StepAbsolute));
+  EXPECT_TRUE(relative.is_empty());
+}
+
+/**
+ * The escape hatch for a release that can never arrive: the pointer left the 3D View, a popup
+ * swallowed the event, the interaction preset changed under the held key.
+ */
+TEST(maya_snap_override, ClearReleasesEverythingAndReportsWhetherItHadTo)
+{
+  MayaSnapOverride snap;
+  EXPECT_FALSE(snap.clear());
+
+  EXPECT_TRUE(snap.press(MayaSnapMode::Point));
+  EXPECT_TRUE(snap.press(MayaSnapMode::Grid));
+  EXPECT_TRUE(snap.clear());
+  EXPECT_TRUE(snap.is_empty());
+  EXPECT_EQ(snap.active(), MayaSnapMode::None);
+  EXPECT_FALSE(snap.clear());
+}
+
+TEST_F(MayaRuntimeTest, ObjectRuntimeReferenceRejectsDeletedOrReusedObject)
 {
   Main *bmain = BKE_main_new();
   Object *object = BKE_object_add_only_object(bmain, OB_EMPTY, "PivotSubject");
@@ -32,7 +126,7 @@ TEST(maya_runtime, ObjectRuntimeReferenceRejectsDeletedOrReusedObject)
   BKE_main_free(bmain);
 }
 
-TEST(maya_runtime, TransformTransactionRestoresObjectsAndRuntime)
+TEST_F(MayaRuntimeTest, TransformTransactionRestoresObjectsAndRuntime)
 {
   Main *bmain = BKE_main_new();
   Object *root = BKE_object_add_only_object(bmain, OB_EMPTY, "Root");
@@ -72,7 +166,7 @@ TEST(maya_runtime, TransformTransactionRestoresObjectsAndRuntime)
   BKE_main_free(bmain);
 }
 
-TEST(maya_runtime, PivotEditTogglePersistsWithoutHostContext)
+TEST_F(MayaRuntimeTest, PivotEditTogglePersistsWithoutHostContext)
 {
   bContext *C = CTX_create();
   MayaWindowRuntime runtime;
@@ -93,7 +187,7 @@ TEST(maya_runtime, PivotEditTogglePersistsWithoutHostContext)
   CTX_free(C);
 }
 
-TEST(maya_runtime, PivotEditDragTailDefersExitOrFocusRestart)
+TEST_F(MayaRuntimeTest, PivotEditDragTailDefersExitOrFocusRestart)
 {
   bContext *C = CTX_create();
 
@@ -127,7 +221,7 @@ TEST(maya_runtime, PivotEditDragTailDefersExitOrFocusRestart)
   restart_runtime.pivot_edit.persistent = true;
   restart_runtime.pivot_edit.target = MayaPivotEditTarget::ObjectOrigin;
   restart_runtime.pivot_edit.phase = MayaPivotEditPhase::PivotDragging;
-  restart_runtime.temporary.snap_stack.append(MayaSnapMode::Point);
+  restart_runtime.temporary.snap.press(MayaSnapMode::Point);
   restart_runtime.pivot_edit.snap_preview.type = MayaPivotSnapTargetType::Vertex;
   restart_runtime.pivot_edit.snap_preview.object_to_world = float4x4::identity();
   restart_runtime.pivot_edit.snap_preview.component_index = 7;
@@ -140,7 +234,7 @@ TEST(maya_runtime, PivotEditDragTailDefersExitOrFocusRestart)
   EXPECT_TRUE(restart_runtime.pivot_edit.restart_after_drag);
   EXPECT_EQ(restart_runtime.pivot_edit.phase, MayaPivotEditPhase::PivotCommitPending);
   EXPECT_EQ(restart_runtime.pivot_edit.target, MayaPivotEditTarget::ObjectOrigin);
-  EXPECT_TRUE(restart_runtime.temporary.snap_stack.is_empty());
+  EXPECT_TRUE(restart_runtime.temporary.snap.is_empty());
   EXPECT_EQ(restart_runtime.pivot_edit.snap_preview.type, MayaPivotSnapTargetType::None);
   EXPECT_FALSE(restart_runtime.pivot_edit.snap_preview.object_to_world.has_value());
   EXPECT_EQ(restart_runtime.pivot_edit.snap_preview_mouse, int2(0));
