@@ -8,6 +8,8 @@
  * Transform conversion for Maya object and component pivots.
  */
 
+#include <cstdio>
+#include <cstdlib>
 #include <memory>
 
 #include "MEM_guardedalloc.h"
@@ -24,6 +26,7 @@
 #include "transform.hh"
 #include "transform_convert.hh"
 #include "transform_snap.hh"
+#include "transform_snap_maya.hh"
 
 namespace blender::ed::transform {
 
@@ -72,6 +75,77 @@ static double3 maya_pivot_unsnapped_position_get(TransInfo *t,
   return data.initial_frame.position_world + double3(translation);
 }
 
+/**
+ * One line per pivot update, so a snap that behaves unexpectedly can be read off a log instead of
+ * guessed at: it shows what the snap search was allowed to look at, whether it found anything and
+ * which of the three candidate positions won.
+ *
+ * Written to the file named by `BLENDER_MAYA_SNAP_TRACE_FILE`, the same pattern as
+ * #BLENDER_STARTUP_TRACE_FILE. Deliberately not `stderr`: that only reaches a log while the console
+ * of the session happens to be redirected, which is why the manipulator trace kept coming back
+ * empty. `go.bat --trace` sets the variable. Temporary, like the manipulator trace.
+ */
+static std::FILE *maya_pivot_trace_open()
+{
+  const char *filepath = std::getenv("BLENDER_MAYA_SNAP_TRACE_FILE");
+  if (filepath == nullptr) {
+    return nullptr;
+  }
+  return std::fopen(filepath, "a");
+}
+
+/**
+ * One line as soon as a pivot drag starts, so an empty log is never ambiguous: with this line the
+ * drag ran and found nothing to snap to, without it the drag never reached this conversion at all.
+ */
+static void maya_pivot_drag_trace_begin(const TransInfo *t)
+{
+  std::FILE *file = maya_pivot_trace_open();
+  if (file == nullptr) {
+    return;
+  }
+  /* The snapping state is decided after the conversion, so only the mode is meaningful here. */
+  std::fprintf(file, "pivot-drag-begin mode=%d\n", int(t->mode));
+  std::fclose(file);
+}
+
+static void maya_pivot_snap_trace(const TransInfo *t,
+                                  const MayaPivotSnapInput &input,
+                                  const MayaPivotSnapDecision &decision)
+{
+  std::FILE *file = maya_pivot_trace_open();
+  if (file == nullptr) {
+    return;
+  }
+  std::fprintf(file,
+               "pivot-snap snap_to=%d tol_px=%.1f mval=(%.0f %.0f) target=%d normal=%d "
+               "snap_pos=%d snap_orient=%d applied=(%.4f %.4f %.4f) pointer=(%.4f %.4f %.4f) "
+               "target_co=(%.4f %.4f %.4f) result=(%.4f %.4f %.4f) from_target=%d aim=%d\n",
+               int(t->tsnap.mode),
+               double(t->tsnap.maya_snap_dist_px),
+               double(t->mval[0]),
+               double(t->mval[1]),
+               int(input.has_target),
+               int(input.target_has_normal),
+               int(input.snap_position),
+               int(input.snap_orientation),
+               input.applied_position.x,
+               input.applied_position.y,
+               input.applied_position.z,
+               input.pointer_position.x,
+               input.pointer_position.y,
+               input.pointer_position.z,
+               input.target_position.x,
+               input.target_position.y,
+               input.target_position.z,
+               decision.position.x,
+               decision.position.y,
+               decision.position.z,
+               int(decision.from_target),
+               int(decision.aim_at_normal));
+  std::fclose(file);
+}
+
 static void recalcDataMayaPivot(TransInfo *t)
 {
   TransDataContainer *tc = TRANS_DATA_CONTAINER_FIRST_OK(t);
@@ -86,31 +160,49 @@ static void recalcDataMayaPivot(TransInfo *t)
 
   maya::MayaPivotToolSettings settings;
   ED_maya_pivot_tool_settings_get(t->context, settings);
-  const bool has_snap_target = validSnap(t);
   if (t->mode == TFM_TRANSLATION) {
-    double3 position = data.initial_frame.position_world;
+    MayaPivotSnapInput snap_input;
+    snap_input.applied_position = data.initial_frame.position_world;
     for (int axis = 0; axis < 3; axis++) {
-      position[axis] += double(data.position_proxy[axis] - data.initial_position_proxy[axis]);
+      snap_input.applied_position[axis] += double(data.position_proxy[axis] -
+                                                  data.initial_position_proxy[axis]);
     }
-    if (has_snap_target && settings.snap_position) {
-      /* Snapping puts the pivot exactly on the target, as Maya does. Deriving it from the proxy
-       * delta instead would offset it by the distance between the pivot and the transform center,
-       * which is what made the pivot jump away while a snap key was held. */
-      position = double3(t->tsnap.snap_target);
+    snap_input.pointer_position = maya_pivot_unsnapped_position_get(t, data);
+    snap_input.target_position = double3(t->tsnap.snap_target);
+    snap_input.constrained_target_position = snap_input.target_position;
+    snap_input.has_constraint = (t->con.mode & CON_APPLY) != 0;
+    if (snap_input.has_constraint) {
+      /* Reach the target through the constraint, so a dragged axis handle keeps the pivot on its
+       * axis and only slides it to where the target projects onto it. */
+      float offset[3];
+      for (int axis = 0; axis < 3; axis++) {
+        offset[axis] = float(snap_input.target_position[axis] -
+                             data.initial_frame.position_world[axis]);
+      }
+      float constrained[3];
+      t->con.applyVec(t, nullptr, nullptr, offset, constrained);
+      snap_input.constrained_target_position = data.initial_frame.position_world +
+                                               double3(constrained);
     }
-    else if (has_snap_target) {
-      position = maya_pivot_unsnapped_position_get(t, data);
-    }
-    if (!data.target->position_set(position, true)) {
+    snap_input.has_target = validSnap(t);
+    snap_input.target_has_normal = !is_zero_v3(t->tsnap.snapNormal);
+    snap_input.snap_position = settings.snap_position;
+    snap_input.snap_orientation = settings.snap_orientation;
+
+    const MayaPivotSnapDecision decision = maya_pivot_snap_decision_get(snap_input);
+    maya_pivot_snap_trace(t, snap_input, decision);
+    if (!data.target->position_set(decision.position, true)) {
       return;
     }
 
-    if (has_snap_target && settings.snap_orientation && !is_zero_v3(t->tsnap.snapNormal)) {
+    if (decision.aim_at_normal) {
       maya::MayaPivotFrame snapped_frame = data.initial_frame;
-      snapped_frame.position_world = position;
+      snapped_frame.position_world = decision.position;
       const double3 surface_normal(t->tsnap.snapNormal);
+      /* Same reference frame the click path uses: the view up decides the secondary axis, so a
+       * dragged and a clicked snap onto the same face produce the same pivot. */
       if (ED_maya_pivot_orientation_aim(
-              snapped_frame, position + surface_normal, 2, double3(0.0, 1.0, 0.0)))
+              snapped_frame, decision.position + surface_normal, 2, double3(t->viewinv[1])))
       {
         data.target->orientation_set(snapped_frame.orientation_world, false);
       }
@@ -191,6 +283,8 @@ static void createTransMayaPivot(bContext *C, TransInfo *t)
   td_ext->quat = pivot_data->orientation_proxy;
   copy_qt_qt(td_ext->iquat, pivot_data->orientation_proxy);
   td_ext->rotOrder = ROT_MODE_QUAT;
+
+  maya_pivot_drag_trace_begin(t);
 }
 
 TransConvertTypeInfo TransConvertType_MayaPivot = {

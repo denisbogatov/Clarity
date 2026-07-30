@@ -46,6 +46,7 @@
 #include "transform_convert.hh"
 #include "transform_mode.hh"
 #include "transform_snap.hh"
+#include "transform_snap_maya.hh"
 
 namespace blender::ed::transform {
 
@@ -621,6 +622,99 @@ void transform_snap_mixed_apply(TransInfo *t, float *vec)
   }
 }
 
+MayaSnapPlan transform_snap_maya_plan_get(const MayaSnapPlanInput &input)
+{
+  MayaSnapPlan plan;
+  if (input.mode == ed::maya::MayaSnapMode::None) {
+    return plan;
+  }
+  if (!input.is_translation && input.mode != ed::maya::MayaSnapMode::Step) {
+    /* Maya only steps a rotation or a scale; its point, curve and grid snapping are about where
+     * something goes, so they have nothing to say here. */
+    return plan;
+  }
+
+  switch (input.mode) {
+    case ed::maya::MayaSnapMode::Grid:
+      plan.use_snap = true;
+      plan.snap_to = SCE_SNAP_TO_GRID;
+      plan.source_is_center = true;
+      break;
+    case ed::maya::MayaSnapMode::Curve:
+      plan.use_snap = true;
+      plan.snap_to = SCE_SNAP_TO_EDGE;
+      plan.curve_targets_only = true;
+      plan.source_is_center = true;
+      break;
+    case ed::maya::MayaSnapMode::Point:
+      plan.use_snap = true;
+      plan.snap_to = SCE_SNAP_TO_VERTEX;
+      plan.include_object_pivots = true;
+      plan.source_is_center = true;
+      break;
+    case ed::maya::MayaSnapMode::ViewPlane:
+      /* A constraint, not a target: nothing is snapped onto anything. */
+      plan.view_plane = true;
+      break;
+    case ed::maya::MayaSnapMode::MeshCenter:
+      plan.use_snap = true;
+      plan.snap_to = SCE_SNAP_TO_VOLUME;
+      plan.mesh_center = true;
+      plan.source_is_center = true;
+      break;
+    case ed::maya::MayaSnapMode::Step:
+      plan.use_snap = true;
+      plan.snap_to = SCE_SNAP_TO_INCREMENT;
+      /* Absolute steps are measured from the world origin, so they only mean anything while the
+       * translation itself runs in global space. */
+      plan.absolute_grid = input.step.mode == ed::maya::MAYA_STEP_SNAP_ABSOLUTE &&
+                           (!input.is_translation || input.orientation_is_global);
+      /* Outside the 3D View the increment carries the aspect of that editor, so it is left alone. */
+      if (input.space_is_view3d) {
+        if (input.is_translation && input.step.size > 0.0f) {
+          plan.increment = input.step.size;
+        }
+        else if (input.is_rotation && input.step.angle > 0.0f) {
+          plan.increment = input.step.angle;
+        }
+      }
+      break;
+    case ed::maya::MayaSnapMode::None:
+      BLI_assert_unreachable();
+      break;
+  }
+  return plan;
+}
+
+MayaPivotSnapDecision maya_pivot_snap_decision_get(const MayaPivotSnapInput &input)
+{
+  MayaPivotSnapDecision decision;
+  if (!input.has_target) {
+    /* Nothing is near the pointer, so the pivot follows it. Holding it at the last target instead
+     * is what made the pivot look magnetized to a vertex it had already left. */
+    decision.position = input.applied_position;
+    return decision;
+  }
+  if (input.snap_position) {
+    /* The magnet: exactly on the target. Deriving it from the drag would offset it by the distance
+     * between the pivot and the transform center.
+     *
+     * A dragged axis or plane handle still owns the direction: Maya slides the pivot along it up to
+     * the target instead of pulling the pivot off it, which is what taking the target verbatim did.
+     */
+    decision.position = input.has_constraint ? input.constrained_target_position :
+                                               input.target_position;
+    decision.from_target = true;
+  }
+  else {
+    /* Position snapping is off, so the pointer wins; the snap that was applied has to be undone,
+     * which is what #pointer_position is for. */
+    decision.position = input.pointer_position;
+  }
+  decision.aim_at_normal = input.snap_orientation && input.target_has_normal;
+  return decision;
+}
+
 void resetSnapping(TransInfo *t)
 {
   t->tsnap.status = SNAP_RESETTED;
@@ -632,6 +726,7 @@ void resetSnapping(TransInfo *t)
   t->tsnap.maya_include_object_pivots = false;
   t->tsnap.maya_view_plane = false;
   t->tsnap.maya_mesh_center = false;
+  t->tsnap.maya_snap_dist_px = 0.0f;
   t->tsnap.target_operation = SCE_SNAP_TARGET_ALL;
   t->tsnap.source_operation = SCE_SNAP_SOURCE_CLOSEST;
   t->tsnap.last = 0;
@@ -1380,7 +1475,10 @@ static void snap_target_view3d_fn(TransInfo *t, float * /*vec*/)
   float no[3];
   bool found = false;
   eSnapMode snap_elem = SCE_SNAP_TO_NONE;
-  float dist_px = SNAP_MIN_DISTANCE; /* Use a user defined value here. */
+  /* Maya restricts the search to its own snap tolerance around the pointer, so a target only wins
+   * while the pointer is actually near it. */
+  float dist_px = t->tsnap.maya_snap_dist_px > 0.0f ? t->tsnap.maya_snap_dist_px :
+                                                      SNAP_MIN_DISTANCE;
 
   if (t->tsnap.mode & (SCE_SNAP_TO_GEOM | SCE_SNAP_TO_GRID)) {
     zero_v3(no); /* objects won't set this */

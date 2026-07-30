@@ -133,8 +133,18 @@ struct WindowManagerRuntime {
    * fields used across editor and window-manager translation units.
    */
   bool maya_interaction_enabled;
+  /** #ed::maya::MayaToolID of the globally active Maya tool, mirrored for UI reads. */
+  uint8_t maya_tool;
   uint8_t maya_snap_mode;
   uint8_t maya_snap_temporary_mode;
+  /** #ed::maya::eMayaStepSnapMode of the Step Snap widget. */
+  uint8_t maya_snap_step_mode;
+  /** Translation step in scene units, rotation step in radians. */
+  float maya_snap_step_size;
+  float maya_snap_step_angle;
+  /** Maya's "Use snap tolerance" and "Snap tolerance" in pixels. */
+  bool maya_snap_use_tolerance;
+  int maya_snap_tolerance;
   uint64_t maya_interaction_revision;
 
   WindowManagerRuntime();

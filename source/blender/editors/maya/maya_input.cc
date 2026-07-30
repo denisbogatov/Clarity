@@ -15,6 +15,53 @@
 
 namespace blender {
 
+namespace ed::maya {
+
+MayaSnapMode snap_key_event_mode_get(const int key_type,
+                                     const short key_val,
+                                     const uint8_t modifier)
+{
+  if (!ELEM(key_val, KM_PRESS, KM_RELEASE)) {
+    return MayaSnapMode::None;
+  }
+
+  MayaSnapMode mode = MayaSnapMode::None;
+  /* `Shift` belongs to the drag that `J` is held during, not to another binding of the key: Maya
+   * steps a shift-duplicate drag just like any other. */
+  bool shift_allowed = false;
+  switch (key_type) {
+    case EVT_XKEY:
+      mode = MayaSnapMode::Grid;
+      break;
+    case EVT_CKEY:
+      mode = MayaSnapMode::Curve;
+      break;
+    case EVT_VKEY:
+      mode = MayaSnapMode::Point;
+      break;
+    case EVT_JKEY:
+      shift_allowed = true;
+      mode = MayaSnapMode::Step;
+      break;
+    default:
+      return MayaSnapMode::None;
+  }
+
+  if (key_val == KM_RELEASE) {
+    /* The key owns the mode, so its release always resolves: the modifiers held now are
+     * irrelevant. */
+    return mode;
+  }
+
+  int blocked = int(KM_CTRL) | int(KM_ALT) | int(KM_OSKEY);
+  if (!shift_allowed) {
+    blocked |= int(KM_SHIFT);
+  }
+  return (int(modifier) & blocked) == 0 ? mode : MayaSnapMode::None;
+}
+
+}  // namespace ed::maya
+
 std::optional<ed::maya::MayaInputAction> ED_maya_input_translate(
     const bContext * /*C*/, const wmEvent &event)
 {
@@ -127,26 +174,10 @@ std::optional<ed::maya::MayaInputAction> ED_maya_input_translate(
     action.id = ed::maya::MayaActionID::FocusLost;
     action.phase = ed::maya::MayaActionPhase::Cancel;
   }
-  else if (ELEM(event.type, EVT_XKEY, EVT_CKEY, EVT_VKEY) &&
-           ELEM(event.val, KM_PRESS, KM_RELEASE) &&
-           (event.val == KM_RELEASE || (!action.shift && !action.ctrl && !action.alt)))
+  else if (ed::maya::snap_key_event_mode_get(int(event.type), event.val, event.modifier) !=
+           ed::maya::MayaSnapMode::None)
   {
-    if (event.type == EVT_XKEY) {
-      action.id = ed::maya::MayaActionID::TemporaryGridSnap;
-    }
-    else if (event.type == EVT_CKEY) {
-      action.id = ed::maya::MayaActionID::TemporaryCurveSnap;
-    }
-    else {
-      action.id = ed::maya::MayaActionID::TemporaryPointSnap;
-    }
-    action.phase = event.val == KM_PRESS ? ed::maya::MayaActionPhase::Begin :
-                                          ed::maya::MayaActionPhase::End;
-  }
-  else if (event.type == EVT_JKEY && ELEM(event.val, KM_PRESS, KM_RELEASE) &&
-           !action.ctrl && !action.alt)
-  {
-    action.id = ed::maya::MayaActionID::TemporaryStepSnap;
+    action.id = ed::maya::MayaActionID::TemporarySnap;
     action.phase = event.val == KM_PRESS ? ed::maya::MayaActionPhase::Begin :
                                           ed::maya::MayaActionPhase::End;
   }

@@ -149,26 +149,10 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     ed::maya::pivot_edit_input_reset(C, runtime);
     return ed::maya::MayaDispatchResult::PassThrough;
   }
-  if (ELEM(action.id,
-           ed::maya::MayaActionID::TemporaryGridSnap,
-           ed::maya::MayaActionID::TemporaryCurveSnap,
-           ed::maya::MayaActionID::TemporaryPointSnap,
-           ed::maya::MayaActionID::TemporaryStepSnap))
-  {
-    ed::maya::MayaSnapMode mode = ed::maya::MayaSnapMode::Grid;
-    if (action.id == ed::maya::MayaActionID::TemporaryCurveSnap) {
-      mode = ed::maya::MayaSnapMode::Curve;
-    }
-    else if (action.id == ed::maya::MayaActionID::TemporaryPointSnap) {
-      mode = ed::maya::MayaSnapMode::Point;
-    }
-    else if (action.id == ed::maya::MayaActionID::TemporaryStepSnap) {
-      mode = action.phase == ed::maya::MayaActionPhase::End || !action.shift ?
-                 ed::maya::MayaSnapMode::StepAbsolute :
-                 ed::maya::MayaSnapMode::StepRelative;
-    }
-    return ED_maya_snap_override_set(
-               C, mode, action.phase == ed::maya::MayaActionPhase::Begin) ?
+  if (action.id == ed::maya::MayaActionID::TemporarySnap) {
+    const wmEvent *event = action.source_event;
+    return event != nullptr && ED_maya_snap_key_event_apply(
+                                   C, int(event->type), event->val, event->modifier) ?
                ed::maya::MayaDispatchResult::Handled :
                ed::maya::MayaDispatchResult::PassThrough;
   }
@@ -254,6 +238,9 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     return ed::maya::MayaDispatchResult::Handled;
   }
   if (action.id == ed::maya::MayaActionID::ComponentMarkingMenu) {
+    /* The menu owns the keyboard until it closes, so a snap key released over it never reaches the
+     * dispatcher. Letting the held keys go with the menu is the only state that stays truthful. */
+    ED_maya_snap_override_release_all(C);
     constexpr float maya_component_menu_threshold = 32.0f;
     const wmOperatorStatus status = ui::pie_menu_invoke_with_threshold(
         C,
@@ -341,6 +328,10 @@ ed::maya::MayaDispatchResult ED_maya_event_dispatch(bContext *C, const wmEvent *
     }
     ed::maya::pivot_edit_input_reset(C, *runtime);
     return ed::maya::MayaDispatchResult::PassThrough;
+  }
+  if (runtime != nullptr) {
+    /* First event after a swallowed release: drop the modes before anything reads them. */
+    ed::maya::snap_override_key_state_reconcile(C, *runtime);
   }
   if (runtime != nullptr && runtime->active_session) {
     const std::optional<ed::maya::MayaInputAction> action = ED_maya_input_translate(C, *event);

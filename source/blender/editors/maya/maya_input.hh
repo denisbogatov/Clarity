@@ -71,10 +71,7 @@ enum class MayaActionID : uint16_t {
   ComponentVertexFace,
   ComponentMulti,
 
-  TemporaryGridSnap,
-  TemporaryCurveSnap,
-  TemporaryPointSnap,
-  TemporaryStepSnap,
+  TemporarySnap,
 };
 
 enum class MayaActionPhase : uint8_t {
@@ -107,6 +104,17 @@ struct MayaInputAction {
   MayaPointerButton pointer_button = MayaPointerButton::None;
   const wmEvent *source_event = nullptr;
 };
+
+/**
+ * Momentary snap mode a physical key event resolves to, or #MayaSnapMode::None when the event does
+ * not belong to a snap key at all.
+ *
+ * The single place that maps keys to snap modes. A press honours the modifiers that belong to other
+ * bindings, while a release resolves whatever is held with it: the release is the only way back out
+ * of the mode, and dropping one because `Ctrl` or `Alt` happened to be down is what used to leave
+ * temporary snapping stuck on.
+ */
+MayaSnapMode snap_key_event_mode_get(int key_type, short key_val, uint8_t modifier);
 
 }  // namespace ed::maya
 

@@ -52,6 +52,7 @@ ed::maya::MayaToolActivationResult ED_maya_tool_activate(
   runtime->tool.previous = runtime->tool.active;
   runtime->tool.active = tool_id;
   runtime->tool.revision++;
+  ed::maya::tool_mirror_sync(C, runtime->tool.active);
 
   if (next->activate != nullptr) {
     next->activate(C, *runtime);

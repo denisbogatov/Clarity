@@ -137,8 +137,36 @@ enum class MayaSnapMode : uint8_t {
   Point,
   ViewPlane,
   MeshCenter,
-  StepAbsolute,
-  StepRelative,
+  /** Discrete steps. #MayaStepSnapSettings decides how big they are and what they are measured
+   * from, exactly like Maya's Step Snap settings behind the same key. */
+  Step,
+};
+
+enum eMayaStepSnapMode : uint8_t {
+  /** Steps counted from where the transform started. Maya's default. */
+  MAYA_STEP_SNAP_RELATIVE = 0,
+  /** Steps counted from the world origin, so the result lands on multiples of the step. */
+  MAYA_STEP_SNAP_ABSOLUTE = 1,
+};
+
+struct MayaStepSnapSettings {
+  eMayaStepSnapMode mode = MAYA_STEP_SNAP_RELATIVE;
+  /** One step of a translation, in scene units. */
+  float size = 1.0f;
+  /**
+   * One step of a rotation, in radians. Maya's own default is 15 degrees, spelled out here so this
+   * widely included header does not have to pull in the math constants for it.
+   */
+  float angle = 0.261799388f;
+};
+
+/**
+ * Maya's snapping tolerance: the region around the pointer a target has to be in to win.
+ * With #limited off the region is the whole viewport, which is Maya's "snap to anything viewable".
+ */
+struct MayaSnapToleranceSettings {
+  bool limited = true;
+  int size_px = 10;
 };
 
 enum class MayaNavigationDebugStage : uint8_t {
@@ -239,7 +267,17 @@ bool ED_maya_pivot_orientation_aim(ed::maya::MayaPivotFrame &frame,
                                    const double3 &target_world,
                                    int active_axis,
                                    const double3 &view_up);
-bool ED_maya_snap_override_set(const bContext *C, ed::maya::MayaSnapMode mode, bool enabled);
+/**
+ * Feed one physical key event to the momentary snap state. Returns whether the event belongs to a
+ * snap key, in which case it must not reach any other binding.
+ *
+ * The idle dispatcher and a running transform both funnel their key events through here, so the two
+ * can never disagree about which key holds which mode.
+ */
+bool ED_maya_snap_key_event_apply(const bContext *C,
+                                  int key_type,
+                                  short key_val,
+                                  uint8_t modifier);
 /**
  * Treat every momentary snap key as released. For the cases where the release itself can never
  * reach the dispatcher — the pointer left the 3D View, a popup swallowed the event — which is what
@@ -249,6 +287,15 @@ bool ED_maya_snap_override_release_all(const bContext *C);
 ed::maya::MayaSnapMode ED_maya_snap_override_get(const bContext *C);
 bool ED_maya_snap_mode_set(const bContext *C, ed::maya::MayaSnapMode mode);
 ed::maya::MayaSnapMode ED_maya_snap_mode_get(const bContext *C);
+/** Step size and reference of #ed::maya::MayaSnapMode::Step, the defaults when there is no window. */
+ed::maya::MayaStepSnapSettings ED_maya_snap_step_settings_get(const bContext *C);
+ed::maya::MayaSnapToleranceSettings ED_maya_snap_tolerance_settings_get(const bContext *C);
+/**
+ * Radius in pixels a Maya snap target has to be inside of, derived from the tolerance settings.
+ * \a region_size_px is what an unlimited tolerance resolves to, so the caller decides what
+ * "anything viewable" means for its own query.
+ */
+float ED_maya_snap_tolerance_px_get(const bContext *C, int region_size_px);
 void ED_maya_pivot_event_pre_modal(bContext *C, const wmEvent *event);
 void ED_maya_transform_begin(
     const bContext *C,

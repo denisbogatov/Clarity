@@ -106,6 +106,7 @@ set(SRC
   transform_mode.hh
   transform_orientations.hh
   transform_snap.hh
+  transform_snap_maya.hh
   transform_snap_object.hh
 )
 

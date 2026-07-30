@@ -13,6 +13,10 @@
 
 #include "ED_maya.hh"
 
+#include "WM_types.hh"
+#include "wm_event_types.hh"
+
+#include "maya_input.hh"
 #include "maya_runtime.hh"
 
 namespace blender::ed::maya::tests {
@@ -31,15 +35,15 @@ TEST(maya_snap_override, HeldKeysStackAndTheLastOneWins)
   EXPECT_TRUE(snap.is_empty());
   EXPECT_EQ(snap.active(), MayaSnapMode::None);
 
-  EXPECT_TRUE(snap.press(MayaSnapMode::Point));
+  EXPECT_TRUE(snap.press(EVT_VKEY, MayaSnapMode::Point));
   EXPECT_EQ(snap.active(), MayaSnapMode::Point);
-  EXPECT_TRUE(snap.press(MayaSnapMode::Grid));
+  EXPECT_TRUE(snap.press(EVT_XKEY, MayaSnapMode::Grid));
   EXPECT_EQ(snap.active(), MayaSnapMode::Grid);
 
   /* Releasing the newer key falls back to the one still held, it does not clear everything. */
-  EXPECT_TRUE(snap.release(MayaSnapMode::Grid));
+  EXPECT_TRUE(snap.release(EVT_XKEY));
   EXPECT_EQ(snap.active(), MayaSnapMode::Point);
-  EXPECT_TRUE(snap.release(MayaSnapMode::Point));
+  EXPECT_TRUE(snap.release(EVT_VKEY));
   EXPECT_TRUE(snap.is_empty());
 }
 
@@ -47,12 +51,12 @@ TEST(maya_snap_override, HeldKeysStackAndTheLastOneWins)
 TEST(maya_snap_override, RepeatedPressDoesNotStackAndOneReleaseEndsIt)
 {
   MayaSnapOverride snap;
-  EXPECT_TRUE(snap.press(MayaSnapMode::Point));
-  EXPECT_FALSE(snap.press(MayaSnapMode::Point));
-  EXPECT_FALSE(snap.press(MayaSnapMode::Point));
+  EXPECT_TRUE(snap.press(EVT_VKEY, MayaSnapMode::Point));
+  EXPECT_FALSE(snap.press(EVT_VKEY, MayaSnapMode::Point));
+  EXPECT_FALSE(snap.press(EVT_VKEY, MayaSnapMode::Point));
   EXPECT_EQ(snap.held_num(), 1);
 
-  EXPECT_TRUE(snap.release(MayaSnapMode::Point));
+  EXPECT_TRUE(snap.release(EVT_VKEY));
   EXPECT_TRUE(snap.is_empty());
   EXPECT_EQ(snap.active(), MayaSnapMode::None);
 }
@@ -61,36 +65,108 @@ TEST(maya_snap_override, RepeatedPressDoesNotStackAndOneReleaseEndsIt)
 TEST(maya_snap_override, StrayReleaseLeavesTheHeldKeysAlone)
 {
   MayaSnapOverride snap;
-  EXPECT_TRUE(snap.press(MayaSnapMode::Curve));
+  EXPECT_TRUE(snap.press(EVT_CKEY, MayaSnapMode::Curve));
 
-  EXPECT_FALSE(snap.release(MayaSnapMode::Point));
-  EXPECT_FALSE(snap.release(MayaSnapMode::None));
+  EXPECT_FALSE(snap.release(EVT_VKEY));
   EXPECT_EQ(snap.active(), MayaSnapMode::Curve);
   EXPECT_EQ(snap.held_num(), 1);
 }
 
-/** `J` and `Shift+J` are one key: they never stack, and either release frees it. */
-TEST(maya_snap_override, StepModesShareTheirKey)
+/** A key holds one mode: repeats never stack and one release frees it. */
+TEST(maya_snap_override, StepKeyHoldsOneModeOnly)
 {
-  EXPECT_TRUE(MayaSnapOverride::modes_share_key(MayaSnapMode::StepAbsolute,
-                                                MayaSnapMode::StepRelative));
-  EXPECT_FALSE(
-      MayaSnapOverride::modes_share_key(MayaSnapMode::Point, MayaSnapMode::Grid));
-
   MayaSnapOverride snap;
-  EXPECT_TRUE(snap.press(MayaSnapMode::StepAbsolute));
-  EXPECT_FALSE(snap.press(MayaSnapMode::StepRelative));
+  EXPECT_TRUE(snap.press(EVT_JKEY, MayaSnapMode::Step));
+  EXPECT_FALSE(snap.press(EVT_JKEY, MayaSnapMode::Step));
   EXPECT_EQ(snap.held_num(), 1);
-  EXPECT_EQ(snap.active(), MayaSnapMode::StepAbsolute);
+  EXPECT_EQ(snap.active(), MayaSnapMode::Step);
 
-  /* The release reports the absolute variant even when the key went down with Shift. */
-  EXPECT_TRUE(snap.release(MayaSnapMode::StepAbsolute));
+  /* The release names the key, not the mode it engaged. */
+  EXPECT_TRUE(snap.release(EVT_JKEY));
   EXPECT_TRUE(snap.is_empty());
+}
 
-  MayaSnapOverride relative;
-  EXPECT_TRUE(relative.press(MayaSnapMode::StepRelative));
-  EXPECT_TRUE(relative.release(MayaSnapMode::StepAbsolute));
-  EXPECT_TRUE(relative.is_empty());
+/**
+ * A fresh press of a key that is still listed means its release was lost: the press is the newer
+ * truth, so it replaces the stale entry instead of stacking behind it.
+ */
+TEST(maya_snap_override, PressOfAHeldKeyWithAnotherModeRebuildsIt)
+{
+  MayaSnapOverride snap;
+  EXPECT_TRUE(snap.press(EVT_VKEY, MayaSnapMode::Point));
+  EXPECT_TRUE(snap.press(EVT_VKEY, MayaSnapMode::Grid));
+  EXPECT_EQ(snap.held_num(), 1);
+  EXPECT_EQ(snap.active(), MayaSnapMode::Grid);
+  EXPECT_TRUE(snap.release(EVT_VKEY));
+  EXPECT_TRUE(snap.is_empty());
+}
+
+/**
+ * The escape hatch for a release the dispatcher never saw: only the key the window reports as held
+ * can be proven gone, so an overlapping second key keeps its mode.
+ */
+TEST(maya_snap_override, OnlyWindowTrackedKeysAreReleasedByReconcile)
+{
+  MayaSnapOverride snap;
+  EXPECT_FALSE(snap.release_window_tracked_keys());
+
+  EXPECT_TRUE(snap.press(EVT_VKEY, MayaSnapMode::Point, true));
+  EXPECT_TRUE(snap.press(EVT_XKEY, MayaSnapMode::Grid, false));
+  EXPECT_TRUE(snap.release_window_tracked_keys());
+  EXPECT_EQ(snap.held_num(), 1);
+  EXPECT_EQ(snap.active(), MayaSnapMode::Grid);
+  EXPECT_FALSE(snap.release_window_tracked_keys());
+}
+
+/**
+ * Maya's documented tolerance: on, the target has to be inside the region around the pointer; off,
+ * "the snap region is unlimited; you can snap to anything viewable".
+ */
+TEST(maya_snap_tolerance, LimitedToleranceScalesWithTheInterfaceAndOffMeansTheWholeRegion)
+{
+  MayaSnapToleranceSettings settings;
+  settings.limited = true;
+  settings.size_px = 10;
+  EXPECT_FLOAT_EQ(snap_tolerance_radius_px(settings, 1200, 1.0f), 10.0f);
+  EXPECT_FLOAT_EQ(snap_tolerance_radius_px(settings, 1200, 2.0f), 20.0f);
+
+  settings.limited = false;
+  EXPECT_FLOAT_EQ(snap_tolerance_radius_px(settings, 1200, 2.0f), 1200.0f);
+
+  /* Degenerate input must never disable snapping by asking for a zero radius. */
+  settings.limited = true;
+  settings.size_px = 0;
+  EXPECT_FLOAT_EQ(snap_tolerance_radius_px(settings, 0, 0.0f), 1.0f);
+  settings.limited = false;
+  EXPECT_FLOAT_EQ(snap_tolerance_radius_px(settings, 0, 1.0f), 1.0f);
+}
+
+/** The key table is the only place that decides which key holds which mode. */
+TEST(maya_snap_keys, ReleaseResolvesWhateverModifiersCameWithIt)
+{
+  EXPECT_EQ(snap_key_event_mode_get(EVT_VKEY, KM_PRESS, 0), MayaSnapMode::Point);
+  EXPECT_EQ(snap_key_event_mode_get(EVT_XKEY, KM_PRESS, 0), MayaSnapMode::Grid);
+  EXPECT_EQ(snap_key_event_mode_get(EVT_CKEY, KM_PRESS, 0), MayaSnapMode::Curve);
+
+  /* Whether the steps are relative or absolute is a setting, not a second binding of the key, so
+   * `Shift` stays available to the drag `J` is held during. */
+  EXPECT_EQ(snap_key_event_mode_get(EVT_JKEY, KM_PRESS, 0), MayaSnapMode::Step);
+  EXPECT_EQ(snap_key_event_mode_get(EVT_JKEY, KM_PRESS, KM_SHIFT), MayaSnapMode::Step);
+
+  /* A press must not steal a binding that belongs to a modifier combination. */
+  EXPECT_EQ(snap_key_event_mode_get(EVT_VKEY, KM_PRESS, KM_CTRL), MayaSnapMode::None);
+  EXPECT_EQ(snap_key_event_mode_get(EVT_XKEY, KM_PRESS, KM_SHIFT), MayaSnapMode::None);
+  EXPECT_EQ(snap_key_event_mode_get(EVT_JKEY, KM_PRESS, KM_ALT), MayaSnapMode::None);
+
+  /* The release is the only way out of the mode, so no modifier may swallow it. */
+  EXPECT_EQ(snap_key_event_mode_get(EVT_JKEY, KM_RELEASE, KM_ALT), MayaSnapMode::Step);
+  EXPECT_EQ(snap_key_event_mode_get(EVT_JKEY, KM_RELEASE, uint8_t(KM_CTRL | KM_SHIFT)),
+            MayaSnapMode::Step);
+  EXPECT_EQ(snap_key_event_mode_get(EVT_VKEY, KM_RELEASE, uint8_t(KM_CTRL | KM_ALT)),
+            MayaSnapMode::Point);
+
+  EXPECT_EQ(snap_key_event_mode_get(EVT_ZKEY, KM_PRESS, 0), MayaSnapMode::None);
+  EXPECT_EQ(snap_key_event_mode_get(EVT_VKEY, KM_DBL_CLICK, 0), MayaSnapMode::None);
 }
 
 /**
@@ -102,8 +178,8 @@ TEST(maya_snap_override, ClearReleasesEverythingAndReportsWhetherItHadTo)
   MayaSnapOverride snap;
   EXPECT_FALSE(snap.clear());
 
-  EXPECT_TRUE(snap.press(MayaSnapMode::Point));
-  EXPECT_TRUE(snap.press(MayaSnapMode::Grid));
+  EXPECT_TRUE(snap.press(EVT_VKEY, MayaSnapMode::Point));
+  EXPECT_TRUE(snap.press(EVT_XKEY, MayaSnapMode::Grid));
   EXPECT_TRUE(snap.clear());
   EXPECT_TRUE(snap.is_empty());
   EXPECT_EQ(snap.active(), MayaSnapMode::None);
@@ -221,7 +297,7 @@ TEST_F(MayaRuntimeTest, PivotEditDragTailDefersExitOrFocusRestart)
   restart_runtime.pivot_edit.persistent = true;
   restart_runtime.pivot_edit.target = MayaPivotEditTarget::ObjectOrigin;
   restart_runtime.pivot_edit.phase = MayaPivotEditPhase::PivotDragging;
-  restart_runtime.temporary.snap.press(MayaSnapMode::Point);
+  restart_runtime.temporary.snap.press(EVT_VKEY, MayaSnapMode::Point);
   restart_runtime.pivot_edit.snap_preview.type = MayaPivotSnapTargetType::Vertex;
   restart_runtime.pivot_edit.snap_preview.object_to_world = float4x4::identity();
   restart_runtime.pivot_edit.snap_preview.component_index = 7;

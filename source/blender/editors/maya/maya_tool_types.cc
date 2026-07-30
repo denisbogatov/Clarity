@@ -242,6 +242,7 @@ void ED_maya_tool_gizmo_state_ensure(bContext *C, ed::maya::MayaToolState &tool)
     if (const std::optional<ed::maya::MayaToolID> adopted = maya_tool_from_gizmo_state(*v3d)) {
       tool.active = *adopted;
       tool.previous = *adopted;
+      ed::maya::tool_mirror_sync(C, tool.active);
     }
   }
 

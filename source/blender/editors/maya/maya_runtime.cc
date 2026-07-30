@@ -1682,7 +1682,9 @@ static void pivot_snap_target_query(const bContext *C,
   const float previous[3] = {float(previous_position.x),
                              float(previous_position.y),
                              float(previous_position.z)};
-  float snap_distance = 24.0f * U.pixelsize;
+  /* Same tolerance a drag would snap with, so the preview never promises a target the drag would
+   * not take. */
+  float snap_distance = ED_maya_snap_tolerance_px_get(C, max_ii(region.winx, region.winy));
   const eSnapMode hit_type = ed::transform::snap_object_project_view3d_ex(
       snap_context,
       CTX_data_ensure_evaluated_depsgraph(C),
@@ -1996,6 +1998,14 @@ void pivot_edit_selection_changed(bContext *C, MayaWindowRuntime &runtime)
 /**
  * Mirror the UI reads. Written from one place only, so it can never disagree with the held keys.
  */
+void tool_mirror_sync(const bContext *C, const MayaToolID tool)
+{
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm != nullptr && wm->runtime != nullptr) {
+    wm->runtime->maya_tool = uint8_t(tool);
+  }
+}
+
 void snap_override_mirror_sync(const bContext *C, const MayaWindowRuntime &runtime)
 {
   const wmWindowManager *wm = CTX_wm_manager(C);
@@ -2019,6 +2029,53 @@ void snap_override_revision_reconcile(const bContext *C, MayaWindowRuntime &runt
   runtime.interaction_revision_seen = wm->runtime->maya_interaction_revision;
   runtime.temporary.snap.clear();
   snap_override_mirror_sync(C, runtime);
+}
+
+float snap_tolerance_radius_px(const MayaSnapToleranceSettings &settings,
+                               const int region_size_px,
+                               const float pixel_size)
+{
+  if (!settings.limited) {
+    /* Maya's unlimited region: everything the view shows is a candidate. */
+    return float(max_ii(region_size_px, 1));
+  }
+  return float(max_ii(settings.size_px, 1)) * (pixel_size > 0.0f ? pixel_size : 1.0f);
+}
+
+/**
+ * The one non-modifier key the window reports as held, #EVENT_NONE when none is. Updated while the
+ * event is queued, so it is truthful no matter which handler ends up consuming the event.
+ */
+static wmEventType window_tracked_key_get(const bContext *C)
+{
+  const wmWindow *win = CTX_wm_window(C);
+  const wmEvent *event_state = win != nullptr && win->runtime != nullptr ?
+                                   win->runtime->eventstate :
+                                   nullptr;
+  return event_state != nullptr ? event_state->keymodifier : EVENT_NONE;
+}
+
+/**
+ * Drop the held keys the window no longer tracks as down.
+ *
+ * A release only reaches the dispatcher when nothing else consumed the event first, so a modal
+ * operator, a popup or a menu can swallow the one release a momentary mode depends on and leave it
+ * on for good — snapping every later transform to the step grid. The window tracks whether any
+ * non-modifier key is currently down, and no snap key can be held while that says none is.
+ */
+void snap_override_key_state_reconcile(const bContext *C, MayaWindowRuntime &runtime)
+{
+  if (runtime.temporary.snap.is_empty() ||
+      window_tracked_key_get(C) != EVENT_NONE ||
+      !runtime.temporary.snap.release_window_tracked_keys())
+  {
+    return;
+  }
+  snap_override_mirror_sync(C, runtime);
+  if (runtime.temporary.snap.is_empty()) {
+    pivot_edit_snap_preview_clear(runtime);
+  }
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
 }
 
 void pivot_edit_input_reset(bContext *C, MayaWindowRuntime &runtime)
@@ -2701,11 +2758,17 @@ bool ED_maya_pivot_orientation_aim(ed::maya::MayaPivotFrame &frame,
   return true;
 }
 
-bool ED_maya_snap_override_set(const bContext *C,
-                               const ed::maya::MayaSnapMode mode,
-                               const bool enabled)
+bool ED_maya_snap_key_event_apply(const bContext *C,
+                                  const int key_type,
+                                  const short key_val,
+                                  const uint8_t modifier)
 {
-  if (!ED_maya_interaction_enabled(C) || mode == ed::maya::MayaSnapMode::None) {
+  const ed::maya::MayaSnapMode mode = ed::maya::snap_key_event_mode_get(
+      key_type, key_val, modifier);
+  if (mode == ed::maya::MayaSnapMode::None) {
+    return false;
+  }
+  if (!ED_maya_interaction_enabled(C)) {
     return false;
   }
   ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_ensure(C);
@@ -2715,7 +2778,11 @@ bool ED_maya_snap_override_set(const bContext *C,
 
   ed::maya::snap_override_revision_reconcile(C, *runtime);
   ed::maya::MayaSnapOverride &snap = runtime->temporary.snap;
-  const bool changed = enabled ? snap.press(mode) : snap.release(mode);
+  const bool changed = key_val == KM_PRESS ?
+                           snap.press(key_type,
+                                      mode,
+                                      ed::maya::window_tracked_key_get(C) == key_type) :
+                           snap.release(key_type);
   ed::maya::snap_override_mirror_sync(C, *runtime);
   if (!changed) {
     /* A key repeat or a release of a key that is not held: consumed, nothing to redraw. */
@@ -2779,6 +2846,43 @@ ed::maya::MayaSnapMode ED_maya_snap_mode_get(const bContext *C)
     return ed::maya::MayaSnapMode::None;
   }
   return ed::maya::MayaSnapMode(wm->runtime->maya_snap_mode);
+}
+
+ed::maya::MayaStepSnapSettings ED_maya_snap_step_settings_get(const bContext *C)
+{
+  ed::maya::MayaStepSnapSettings settings;
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm == nullptr || wm->runtime == nullptr) {
+    return settings;
+  }
+  settings.mode = ed::maya::eMayaStepSnapMode(wm->runtime->maya_snap_step_mode);
+  if (wm->runtime->maya_snap_step_size > 0.0f) {
+    settings.size = wm->runtime->maya_snap_step_size;
+  }
+  if (wm->runtime->maya_snap_step_angle > 0.0f) {
+    settings.angle = wm->runtime->maya_snap_step_angle;
+  }
+  return settings;
+}
+
+ed::maya::MayaSnapToleranceSettings ED_maya_snap_tolerance_settings_get(const bContext *C)
+{
+  ed::maya::MayaSnapToleranceSettings settings;
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm == nullptr || wm->runtime == nullptr) {
+    return settings;
+  }
+  settings.limited = wm->runtime->maya_snap_use_tolerance;
+  if (wm->runtime->maya_snap_tolerance > 0) {
+    settings.size_px = wm->runtime->maya_snap_tolerance;
+  }
+  return settings;
+}
+
+float ED_maya_snap_tolerance_px_get(const bContext *C, const int region_size_px)
+{
+  return ed::maya::snap_tolerance_radius_px(
+      ED_maya_snap_tolerance_settings_get(C), region_size_px, U.pixelsize);
 }
 
 void ED_maya_pivot_event_pre_modal(bContext *C, const wmEvent *event)

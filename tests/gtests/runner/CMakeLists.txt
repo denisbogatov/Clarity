@@ -52,4 +52,14 @@ elseif(APPLE)
   endforeach()
 endif()
 
+# Keep the whole test tree out of the default build. With the Ninja generator the install target
+# depends on `all`, so leaving the suites in it makes every edit/build/launch iteration compile the
+# test translation units and whole-archive link this binary, which is what forced the tests into a
+# second build tree of their own. Requesting `blender_test` explicitly still builds everything it
+# needs, because dependencies of an explicit target ignore EXCLUDE_FROM_ALL.
+set_target_properties(blender_test PROPERTIES EXCLUDE_FROM_ALL TRUE)
+foreach(_lib ${_test_libs})
+  set_target_properties(${_lib} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endforeach()
+
 unset(_test_libs)

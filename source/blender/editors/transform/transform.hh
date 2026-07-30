@@ -559,6 +559,12 @@ struct TransSnap {
   /** Use deterministic front/back depth pairing for Maya Mesh Center Snap. */
   bool maya_mesh_center;
   /**
+   * Radius in pixels around the pointer that Maya snapping accepts a target in, Maya's "Snap
+   * tolerance". Zero while Maya snapping is not driving the transform, and the size of the region
+   * when the tolerance is turned off, which is Maya's "snap to anything viewable".
+   */
+  float maya_snap_dist_px;
+  /**
    * World-space position of the visible Maya pivot, captured before the transform moved anything.
    * Maya puts that pivot onto the snap target, so it is the snap source instead of the center of
    * the selection. Captured once because the pivot itself travels with the data during the drag.

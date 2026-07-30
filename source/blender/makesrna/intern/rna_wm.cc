@@ -11,6 +11,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_windowmanager_types.h"
 
+#include "BLI_math_constants.h"
 #include "BLI_path_utils.hh"
 #include "BLI_string_utf8_symbols.h"
 
@@ -1590,6 +1591,12 @@ static void rna_WindowManager_maya_interaction_enabled_set(PointerRNA *ptr, cons
   }
 }
 
+static int rna_WindowManager_maya_tool_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->maya_tool;
+}
+
 static int rna_WindowManager_maya_snap_mode_get(PointerRNA *ptr)
 {
   const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
@@ -1600,6 +1607,66 @@ static int rna_WindowManager_maya_snap_temporary_mode_get(PointerRNA *ptr)
 {
   const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
   return wm->runtime->maya_snap_temporary_mode;
+}
+
+static int rna_WindowManager_maya_snap_step_mode_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->maya_snap_step_mode;
+}
+
+static void rna_WindowManager_maya_snap_step_mode_set(PointerRNA *ptr, const int value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  wm->runtime->maya_snap_step_mode = uint8_t(value);
+}
+
+static float rna_WindowManager_maya_snap_step_size_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->maya_snap_step_size;
+}
+
+static void rna_WindowManager_maya_snap_step_size_set(PointerRNA *ptr, const float value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  wm->runtime->maya_snap_step_size = value < 1e-4f ? 1e-4f : value;
+}
+
+static float rna_WindowManager_maya_snap_step_angle_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->maya_snap_step_angle;
+}
+
+static void rna_WindowManager_maya_snap_step_angle_set(PointerRNA *ptr, const float value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  wm->runtime->maya_snap_step_angle = value < 1e-4f ? 1e-4f : value;
+}
+
+static bool rna_WindowManager_maya_snap_use_tolerance_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->maya_snap_use_tolerance;
+}
+
+static void rna_WindowManager_maya_snap_use_tolerance_set(PointerRNA *ptr, const bool value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  wm->runtime->maya_snap_use_tolerance = value;
+}
+
+static int rna_WindowManager_maya_snap_tolerance_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->maya_snap_tolerance;
+}
+
+static void rna_WindowManager_maya_snap_tolerance_set(PointerRNA *ptr, const int value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  wm->runtime->maya_snap_tolerance = value < 1 ? 1 : value;
 }
 
 struct MayaPivotStateSnapshot {
@@ -3073,8 +3140,26 @@ static void rna_def_windowmanager(BlenderRNA *brna)
       {3, "POINT", 0, "Point", "Snap to points and transform pivots"},
       {4, "VIEW_PLANE", 0, "View Plane", "Move on the view plane frozen at transform start"},
       {5, "MESH_CENTER", 0, "Mesh Center", "Snap midway between the front and back mesh hits"},
-      {6, "STEP_ABSOLUTE", 0, "Absolute Step", "Snap to absolute increments"},
-      {7, "STEP_RELATIVE", 0, "Relative Step", "Snap to relative increments"},
+      {6, "STEP", 0, "Step", "Snap to discrete steps"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
+  /* Values follow #ed::maya::MayaToolID. */
+  static const EnumPropertyItem maya_tool_items[] = {
+      {0, "NONE", 0, "None", ""},
+      {1, "SELECT", 0, "Select", ""},
+      {2, "MOVE", 0, "Move", ""},
+      {3, "ROTATE", 0, "Rotate", ""},
+      {4, "SCALE", 0, "Scale", ""},
+      {5, "MULTI_CUT", 0, "Multi-Cut", ""},
+      {6, "TARGET_WELD", 0, "Target Weld", ""},
+      {7, "QUAD_DRAW", 0, "Quad Draw", ""},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
+  static const EnumPropertyItem maya_snap_step_mode_items[] = {
+      {0, "RELATIVE", 0, "Relative", "Count steps from where the transform started"},
+      {1, "ABSOLUTE", 0, "Absolute", "Land on multiples of the step measured from the origin"},
       {0, nullptr, 0, nullptr, nullptr},
   };
 
@@ -3173,6 +3258,12 @@ static void rna_def_windowmanager(BlenderRNA *brna)
       prop, "Maya Interaction", "Enable Maya-style viewport interaction and transform snapping");
   RNA_def_property_update(prop, NC_WINDOW, nullptr);
 
+  prop = RNA_def_property(srna, "maya_tool", PROP_ENUM, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_enum_items(prop, maya_tool_items);
+  RNA_def_property_enum_funcs(prop, "rna_WindowManager_maya_tool_get", nullptr, nullptr);
+  RNA_def_property_ui_text(prop, "Maya Tool", "Globally active Maya tool");
+
   prop = RNA_def_property(srna, "maya_snap_mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_enum_items(prop, maya_snap_mode_items);
@@ -3186,6 +3277,58 @@ static void rna_def_windowmanager(BlenderRNA *brna)
       prop, "rna_WindowManager_maya_snap_temporary_mode_get", nullptr, nullptr);
   RNA_def_property_ui_text(
       prop, "Temporary Maya Snap Mode", "Last pressed temporary Maya snapping override");
+
+  prop = RNA_def_property(srna, "maya_snap_step_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, maya_snap_step_mode_items);
+  RNA_def_property_enum_funcs(prop,
+                              "rna_WindowManager_maya_snap_step_mode_get",
+                              "rna_WindowManager_maya_snap_step_mode_set",
+                              nullptr);
+  RNA_def_property_ui_text(prop, "Step Snap Mode", "What Maya step snapping measures its steps from");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+
+  prop = RNA_def_property(srna, "maya_snap_step_size", PROP_FLOAT, PROP_DISTANCE);
+  RNA_def_property_float_funcs(prop,
+                               "rna_WindowManager_maya_snap_step_size_get",
+                               "rna_WindowManager_maya_snap_step_size_set",
+                               nullptr);
+  RNA_def_property_range(prop, 1e-4f, 10000.0f);
+  RNA_def_property_ui_range(prop, 0.01f, 100.0f, 1.0f, 3);
+  RNA_def_property_ui_text(prop, "Step Snap Size", "Size of one Maya snapping step");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+
+  prop = RNA_def_property(srna, "maya_snap_step_angle", PROP_FLOAT, PROP_ANGLE);
+  RNA_def_property_float_funcs(prop,
+                               "rna_WindowManager_maya_snap_step_angle_get",
+                               "rna_WindowManager_maya_snap_step_angle_set",
+                               nullptr);
+  /* Same range and drag behavior as the scene's own rotation increment. */
+  RNA_def_property_range(prop, 1e-4f, DEG2RADF(180.0f));
+  RNA_def_property_ui_range(prop, DEG2RADF(1.0f), DEG2RADF(180.0f), 100.0f, 2);
+  RNA_def_property_ui_text(
+      prop, "Step Snap Angle", "Angle of one Maya snapping step while rotating");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+
+  prop = RNA_def_property(srna, "maya_snap_use_tolerance", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_WindowManager_maya_snap_use_tolerance_get",
+                                 "rna_WindowManager_maya_snap_use_tolerance_set");
+  RNA_def_property_ui_text(prop,
+                           "Use Snap Tolerance",
+                           "Only snap to targets inside the tolerance around the pointer, instead "
+                           "of to anything viewable");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+
+  prop = RNA_def_property(srna, "maya_snap_tolerance", PROP_INT, PROP_PIXEL);
+  RNA_def_property_int_funcs(prop,
+                             "rna_WindowManager_maya_snap_tolerance_get",
+                             "rna_WindowManager_maya_snap_tolerance_set",
+                             nullptr);
+  RNA_def_property_range(prop, 1, 1000);
+  RNA_def_property_ui_range(prop, 1, 100, 1, -1);
+  RNA_def_property_ui_text(
+      prop, "Snap Tolerance", "Size of the snapping region around the pointer, in pixels");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
 
   prop = RNA_def_property(srna, "maya_pivot_edit_active", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);

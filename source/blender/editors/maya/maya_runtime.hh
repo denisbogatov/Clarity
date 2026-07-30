@@ -131,45 +131,63 @@ struct MayaPivotEditState {
  * Momentary snap modes and the keys that hold them.
  *
  * Temporary snapping is driven by physical keys, and every event has to reach exactly one entry
- * point here. Appending to a bare stack from several call sites is what let a mode stay held after
- * its key was already up — a repeated press stacked a second copy, and a release that never arrived
- * (a popup or another editor swallowed it) left the mode on with no way back.
+ * point here. The state is keyed by the physical key instead of by the mode it engages: a release
+ * only has to name its key, so it can never be dropped because the mode that key would name
+ * changed while it was down, and a fresh press of a key that is still listed rebuilds the entry
+ * instead of trusting one whose release was lost.
  *
  * Pure state, so the rules are unit tested without a window manager.
  */
 class MayaSnapOverride {
  public:
-  /** `Shift+J` and `J` are the same physical key, so the two step modes never stack. */
-  static bool modes_share_key(MayaSnapMode a, MayaSnapMode b)
-  {
-    if (a == b) {
-      return true;
-    }
-    const auto is_step = [](const MayaSnapMode mode) {
-      return ELEM(mode, MayaSnapMode::StepAbsolute, MayaSnapMode::StepRelative);
-    };
-    return is_step(a) && is_step(b);
-  }
-
-  /** Key down. False when the state was already what the press asks for, a key repeat included. */
-  bool press(const MayaSnapMode mode)
-  {
-    if (mode == MayaSnapMode::None || holds_key_of(mode)) {
-      return false;
-    }
-    held_.append(mode);
-    return true;
-  }
-
-  /** Key up. Drops every mode the key owns, so a stray release cannot corrupt the stack. */
-  bool release(const MayaSnapMode mode)
+  /**
+   * Key down. False when the state was already what the press asks for, a key repeat included.
+   * A press of a key that is still held with another mode replaces it: the only way to get there
+   * is a release that never arrived, so the press is the more recent truth.
+   *
+   * \a window_tracks_key records whether the window reports this key as the one held non-modifier
+   * key. That is the only key whose loss #release_window_tracked_keys can prove.
+   */
+  bool press(const int key, const MayaSnapMode mode, const bool window_tracks_key = false)
   {
     if (mode == MayaSnapMode::None) {
       return false;
     }
+    for (int64_t i = held_.size() - 1; i >= 0; i--) {
+      if (held_[i].key != key) {
+        continue;
+      }
+      if (held_[i].mode == mode) {
+        return false;
+      }
+      held_.remove(i);
+    }
+    held_.append({key, mode, window_tracks_key});
+    return true;
+  }
+
+  /**
+   * Key up for every key the window used to track and no longer does. Never touches a key whose
+   * state cannot be observed, so an overlapping second key keeps its mode.
+   */
+  bool release_window_tracked_keys()
+  {
     bool changed = false;
     for (int64_t i = held_.size() - 1; i >= 0; i--) {
-      if (modes_share_key(held_[i], mode)) {
+      if (held_[i].window_tracks_key) {
+        held_.remove(i);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  /** Key up. Drops what the key holds, whatever modifiers happened to come with the release. */
+  bool release(const int key)
+  {
+    bool changed = false;
+    for (int64_t i = held_.size() - 1; i >= 0; i--) {
+      if (held_[i].key == key) {
         held_.remove(i);
         changed = true;
       }
@@ -190,7 +208,7 @@ class MayaSnapOverride {
   /** The mode that wins: the most recently pressed key. */
   MayaSnapMode active() const
   {
-    return held_.is_empty() ? MayaSnapMode::None : held_.last();
+    return held_.is_empty() ? MayaSnapMode::None : held_.last().mode;
   }
 
   bool is_empty() const
@@ -204,17 +222,13 @@ class MayaSnapOverride {
   }
 
  private:
-  bool holds_key_of(const MayaSnapMode mode) const
-  {
-    for (const MayaSnapMode held : held_) {
-      if (modes_share_key(held, mode)) {
-        return true;
-      }
-    }
-    return false;
-  }
+  struct HeldKey {
+    int key = 0;
+    MayaSnapMode mode = MayaSnapMode::None;
+    bool window_tracks_key = false;
+  };
 
-  Vector<MayaSnapMode, 5> held_;
+  Vector<HeldKey, 5> held_;
 };
 
 struct MayaTemporaryOverrides {
@@ -306,8 +320,24 @@ void pivot_edit_snap_preview_update(const bContext *C,
                                     MayaWindowRuntime &runtime,
                                     const int2 &mouse_region);
 void pivot_edit_snap_preview_clear(MayaWindowRuntime &runtime);
+/**
+ * Radius in pixels a snap target has to be inside of.
+ *
+ * \a region_size_px is what an unlimited tolerance resolves to, so each query decides for itself
+ * what Maya's "snap to anything viewable" means. Pure, so the rule is unit tested.
+ */
+float snap_tolerance_radius_px(const MayaSnapToleranceSettings &settings,
+                               int region_size_px,
+                               float pixel_size);
+
+/**
+ * Mirror the active tool for the UI reads, so the Step Snap widget can show the step of the tool the
+ * next drag will use. Called from every place that changes the tool, and from nowhere else.
+ */
+void tool_mirror_sync(const bContext *C, MayaToolID tool);
 void snap_override_mirror_sync(const bContext *C, const MayaWindowRuntime &runtime);
 void snap_override_revision_reconcile(const bContext *C, MayaWindowRuntime &runtime);
+void snap_override_key_state_reconcile(const bContext *C, MayaWindowRuntime &runtime);
 void pivot_edit_input_reset(bContext *C, MayaWindowRuntime &runtime);
 void pivot_edit_validate(bContext *C, MayaWindowRuntime &runtime);
 void pivot_edit_end(bContext *C, MayaWindowRuntime &runtime);

@@ -778,6 +778,8 @@ class VIEW3D_HT_header(Header):
                     ('POINT', 'SNAP_VERTEX'),
                     ('VIEW_PLANE', 'SNAP_FACE'),
                     ('MESH_CENTER', 'SNAP_FACE_CENTER'),
+                    # Step snapping is a mode like the others: click to hold it on, J for a moment.
+                    ('STEP', 'SNAP_INCREMENT'),
                 )
                 for mode, icon in maya_snap_buttons:
                     sub = row.row(align=True)
@@ -789,11 +791,17 @@ class VIEW3D_HT_header(Header):
                         depress=persistent_mode == mode,
                     )
                     props.mode = mode
-                if temporary_mode in {'STEP_ABSOLUTE', 'STEP_RELATIVE'}:
-                    row.label(
-                        text="J" if temporary_mode == 'STEP_ABSOLUTE' else "Shift J",
-                        icon='SNAP_INCREMENT',
-                    )
+                # Both step sizes stay editable side by side: which one a drag uses follows from the
+                # tool, so having to switch a mode to reach the other would only hide one of them.
+                # They turn red together with the increment button while J holds the mode.
+                sub = row.row(align=True)
+                sub.alert = temporary_mode == 'STEP'
+                sub_size = sub.row(align=True)
+                sub_size.ui_units_x = 3.0
+                sub_size.prop(window_manager, "maya_snap_step_size", text="")
+                sub_angle = sub.row(align=True)
+                sub_angle.ui_units_x = 3.0
+                sub_angle.prop(window_manager, "maya_snap_step_angle", text="")
                 row.popover(
                     panel="VIEW3D_PT_snapping",
                     icon='SNAP_ON' if effective_mode != 'NONE' else 'SNAP_OFF',
@@ -7991,6 +7999,24 @@ class VIEW3D_PT_snapping(Panel):
         object_mode = 'OBJECT' if obj is None else obj.mode
 
         layout = self.layout
+
+        window_manager = context.window_manager
+        if window_manager.maya_interaction_enabled:
+            col = layout.column()
+            col.label(text="Step Snap")
+            col.prop(window_manager, "maya_snap_step_size", text="Move")
+            col.prop(window_manager, "maya_snap_step_angle", text="Rotate")
+
+            col.separator()
+
+            col.label(text="Snap Tolerance")
+            col.prop(window_manager, "maya_snap_use_tolerance", text="Use Tolerance")
+            sub = col.column()
+            sub.active = window_manager.maya_snap_use_tolerance
+            sub.prop(window_manager, "maya_snap_tolerance", text="Tolerance")
+
+            layout.separator()
+
         col = layout.column()
 
         col.label(text="Snap Base")

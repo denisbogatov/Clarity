@@ -54,6 +54,7 @@
 #include "transform.hh"
 #include "transform_convert.hh"
 #include "transform_snap.hh"
+#include "transform_snap_maya.hh"
 
 namespace blender {
 
@@ -89,6 +90,15 @@ static const char OP_EDGE_BWEIGHT[] = "TRANSFORM_OT_edge_bevelweight";
 static const char OP_SEQ_SLIDE[] = "TRANSFORM_OT_seq_slide";
 static const char OP_NORMAL_ROTATION[] = "TRANSFORM_OT_rotate_normal";
 
+/** Size an unlimited Maya snap tolerance resolves to for a region-sized query. */
+static int transform_maya_region_extent(const ARegion *region)
+{
+  if (region == nullptr) {
+    return 0;
+  }
+  return region->winx > region->winy ? region->winx : region->winy;
+}
+
 static void transform_maya_pivot_update(const bContext *C, const TransInfo *t)
 {
   if (t->mode != TFM_TRANSLATION) {
@@ -114,77 +124,56 @@ static void transform_maya_snap_apply(const bContext *C,
   t->tsnap.maya_include_object_pivots = false;
   t->tsnap.maya_view_plane = false;
   t->tsnap.maya_mesh_center = false;
+  t->tsnap.maya_snap_dist_px = 0.0f;
   if (!ED_maya_interaction_enabled(C)) {
     return;
   }
 
-  ed::maya::MayaSnapMode maya_snap_mode = ED_maya_snap_override_get(C);
-  if (maya_snap_mode == ed::maya::MayaSnapMode::None) {
-    maya_snap_mode = ED_maya_snap_mode_get(C);
+  MayaSnapPlanInput plan_input;
+  plan_input.mode = ED_maya_snap_override_get(C);
+  if (plan_input.mode == ed::maya::MayaSnapMode::None) {
+    plan_input.mode = ED_maya_snap_mode_get(C);
   }
-  if (maya_snap_mode == ed::maya::MayaSnapMode::None) {
-    return;
-  }
-  if (t->mode != TFM_TRANSLATION &&
-      !ELEM(maya_snap_mode,
-            ed::maya::MayaSnapMode::StepAbsolute,
-            ed::maya::MayaSnapMode::StepRelative))
-  {
-    return;
-  }
-  t->tsnap.maya_mode_active = true;
-  switch (maya_snap_mode) {
-    case ed::maya::MayaSnapMode::Grid:
-      t->tsnap.mode = SCE_SNAP_TO_GRID;
-      break;
-    case ed::maya::MayaSnapMode::Curve:
-      t->tsnap.mode = SCE_SNAP_TO_EDGE;
-      t->tsnap.maya_curve_targets_only = true;
-      break;
-    case ed::maya::MayaSnapMode::Point:
-      t->tsnap.mode = SCE_SNAP_TO_VERTEX;
-      t->tsnap.maya_include_object_pivots = true;
-      break;
-    case ed::maya::MayaSnapMode::ViewPlane:
-      t->tsnap.mode = SCE_SNAP_TO_NONE;
-      t->tsnap.maya_view_plane = true;
-      if (is_zero_v3(t->tsnap.maya_view_plane_normal)) {
-        normalize_v3_v3(t->tsnap.maya_view_plane_normal, t->viewinv[2]);
-      }
-      t->modifiers &= ~MOD_SNAP;
-      return;
-    case ed::maya::MayaSnapMode::MeshCenter:
-      t->tsnap.mode = SCE_SNAP_TO_VOLUME;
-      t->tsnap.maya_mesh_center = true;
-      break;
-    case ed::maya::MayaSnapMode::StepAbsolute:
-      t->tsnap.mode = SCE_SNAP_TO_INCREMENT;
-      if (t->mode == TFM_TRANSLATION &&
-          t->orient[t->orient_curr].type != V3D_ORIENT_GLOBAL)
-      {
-        t->tsnap.flag &= ~SCE_SNAP_ABS_GRID;
-      }
-      else {
-        t->tsnap.flag |= SCE_SNAP_ABS_GRID;
-      }
-      break;
-    case ed::maya::MayaSnapMode::StepRelative:
-      t->tsnap.mode = SCE_SNAP_TO_INCREMENT;
-      t->tsnap.flag &= ~SCE_SNAP_ABS_GRID;
-      break;
-    case ed::maya::MayaSnapMode::None:
-      BLI_assert_unreachable();
-      return;
-  }
+  plan_input.is_translation = t->mode == TFM_TRANSLATION;
+  plan_input.is_rotation = ELEM(t->mode, TFM_ROTATION, TFM_TRACKBALL);
+  plan_input.orientation_is_global = t->orient[t->orient_curr].type == V3D_ORIENT_GLOBAL;
+  plan_input.space_is_view3d = t->spacetype == SPACE_VIEW3D;
+  plan_input.step = ED_maya_snap_step_settings_get(C);
+  const MayaSnapPlan plan = transform_snap_maya_plan_get(plan_input);
 
-  if (!ELEM(maya_snap_mode,
-            ed::maya::MayaSnapMode::StepAbsolute,
-            ed::maya::MayaSnapMode::StepRelative))
-  {
+  /* The Maya state is the only thing that snaps in this interaction model. Blender's magnet and its
+   * `Ctrl` invert are not part of it, so they are taken out of the decision instead of being left
+   * to snap on their own: that is what quantized every transform to the increment grid with no key
+   * held, and what kept Maya's own modes from snapping while the magnet was off. */
+  t->tsnap.maya_mode_active = plan.use_snap || plan.view_plane;
+  t->tsnap.mode = plan.snap_to;
+  t->tsnap.maya_curve_targets_only = plan.curve_targets_only;
+  t->tsnap.maya_include_object_pivots = plan.include_object_pivots;
+  t->tsnap.maya_mesh_center = plan.mesh_center;
+  t->tsnap.maya_view_plane = plan.view_plane;
+  SET_FLAG_FROM_TEST(t->tsnap.flag, plan.absolute_grid, SCE_SNAP_ABS_GRID);
+  SET_FLAG_FROM_TEST(t->modifiers, plan.use_snap, MOD_SNAP);
+  t->modifiers &= ~MOD_SNAP_INVERT;
+  transform_snap_flag_from_modifiers_set(t);
+
+  if (plan.view_plane && is_zero_v3(t->tsnap.maya_view_plane_normal)) {
+    normalize_v3_v3(t->tsnap.maya_view_plane_normal, t->viewinv[2]);
+  }
+  if (plan.source_is_center) {
     t->tsnap.source_operation = SCE_SNAP_SOURCE_CENTER;
   }
+  if (plan.increment > 0.0f) {
+    /* The Step Snap size replaces the grid the increment would use otherwise, so one step is one
+     * step whatever the scene grid happens to be. */
+    t->increment = float3(plan.increment);
+  }
+  if (plan.use_snap) {
+    /* Maya only magnets onto a target the pointer is actually near, so the search is restricted to
+     * the snap tolerance; outside it the transform follows the pointer as if nothing was held. */
+    t->tsnap.maya_snap_dist_px = ED_maya_snap_tolerance_px_get(
+        C, transform_maya_region_extent(t->region));
+  }
   transform_snap_callbacks_update(t);
-  t->modifiers |= MOD_SNAP;
 }
 
 static bool transform_maya_snap_event(const bContext *C,
@@ -215,27 +204,9 @@ static bool transform_maya_snap_event(const bContext *C,
     key_val = event->prev_val;
   }
 
-  if (!ELEM(key_type, EVT_XKEY, EVT_CKEY, EVT_VKEY, EVT_JKEY) ||
-      !ELEM(key_val, KM_PRESS, KM_RELEASE) ||
-      (key_val == KM_PRESS && (event->modifier & (KM_CTRL | KM_ALT | KM_OSKEY)) != 0) ||
-      (key_val == KM_PRESS && key_type != EVT_JKEY && (event->modifier & KM_SHIFT) != 0))
-  {
+  if (!ED_maya_snap_key_event_apply(C, int(key_type), key_val, event->modifier)) {
     return false;
   }
-
-  ed::maya::MayaSnapMode mode = ed::maya::MayaSnapMode::Grid;
-  if (key_type == EVT_CKEY) {
-    mode = ed::maya::MayaSnapMode::Curve;
-  }
-  else if (key_type == EVT_VKEY) {
-    mode = ed::maya::MayaSnapMode::Point;
-  }
-  else if (key_type == EVT_JKEY) {
-    mode = key_val == KM_RELEASE || (event->modifier & KM_SHIFT) == 0 ?
-               ed::maya::MayaSnapMode::StepAbsolute :
-               ed::maya::MayaSnapMode::StepRelative;
-  }
-  ED_maya_snap_override_set(C, mode, key_val == KM_PRESS);
   transform_maya_snap_apply(C, t, op, true);
   t->redraw |= TREDRAW_HARD;
   return true;
@@ -1753,6 +1724,7 @@ enum eMayaSnapToggleMode {
   MAYA_SNAP_TOGGLE_POINT,
   MAYA_SNAP_TOGGLE_VIEW_PLANE,
   MAYA_SNAP_TOGGLE_MESH_CENTER,
+  MAYA_SNAP_TOGGLE_STEP,
 };
 
 static const EnumPropertyItem maya_snap_toggle_mode_items[] = {
@@ -1777,6 +1749,11 @@ static const EnumPropertyItem maya_snap_toggle_mode_items[] = {
      ICON_SNAP_FACE_CENTER,
      "Mesh Center",
      "Snap midway between the front and back hits of the nearest mesh object"},
+    {MAYA_SNAP_TOGGLE_STEP,
+     "STEP",
+     ICON_SNAP_INCREMENT,
+     "Step",
+     "Move and rotate in the discrete steps of the Step Snap settings"},
     {0, nullptr, 0, nullptr, nullptr},
 };
 
@@ -1793,6 +1770,8 @@ static ed::maya::MayaSnapMode maya_snap_toggle_mode_get(const int mode)
       return ed::maya::MayaSnapMode::ViewPlane;
     case MAYA_SNAP_TOGGLE_MESH_CENTER:
       return ed::maya::MayaSnapMode::MeshCenter;
+    case MAYA_SNAP_TOGGLE_STEP:
+      return ed::maya::MayaSnapMode::Step;
   }
   BLI_assert_unreachable();
   return ed::maya::MayaSnapMode::None;
@@ -1885,7 +1864,8 @@ static wmOperatorStatus maya_pivot_click_exec(bContext *C, wmOperator *op)
   const float previous_position[3] = {float(frame.position_world.x),
                                       float(frame.position_world.y),
                                       float(frame.position_world.z)};
-  float snap_distance = 24.0f * U.pixelsize;
+  float snap_distance = ED_maya_snap_tolerance_px_get(
+      C, transform_maya_region_extent(region));
   const eSnapMode hit_type = ed::transform::snap_object_project_view3d_ex(
       snap_context,
       CTX_data_ensure_evaluated_depsgraph(C),
