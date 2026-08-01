@@ -196,6 +196,26 @@ static const EnumPropertyItem rna_enum_userdef_viewport_aa_items[] = {
     {0, nullptr, 0, nullptr, nullptr},
 };
 
+static const EnumPropertyItem rna_enum_userdef_viewport_vsync_items[] = {
+    {USER_VIEWPORT_VSYNC_OFF,
+     "OFF",
+     0,
+     "Off",
+     "Present frames as soon as they are drawn; lowest input latency, tearing is possible"},
+    {USER_VIEWPORT_VSYNC_ADAPTIVE,
+     "ADAPTIVE",
+     0,
+     "Adaptive",
+     "Synchronize while the viewport keeps up with the monitor and allow tearing when it does not; "
+     "requires driver support, otherwise behaves as Off"},
+    {USER_VIEWPORT_VSYNC_ON,
+     "ON",
+     0,
+     "On",
+     "Always wait for the monitor refresh; smoothest image at the cost of input latency"},
+    {0, nullptr, 0, nullptr, nullptr},
+};
+
 static const EnumPropertyItem rna_enum_userdef_viewport_fps_limit_items[] = {
     {60, "FPS_60", 0, "60 FPS", "Limit viewport redraws to 60 frames per second"},
     {120, "FPS_120", 0, "120 FPS", "Limit viewport redraws to 120 frames per second"},
@@ -6284,12 +6304,11 @@ static void rna_def_userdef_system(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, 0, "rna_userdef_update");
 
-  prop = RNA_def_property(srna, "use_viewport_vsync", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, nullptr, "viewport_vsync", 1);
-  RNA_def_property_ui_text(prop,
-                           "VSync",
-                           "Synchronize viewport redraws to the monitor refresh rate; when disabled, "
-                           "use adaptive VSync if supported by the OpenGL driver");
+  prop = RNA_def_property(srna, "viewport_vsync", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, nullptr, "viewport_vsync");
+  RNA_def_property_enum_items(prop, rna_enum_userdef_viewport_vsync_items);
+  RNA_def_property_ui_text(
+      prop, "VSync", "How viewport redraws are synchronized to the monitor refresh rate");
   RNA_def_property_update(prop, 0, "rna_userdef_gpu_update");
 
   prop = RNA_def_property(srna, "solid_lights", PROP_COLLECTION, PROP_NONE);

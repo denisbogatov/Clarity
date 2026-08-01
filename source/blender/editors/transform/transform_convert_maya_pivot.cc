@@ -8,6 +8,7 @@
  * Transform conversion for Maya object and component pivots.
  */
 
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
@@ -37,13 +38,24 @@ struct MayaPivotTransData {
   float orientation_proxy[4] = {1.0f, 0.0f, 0.0f, 0.0f};
   float initial_position_proxy[3] = {};
   float initial_orientation_proxy[4] = {1.0f, 0.0f, 0.0f, 0.0f};
+  std::FILE *trace_file = nullptr;
+  uint64_t trace_update_count = 0;
 };
 
-static void freeTransMayaPivot(TransInfo * /*t*/,
+static void freeTransMayaPivot(TransInfo *t,
                                TransDataContainer * /*tc*/,
                                TransCustomData *custom_data)
 {
-  MEM_delete(static_cast<MayaPivotTransData *>(custom_data->data));
+  MayaPivotTransData *data = static_cast<MayaPivotTransData *>(custom_data->data);
+  if (data->trace_file != nullptr) {
+    std::fprintf(data->trace_file,
+                 "pivot-drag-end state=%d updates=%llu\n",
+                 int(t->state),
+                 static_cast<unsigned long long>(data->trace_update_count));
+    std::fclose(data->trace_file);
+    data->trace_file = nullptr;
+  }
+  MEM_delete(data);
   custom_data->data = nullptr;
 }
 
@@ -98,26 +110,27 @@ static std::FILE *maya_pivot_trace_open()
  * One line as soon as a pivot drag starts, so an empty log is never ambiguous: with this line the
  * drag ran and found nothing to snap to, without it the drag never reached this conversion at all.
  */
-static void maya_pivot_drag_trace_begin(const TransInfo *t)
+static void maya_pivot_drag_trace_begin(const TransInfo *t, MayaPivotTransData &data)
 {
-  std::FILE *file = maya_pivot_trace_open();
-  if (file == nullptr) {
+  if (data.trace_file == nullptr) {
     return;
   }
   /* The snapping state is decided after the conversion, so only the mode is meaningful here. */
-  std::fprintf(file, "pivot-drag-begin mode=%d\n", int(t->mode));
-  std::fclose(file);
+  std::fprintf(data.trace_file, "pivot-drag-begin mode=%d\n", int(t->mode));
+  /* Keep the trace useful if Blender hangs mid-drag without flushing every modal update. */
+  std::fflush(data.trace_file);
 }
 
-static void maya_pivot_snap_trace(const TransInfo *t,
+static void maya_pivot_snap_trace(MayaPivotTransData &data,
+                                  const TransInfo *t,
                                   const MayaPivotSnapInput &input,
                                   const MayaPivotSnapDecision &decision)
 {
-  std::FILE *file = maya_pivot_trace_open();
-  if (file == nullptr) {
+  if (data.trace_file == nullptr) {
     return;
   }
-  std::fprintf(file,
+  data.trace_update_count++;
+  std::fprintf(data.trace_file,
                "pivot-snap snap_to=%d tol_px=%.1f mval=(%.0f %.0f) target=%d normal=%d "
                "snap_pos=%d snap_orient=%d applied=(%.4f %.4f %.4f) pointer=(%.4f %.4f %.4f) "
                "target_co=(%.4f %.4f %.4f) result=(%.4f %.4f %.4f) from_target=%d aim=%d\n",
@@ -143,7 +156,6 @@ static void maya_pivot_snap_trace(const TransInfo *t,
                decision.position.z,
                int(decision.from_target),
                int(decision.aim_at_normal));
-  std::fclose(file);
 }
 
 static void recalcDataMayaPivot(TransInfo *t)
@@ -190,7 +202,7 @@ static void recalcDataMayaPivot(TransInfo *t)
     snap_input.snap_orientation = settings.snap_orientation;
 
     const MayaPivotSnapDecision decision = maya_pivot_snap_decision_get(snap_input);
-    maya_pivot_snap_trace(t, snap_input, decision);
+    maya_pivot_snap_trace(data, t, snap_input, decision);
     if (!data.target->position_set(decision.position, true)) {
       return;
     }
@@ -263,6 +275,7 @@ static void createTransMayaPivot(bContext *C, TransInfo *t)
   pivot_data->orientation_proxy[3] = float(frame.orientation_world.z);
   copy_v3_v3(pivot_data->initial_position_proxy, pivot_data->position_proxy);
   copy_qt_qt(pivot_data->initial_orientation_proxy, pivot_data->orientation_proxy);
+  pivot_data->trace_file = maya_pivot_trace_open();
   tc->custom.type.data = pivot_data;
   tc->custom.type.free_cb = freeTransMayaPivot;
 
@@ -284,7 +297,7 @@ static void createTransMayaPivot(bContext *C, TransInfo *t)
   copy_qt_qt(td_ext->iquat, pivot_data->orientation_proxy);
   td_ext->rotOrder = ROT_MODE_QUAT;
 
-  maya_pivot_drag_trace_begin(t);
+  maya_pivot_drag_trace_begin(t, *pivot_data);
 }
 
 TransConvertTypeInfo TransConvertType_MayaPivot = {

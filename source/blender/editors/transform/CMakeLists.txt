@@ -103,6 +103,7 @@ set(SRC
   transform_convert.hh
   transform_draw_cursors.hh
   transform_gizmo.hh
+  transform_gizmo_maya_cache.hh
   transform_mode.hh
   transform_orientations.hh
   transform_snap.hh

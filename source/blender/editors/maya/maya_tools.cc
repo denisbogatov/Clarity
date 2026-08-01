@@ -835,6 +835,12 @@ static wmOperatorStatus select_marquee_call(bContext *C, const MayaInputAction &
   wmOperatorType *ot = WM_operatortype_find("VIEW3D_OT_select_box", true);
   PointerRNA ptr = WM_operator_properties_create_ptr(ot);
   RNA_enum_set(&ptr, "mode", select_op);
+  /* The marquee is started from the motion that crossed the drag threshold, so the event handed to
+   * #WM_gesture_box_invoke is a mouse move rather than a press. Left at its default, `wait_for_input`
+   * would then make it open a #WM_GESTURE_CROSS_RECT: a full-viewport dashed cross waiting for a
+   * separate click that can never come, because the button is already held and will only be
+   * released. The rectangle has to begin at the press position right away. */
+  RNA_boolean_set(&ptr, "wait_for_input", false);
   bool use_depth = false;
   const MayaWindowRuntime *runtime = runtime_get(C);
   if (runtime != nullptr) {
@@ -1244,6 +1250,14 @@ bool left_mouse_marquee_drag_handle(bContext *C,
   /* Edit Pivot owns the left button while it is active: its click operator places the pivot, and a
    * drag there must not start selecting instead. */
   if (runtime.pivot_edit.target != MayaPivotEditTarget::None) {
+    return false;
+  }
+  /* So does the manipulator, and it cannot defend itself here: the dispatcher runs before the region
+   * handlers, so a drag claimed at this point never reaches the gizmo map at all. Without this the
+   * manipulator is drawn but inert - every drag on a handle became a selection rectangle instead of
+   * a transform. The highlight is what the gizmo map itself would test the press against, so asking
+   * it is the same question the gizmo would have asked one step later. */
+  if (WM_gizmomap_region_is_highlighted(CTX_wm_region(C))) {
     return false;
   }
   const ARegion *region = CTX_wm_region(C);

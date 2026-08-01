@@ -56,6 +56,13 @@ bool ED_maya_interaction_enabled(const bContext *C)
          ED_maya_interaction_preset_enabled(C);
 }
 
+static bool maya_viewport_window_interaction_enabled(const bContext *C)
+{
+  const ARegion *region = CTX_wm_region(C);
+  return ED_maya_interaction_enabled(C) && region != nullptr &&
+         region->regiontype == RGN_TYPE_WINDOW;
+}
+
 static ed::maya::MayaDispatchResult maya_dispatch_to_active_session(
     bContext *C,
     ed::maya::MayaWindowRuntime &runtime,
@@ -210,14 +217,25 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     return ed::maya::MayaDispatchResult::Handled;
   }
   if (action.id == ed::maya::MayaActionID::ActivateTool) {
-    /* Switching tools rebuilds the pivot state for the new tool, but Edit Pivot itself survives:
-     * in Maya the mode stays on until it is toggled off. */
-    const bool resume_pivot_edit = runtime.pivot_edit.target !=
-                                   ed::maya::MayaPivotEditTarget::None;
-    ed::maya::pivot_edit_end(C, runtime);
-    ED_maya_tool_activate(C, action.tool, ed::maya::MayaToolActivationReason::Hotkey);
-    if (resume_pivot_edit) {
-      ed::maya::pivot_edit_resume_persistent(C, runtime);
+    /* Key repeat is state-preserving input, not a request to rebuild Edit Pivot. A non-repeat press
+     * still goes through activation so the Maya tool can neutralize a desynchronized Blender tool. */
+    if (action.source_event != nullptr &&
+        (action.source_event->flag & WM_EVENT_IS_REPEAT) != 0)
+    {
+      return ed::maya::MayaDispatchResult::Handled;
+    }
+    const ed::maya::MayaToolActivationResult result = ED_maya_tool_activate(
+        C, action.tool, ed::maya::MayaToolActivationReason::Hotkey);
+    /* #MayaToolActivationResult::AlreadyActive still ran the activation callback, which neutralizes
+     * the Blender tool and rewrites the gizmo visibility of every 3D View. That leaves the Edit
+     * Pivot manipulator needing the same refresh a real tool change needs, and validation cannot
+     * stand in for it: re-activating the active tool does not bump #MayaToolState::revision. */
+    if (ELEM(result,
+             ed::maya::MayaToolActivationResult::Activated,
+             ed::maya::MayaToolActivationResult::AlreadyActive) &&
+        runtime.pivot_edit.target != ed::maya::MayaPivotEditTarget::None)
+    {
+      ed::maya::pivot_edit_tool_changed(C, runtime);
     }
     return ed::maya::MayaDispatchResult::Handled;
   }
@@ -345,16 +363,19 @@ ed::maya::MayaDispatchResult ED_maya_event_dispatch(bContext *C, const wmEvent *
   }
 
   ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
-  if (!ED_maya_interaction_enabled(C)) {
+  if (!maya_viewport_window_interaction_enabled(C)) {
     if (runtime != nullptr) {
+      /* This also recovers a session that outlived its own end condition: it is the one place that
+       * reliably runs while one is stuck, and leaving it running would starve selection of the left
+       * mouse button, which the keymap then turns into `transform.translate` on a drag. */
       if (runtime->active_session) {
         runtime->active_session->cancel(C);
         runtime->active_session.reset();
       }
       if (ED_maya_interaction_preset_enabled(C)) {
-        /* The Maya model is still active, the pointer just is not over a 3D View. Only the keys can
-         * be wrong here: their release will never be delivered to us, so temporary snapping has to
-         * be let go of, while Edit Pivot survives the trip outside the viewport. */
+        /* The Maya model is still active, the pointer just is not over a viewport window. Only the
+         * keys can be wrong here: their release will never be delivered to us, so temporary
+         * snapping has to be let go of, while Edit Pivot survives the trip outside the viewport. */
         ED_maya_snap_override_release_all(C);
       }
       else {

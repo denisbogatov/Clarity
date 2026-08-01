@@ -371,6 +371,14 @@ void WM_gizmomap_message_subscribe(const bContext *C,
                                    ARegion *region,
                                    wmMsgBus *mbus);
 bool WM_gizmomap_is_any_selected(const wmGizmoMap *gzmap);
+/**
+ * Whether a gizmo in \a region is currently highlighted, that is, whether the pointer is over one.
+ * Null-safe in both the region and its gizmo map.
+ *
+ * Anything that consumes a drag before the region handlers run has to ask this first: the gizmo map
+ * only gets its chance after them, so a drag claimed earlier never reaches the manipulator at all.
+ */
+bool WM_gizmomap_region_is_highlighted(const ARegion *region);
 wmGizmo *WM_gizmomap_get_modal(const wmGizmoMap *gzmap);
 
 /**

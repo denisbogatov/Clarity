@@ -537,6 +537,18 @@ enum eUserpref_TempSpaceDisplayType : char {
   USER_TEMP_SPACE_DISPLAY_WINDOW = 1,
 };
 
+/**
+ * How viewport redraws are paced against the monitor. Off is a distinct choice rather than the
+ * absence of On: with adaptive VSync the viewport still waits for the refresh whenever it renders
+ * faster than the monitor, which is most of the time, so it cannot be used to measure or to get the
+ * lowest input latency.
+ */
+enum eUserpref_ViewportVSync : char {
+  USER_VIEWPORT_VSYNC_OFF = 0,
+  USER_VIEWPORT_VSYNC_ON = 1,
+  USER_VIEWPORT_VSYNC_ADAPTIVE = 2,
+};
+
 enum eUserpref_EmulateMMBMod : char {
   USER_EMU_MMB_MOD_ALT = 0,
   USER_EMU_MMB_MOD_OSKEY = 1,
@@ -1259,7 +1271,7 @@ struct UserDef {
   char _pad18[1] = {};
   /** Maximum viewport redraw rate in frames per second, or zero for unlimited. */
   short viewport_fps_limit = 0;
-  char viewport_vsync = 0;
+  eUserpref_ViewportVSync viewport_vsync = USER_VIEWPORT_VSYNC_OFF;
   char _pad19[3] = {};
 
   eUserpref_SeqProxySetup sequencer_proxy_setup = USER_SEQ_PROXY_SETUP_AUTOMATIC;

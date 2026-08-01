@@ -69,6 +69,7 @@
 #include "transform.hh"
 #include "transform_convert.hh"
 #include "transform_gizmo.hh"
+#include "transform_gizmo_maya_cache.hh"
 #include "transform_snap.hh"
 
 namespace blender::ed::transform {
@@ -94,6 +95,7 @@ static bool gizmo_trace_enabled()
     fflush(stderr); \
   } \
   ((void)0)
+
 
 static void gizmogroup_refresh_from_matrix(wmGizmoGroup *gzgroup,
                                            const float twmat[4][4],
@@ -146,6 +148,7 @@ struct GizmoGroup {
   int use_twtype_refresh;
   bool use_maya_center_style;
   bool use_maya_edit_pivot_style;
+  MayaGizmoStyleCache maya_style_cache;
 
   /* Only for view orientation. */
   struct {
@@ -1958,6 +1961,7 @@ static void gizmogroup_init_properties_from_twtype(wmGizmoGroup *gzgroup)
     }
   }
   MAN_ITER_AXES_END;
+  ggd->maya_style_cache.invalidate();
 }
 
 static void WIDGETGROUP_gizmo_setup(const bContext *C, wmGizmoGroup *gzgroup)
@@ -2088,7 +2092,7 @@ static void gizmogroup_refresh_from_matrix(wmGizmoGroup *gzgroup,
 
 /**
  * The manipulator is one system: every pass that can change its appearance recomputes the same two
- * inputs and reapplies the whole style, so no redraw can show a half-updated manipulator.
+ * inputs. Style transitions apply atomically; unchanged draws stop at the cache.
  */
 static bool gizmogroup_maya_style_calc(const wmGizmoGroup *gzgroup, const View3D *v3d)
 {
@@ -2113,6 +2117,10 @@ static void gizmogroup_apply_maya_center_style(GizmoGroup *ggd,
                                                const bool use_maya_style,
                                                const bool use_edit_pivot_style)
 {
+  if (!ggd->maya_style_cache.update_needed(use_maya_style, use_edit_pivot_style, ggd->twtype)) {
+    return;
+  }
+
   wmGizmo *translate_center = ggd->gizmos[MAN_AXIS_TRANS_C];
   RNA_enum_set(translate_center->ptr,
                "draw_style",
@@ -2158,6 +2166,7 @@ static void gizmogroup_apply_maya_center_style(GizmoGroup *ggd,
 
   ggd->use_maya_center_style = use_maya_style;
   ggd->use_maya_edit_pivot_style = use_edit_pivot_style;
+  ggd->maya_style_cache.mark_applied(use_maya_style, use_edit_pivot_style, ggd->twtype);
 }
 
 static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
@@ -2268,9 +2277,9 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
       gizmogroup_init_properties_from_twtype(gzgroup);
     }
     if (!is_modal) {
-      /* Reapplied on every pass rather than only on a change: switching mode or tool rebuilds the
-       * gizmo properties, and a single redraw that saw the previous style made the manipulator
-       * flicker. A drag owns its own styles, so it is left alone. */
+      /* The cache is invalidated when a mode/tool rebuilds the gizmo properties, preventing a
+       * one-frame stale style without rewriting the same RNA values on every draw. A drag owns its
+       * own styles, so it is left alone. */
       gizmogroup_apply_maya_center_style(ggd, use_maya_palette, maya_edit_pivot);
     }
   }
@@ -2426,6 +2435,8 @@ static void gizmo_3d_draw_invoke(wmGizmoGroup *gzgroup,
 
   gizmo_3d_setup_draw_modal(axis_active, axis_idx_active, ggd->twtype);
   if (use_maya_style) {
+    /* The modal glyphs below temporarily override the cached idle style. */
+    ggd->maya_style_cache.invalidate();
     if (axis_idx_active == MAN_AXIS_SCALE_C) {
       RNA_enum_set(axis_active->ptr,
                    "draw_style",

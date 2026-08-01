@@ -250,6 +250,15 @@ bool WM_gizmomap_is_any_selected(const wmGizmoMap *gzmap)
   return gzmap->gzmap_context.select.len != 0;
 }
 
+bool WM_gizmomap_region_is_highlighted(const ARegion *region)
+{
+  if (region == nullptr || region->runtime == nullptr) {
+    return false;
+  }
+  const wmGizmoMap *gzmap = region->runtime->gizmo_map;
+  return gzmap != nullptr && gzmap->gzmap_context.highlight != nullptr;
+}
+
 wmGizmo *WM_gizmomap_get_modal(const wmGizmoMap *gzmap)
 {
   return gzmap->gzmap_context.modal;

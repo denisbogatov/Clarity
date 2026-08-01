@@ -291,6 +291,24 @@ TEST_F(MayaRuntimeTest, PivotEditTogglePersistsWithoutHostContext)
   CTX_free(C);
 }
 
+TEST(maya_pivot_edit, ToolChangePreservesTheActiveTarget)
+{
+  MayaWindowRuntime runtime;
+  runtime.pivot_edit.persistent = true;
+  runtime.pivot_edit.target = MayaPivotEditTarget::ObjectOrigin;
+  runtime.pivot_edit.phase = MayaPivotEditPhase::PersistentPivot;
+  runtime.tool.active = MayaToolID::Rotate;
+  runtime.tool.revision = 17;
+
+  pivot_edit_tool_changed(nullptr, runtime);
+
+  EXPECT_TRUE(runtime.pivot_edit.persistent);
+  EXPECT_EQ(runtime.pivot_edit.target, MayaPivotEditTarget::ObjectOrigin);
+  EXPECT_EQ(runtime.pivot_edit.phase, MayaPivotEditPhase::PersistentPivot);
+  EXPECT_EQ(runtime.pivot_edit.tool, MayaToolID::Rotate);
+  EXPECT_EQ(runtime.pivot_edit.tool_revision, 17);
+}
+
 TEST_F(MayaRuntimeTest, PivotEditDragTailDefersExitOrFocusRestart)
 {
   bContext *C = CTX_create();

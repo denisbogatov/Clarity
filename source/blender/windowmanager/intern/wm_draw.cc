@@ -1974,7 +1974,22 @@ static void wm_draw_frame_rate_limit_apply(const int frame_rate_limit)
 static void wm_draw_vsync_update(wmWindowManager *wm)
 {
   static int applied_vsync = GHOST_kVSyncModeUnset;
-  const int requested_vsync = U.viewport_vsync ? GHOST_kVSyncModeOn : GHOST_kVSyncModeAuto;
+  /* Off must reach the driver as #GHOST_kVSyncModeOff rather than as #GHOST_kVSyncModeAuto: Auto is
+   * adaptive VSync, which still waits for the refresh whenever the viewport renders faster than the
+   * monitor. That is the normal case - a solid-shaded frame costs a few milliseconds - so Auto paces
+   * the whole viewport at the monitor rate and the wait shows up inside the context activation. */
+  int requested_vsync = GHOST_kVSyncModeOff;
+  switch (U.viewport_vsync) {
+    case USER_VIEWPORT_VSYNC_ON:
+      requested_vsync = GHOST_kVSyncModeOn;
+      break;
+    case USER_VIEWPORT_VSYNC_ADAPTIVE:
+      requested_vsync = GHOST_kVSyncModeAuto;
+      break;
+    case USER_VIEWPORT_VSYNC_OFF:
+      requested_vsync = GHOST_kVSyncModeOff;
+      break;
+  }
   if (requested_vsync == applied_vsync) {
     return;
   }

@@ -38,6 +38,7 @@
 #include "BLI_vector.hh"
 
 #include "BKE_appdir.hh"
+#include "BKE_blender_version.h"
 #include "BKE_context.hh"
 #include "BKE_editmesh.hh"
 #include "BKE_global.hh"
@@ -80,6 +81,43 @@
 #include "wm_event_types.hh"
 
 namespace blender::ed::maya {
+
+void MayaSnapObjectContextDeleter::operator()(ed::transform::SnapObjectContext *context) const
+{
+  ed::transform::snap_object_context_destroy(context);
+}
+
+std::FILE *navigation_trace_file_open()
+{
+  char filepath[FILE_MAX];
+  BLI_path_join(filepath, sizeof(filepath), BKE_tempdir_base(), "maya_navigation_trace.log");
+
+  /* The trace is reopened for appending many times per session, so without rotating it once per run
+   * the file accumulates sessions from different builds. Any aggregate over it then silently mixes
+   * them, which reads as a measurement rather than as stale data. One run, one file. */
+  static bool run_header_written = false;
+  if (!run_header_written) {
+    run_header_written = true;
+    char previous[FILE_MAX];
+    BLI_path_join(
+        previous, sizeof(previous), BKE_tempdir_base(), "maya_navigation_trace.prev.log");
+    if (BLI_exists(filepath)) {
+      BLI_rename_overwrite(filepath, previous);
+    }
+    if (std::FILE *header = BLI_fopen(filepath, "w")) {
+      /* The settings that decide how a frame is paced belong to the header: a comparison between two
+       * runs is only meaningful once they are known to have been paced the same way. */
+      std::fprintf(header,
+                   "RUN blender=%s fps_limit=%d vsync=%d viewport_aa=%d\n",
+                   BKE_blender_version_string(),
+                   int(U.viewport_fps_limit),
+                   int(U.viewport_vsync),
+                   int(U.viewport_aa));
+      std::fclose(header);
+    }
+  }
+  return BLI_fopen(filepath, "a");
+}
 
 struct MayaPivotUndoSnapshot {
   uint32_t scene_session_uid = 0;
@@ -367,6 +405,9 @@ struct MayaTransformDebugState {
   std::string operator_id;
   int context_mode;
   int mesh_select_mode;
+  bool maya_pivot_transform;
+  MayaPivotEditTarget pivot_target;
+  MayaSnapMode snap_mode_at_begin;
   double start_time = BLI_time_now_seconds();
   double last_event_time = start_time;
   uint64_t event_index = 0;
@@ -375,10 +416,18 @@ struct MayaTransformDebugState {
   Vector<MayaTransformDebugStageSample> samples;
   std::array<double, size_t(MayaNavigationDebugStage::Count)> stage_max_ms = {};
 
-  MayaTransformDebugState(const char *operator_id, const int context_mode, const int mesh_select_mode)
+  MayaTransformDebugState(const char *operator_id,
+                          const int context_mode,
+                          const int mesh_select_mode,
+                          const bool maya_pivot_transform,
+                          const MayaPivotEditTarget pivot_target,
+                          const MayaSnapMode snap_mode_at_begin)
       : operator_id(operator_id ? operator_id : "-"),
         context_mode(context_mode),
-        mesh_select_mode(mesh_select_mode)
+        mesh_select_mode(mesh_select_mode),
+        maya_pivot_transform(maya_pivot_transform),
+        pivot_target(pivot_target),
+        snap_mode_at_begin(snap_mode_at_begin)
   {
     samples.reserve(32768);
   }
@@ -432,23 +481,25 @@ struct MayaTransformDebugState {
     }
     flushed = true;
 
-    char filepath[FILE_MAX];
-    BLI_path_join(filepath, sizeof(filepath), BKE_tempdir_base(), "maya_navigation_trace.log");
-    FILE *file = BLI_fopen(filepath, "a");
+    FILE *file = navigation_trace_file_open();
     if (file == nullptr) {
       return;
     }
 
     std::fprintf(file,
-                 "TRANSFORM_SESSION operator=%s context_mode=%d mesh_select_mode=%d "
-                 "events=%llu frames=%llu duration_ms=%.3f samples=%d\n",
-                 operator_id.c_str(),
-                 context_mode,
-                 mesh_select_mode,
-                 static_cast<unsigned long long>(event_index),
-                 static_cast<unsigned long long>(frame_index),
-                 (last_event_time - start_time) * 1000.0,
-                 int(samples.size()));
+                  "TRANSFORM_SESSION operator=%s context_mode=%d mesh_select_mode=%d "
+                  "maya_pivot=%d pivot_target=%d snap_mode_at_begin=%d "
+                  "events=%llu frames=%llu duration_ms=%.3f samples=%d\n",
+                  operator_id.c_str(),
+                  context_mode,
+                  mesh_select_mode,
+                  int(maya_pivot_transform),
+                  int(pivot_target),
+                  int(snap_mode_at_begin),
+                  static_cast<unsigned long long>(event_index),
+                  static_cast<unsigned long long>(frame_index),
+                  (last_event_time - start_time) * 1000.0,
+                  int(samples.size()));
     std::fputs("  PERF_SUMMARY", file);
     for (int stage_index = 0; stage_index < int(MayaNavigationDebugStage::Count); stage_index++) {
       if (stage_max_ms[stage_index] > 0.0) {
@@ -1463,7 +1514,14 @@ class MayaObjectPivotEditTarget final : public MayaPivotEditTargetBackend {
     runtime_.tool.manipulator_pivot.position_world = position_world;
     runtime_.tool.manipulator_pivot.position_valid = true;
     runtime_.tool.manipulator_pivot.last_object = ED_maya_object_runtime_ref_create(object_);
-    notify_changed();
+    /* A drag calls this once per modal update, and the transform system already publishes a redraw
+     * notifier for each one, so a duplicate here would refresh the viewport, gizmos and sidebar a
+     * second time per event. The one-shot paths - clicks, resets, and the restore #cancel runs from
+     * `special_aftertrans_update` while the drag still counts as active - keep their notifier: it is
+     * the only one carrying this object as its reference. */
+    if (!runtime_.transform_active) {
+      notify_changed();
+    }
     return true;
   }
 
@@ -1653,6 +1711,7 @@ static int2 pointer_region_position_get(const bContext *C)
  * \a r_result is reset first, so a miss leaves #MayaPivotSnapTargetType::None behind.
  */
 static void pivot_snap_target_query(const bContext *C,
+                                    ed::transform::SnapObjectContext *snap_context,
                                     const ARegion &region,
                                     const View3D &view,
                                     const int2 &mouse_region,
@@ -1660,7 +1719,6 @@ static void pivot_snap_target_query(const bContext *C,
                                     MayaPivotSnapResult &r_result)
 {
   r_result = {};
-  ed::transform::SnapObjectContext *snap_context = ed::transform::snap_object_context_create();
   if (snap_context == nullptr) {
     return;
   }
@@ -1702,7 +1760,6 @@ static void pivot_snap_target_query(const bContext *C,
       &hit_object,
       hit_object_matrix,
       hit_face_normal);
-  ed::transform::snap_object_context_destroy(snap_context);
   if (hit_type == SCE_SNAP_TO_NONE) {
     return;
   }
@@ -1723,6 +1780,7 @@ void pivot_edit_snap_preview_clear(MayaWindowRuntime &runtime)
 {
   MayaPivotEditState &state = runtime.pivot_edit;
   state.snap_preview = {};
+  state.snap_preview_context.reset();
   state.snap_preview_mouse = int2(0);
   state.snap_preview_queried = false;
 }
@@ -1755,7 +1813,23 @@ void pivot_edit_snap_preview_update(const bContext *C,
   const bool had_preview = state.snap_preview.type != MayaPivotSnapTargetType::None;
   state.snap_preview_mouse = mouse_region;
   state.snap_preview_queried = true;
+
+  std::unique_ptr<ed::transform::SnapObjectContext, MayaSnapObjectContextDeleter>
+      one_shot_context;
+  ed::transform::SnapObjectContext *snap_context = nullptr;
+  if (CTX_data_mode_enum(C) == CTX_MODE_EDIT_MESH) {
+    /* Repeated queries with ignore_editmode_filtering are not supported by SnapObjectContext. */
+    one_shot_context.reset(ed::transform::snap_object_context_create());
+    snap_context = one_shot_context.get();
+  }
+  else {
+    if (!state.snap_preview_context) {
+      state.snap_preview_context.reset(ed::transform::snap_object_context_create());
+    }
+    snap_context = state.snap_preview_context.get();
+  }
   pivot_snap_target_query(C,
+                          snap_context,
                           *region,
                           *view,
                           mouse_region,
@@ -1903,6 +1977,18 @@ bool pivot_edit_toggle_persistent(bContext *C, MayaWindowRuntime &runtime)
   }
   pivot_edit_end(C, runtime);
   return true;
+}
+
+void pivot_edit_tool_changed(bContext *C, MayaWindowRuntime &runtime)
+{
+  MayaPivotEditState &state = runtime.pivot_edit;
+  state.tool = runtime.tool.active;
+  state.tool_revision = runtime.tool.revision;
+  if (C != nullptr && state.target != MayaPivotEditTarget::None) {
+    /* The target and authored frame do not depend on the active tool. Reusing them avoids the
+     * end/begin pair (and its two full presentation refreshes) while the gizmo changes layout. */
+    ED_maya_tool_presentation_refresh(C, runtime);
+  }
 }
 
 bool pivot_edit_pin_toggle(bContext *C, MayaWindowRuntime &runtime)
@@ -2099,8 +2185,15 @@ void pivot_edit_input_reset(bContext *C, MayaWindowRuntime &runtime)
 
 void pivot_edit_validate(bContext *C, MayaWindowRuntime &runtime)
 {
-  manipulator_pivot_last_object_resolve(C, runtime);
   MayaPivotEditState &state = runtime.pivot_edit;
+  if (state.target == MayaPivotEditTarget::None) {
+    if (state.persistent) {
+      pivot_edit_resume_persistent(C, runtime);
+    }
+    return;
+  }
+
+  manipulator_pivot_last_object_resolve(C, runtime);
   if (state.target == MayaPivotEditTarget::None) {
     if (state.persistent) {
       pivot_edit_resume_persistent(C, runtime);
@@ -2238,6 +2331,25 @@ static Object *pivot_custom_object_get(const bContext *C,
   return r_object_pivot_edit ? runtime->pivot_edit.object : CTX_data_active_object(C);
 }
 
+/**
+ * Selection cannot change while a modal transform owns the region. Its component pivot was synced
+ * during transform initialization, so rescanning and hashing every mesh element from every gizmo
+ * refresh only repeats work and can dominate a dense edit-mesh drag.
+ */
+static bool pivot_custom_prepare_for_read(const bContext *C, MayaWindowRuntime &runtime)
+{
+  if (runtime.transform_active) {
+    const MayaCustomPivotData *custom = runtime.pivot_edit.custom.get();
+    if (custom != nullptr && custom->selection_signature_valid &&
+        CTX_data_mode_enum(C) == CTX_MODE_EDIT_MESH && custom->scene == CTX_data_scene(C) &&
+        custom->object == CTX_data_active_object(C))
+    {
+      return true;
+    }
+  }
+  return pivot_custom_sync_to_selection(C, runtime, false);
+}
+
 }  // namespace ed::maya
 
 bool ED_maya_pivot_custom_matrix_get(const bContext *C,
@@ -2277,7 +2389,7 @@ bool ED_maya_pivot_custom_matrix_get(const bContext *C,
   if (runtime == nullptr) {
     return false;
   }
-  if (!ed::maya::pivot_custom_sync_to_selection(C, *runtime, false)) {
+  if (!ed::maya::pivot_custom_prepare_for_read(C, *runtime)) {
     return false;
   }
   const ed::maya::MayaCustomPivotData *custom =
@@ -2312,7 +2424,7 @@ bool ED_maya_pivot_custom_orientation_get(const bContext *C, float r_orientation
     quat_to_mat3(r_orientation, orientation);
     return true;
   }
-  if (runtime == nullptr || !ed::maya::pivot_custom_sync_to_selection(C, *runtime, false)) {
+  if (runtime == nullptr || !ed::maya::pivot_custom_prepare_for_read(C, *runtime)) {
     return false;
   }
   const ed::maya::MayaCustomPivotData *custom =
@@ -2329,7 +2441,7 @@ bool ED_maya_pivot_edit_data_get(const bContext *C,
                                  float **r_rotation_quaternion)
 {
   ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
-  if (runtime == nullptr || !ed::maya::pivot_custom_sync_to_selection(C, *runtime, false)) {
+  if (runtime == nullptr || !ed::maya::pivot_custom_prepare_for_read(C, *runtime)) {
     return false;
   }
   ed::maya::MayaCustomPivotData *custom =
@@ -2940,8 +3052,17 @@ void ED_maya_transform_begin(const bContext *C,
     copy_v3_v3(pivot.follow_location_initial, pivot.custom->location);
   }
   if (ED_maya_interaction_enabled(C) && ed::maya::navigation_debug_logging_enabled(C)) {
+    const ed::maya::MayaSnapMode temporary_snap_mode = runtime->temporary.snap.active();
+    const ed::maya::MayaSnapMode effective_snap_mode =
+        temporary_snap_mode != ed::maya::MayaSnapMode::None ? temporary_snap_mode :
+                                                              ED_maya_snap_mode_get(C);
     runtime->transform_debug = std::make_unique<ed::maya::MayaTransformDebugState>(
-        operator_id, context_mode, mesh_select_mode);
+        operator_id,
+        context_mode,
+        mesh_select_mode,
+        is_maya_pivot_transform,
+        pivot.target,
+        effective_snap_mode);
   }
 }
 
@@ -3121,9 +3242,7 @@ void ED_maya_viewport_debug_event(const bContext *C,
     return;
   }
 
-  char filepath[FILE_MAX];
-  BLI_path_join(filepath, sizeof(filepath), BKE_tempdir_base(), "maya_navigation_trace.log");
-  FILE *file = BLI_fopen(filepath, "a");
+  FILE *file = ed::maya::navigation_trace_file_open();
   if (file == nullptr) {
     return;
   }

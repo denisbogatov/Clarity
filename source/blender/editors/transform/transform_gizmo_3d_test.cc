@@ -9,6 +9,7 @@
 #include "ED_gizmo_library.hh"
 
 #include "transform_gizmo.hh"
+#include "transform_gizmo_maya_cache.hh"
 
 namespace blender::ed::transform::tests {
 
@@ -152,6 +153,31 @@ TEST(transform_gizmo_3d, ScaleCenterStyleFollowsThePreset)
             ED_GIZMO_PRIMITIVE_STYLE_ANNULUS);
   EXPECT_EQ(gizmo_3d_scale_center_style_get(blender_default, true),
             ED_GIZMO_PRIMITIVE_STYLE_CIRCLE);
+}
+
+/**
+ * Repeated draw preparation keeps the already applied style, while a layout rebuild or a mode
+ * transition forces one atomic reapplication.
+ */
+TEST(transform_gizmo_3d, MayaStyleCacheTracksTransitionsAndInvalidation)
+{
+  const int layout = V3D_GIZMO_SHOW_OBJECT_TRANSLATE | V3D_GIZMO_SHOW_OBJECT_ROTATE;
+
+  MayaGizmoStyleCache cache{};
+  EXPECT_TRUE(cache.update_needed(maya, no_edit_pivot, layout));
+
+  cache.mark_applied(maya, no_edit_pivot, layout);
+  EXPECT_FALSE(cache.update_needed(maya, no_edit_pivot, layout));
+  EXPECT_TRUE(cache.update_needed(maya, edit_pivot, layout));
+  EXPECT_TRUE(cache.update_needed(blender_default, no_edit_pivot, layout));
+
+  /* The translate handles are laid out from the manipulator layout, so it belongs to the key even
+   * when neither style flag moved. */
+  EXPECT_TRUE(cache.update_needed(maya, no_edit_pivot, V3D_GIZMO_SHOW_OBJECT_TRANSLATE));
+
+  cache.mark_applied(maya, edit_pivot, layout);
+  cache.invalidate();
+  EXPECT_TRUE(cache.update_needed(maya, edit_pivot, layout));
 }
 
 }  // namespace blender::ed::transform::tests

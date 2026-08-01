@@ -8,6 +8,8 @@
 
 #include "maya_navigation.hh"
 
+#include "maya_runtime.hh"
+
 #include <algorithm>
 #include <array>
 #include <cstdlib>
@@ -281,9 +283,7 @@ struct MayaNavigationDebugState {
 
   void flush() const
   {
-    char filepath[FILE_MAX];
-    BLI_path_join(filepath, sizeof(filepath), BKE_tempdir_base(), "maya_navigation_trace.log");
-    FILE *file = BLI_fopen(filepath, "a");
+    FILE *file = navigation_trace_file_open();
     if (file == nullptr) {
       return;
     }

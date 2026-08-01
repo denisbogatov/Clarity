@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 #include <memory>
 
 #include "BLI_math_matrix_types.hh"
@@ -30,6 +31,10 @@ struct Object;
 struct ScrArea;
 struct Scene;
 struct WorkSpace;
+
+namespace ed::transform {
+struct SnapObjectContext;
+}
 
 namespace ed::maya {
 
@@ -94,6 +99,10 @@ struct MayaCustomPivotData {
   bool pinned = false;
 };
 
+struct MayaSnapObjectContextDeleter {
+  void operator()(ed::transform::SnapObjectContext *context) const;
+};
+
 struct MayaPivotEditState {
   MayaPivotEditPhase phase = MayaPivotEditPhase::Normal;
   MayaPivotEditTarget target = MayaPivotEditTarget::None;
@@ -123,6 +132,13 @@ struct MayaPivotEditState {
    * would put the pivot. #MayaPivotSnapTargetType::None means there is nothing to draw.
    */
   MayaPivotSnapResult snap_preview;
+  /**
+   * Reuse the object-mode query context and its temporary storage while the preview follows the
+   * pointer. Edit mode deliberately keeps one-shot contexts because `ignore_editmode_filtering`
+   * does not support repeated queries on the same context.
+   */
+  std::unique_ptr<ed::transform::SnapObjectContext, MayaSnapObjectContextDeleter>
+      snap_preview_context;
   /** Region-space mouse the preview was computed for, so a resting pointer costs nothing. */
   int2 snap_preview_mouse = int2(0);
   bool snap_preview_queried = false;
@@ -313,9 +329,16 @@ MayaWindowRuntime *runtime_get(const bContext *C);
 MayaWindowRuntime *runtime_ensure(const bContext *C);
 bool navigation_debug_logging_enabled(const bContext *C);
 int navigation_frame_rate_limit_setting(const bContext *C);
+/**
+ * The viewport performance trace, opened for appending. Rotates the previous run to
+ * `maya_navigation_trace.prev.log` and writes a `RUN` header the first time it is called in a
+ * process, so one run is one file and aggregates cannot mix builds.
+ */
+std::FILE *navigation_trace_file_open();
 bool pivot_edit_toggle_persistent(bContext *C, MayaWindowRuntime &runtime);
 bool pivot_edit_resume_persistent(bContext *C, MayaWindowRuntime &runtime);
 bool pivot_edit_pin_toggle(bContext *C, MayaWindowRuntime &runtime);
+void pivot_edit_tool_changed(bContext *C, MayaWindowRuntime &runtime);
 MayaDispatchResult pivot_edit_click_handle_action(bContext *C,
                                                    MayaWindowRuntime &runtime,
                                                    const MayaInputAction &action);
