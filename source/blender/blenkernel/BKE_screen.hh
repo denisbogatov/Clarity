@@ -430,6 +430,13 @@ enum {
   PANEL_TYPE_LAYOUT_VERT_BAR = (1 << 3),
   /** This panel type represents data external to the UI. */
   PANEL_TYPE_INSTANCED = (1 << 4),
+  /**
+   * The panel is always expanded: it keeps its header, but nothing collapses it - not the header
+   * click, not `A`, not a drag across it, not a `Ctrl` collapse-all from a neighbour. For a panel
+   * that is the only content of a floating region, a collapsed state is a dead end: the region
+   * shrinks to a title bar that carries no information the operator name does not already give.
+   */
+  PANEL_TYPE_ALWAYS_OPEN = (1 << 5),
   /** Don't search panels with this type during property search. */
   PANEL_TYPE_NO_SEARCH = (1 << 7),
 };

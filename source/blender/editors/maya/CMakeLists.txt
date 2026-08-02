@@ -63,6 +63,7 @@ if(WITH_GTESTS)
   set(TEST_SRC
     maya_runtime_test.cc
     maya_selection_menu_test.cc
+    maya_topology_select_test.cc
   )
   set(TEST_INC
   )

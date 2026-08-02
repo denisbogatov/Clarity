@@ -133,6 +133,16 @@ static bool panel_type_context_poll(ARegion *region,
 /** \name Local Functions
  * \{ */
 
+/**
+ * Whether the panel refuses to collapse, see #PANEL_TYPE_ALWAYS_OPEN. Sub-panels of such a panel
+ * are not covered: the flag is about the panel that owns the header, and a sub-panel is free to
+ * fold away the section it groups.
+ */
+static bool panel_type_is_always_open(const Panel *panel)
+{
+  return panel->type != nullptr && (panel->type->flag & PANEL_TYPE_ALWAYS_OPEN) != 0;
+}
+
 static bool panel_active_animation_changed(ListBaseT<Panel> *lb,
                                            Panel **r_panel_animation,
                                            bool *r_no_animation)
@@ -650,7 +660,7 @@ static void panels_collapse_all(ARegion *region, const Panel *from_panel)
     PanelType *pt = panel.type;
 
     /* Close panels with headers in the same context. */
-    if (pt && from_pt && !(pt->flag & PANEL_TYPE_NO_HEADER)) {
+    if (pt && from_pt && !(pt->flag & PANEL_TYPE_NO_HEADER) && !panel_type_is_always_open(&panel)) {
       if (!pt->context[0] || !from_pt->context[0] || STREQ(pt->context, from_pt->context)) {
         if ((panel.flag & PNL_PIN) || !category || !pt->category[0] ||
             STREQ(pt->category, category))
@@ -699,7 +709,7 @@ Panel *panel_begin(
   if (newpanel) {
     panel = BKE_panel_new(pt);
 
-    if (pt->flag & PANEL_TYPE_DEFAULT_CLOSED) {
+    if ((pt->flag & PANEL_TYPE_DEFAULT_CLOSED) && !(pt->flag & PANEL_TYPE_ALWAYS_OPEN)) {
       panel->flag |= PNL_CLOSED;
       panel->runtime_flag |= PANEL_WAS_CLOSED;
     }
@@ -1002,6 +1012,13 @@ bool panel_is_closed(const Panel *panel)
 {
   /* Header-less panels can never be closed, otherwise they could disappear. */
   if (panel->type && panel->type->flag & PANEL_TYPE_NO_HEADER) {
+    return false;
+  }
+
+  /* Answering here rather than clearing #PNL_CLOSED covers every path at once - the stored flag of
+   * a file saved before the panel became always-open, the search filter, and the collapse gestures
+   * - and it is what the expand arrow, the layout and the region height all read. */
+  if (panel_type_is_always_open(panel)) {
     return false;
   }
 
@@ -2159,6 +2176,9 @@ static void panel_drag_collapse(const bContext *C,
     if (panel->type && (panel->type->flag & PANEL_TYPE_NO_HEADER)) {
       continue;
     }
+    if (panel_type_is_always_open(panel)) {
+      continue;
+    }
     const int oldflag = panel->flag;
 
     /* Set up `rect` to match header size. */
@@ -2307,8 +2327,12 @@ static void handle_panel_header(const bContext *C,
     expansion_area_xmax -= PNL_ICON;
   }
 
-  /* Collapse and expand panels. */
-  if (ELEM(event_type, EVT_RETKEY, EVT_PADENTER, EVT_AKEY) || mx < expansion_area_xmax) {
+  /* Collapse and expand panels. An always-open panel takes no part in this, so the click falls
+   * through to the drag area below instead of running an animation that reopens on the next
+   * layout. */
+  if (!panel_type_is_always_open(panel) &&
+      (ELEM(event_type, EVT_RETKEY, EVT_PADENTER, EVT_AKEY) || mx < expansion_area_xmax))
+  {
     if (ctrl && !is_subpanel) {
       /* For parent panels, collapse all other panels or toggle children. */
       if (panel_is_closed(panel) || panel->children.is_empty()) {

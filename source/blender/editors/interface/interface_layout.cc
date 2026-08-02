@@ -4091,6 +4091,41 @@ static bool item_is_radial_displayable(Item *item)
   return true;
 }
 
+/**
+ * The single button a radial slot stands for, when the slot holds a layout rather than a button.
+ *
+ * A menu that has to grey out one item on its own wraps that item in a row, because the enabled
+ * state belongs to a layout and not to a button. The slot is then a layout, and the radial
+ * properties below - the direction and the pie emboss - never reach the button inside it: the item
+ * cannot be aimed at, only clicked, and it is drawn as an ordinary row. Reaching one button down
+ * costs nothing and makes the two ways of writing the same menu behave alike.
+ *
+ * Only an unambiguous slot qualifies. A layout holding several buttons has no single button the
+ * direction could belong to, and is left as it was.
+ */
+static ButtonItem *radial_slot_sole_button(Item *item)
+{
+  if (item->type() == ItemType::Button) {
+    return static_cast<ButtonItem *>(item);
+  }
+  Layout *layout = dynamic_cast<Layout *>(item);
+  if (layout == nullptr) {
+    return nullptr;
+  }
+  ButtonItem *found = nullptr;
+  for (Item *subitem : layout->items()) {
+    ButtonItem *bitem = radial_slot_sole_button(subitem);
+    if (bitem == nullptr) {
+      continue;
+    }
+    if (found != nullptr) {
+      return nullptr;
+    }
+    found = bitem;
+  }
+  return found;
+}
+
 static bool item_is_radial_drawable(ButtonItem *bitem)
 {
 
@@ -4135,8 +4170,16 @@ void LayoutRadial::resolve_impl()
     /* Enable for non-buttons because a direction may reference a layout, see: #112610. */
     bool use_dir = true;
 
-    if (item->type() == ItemType::Button) {
-      ButtonItem *bitem = static_cast<ButtonItem *>(item);
+    /* A marking menu greys single items out, which needs a row around them; the button inside is
+     * still what the direction belongs to. Other pie menus keep the plain rule, so a slot holding a
+     * layout stays as it was there. */
+    const bool is_marking_menu = (this->block()->pie_data->flags & PIE_MARKING_STYLE) != 0;
+    ButtonItem *slot_button = is_marking_menu ? radial_slot_sole_button(item) :
+                                                (item->type() == ItemType::Button ?
+                                                     static_cast<ButtonItem *>(item) :
+                                                     nullptr);
+    if (slot_button != nullptr) {
+      ButtonItem *bitem = slot_button;
 
       bitem->but->pie_dir = dir;
       /* Scale the buttons. */

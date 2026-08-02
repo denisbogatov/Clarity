@@ -4094,11 +4094,87 @@ static void do_mesh_box_select__doSelectFace(void *user_data,
     data->is_changed = true;
   }
 }
+
+/** Whether any part of the projected face covers the rectangle. */
+static bool mesh_box_select_face_region_overlap(const ViewContext *vc,
+                                                BMFace *face,
+                                                const rctf *rect)
+{
+  Vector<float2> screen_coords;
+  screen_coords.reserve(face->len);
+
+  BMIter iter;
+  BMLoop *loop;
+  BM_ITER_ELEM (loop, &iter, face, BM_LOOPS_OF_FACE) {
+    float2 screen_co;
+    if (ED_view3d_project_float_object(
+            vc->region, loop->v->co, screen_co, V3D_PROJ_TEST_CLIP_NEAR) != V3D_PROJ_RET_OK)
+    {
+      return false;
+    }
+    if (BLI_rctf_isect_pt_v(rect, screen_co)) {
+      return true;
+    }
+    screen_coords.append(screen_co);
+  }
+
+  for (const int i : screen_coords.index_range()) {
+    const float2 &a = screen_coords[i];
+    const float2 &b = screen_coords[(i + 1) % screen_coords.size()];
+    if (BLI_rctf_isect_segment(rect, a, b)) {
+      return true;
+    }
+  }
+
+  /* The rectangle can lie wholly inside a large face without touching its vertices or edges. */
+  const float corners[4][2] = {
+      {rect->xmin, rect->ymin},
+      {rect->xmin, rect->ymax},
+      {rect->xmax, rect->ymin},
+      {rect->xmax, rect->ymax},
+  };
+  const float (*polygon)[2] = reinterpret_cast<const float (*)[2]>(screen_coords.data());
+  for (const int i : IndexRange(4)) {
+    if (isect_point_poly_v2(corners[i], polygon, uint(screen_coords.size()))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void do_mesh_box_select__doSelectFaceRegionOverlap(BoxSelectUserData *data)
+{
+  BMIter iter;
+  BMFace *face;
+  BM_ITER_MESH (face, &iter, data->vc->em->bm, BM_FACES_OF_MESH) {
+    if (BM_elem_flag_test(face, BM_ELEM_HIDDEN)) {
+      continue;
+    }
+    const bool is_select = BM_elem_flag_test(face, BM_ELEM_SELECT);
+    if ((data->sel_op == SEL_OP_ADD && is_select) ||
+        (data->sel_op == SEL_OP_SUB && !is_select) ||
+        !mesh_box_select_face_region_overlap(data->vc, face, data->rect_fl))
+    {
+      continue;
+    }
+
+    const int sel_op_result = ED_select_op_action_deselected(data->sel_op, is_select, true);
+    if (sel_op_result != -1) {
+      BM_face_select_set(data->vc->em->bm, face, sel_op_result);
+      if (data->uv_selctx) {
+        data->uv_selctx->face_select_set(face, sel_op_result);
+      }
+      data->is_changed = true;
+    }
+  }
+}
+
 static bool do_mesh_box_select(const ViewContext *vc,
                                wmGenericUserData *wm_userdata,
                                const rcti *rect,
                                const eSelectOp sel_op,
-                               const bool use_depth)
+                               const bool use_depth,
+                               const bool face_region_overlap)
 {
   BoxSelectUserData data;
   ToolSettings *ts = vc->scene->toolsettings;
@@ -4171,6 +4247,9 @@ static bool do_mesh_box_select(const ViewContext *vc,
     if (use_zbuf) {
       data.is_changed |= edbm_backbuf_check_and_select_faces(
           esel, vc->depsgraph, vc->obedit, vc->em, data.uv_selctx, sel_op);
+    }
+    else if (face_region_overlap) {
+      do_mesh_box_select__doSelectFaceRegionOverlap(&data);
     }
     else {
       mesh_foreachScreenFace(
@@ -4597,8 +4676,12 @@ static wmOperatorStatus view3d_box_select_exec(bContext *C, wmOperator *op)
       switch (vc.obedit->type) {
         case OB_MESH:
           vc.em = BKE_editmesh_from_object(vc.obedit);
-          changed = do_mesh_box_select(
-              &vc, wm_userdata, &rect, sel_op, RNA_boolean_get(op->ptr, "use_depth"));
+          changed = do_mesh_box_select(&vc,
+                                       wm_userdata,
+                                       &rect,
+                                       sel_op,
+                                       RNA_boolean_get(op->ptr, "use_depth"),
+                                       RNA_boolean_get(op->ptr, "face_region_overlap"));
           if (changed) {
             DEG_id_tag_update(vc.obedit->data, ID_RECALC_SELECT);
             WM_event_add_notifier(C, NC_GEOM | ND_SELECT, vc.obedit->data);
@@ -4734,6 +4817,12 @@ void VIEW3D_OT_select_box(wmOperatorType *ot)
   WM_operator_properties_select_operation(ot);
   PropertyRNA *prop = RNA_def_boolean(
       ot->srna, "use_depth", true, "Use Depth", "Only select components visible from the camera");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(ot->srna,
+                         "face_region_overlap",
+                         false,
+                         "Face Region Overlap",
+                         "A face is inside when any projected part overlaps the box");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 

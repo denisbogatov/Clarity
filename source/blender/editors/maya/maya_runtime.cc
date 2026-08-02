@@ -3262,6 +3262,10 @@ void ED_maya_viewport_debug_event(const bContext *C,
 void ED_maya_runtime_free(bContext *C, const wmWindow *win)
 {
   if (ed::maya::MayaWindowRuntime *runtime = ed::maya::runtimes().lookup_ptr(win)) {
+    if (runtime->selection_cursor != nullptr && G_MAIN->wm.first != nullptr) {
+      WM_paint_cursor_end(runtime->selection_cursor);
+      runtime->selection_cursor = nullptr;
+    }
     if (C != nullptr) {
       ed::maya::pivot_edit_end(C, *runtime);
       if (wmWindowManager *wm = CTX_wm_manager(C)) {

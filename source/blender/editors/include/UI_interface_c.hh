@@ -1144,6 +1144,11 @@ void block_update_from_old(const bContext *C, Block *block);
 enum {
   BLOCK_THEME_STYLE_REGULAR = 0,
   BLOCK_THEME_STYLE_POPUP = 1,
+  /**
+   * A sub-menu of a Maya marking menu. It is opened from a row of the menu and reads as part of
+   * it, so it is backed in the button grey rather than the near-black of a regular menu.
+   */
+  BLOCK_THEME_STYLE_MAYA_MENU = 2,
 };
 void block_theme_style_set(Block *block, char theme_style);
 EmbossType block_emboss_get(Block *block);

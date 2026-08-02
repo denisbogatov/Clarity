@@ -233,10 +233,45 @@ bool button_is_marking_menu_item(const Button *but)
          (but->block->pie_data->flags & PIE_MARKING_STYLE) != 0;
 }
 
+/**
+ * The item a marking-menu stroke points at: the one whose direction is closest to it.
+ *
+ * Blender gives each item the 45 degrees either side of its own direction and nothing beyond, which
+ * is exact coverage only when the ring is full. A Maya marking menu is usually not full - the Move
+ * orientation wheel, for instance, has items at four of the eight directions - and every direction
+ * the gap is wider than 90 degrees leaves a wedge where the stroke lights nothing up, so a diagonal
+ * flick out of the menu quietly does nothing. Maya has no such wedge: outside the dead zone the
+ * whole plane belongs to some item, and the nearest one is it.
+ */
+static RadialDirection pie_marking_nearest_dir(const Block *block)
+{
+  RadialDirection nearest = UI_RADIAL_NONE;
+  float nearest_cos = -2.0f;
+  for (int i = int(UI_RADIAL_N); i <= int(UI_RADIAL_NW); i++) {
+    if ((block->pie_data->pie_dir_mask & (1 << i)) == 0) {
+      continue;
+    }
+    float dir_vec[2];
+    button_pie_dir(RadialDirection(i), dir_vec);
+    const float dir_cos = dot_v2v2(dir_vec, block->pie_data->pie_dir);
+    /* `>` rather than `>=` keeps the lower direction on an exact tie, matching the tie breaker the
+     * general path uses. */
+    if (dir_cos > nearest_cos) {
+      nearest_cos = dir_cos;
+      nearest = RadialDirection(i);
+    }
+  }
+  return nearest;
+}
+
 static bool but_isect_pie_seg(const Block *block, const Button *but)
 {
   if (block->pie_data->flags & PIE_INVALID_DIR) {
     return false;
+  }
+
+  if (block->pie_data->flags & PIE_MARKING_STYLE) {
+    return pie_marking_nearest_dir(block) == but->pie_dir;
   }
 
   /* Plus/minus 45 degrees: `cosf(DEG2RADF(45)) == M_SQRT1_2`. */
@@ -368,10 +403,20 @@ Button *button_find_mouse_over_ex(const ARegion *region,
 {
   Button *butover = nullptr;
 
-  if (!region_contains_point_px(region, xy)) {
-    return nullptr;
-  }
+  const bool inside_region = region_contains_point_px(region, xy);
+
   for (Block &block : region->runtime->uiblocks) {
+    /* A marking menu is aimed, not hit: the boxes are a legend for the directions and the stroke is
+     * expected to run well past them - in Maya it commonly ends on the far side of the model. The
+     * region is only as large as the little cluster of boxes, so refusing every point outside it is
+     * what makes the stroke stop selecting the moment it leaves them. Every other region keeps the
+     * bounds check, which is what stops a menu from answering for pixels that are not its own. */
+    const bool is_marking_pie = block.pie_data != nullptr &&
+                                (block.pie_data->flags & PIE_MARKING_STYLE) != 0;
+    if (!inside_region && !is_marking_pie) {
+      continue;
+    }
+
     float mx = xy[0], my = xy[1];
     window_to_block_fl(region, &block, &mx, &my);
     /* Skip when the mouse is hovering auto-scroll handlers. */

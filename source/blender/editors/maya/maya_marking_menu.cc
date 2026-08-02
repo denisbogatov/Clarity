@@ -549,37 +549,71 @@ static void maya_move_marking_menu_draw(const bContext *C, Menu *menu)
           UI_ITEM_NONE);
 }
 
+/**
+ * A submenu of the marking menu is one more panel of it, not a menu in its own right, so it is
+ * backed in the same grey as the rows that opened it.
+ */
+static void maya_submenu_style_set(Menu *menu)
+{
+  if (ui::Block *block = menu->layout->block()) {
+    ui::block_theme_style_set(block, ui::BLOCK_THEME_STYLE_MAYA_MENU);
+  }
+}
+
+/** The second panel of the selection constraints: what "by angle" means, in degrees. */
+static void maya_selection_constraint_angle_draw(const bContext *C, Menu *menu)
+{
+  maya_submenu_style_set(menu);
+
+  /* Only the tolerance. Switching the constraint on is what a click on the Angle row does, so a
+   * second switch here would be the same setting under two names. */
+  if (wmWindowManager *wm = CTX_wm_manager(C)) {
+    PointerRNA wm_ptr = RNA_id_pointer_create(&wm->id);
+    menu->layout->prop(
+        &wm_ptr, "maya_selection_constraint_angle", UI_ITEM_NONE, "Tolerance", ICON_NONE);
+  }
+}
+
 static void maya_selection_constraints_draw(const bContext *C, Menu *menu)
 {
+  maya_submenu_style_set(menu);
+
   const MayaMoveToolState state = move_tool_state_get(C);
-  wmWindowManager *wm = CTX_wm_manager(C);
-  PointerRNA wm_ptr = wm != nullptr ? RNA_id_pointer_create(&wm->id) : PointerRNA_NULL;
 
   for (const EnumPropertyItem *item = maya_selection_constraint_items; item->identifier != nullptr;
        item++)
   {
     const MayaSelectionConstraint constraint = MayaSelectionConstraint(item->value);
-    const bool is_angle = constraint == MayaSelectionConstraint::Angle;
-    /* The Angle constraint is the one with a number behind it, so its tolerance sits on the same
-     * row: in Maya it is the only thing the constraint settings are ever opened for. */
-    ui::Layout &row = is_angle ? menu->layout->row(false) : *menu->layout;
-    PointerRNA op_ptr = row.op("MAYA_OT_selection_constraint_set",
-                               item->name,
-                               check_icon(state.selection_constraint == constraint),
-                               wm::OpCallContext::ExecDefault,
-                               UI_ITEM_NONE);
-    RNA_enum_set(&op_ptr, "constraint", item->value);
-
-    if (is_angle && wm_ptr.data != nullptr) {
-      ui::Layout &field = row.row(false);
-      field.ui_units_x_set(4.0f);
-      field.prop(&wm_ptr, "maya_selection_constraint_angle", UI_ITEM_NONE, "", ICON_NONE);
+    const int icon = check_icon(state.selection_constraint == constraint);
+    PointerRNA op_ptr;
+    if (constraint == MayaSelectionConstraint::Angle) {
+      /* Angle is the only constraint that carries a number, and a menu is a stack of full-width
+       * rows: anything placed beside a row - a field, an arrow button - pushes everything after it
+       * into a second column. So the row stays an ordinary switch and holding it opens the
+       * tolerance, the way Maya's option boxes work. */
+      op_ptr = menu->layout->op_menu_hold(
+          WM_operatortype_find("MAYA_OT_selection_constraint_set", true),
+          item->name,
+          icon,
+          wm::OpCallContext::ExecDefault,
+          UI_ITEM_NONE,
+          "VIEW3D_MT_maya_selection_constraint_angle");
     }
+    else {
+      op_ptr = menu->layout->op("MAYA_OT_selection_constraint_set",
+                                item->name,
+                                icon,
+                                wm::OpCallContext::ExecDefault,
+                                UI_ITEM_NONE);
+    }
+    RNA_enum_set(&op_ptr, "constraint", item->value);
   }
 }
 
 static void maya_transform_constraints_draw(const bContext *C, Menu *menu)
 {
+  maya_submenu_style_set(menu);
+
   const MayaMoveToolState state = move_tool_state_get(C);
   for (const EnumPropertyItem *item = maya_transform_constraint_items; item->identifier != nullptr;
        item++)
@@ -619,6 +653,8 @@ void register_marking_menu_types()
   move_menutype_register(
       "VIEW3D_MT_maya_selection_constraints", maya_selection_constraints_draw, false);
   move_menutype_register(
+      "VIEW3D_MT_maya_selection_constraint_angle", maya_selection_constraint_angle_draw, false);
+  move_menutype_register(
       "VIEW3D_MT_maya_transform_constraints", maya_transform_constraints_draw, false);
 }
 
@@ -630,6 +666,13 @@ bool ED_maya_move_keep_spacing_get(const bContext *C)
 {
   const ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
   return runtime == nullptr ? true : runtime->move_tool_settings.keep_spacing;
+}
+
+ed::maya::MayaTransformConstraint ED_maya_transform_constraint_get(const bContext *C)
+{
+  const ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
+  return runtime == nullptr ? ed::maya::MayaTransformConstraint::Off :
+                              runtime->move_tool_settings.transform_constraint;
 }
 
 }  // namespace blender

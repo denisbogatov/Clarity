@@ -115,6 +115,73 @@ TEST(transform_snap_maya_plan, NothingSnapsWithoutAMayaMode)
   EXPECT_EQ(plan.increment, 0.0f);
 }
 
+/** The Move Tool marking menu holds components on the edges they were moved along. */
+TEST(transform_snap_maya_plan, EdgeConstraintKeepsComponentsOnEdges)
+{
+  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::None);
+  input.transform_constraint = maya::MayaTransformConstraint::Edge;
+  input.is_component_edit = true;
+
+  const MayaSnapPlan plan = transform_snap_maya_plan_get(input);
+
+  EXPECT_TRUE(plan.use_snap);
+  EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_EDGE);
+  /* The component lands on the edge itself, so the pivot has no say. */
+  EXPECT_FALSE(plan.source_is_center);
+  EXPECT_FALSE(plan.curve_targets_only);
+}
+
+TEST(transform_snap_maya_plan, SurfaceConstraintKeepsComponentsOnFaces)
+{
+  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::None);
+  input.transform_constraint = maya::MayaTransformConstraint::Surface;
+  input.is_component_edit = true;
+
+  const MayaSnapPlan plan = transform_snap_maya_plan_get(input);
+
+  EXPECT_TRUE(plan.use_snap);
+  EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_FACE);
+}
+
+/** Maya constrains components, never whole objects. */
+TEST(transform_snap_maya_plan, TransformConstraintsLeaveObjectModeAlone)
+{
+  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::None);
+  input.transform_constraint = maya::MayaTransformConstraint::Edge;
+  input.is_component_edit = false;
+
+  const MayaSnapPlan plan = transform_snap_maya_plan_get(input);
+
+  EXPECT_FALSE(plan.use_snap);
+  EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_NONE);
+}
+
+/** A held snap key is a deliberate one-off, so it outranks a constraint that is always on. */
+TEST(transform_snap_maya_plan, AHeldSnapKeyOutranksTheTransformConstraint)
+{
+  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::Point);
+  input.transform_constraint = maya::MayaTransformConstraint::Edge;
+  input.is_component_edit = true;
+
+  const MayaSnapPlan plan = transform_snap_maya_plan_get(input);
+
+  EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_VERTEX);
+}
+
+/** A constraint holds a component while it travels; it has nothing to say about a rotation. */
+TEST(transform_snap_maya_plan, TransformConstraintsOnlyReachTranslation)
+{
+  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::None);
+  input.is_translation = false;
+  input.is_rotation = true;
+  input.transform_constraint = maya::MayaTransformConstraint::Edge;
+  input.is_component_edit = true;
+
+  const MayaSnapPlan plan = transform_snap_maya_plan_get(input);
+
+  EXPECT_FALSE(plan.use_snap);
+}
+
 /** Maya moves the pivot onto the point under the pointer, and object pivots are points too. */
 TEST(transform_snap_maya_plan, PointSnapTargetsVerticesAndPivotsFromTheCenter)
 {

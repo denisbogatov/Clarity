@@ -142,10 +142,23 @@ TEST(maya_snap_tolerance, LimitedToleranceScalesWithTheInterfaceAndOffMeansTheWh
   EXPECT_FLOAT_EQ(snap_tolerance_radius_px(settings, 0, 1.0f), 1.0f);
 }
 
+TEST(maya_selection, CameraBasedSelectionDefaultsToAutomatic)
+{
+  const MayaSelectionSettings settings;
+  EXPECT_EQ(settings.camera_based_selection, MayaCameraBasedSelection::Auto);
+
+  EXPECT_TRUE(camera_based_selection_use_depth(MayaCameraBasedSelection::Auto, true, false));
+  EXPECT_FALSE(camera_based_selection_use_depth(MayaCameraBasedSelection::Auto, true, true));
+  EXPECT_FALSE(camera_based_selection_use_depth(MayaCameraBasedSelection::Auto, false, false));
+  EXPECT_FALSE(camera_based_selection_use_depth(MayaCameraBasedSelection::Off, true, false));
+  EXPECT_TRUE(camera_based_selection_use_depth(MayaCameraBasedSelection::On, false, false));
+  EXPECT_FALSE(camera_based_selection_use_depth(MayaCameraBasedSelection::On, true, true));
+}
+
 /**
- * Maya's topological double click: the modifiers pick the set operation and nothing else. Deriving
- * the operation from the gesture instead is what made `Ctrl+Shift` add a full loop where a path was
- * asked for, and `Shift` unable to remove anything.
+ * Base topological set operations derived from modifiers. The dispatcher reserves the
+ * `Ctrl+Shift+LMB` click chord for the additive marquee before topology selection reaches this
+ * table, but keeping the mapping total makes its lower-level rule explicit.
  */
 TEST(maya_topology_select, ModifiersPickTheSetOperation)
 {

@@ -11,6 +11,7 @@
 #include "DNA_screen_types.h"
 #include "DNA_space_enums.h"
 #include "DNA_userdef_types.h"
+#include "DNA_vec_types.h"
 
 #include "BLI_assert.h"
 #include "BLI_path_utils.hh"
@@ -22,6 +23,7 @@
 
 #include "WM_api.hh"
 #include "WM_types.hh"
+#include "wm_event_types.hh"
 
 #include "UI_interface_c.hh"
 
@@ -61,6 +63,87 @@ static bool maya_viewport_window_interaction_enabled(const bContext *C)
   const ARegion *region = CTX_wm_region(C);
   return ED_maya_interaction_enabled(C) && region != nullptr &&
          region->regiontype == RGN_TYPE_WINDOW;
+}
+
+static bool maya_selection_modifier_cursor_poll(bContext *C)
+{
+  if (!maya_viewport_window_interaction_enabled(C)) {
+    return false;
+  }
+
+  const wmWindow *win = CTX_wm_window(C);
+  const wmEvent *event_state = win != nullptr ? win->runtime->eventstate : nullptr;
+  if (event_state == nullptr || (event_state->modifier & KM_CTRL) == 0 ||
+      (event_state->modifier & KM_ALT) != 0)
+  {
+    return false;
+  }
+
+  const ed::maya::MayaWindowRuntime *runtime = ed::maya::runtime_get(C);
+  return runtime != nullptr && !runtime->active_session && !runtime->transform_active &&
+         runtime->pivot_edit.target == ed::maya::MayaPivotEditTarget::None;
+}
+
+static void maya_selection_modifier_cursor_draw(bContext *C,
+                                                const int2 &xy,
+                                                const float2 & /*tilt*/,
+                                                void *customdata)
+{
+  const wmWindow *win = static_cast<wmWindow *>(customdata);
+  if (CTX_wm_window(C) != win || win->runtime->eventstate == nullptr) {
+    return;
+  }
+
+  const bool is_add = (win->runtime->eventstate->modifier & KM_SHIFT) != 0;
+  const float scale = U.scale_factor;
+  const float x_min = float(xy.x) + 13.0f * scale;
+  const float x_max = float(xy.x) + 22.0f * scale;
+  const float x_center = (x_min + x_max) * 0.5f;
+  const float y = float(xy.y) - 12.0f * scale;
+  const rctf horizontal_outline = {
+      x_min - scale, x_max + scale, y - 3.0f * scale, y + 3.0f * scale};
+  const rctf horizontal = {x_min, x_max, y - scale, y + scale};
+  const rctf vertical_outline = {x_center - 3.0f * scale,
+                                 x_center + 3.0f * scale,
+                                 y - 5.5f * scale,
+                                 y + 5.5f * scale};
+  const rctf vertical = {x_center - scale,
+                         x_center + scale,
+                         y - 4.5f * scale,
+                         y + 4.5f * scale};
+  const float outline_color[4] = {0.02f, 0.02f, 0.02f, 0.9f};
+  const float operation_color[4] = {
+      is_add ? 0.2f : 1.0f, is_add ? 0.9f : 0.18f, is_add ? 0.3f : 0.12f, 1.0f};
+  ui::draw_roundbox_4fv(&horizontal_outline, true, 0.0f, outline_color);
+  if (is_add) {
+    ui::draw_roundbox_4fv(&vertical_outline, true, 0.0f, outline_color);
+  }
+  ui::draw_roundbox_4fv(&horizontal, true, 0.0f, operation_color);
+  if (is_add) {
+    ui::draw_roundbox_4fv(&vertical, true, 0.0f, operation_color);
+  }
+}
+
+static void maya_selection_cursor_ensure(bContext *C,
+                                         ed::maya::MayaWindowRuntime &runtime,
+                                         const wmEvent &event)
+{
+  bool cursor_created = false;
+  if (runtime.selection_cursor == nullptr) {
+    wmWindow *win = CTX_wm_window(C);
+    if (win == nullptr) {
+      return;
+    }
+    runtime.selection_cursor = WM_paint_cursor_activate(SPACE_VIEW3D,
+                                                        RGN_TYPE_WINDOW,
+                                                        maya_selection_modifier_cursor_poll,
+                                                        maya_selection_modifier_cursor_draw,
+                                                        win);
+    cursor_created = true;
+  }
+  if (cursor_created || ISKEYMODIFIER(event.type)) {
+    WM_paint_cursor_tag_redraw(CTX_wm_window(C), CTX_wm_region(C));
+  }
 }
 
 static ed::maya::MayaDispatchResult maya_dispatch_to_active_session(
@@ -147,6 +230,14 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     ed::maya::MayaWindowRuntime &runtime,
     const ed::maya::MayaInputAction &action)
 {
+  /* A marquee that has ended leaves its result to be constrained. The gesture keeps the left button
+   * to itself while it runs, so the first action that arrives here again means it is over. */
+  if (action.source_event != nullptr &&
+      !(action.source_event->type == LEFTMOUSE && action.source_event->val == KM_PRESS))
+  {
+    ed::maya::selection_constraint_apply_pending(C, runtime);
+  }
+
   if (ed::maya::left_mouse_marquee_drag_handle(C, runtime, action)) {
     return ed::maya::MayaDispatchResult::Handled;
   }
@@ -259,7 +350,11 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
   }
   if (action.id == ed::maya::MayaActionID::BridgeOrFill) {
     const wmOperatorStatus status = WM_operator_name_call(
-        C, "VIEW3D_OT_maya_bridge_or_fill", wm::OpCallContext::ExecDefault, nullptr, nullptr);
+        C,
+        "MESH_OT_bridge_edge_loops",
+        wm::OpCallContext::InvokeDefault,
+        nullptr,
+        action.source_event);
     return (status & OPERATOR_CANCELLED) ? ed::maya::MayaDispatchResult::PassThrough :
                                           ed::maya::MayaDispatchResult::Handled;
   }
@@ -386,6 +481,9 @@ ed::maya::MayaDispatchResult ED_maya_event_dispatch(bContext *C, const wmEvent *
     }
     return ed::maya::MayaDispatchResult::PassThrough;
   }
+  if (runtime != nullptr) {
+    maya_selection_cursor_ensure(C, *runtime, *event);
+  }
   if (runtime != nullptr && event->type == WINDEACTIVATE) {
     if (runtime->active_session) {
       runtime->active_session->cancel(C);
@@ -419,6 +517,7 @@ ed::maya::MayaDispatchResult ED_maya_event_dispatch(bContext *C, const wmEvent *
   if (runtime == nullptr) {
     return ed::maya::MayaDispatchResult::PassThrough;
   }
+  maya_selection_cursor_ensure(C, *runtime, *event);
 
   /* Validate before translating: events that carry no Maya action (undo, mode switch, deleting the
    * active object from another editor) must still be able to end a temporary Edit Pivot instead of

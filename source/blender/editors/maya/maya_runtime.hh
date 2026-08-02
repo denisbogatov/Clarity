@@ -31,6 +31,7 @@ struct Object;
 struct ScrArea;
 struct Scene;
 struct WorkSpace;
+struct wmPaintCursor;
 
 namespace ed::transform {
 struct SnapObjectContext;
@@ -266,7 +267,7 @@ struct MayaSelectionSettings {
   bool keep_faces_together = true;
   float click_box_size = 4.0f;
   float manipulation_box_size = 10.0f;
-  MayaCameraBasedSelection camera_based_selection = MayaCameraBasedSelection::Off;
+  MayaCameraBasedSelection camera_based_selection = MayaCameraBasedSelection::Auto;
   bool highlight_backfaces = true;
   /** Maya `polySelectConstraint`: global, and shown by more than one marking menu. */
   MayaSelectionConstraint selection_constraint = MayaSelectionConstraint::Off;
@@ -293,6 +294,30 @@ struct MayaWindowRuntime {
   std::shared_ptr<MayaSelectionMemory> selection_memory;
   std::shared_ptr<MayaShiftTransformState> shift_transform;
   std::unique_ptr<MayaTransformDebugState> transform_debug;
+  /** Cursor overlay that previews subtract/add while `Ctrl`/`Ctrl+Shift` is held in this window. */
+  wmPaintCursor *selection_cursor = nullptr;
+  /**
+   * A marquee is a modal gesture, so what it selected only exists once it ends. The selection
+   * constraint cannot run at the moment the marquee starts; it is applied on the first event after
+   * the gesture is over.
+   */
+  bool selection_constraint_pending = false;
+  /**
+   * The component that was active before the last component pick.
+   *
+   * A double click arrives after the single click that precedes it, and that click has already
+   * moved the active component onto whatever is under the pointer. Every Maya topology gesture
+   * reads the pair - the component that was selected and the one just double clicked - to decide
+   * which way a loop runs or which two ends a path joins, so the first of the two has to be
+   * remembered before the click overwrites it. Without it every gesture would ask for the way from
+   * the clicked component to itself, which is one component long.
+   *
+   * Kept as a type and an index rather than a pointer because an index survives anything that
+   * reallocates the mesh; both are validated against the object they were taken from before use.
+   */
+  const Object *topology_anchor_object = nullptr;
+  int topology_anchor_index = -1;
+  char topology_anchor_htype = 0;
   bool transform_active = false;
   uint64_t instance_id = 0;
   uint64_t interaction_revision_seen = 0;

@@ -20,25 +20,39 @@ struct wmOperatorType;
 namespace ed::maya {
 
 enum class MayaDispatchResult : uint8_t;
+enum class MayaCameraBasedSelection : uint8_t;
 struct MayaInputAction;
 struct MayaWindowRuntime;
 
 /**
- * Which set operation a topological double click asks for. The gesture decides whether a loop or a
- * path is affected; the modifiers decide only this.
+ * Which base set operation a topological double click asks for. The component mode and gesture
+ * decide whether a shell, loop or path is affected; an adjacent Shift-face gesture remains
+ * additive because its preceding click has already selected the shared edge.
  */
 enum class MayaTopologySelectOp : uint8_t {
-  /** Plain double click: the loop becomes the selection. */
+  /** Plain double click: the topology target becomes the selection. */
   Replace,
   /** `Shift`: flip the state of the components, so the same gesture adds and removes. */
   Toggle,
   /** `Ctrl`: take the loop or path out of the selection, whatever its state was. */
   Subtract,
-  /** `Ctrl+Shift`: put it in, without touching anything already selected. */
+  /** `Ctrl+Shift`: the base additive operation; the click chord itself belongs to the marquee. */
   Add,
 };
 
 MayaTopologySelectOp topology_select_op_from_action(const MayaInputAction &action);
+
+/** Whether marquee selection must reject components occluded from the current view. */
+bool camera_based_selection_use_depth(MayaCameraBasedSelection mode,
+                                      bool is_shaded,
+                                      bool is_xray);
+
+/**
+ * Whether the action is the additive marquee's own chord and must be swallowed rather than reach
+ * the pickers. Only the click belongs to the marquee; the double click of the same chord is the
+ * topology gesture.
+ */
+bool selection_action_is_reserved_for_marquee(const MayaInputAction &action);
 
 void register_tool_operators();
 MayaDispatchResult selection_handle_action(bContext *C,
@@ -56,6 +70,11 @@ bool left_mouse_marquee_drag_handle(bContext *C,
 bool middle_mouse_axis_drag_handle(bContext *C,
                                    MayaWindowRuntime &runtime,
                                    const MayaInputAction &action);
+/**
+ * Run the standing selection constraint over what a finished marquee selected. Does nothing unless
+ * a marquee left something to constrain, so it is cheap to call for every action.
+ */
+bool selection_constraint_apply_pending(bContext *C, MayaWindowRuntime &runtime);
 bool shift_transform_prepare(bContext *C, wmOperator *op, const wmEvent *event);
 void shift_transform_end(bContext *C, MayaWindowRuntime &runtime, bool cancelled);
 

@@ -65,6 +65,10 @@ bpy.data.objects.remove(duplicate, do_unlink=True)
 
 bpy.context.view_layer.objects.active = subject
 subject.select_set(True)
+# Two pushes, not one: in background mode the memfile undo stack is empty until something
+# initializes it, so the first push only becomes the initial state and leaves nothing to step back
+# to. The same note is in `bl_global_undo.py`, which is where this pattern comes from.
+bpy.ops.ed.undo_push(message="Custom pivot lifecycle initial state")
 bpy.ops.ed.undo_push(message="Custom pivot lifecycle before delete")
 bpy.ops.object.delete()
 bpy.ops.ed.undo()

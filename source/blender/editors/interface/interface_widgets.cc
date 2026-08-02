@@ -34,6 +34,7 @@
 
 #include "BLF_api.hh"
 
+#include "ED_maya.hh"
 #include "ED_node.hh"
 
 #include "UI_interface_icons.hh"
@@ -3299,6 +3300,29 @@ static void widget_state_pulldown(WidgetType *wt,
 }
 
 /* special case, pie menu items */
+/**
+ * The item a marking-menu stroke points at, painted the way Maya paints it.
+ *
+ * The ordinary highlight is #widget_active_color brightening `wcol.inner`, which on the grey button
+ * plate reads as white and is easy to miss on a menu that is only up for a moment. Maya fills the
+ * item with its interface blue instead, so the choice is unmistakable. The fill has to be written
+ * after the general state function, which is what applies that brightening.
+ */
+static void widget_state_marking_menu_item(WidgetType *wt,
+                                           const WidgetStateInfo *state,
+                                           const EmbossType emboss)
+{
+  widget_state(wt, state, emboss);
+
+  if (state->but_flag & (UI_HOVER | UI_SELECT)) {
+    const uchar selected_inner[4] = {84, 136, 164, 255};
+    const uchar selected_text[4] = {255, 255, 255, 255};
+    copy_v4_v4_uchar(wt->wcol.inner, selected_inner);
+    copy_v4_v4_uchar(wt->wcol.outline, selected_inner);
+    copy_v4_v4_uchar(wt->wcol.text, selected_text);
+  }
+}
+
 static void widget_state_pie_menu_item(WidgetType *wt,
                                        const WidgetStateInfo *state,
                                        EmbossType /*emboss*/)
@@ -5615,6 +5639,11 @@ void draw_button(const bContext *C, ARegion *region, uiStyle *style, Button *but
        * not the near-black plates a Blender pie menu uses. Taking the colors from the regular
        * button set is also what keeps the two halves of the menu looking like one menu. */
       wt->wcol_theme = &tui->wcol_tool;
+      /* The pie state function highlights by filling the item with `wcol.item`, which in the pie
+       * theme is a grey meant for exactly that. In the button theme the same field is the color of
+       * the check mark - pure white - so it has to give way to a highlight that suits a button;
+       * Maya's is its interface blue. */
+      wt->state = widget_state_marking_menu_item;
     }
   }
   else {
@@ -5741,7 +5770,15 @@ void draw_button(const bContext *C, ARegion *region, uiStyle *style, Button *but
         break;
 
       case ButtonType::Pulldown:
-        wt = widget_type(WidgetStyle::Pulldown);
+        if (but_is_marking_menu_list_item(but)) {
+          /* A sub-menu row of a marking menu is a row of the list like any other, so it gets the
+           * button look rather than the header-style pull-down, which draws nothing until the
+           * pointer is over it. */
+          wt = widget_type(WidgetStyle::Exec);
+        }
+        else {
+          wt = widget_type(WidgetStyle::Pulldown);
+        }
         break;
 
       case ButtonType::ButMenu:
@@ -6013,6 +6050,20 @@ void draw_menu_back(uiStyle * /*style*/, Block *block, const rcti *rect)
   WidgetType *wt = widget_type(WidgetStyle::MenuBack);
 
   wt->state(wt, &STATE_INFO_NULL, EmbossType::Undefined);
+  if (block && ED_maya_gizmo_trace_enabled()) {
+    fprintf(stderr,
+            "MENUBACK theme_style=%d flag=%d\n",
+            int(block->theme_style),
+            int(block->flag));
+    fflush(stderr);
+  }
+  if (block && block->theme_style == BLOCK_THEME_STYLE_MAYA_MENU) {
+    /* Backed in the same grey as the rows that opened it, so the sub-menu reads as a second panel
+     * of one menu instead of a black window dropped on top of it. */
+    const bTheme *btheme = theme::theme_get();
+    copy_v4_v4_uchar(wt->wcol.inner, btheme->tui.wcol_tool.inner);
+    copy_v3_v3_uchar(wt->wcol.outline, btheme->tui.wcol_tool.outline);
+  }
   if (block) {
     const float zoom = 1.0f / block->aspect;
     wt->draw_block(&wt->wcol,

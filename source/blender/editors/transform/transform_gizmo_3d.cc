@@ -2560,8 +2560,10 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
   }
 
   if (axis != -1) {
-    /* Swap single axis for two-axis constraint. */
-    const bool flip = (event->modifier & KM_SHIFT) != 0;
+    /* Swap single axis for two-axis constraint. In the Maya model `Shift` on a handle means Shift
+     * Extrude or Shift Duplicate: the drag has to keep the axis the user grabbed, or the new
+     * geometry leaves along the two axes they did not point at. */
+    const bool flip = (event->modifier & KM_SHIFT) != 0 && !ED_maya_interaction_enabled(C);
     BLI_assert(axis_idx != -1);
     const short axis_type = gizmo_get_axis_type(axis_idx);
     if (axis_type != MAN_AXES_ROTATE) {

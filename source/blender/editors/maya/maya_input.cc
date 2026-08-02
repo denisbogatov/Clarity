@@ -263,13 +263,15 @@ std::optional<ed::maya::MayaInputAction> ED_maya_input_translate(
    * recognized from the motion that crosses the drag threshold. See #left_mouse_marquee_drag_handle. */
   else if (event.type == LEFTMOUSE && event.val == KM_CLICK && !action.alt) {
     if (action.ctrl && action.shift) {
-      action.id = ed::maya::MayaActionID::SelectAdd;
+      /* This chord belongs exclusively to the additive marquee. A click without a drag is consumed
+       * so it cannot fall back to picking one component. */
+      action.id = ed::maya::MayaActionID::SelectAddMarquee;
     }
     else if (action.ctrl) {
       action.id = ed::maya::MayaActionID::SelectRemove;
     }
     else if (action.shift) {
-      action.id = ed::maya::MayaActionID::SelectToggle;
+      action.id = ed::maya::MayaActionID::SelectAdd;
     }
     else {
       action.id = ed::maya::MayaActionID::SelectPrimary;

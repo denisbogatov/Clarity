@@ -10,6 +10,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <optional>
 
 #include "DNA_camera_types.h"
 #include "DNA_color_types.h"
@@ -96,18 +97,21 @@ static Map<const wmWindow *, int> &wm_draw_cached_composite_windows()
   return windows;
 }
 
-static bool wm_draw_cached_composite_active(const wmWindow *win)
+/**
+ * Whether this window may composite the coming frame from the region buffers it already has,
+ * and clear the request in the same breath.
+ *
+ * The request is deliberately good for one frame only. Whoever wants the cheap path asks for it
+ * again per event, which a drag does anyway. Held across frames instead, a request that is never
+ * withdrawn - a drag whose mouse-release never arrived, for instance - leaves the whole window
+ * with nothing but its stale buffers: no editor ever redraws again and the program looks hung
+ * while it is in fact still handling events. A per-frame request cannot outlive its owner.
+ */
+static bool wm_draw_cached_composite_take(const wmWindow *win)
 {
   Map<const wmWindow *, int> &windows = wm_draw_cached_composite_windows();
-  const int *winid = windows.lookup_ptr(win);
-  if (winid == nullptr) {
-    return false;
-  }
-  if (*winid != win->winid) {
-    windows.remove(win);
-    return false;
-  }
-  return true;
+  const std::optional<int> winid = windows.pop_try(win);
+  return winid.has_value() && *winid == win->winid;
 }
 
 /**
@@ -1527,11 +1531,10 @@ static void wm_draw_window_onscreen(bContext *C,
   GPU_debug_group_end();
 }
 
-static void wm_draw_window(bContext *C, wmWindow *win)
+static void wm_draw_window(bContext *C, wmWindow *win, const bool cached_composite_only)
 {
   PRF_scope(ProfileCategory::Draw);
   const bool maya_debug = ED_maya_navigation_debug_active(C);
-  const bool cached_composite_only = wm_draw_cached_composite_active(win);
   GPU_context_begin_frame(static_cast<GPUContext *>(win->runtime->gpuctx));
 
   bScreen *screen = WM_window_get_active_screen(win);
@@ -1850,9 +1853,12 @@ bool WM_desktop_cursor_sample_read(float r_col[3])
  * \{ */
 
 /* Quick test to prevent changing window drawable. */
-static bool wm_draw_update_test_window(Main *bmain, bContext *C, wmWindow *win)
+static bool wm_draw_update_test_window(Main *bmain,
+                                       bContext *C,
+                                       wmWindow *win,
+                                       const bool cached_composite_only)
 {
-  if (wm_draw_cached_composite_active(win)) {
+  if (cached_composite_only) {
     return WM_window_get_active_screen(win)->do_draw;
   }
 
@@ -2045,31 +2051,16 @@ void wm_draw_update(bContext *C)
 
     CTX_wm_window_set(C, &win);
 
-    if (wm_draw_update_test_window(bmain, C, &win)) {
-      const bool cached_composite_only = wm_draw_cached_composite_active(&win);
+    /* Taken before the test, so a request that does not lead to a frame is spent rather than left
+     * standing: the next frame is then an ordinary one. */
+    const bool cached_composite_only = wm_draw_cached_composite_take(&win);
+
+    if (wm_draw_update_test_window(bmain, C, &win, cached_composite_only)) {
       const bool maya_debug = ED_maya_navigation_debug_active(C);
       const double frame_start = maya_debug ? BLI_time_now_seconds() : 0.0;
       if (maya_debug) {
         ED_maya_navigation_debug_stage_sample(
             C, ed::maya::MayaNavigationDebugStage::FrameBegin, 0.0);
-      }
-      if (!frame_rate_limit_applied) {
-        const double frame_limit_start = maya_debug ? BLI_time_now_seconds() : 0.0;
-        int frame_rate_limit = U.viewport_fps_limit;
-        const int maya_frame_rate_limit = ED_maya_interaction_frame_rate_limit(C);
-        if (maya_frame_rate_limit > 0 &&
-            (frame_rate_limit == 0 || maya_frame_rate_limit < frame_rate_limit))
-        {
-          frame_rate_limit = maya_frame_rate_limit;
-        }
-        wm_draw_frame_rate_limit_apply(frame_rate_limit);
-        if (maya_debug) {
-          ED_maya_navigation_debug_stage_sample(
-              C,
-              ed::maya::MayaNavigationDebugStage::FrameRateLimit,
-              (BLI_time_now_seconds() - frame_limit_start) * 1000.0);
-        }
-        frame_rate_limit_applied = true;
       }
       PRF_frame_mark_start("Window Drawing"_ustr);
       /* Sets context window+screen. */
@@ -2104,7 +2095,7 @@ void wm_draw_update(bContext *C)
       }
 
       const double window_draw_start = maya_debug ? BLI_time_now_seconds() : 0.0;
-      wm_draw_window(C, &win);
+      wm_draw_window(C, &win, cached_composite_only);
       if (maya_debug) {
         ED_maya_navigation_debug_stage_sample(
             C,
@@ -2136,6 +2127,38 @@ void wm_draw_update(bContext *C)
             (BLI_time_now_seconds() - frame_start) * 1000.0);
       }
       PRF_frame_mark_end("Window Drawing"_ustr);
+
+      /* Pace the frame rate here, after the frame has been handed to the compositor, rather than
+       * before drawing it.
+       *
+       * The main loop reads the mouse, runs the handlers and only then draws, so a wait placed
+       * ahead of the drawing sits between reading the pointer and showing where it went: the frame
+       * that finally appears is one whole wait out of date, and because the wait is whatever is
+       * left of the budget it is a different amount out of date every frame. A steady hand then
+       * produces uneven steps - the picture holds still for a frame and jumps on the next - which
+       * is read as stutter even though every frame was delivered on time.
+       *
+       * Waiting after the frame instead leaves the pointer to be read immediately when the wait
+       * ends, a few milliseconds before the frame that shows it. The cap itself is unchanged: the
+       * spacing between two waits is still one frame period. */
+      if (!frame_rate_limit_applied) {
+        const double frame_limit_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+        int frame_rate_limit = U.viewport_fps_limit;
+        const int maya_frame_rate_limit = ED_maya_interaction_frame_rate_limit(C);
+        if (maya_frame_rate_limit > 0 &&
+            (frame_rate_limit == 0 || maya_frame_rate_limit < frame_rate_limit))
+        {
+          frame_rate_limit = maya_frame_rate_limit;
+        }
+        wm_draw_frame_rate_limit_apply(frame_rate_limit);
+        if (maya_debug) {
+          ED_maya_navigation_debug_stage_sample(
+              C,
+              ed::maya::MayaNavigationDebugStage::FrameRateLimit,
+              (BLI_time_now_seconds() - frame_limit_start) * 1000.0);
+        }
+        frame_rate_limit_applied = true;
+      }
     }
   }
 

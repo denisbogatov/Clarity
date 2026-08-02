@@ -156,7 +156,7 @@ and perspective view, two Blender windows, two 3D View areas.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Object | Select | none | LMB on object | replaces selection | unchanged | Select | unchanged | n/a | previous selection restored |
 | Object | Select | none | LMB on empty space | clears selection | unchanged | Select | unchanged | n/a | previous selection restored |
-| Object | Select | `Shift` | LMB on object | TODO — add or toggle, must match Maya | unchanged | Select | unchanged | n/a | TODO |
+| Object | Select | `Shift` | LMB on object | adds that object without changing the existing selection | unchanged | Select | unchanged | n/a | previous selection restored |
 | Object | Select | `Ctrl` | LMB on object | TODO — remove or toggle | unchanged | Select | unchanged | n/a | TODO |
 | Object | Select | none | LMB drag marquee | replaces selection | unchanged | Select | unchanged | marquee cancelled, selection unchanged | previous selection restored |
 | Object | Move / Rotate / Scale | none | LMB drag from empty space | draws the marquee — the tool key-map must not inherit the drag and start a transform | unchanged | unchanged | unchanged | marquee cancelled | previous selection restored |
@@ -166,21 +166,34 @@ and perspective view, two Blender windows, two 3D View areas.
 | Object | Select | none | LMB on already selected object | selection unchanged | unchanged | Select | unchanged | n/a | no undo step |
 | Object | Select | none | LMB through geometry (occluded object) | TODO — front-most only or through | unchanged | Select | unchanged | n/a | TODO |
 | Edit Mesh | Select | none | LMB on component | replaces component selection | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh | Select | `Shift` | LMB on component | adds that one component without changing the existing selection | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh, face mode | Select | none / `Shift` / `Ctrl` / `Ctrl` `Shift` | LMB drag marquee overlapping a face | replaces / toggles / removes / adds every face whose projected area overlaps the marquee; all four operations use the same hit rule | unchanged | Select | unchanged | selection unchanged | previous selection restored |
+| Edit Mesh, shaded, X-Ray off | Select | any selection modifiers | LMB drag marquee across visible and occluded components | applies the marquee operation only to components with a clear line of sight from the view | unchanged | Select | unchanged | selection unchanged | previous selection restored |
+| Edit Mesh, Wireframe or X-Ray on | Select | any selection modifiers | LMB drag marquee across visible and occluded components | applies the marquee operation to every component hit in projection, including components behind the visible surface | unchanged | Select | unchanged | selection unchanged | previous selection restored |
+| Edit Mesh | Select | `Ctrl` `Shift` | LMB click without dragging | unchanged — the chord is reserved for the additive marquee | unchanged | Select | unchanged | n/a | no undo step |
+| Edit Mesh | Select | `Ctrl` `Shift` | LMB drag marquee | adds every component hit by the marquee; it never falls back to a single-component pick | unchanged | Select | unchanged | selection unchanged | previous selection restored |
+| Edit Mesh, face mode | Select | `Ctrl` `Shift` | LMB drag marquee wholly inside an unselected face | adds every face whose projected area overlaps the marquee; the center and vertices need not be inside | unchanged | Select | unchanged | selection unchanged | previous selection restored |
+| Edit Mesh, face mode | Select | `Ctrl` | LMB drag marquee wholly inside a selected face | removes every selected face whose projected area overlaps the marquee; the center and vertices need not be inside | unchanged | Select | unchanged | selection unchanged | previous selection restored |
 | Object, Edit Pivot | Edit Pivot | none | LMB in the viewport | **unchanged** — the pivot click operator consumes the event | pivot moves to the clicked point | Edit Pivot | unchanged | pivot restored | pivot restored |
 
 The last row is the double-event guard: a pivot click must never also change the
 selection.
+
+While the pointer is over the 3D View, pure `Ctrl` shows a red minus cursor preview and
+`Ctrl` + `Shift` shows a green plus cursor preview. The preview is hidden during navigation,
+transforms and Edit Pivot.
 
 ## Topological selection
 
 | Start mode | Tool before | Keys | Mouse | Selection | Pivot | Tool after | Snapping | Cancel | Undo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Edit Mesh, edge mode | Select | none | LMB double click on an edge | replaces selection with the edge loop; the loop stops at poles, triangles, n-gons and open boundaries | unchanged | Select | unchanged | n/a | previous selection restored |
-| Edit Mesh, face mode | Select | none | LMB double click on a face | replaces selection with the face loop | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh, face mode | Select | none | LMB double click on a face | replaces selection with every face in the connected shell; seams and other edge marks do not split the shell | unchanged | Select | unchanged | n/a | previous selection restored |
 | Edit Mesh, vertex mode | Select | none | LMB double click on a vertex | replaces selection with the vertex loop | unchanged | Select | unchanged | n/a | previous selection restored |
-| Edit Mesh, edge mode, one edge selected | Select | `Shift` | LMB double click on a second edge along the topology | **adds** the partial edge loop between the two | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh, edge mode, one edge selected | Select | `Shift` or `Ctrl Shift` | LMB double click on a second edge | **adds** the complete edge loop of the second edge, whatever is already selected | unchanged | Select | unchanged | n/a | previous selection restored |
 | Edit Mesh, edge mode, one edge selected | Select | `Shift` | LMB double click on the opposite edge of a quad | **adds** the edge ring | unchanged | Select | unchanged | n/a | previous selection restored |
-| Edit Mesh, face mode, one face selected | Select | `Shift` | LMB double click on a second face | **adds** the face loop or path between the two | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh, face mode, one face selected | Select | `Shift` | LMB double click on a neighboring face | **adds** the complete face loop through their shared edge | unchanged | Select | unchanged | n/a | previous selection restored |
+| Edit Mesh, face mode, one face selected | Select | `Shift` | LMB double click on a non-neighboring face | **adds** the shortest face path between the two | unchanged | Select | unchanged | n/a | previous selection restored |
 | Edit Mesh, vertex mode, one vertex selected | Select | `Shift` | LMB double click on a second vertex | **adds** the vertex loop or path between the two | unchanged | Select | unchanged | n/a | previous selection restored |
 | Edit Mesh, any component mode | Select | `Shift` `.` | none | grows the selection by one topological level; repeats | unchanged | Select | unchanged | n/a | one level restored per undo step |
 | Edit Mesh, any component mode | Select | `Shift` `,` | none | shrinks the selection by one outer layer; repeats | unchanged | Select | unchanged | n/a | one level restored per undo step |

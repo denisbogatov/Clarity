@@ -61,6 +61,8 @@ enum class MayaActionID : uint16_t {
   SelectAdd,
   SelectRemove,
   SelectToggle,
+  /** `Ctrl+Shift+LMB` without a drag: consumed because this chord belongs to the add marquee. */
+  SelectAddMarquee,
   /** Double click. The modifiers decide the set operation, the mesh decides loop versus path. */
   SelectTopology,
   SelectGrow,

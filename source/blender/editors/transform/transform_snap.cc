@@ -626,6 +626,26 @@ MayaSnapPlan transform_snap_maya_plan_get(const MayaSnapPlanInput &input)
 {
   MayaSnapPlan plan;
   if (input.mode == ed::maya::MayaSnapMode::None) {
+    /* A transform constraint is what holds a component on the geometry while nothing is snapping
+     * it anywhere. A held snap key is a deliberate one-off and outranks it, which is why this only
+     * answers when there is no snap mode. */
+    if (input.is_translation && input.is_component_edit) {
+      switch (input.transform_constraint) {
+        case ed::maya::MayaTransformConstraint::Edge:
+          plan.use_snap = true;
+          plan.snap_to = SCE_SNAP_TO_EDGE;
+          break;
+        case ed::maya::MayaTransformConstraint::Surface:
+          plan.use_snap = true;
+          plan.snap_to = SCE_SNAP_TO_FACE;
+          break;
+        case ed::maya::MayaTransformConstraint::Off:
+          break;
+      }
+      /* The component itself is what has to end up on the edge or the surface, so the pivot is left
+       * out of the decision even when Keep Spacing is on: it governs where a snap *target* is
+       * aimed at, and a constraint has no target of its own. */
+    }
     return plan;
   }
   if (!input.is_translation && input.mode != ed::maya::MayaSnapMode::Step) {

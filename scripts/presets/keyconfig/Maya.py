@@ -33,15 +33,87 @@ def _is_edit_pivot_conflict(item):
 
 
 def _is_topology_selection_conflict(item):
-    # Double click selects the edge loop and `Shift` double click the path between the previous
-    # component and this one, in every component mode. The Maya interaction model dispatches those
-    # gestures itself, before any keymap runs, so the base bindings can only act where the dispatcher
-    # passes through: `Alt` double click used to still select an edge ring there, while `Alt` belongs
-    # to viewport navigation.
+    # Double click performs the component-mode-specific topology selection. `Shift` double click
+    # adds a face loop when two faces are neighbors, or a path between non-neighboring components.
+    # The Maya interaction model dispatches those gestures itself, before any keymap runs, so the
+    # base bindings can only act where the dispatcher passes through: `Alt` double click used to
+    # still select an edge ring there, while `Alt` belongs to viewport navigation.
     return (
         item[0] in {"mesh.loop_select", "mesh.edgering_select"}
         and item[1].get("value") == 'DOUBLE_CLICK'
     )
+
+
+def _is_shortest_path_conflict(item):
+    # `mesh.shortest_path_pick` sits on `Ctrl Shift` LMB *press*. A press always resolves before the
+    # double click built on top of it, so that binding fires first and the topology gesture the
+    # dispatcher would have run - the edge loop, the face loop - never happens: the redo panel shows
+    # "Pick Shortest Path" and one component gets selected. The dispatcher offers the path itself,
+    # for the component pairs Maya walks a path between, so the base binding only stands in the way.
+    return (
+        item[0].endswith(".shortest_path_pick")
+        and item[1].get("value") == 'PRESS'
+        and item[1].get("ctrl", False)
+        and item[1].get("shift", False)
+    )
+
+
+_SELECT_ALL_OPERATORS = {
+    "object.select_all",
+    "mesh.select_all",
+    "curve.select_all",
+    "armature.select_all",
+    "mball.select_all",
+    "lattice.select_all",
+    "pose.select_all",
+    "particle.select_all",
+}
+
+
+def _keymap_item_action(item):
+    return dict((item[2] or {}).get("properties", ())).get("action")
+
+
+def apply_maya_selection_shortcuts(keyconfig_data):
+    """Move the three selection-wide commands onto the keys Maya uses for them.
+
+    Industry Compatible puts them on `Ctrl A`, `Ctrl Shift A` and `Ctrl I`; Maya uses
+    `Ctrl Shift A`, `Alt D` and `Ctrl Shift I`. Only the editors that select 3D components or
+    objects are touched, so the Outliner, the UV editor and the text editor keep their own.
+    """
+    for _keymap_name, _keymap_args, keymap_content in keyconfig_data:
+        for item in keymap_content["items"]:
+            if item[0] not in _SELECT_ALL_OPERATORS:
+                continue
+            properties = item[1]
+            if properties.get("value") != 'PRESS':
+                continue
+            action = _keymap_item_action(item)
+            if action == 'SELECT' and properties.get("type") == 'A':
+                properties["shift"] = True
+            elif action == 'DESELECT' and properties.get("type") == 'A':
+                # Maya deselects everything with `Alt D`, and leaves `A` to selecting.
+                properties.clear()
+                properties.update({"type": 'D', "value": 'PRESS', "alt": True})
+            elif action == 'INVERT' and properties.get("type") == 'I':
+                properties["shift"] = True
+
+
+def allow_modifiers_on_gizmo_tweak(keyconfig_data):
+    """Let a held modifier reach the manipulator.
+
+    The Industry Compatible binding takes no modifiers at all, and a gizmo whose keymap does not
+    accept the held one is dropped from the hit test entirely (see
+    `wm_gizmo_keymap_uses_event_modifier`): the manipulator stays on screen but stops answering the
+    moment `Shift` goes down, which is what kept Shift Extrude from ever starting. `Alt` is left
+    out because it belongs to viewport navigation.
+    """
+    for _keymap_name, _keymap_args, keymap_content in keyconfig_data:
+        for item in keymap_content["items"]:
+            if item[0] != "gizmogroup.gizmo_tweak":
+                continue
+            # -1 is "any" for a key-map modifier.
+            item[1].update({"ctrl": -1, "shift": -1, "oskey": -1})
 
 
 def remove_maya_key_conflicts(keyconfig_data):
@@ -54,7 +126,11 @@ def remove_maya_key_conflicts(keyconfig_data):
         items = keymap_content["items"]
         items[:] = [
             item for item in items
-            if not (_is_edit_pivot_conflict(item) or _is_topology_selection_conflict(item))
+            if not (
+                _is_edit_pivot_conflict(item)
+                or _is_topology_selection_conflict(item)
+                or _is_shortest_path_conflict(item)
+            )
         ]
 
 
@@ -69,6 +145,8 @@ def load():
     )
     keyconfig_data = industry_compatible.generate_keymaps(params)
     remove_maya_key_conflicts(keyconfig_data)
+    allow_modifiers_on_gizmo_tweak(keyconfig_data)
+    apply_maya_selection_shortcuts(keyconfig_data)
 
     if platform == "darwin":
         from bl_keymap_utils.platform_helpers import keyconfig_data_oskey_from_ctrl_for_macos

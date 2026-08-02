@@ -61,6 +61,14 @@ struct MayaSnapPlanInput {
    * itself, so the part of it nearest the target is what reaches it.
    */
   bool keep_spacing = true;
+  /**
+   * Maya's `manipMoveContext -xformConstraint`. Unlike a snap mode it is not held down: it stays on
+   * until it is turned off, and it only governs components, so it is read separately.
+   */
+  ed::maya::MayaTransformConstraint transform_constraint =
+      ed::maya::MayaTransformConstraint::Off;
+  /** Components are what a transform constraint applies to; whole objects are never constrained. */
+  bool is_component_edit = false;
   ed::maya::MayaStepSnapSettings step;
 };
 

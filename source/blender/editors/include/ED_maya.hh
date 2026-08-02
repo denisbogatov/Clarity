@@ -142,6 +142,17 @@ enum class MayaSnapMode : uint8_t {
   Step,
 };
 
+/**
+ * Maya's `manipMoveContext -xformConstraint`: what the moved components stay attached to. Lives
+ * here rather than with the rest of the marking menu state because the transform module is what
+ * has to honor it.
+ */
+enum class MayaTransformConstraint : uint8_t {
+  Off = 0,
+  Edge = 1,
+  Surface = 2,
+};
+
 enum eMayaStepSnapMode : uint8_t {
   /** Steps counted from where the transform started. Maya's default. */
   MAYA_STEP_SNAP_RELATIVE = 0,
@@ -297,6 +308,11 @@ ed::maya::MayaSnapToleranceSettings ED_maya_snap_tolerance_settings_get(const bC
  */
 bool ED_maya_move_keep_spacing_get(const bContext *C);
 /**
+ * Maya's `manipMoveContext -xformConstraint`, from the Move Tool marking menu: what a moved
+ * component stays attached to. Defaults to off when there is no window runtime.
+ */
+ed::maya::MayaTransformConstraint ED_maya_transform_constraint_get(const bContext *C);
+/**
  * Radius in pixels a Maya snap target has to be inside of, derived from the tolerance settings.
  * \a region_size_px is what an unlimited tolerance resolves to, so the caller decides what
  * "anything viewable" means for its own query.
@@ -316,6 +332,11 @@ void ED_maya_undo_step_clear(const bContext *C);
 void ED_maya_undo_steps_restore(
     bContext *C, const UndoStep *step_from, const UndoStep *step_to, bool is_undo);
 bool ED_maya_shift_transform_prepare(bContext *C, wmOperator *op, const wmEvent *event);
+/**
+ * Hands a drag to Blender's own vertex or edge slide when the Edge transform constraint is on.
+ * Returns true when the slide took the drag, which leaves the caller with nothing to transform.
+ */
+bool ED_maya_transform_slide_invoke(bContext *C, wmOperator *op, const wmEvent *event);
 void ED_maya_navigation_debug_stage_sample(
     const bContext *C,
     ed::maya::MayaNavigationDebugStage stage,

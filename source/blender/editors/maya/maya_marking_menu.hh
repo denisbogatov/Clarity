@@ -19,6 +19,8 @@
 
 #include <cstdint>
 
+#include "ED_maya.hh"
+
 namespace blender {
 
 struct bContext;
@@ -53,12 +55,8 @@ enum class MayaSelectionConstraint : uint8_t {
   Shell = 5,
 };
 
-/** Maya's `manipMoveContext -xformConstraint`: what the moved components stay attached to. */
-enum class MayaTransformConstraint : uint8_t {
-  Off = 0,
-  Edge = 1,
-  Surface = 2,
-};
+/* #MayaTransformConstraint lives in `ED_maya.hh`: the transform module has to read it to honor it,
+ * and this header is private to the Maya editor. */
 
 /** The independent toggles of the Move Tool marking menu, named so one operator can serve them. */
 enum class MayaMoveOption : uint8_t {

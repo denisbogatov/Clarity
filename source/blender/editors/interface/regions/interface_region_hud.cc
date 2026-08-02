@@ -266,7 +266,10 @@ static void hud_panels_register(ARegionType *art, int space_type, int region_typ
   pt->poll = hud_panel_operator_redo_poll;
   pt->space_type = space_type;
   pt->region_type = region_type;
-  pt->flag |= PANEL_TYPE_DEFAULT_CLOSED;
+  /* The floating region exists to show the properties of the operation that just ran. Collapsed it
+   * shows a title bar and nothing else, and the operator name is already in the header, so the
+   * panel is kept expanded and the collapse gestures are taken away from it. */
+  pt->flag |= PANEL_TYPE_ALWAYS_OPEN;
   BLI_addtail(&art->paneltypes, pt);
 }
 
@@ -276,9 +279,64 @@ static void hud_panels_register(ARegionType *art, int space_type, int region_typ
 /** \name Callbacks for Floating Region
  * \{ */
 
+static int hud_region_move_handler(bContext *C, const wmEvent *event, void *userdata);
+
+/**
+ * Release whatever the drag is holding, without touching the window: this also runs when the
+ * window-level handler list is thrown away underneath us, at which point there is no window left
+ * to ask about.
+ */
+static void hud_region_drag_state_clear(bContext *C, void *userdata)
+{
+  ARegion *region = static_cast<ARegion *>(userdata);
+  if (HudRegionData *hrd = static_cast<HudRegionData *>(region->regiondata)) {
+    hrd->is_dragging = false;
+    hrd->position_changed = false;
+  }
+  if (wmWindow *win = CTX_wm_window(C)) {
+    WM_cursor_set(win, WM_CURSOR_DEFAULT);
+    /* Give the editors their ordinary redraws back; see #wm_draw_region_clear. */
+    wm_draw_region_clear(win, region);
+  }
+}
+
+/**
+ * Region handlers only see the events that land on their own region, and the drag moves the region
+ * out from under the pointer the moment it is clamped against the edge of the viewport - or the
+ * pointer simply outruns it. The drag is therefore carried by a window-level handler for as long as
+ * it lasts, which is also what guarantees that the mouse-release which ends it always arrives.
+ */
+static void hud_region_drag_handler_add(bContext *C, ARegion *region)
+{
+  wmWindow *win = CTX_wm_window(C);
+  if (win == nullptr) {
+    return;
+  }
+  WM_event_remove_ui_handler(
+      &win->runtime->modalhandlers, hud_region_move_handler, hud_region_drag_state_clear, region, false);
+  WM_event_add_ui_handler(C,
+                          &win->runtime->modalhandlers,
+                          hud_region_move_handler,
+                          hud_region_drag_state_clear,
+                          region,
+                          eWM_EventHandlerFlag(0));
+}
+
+static void hud_region_drag_handler_remove(bContext *C, ARegion *region)
+{
+  wmWindow *win = CTX_wm_window(C);
+  if (win == nullptr) {
+    return;
+  }
+  /* Postponed: this runs from inside the handler itself, which the event loop is still walking. */
+  WM_event_remove_ui_handler(
+      &win->runtime->modalhandlers, hud_region_move_handler, hud_region_drag_state_clear, region, true);
+}
+
 static void hud_region_move_end(bContext *C, ARegion *region, HudRegionData *hrd)
 {
   hrd->is_dragging = false;
+  hud_region_drag_handler_remove(C, region);
   if (hrd->position_changed && !hrd->operator_idname.empty()) {
     hud_position_storage().operator_offsets.add_overwrite(
         hrd->operator_idname, int2(region->runtime->offset_x, region->runtime->offset_y));
@@ -297,6 +355,11 @@ static int hud_region_move_handler(bContext *C, const wmEvent *event, void *user
   ARegion *region = static_cast<ARegion *>(userdata);
   HudRegionData *hrd = static_cast<HudRegionData *>(region->regiondata);
   if (hrd == nullptr || (region->flag & RGN_FLAG_HIDDEN)) {
+    if (hrd != nullptr && hrd->is_dragging) {
+      /* The panel was taken away under the drag - a new operation replaced it, say. Whatever is
+       * still held on its behalf has to go with it. */
+      hud_region_move_end(C, region, hrd);
+    }
     return WM_UI_HANDLER_CONTINUE;
   }
 
@@ -307,6 +370,12 @@ static int hud_region_move_handler(bContext *C, const wmEvent *event, void *user
     }
     if (ISKEYBOARD(event->type) && event->val == KM_PRESS) {
       /* Never let a missed mouse-release leave this handler swallowing tool hotkeys. */
+      hud_region_move_end(C, region, hrd);
+      return WM_UI_HANDLER_CONTINUE;
+    }
+    if (event->type == WINDEACTIVATE) {
+      /* The release will be delivered to whatever the user switched to, so the drag has to let go
+       * here or it would still be running when they come back. */
       hud_region_move_end(C, region, hrd);
       return WM_UI_HANDLER_CONTINUE;
     }
@@ -351,6 +420,7 @@ static int hud_region_move_handler(bContext *C, const wmEvent *event, void *user
     hrd->is_dragging = true;
     hrd->position_changed = false;
     hrd->drag_xy = int2(event->xy);
+    hud_region_drag_handler_add(C, region);
     WM_cursor_set(CTX_wm_window(C), WM_CURSOR_MOVE);
     return WM_UI_HANDLER_BREAK;
   }

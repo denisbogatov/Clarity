@@ -915,12 +915,18 @@ static void rna_userdef_keyconfig_reload_update(bContext *C,
   USERDEF_TAG_DIRTY;
 }
 
-static void rna_userdef_interaction_preset_update(bContext *C,
-                                                  Main *bmain,
-                                                  Scene * /*scene*/,
-                                                  PointerRNA *ptr)
+/**
+ * \note Two parameters, not four. A property flagged #PROP_CONTEXT_UPDATE is called through
+ * #ContextUpdateFunc, which passes the context and the pointer and nothing else. Declaring the
+ * `Main *` and `Scene *` that an ordinary update callback receives does not add them to the call:
+ * it shifts everything along, so the pointer arrives where `Main` is read and the last two
+ * parameters are whatever the registers happened to hold. Iterating that as a #Main is what
+ * crashed the moment the preset was assigned, from the interface as much as from Python.
+ */
+static void rna_userdef_interaction_preset_update(bContext *C, PointerRNA *ptr)
 {
   UserDef *userdef = static_cast<UserDef *>(ptr->data);
+  Main *bmain = C != nullptr ? CTX_data_main(C) : nullptr;
   const bool use_maya = userdef->interaction_preset == INTERACTION_PRESET_MAYA;
   STRNCPY(userdef->keyconfigstr, use_maya ? "Maya" : "Blender");
   userdef->maya_interaction_defaults_initialized = true;
@@ -938,7 +944,9 @@ static void rna_userdef_interaction_preset_update(bContext *C,
       }
     }
   }
-  WM_keyconfig_reload(C);
+  if (C != nullptr) {
+    WM_keyconfig_reload(C);
+  }
   WM_main_add_notifier(NC_WINDOW, nullptr);
   USERDEF_TAG_DIRTY;
 }

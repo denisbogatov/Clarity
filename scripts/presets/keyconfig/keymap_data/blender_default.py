@@ -5553,7 +5553,7 @@ def km_edit_mesh(params):
          {"properties": [("type", 'COLLAPSE')]}),
         ("mesh.merge", {"type": 'V', "value": 'PRESS', "ctrl": True, "shift": True},
          {"properties": [("type", 'CENTER')]}),
-        ("view3d.maya_bridge_or_fill", {"type": 'B', "value": 'PRESS', "ctrl": True, "shift": True}, None),
+        ("mesh.bridge_edge_loops", {"type": 'B', "value": 'PRESS', "ctrl": True, "shift": True}, None),
         ("mesh.flip_normals", {"type": 'I', "value": 'PRESS', "ctrl": True, "alt": True}, None),
         ("view3d.edit_mesh_extrude_move_normal",
          {"type": 'E', "value": 'PRESS', "ctrl": True, "alt": True}, None),

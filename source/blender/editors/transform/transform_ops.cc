@@ -139,6 +139,8 @@ static void transform_maya_snap_apply(const bContext *C,
   plan_input.orientation_is_global = t->orient[t->orient_curr].type == V3D_ORIENT_GLOBAL;
   plan_input.space_is_view3d = t->spacetype == SPACE_VIEW3D;
   plan_input.keep_spacing = ED_maya_move_keep_spacing_get(C);
+  plan_input.transform_constraint = ED_maya_transform_constraint_get(C);
+  plan_input.is_component_edit = CTX_data_edit_object(C) != nullptr;
   plan_input.step = ED_maya_snap_step_settings_get(C);
   const MayaSnapPlan plan = transform_snap_maya_plan_get(plan_input);
 
@@ -711,6 +713,13 @@ static wmOperatorStatus transform_exec(bContext *C, wmOperator *op)
 
 static wmOperatorStatus transform_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
+  /* The Edge transform constraint replaces the translation with a slide, so it is asked before any
+   * transform data is built. It answers no unless the constraint is on and the selection can
+   * actually slide, which leaves the ordinary translation in charge. */
+  if (ED_maya_transform_slide_invoke(C, op, event)) {
+    return OPERATOR_CANCELLED;
+  }
+
   const bool maya_shift_transform = ED_maya_shift_transform_prepare(C, op, event);
   if (!transformops_data(C, op, event)) {
     if (maya_shift_transform) {
