@@ -291,6 +291,8 @@ TEST(maya_input, MarkingMenuGesturesMapToTheirOwnActions)
                "VIEW3D_MT_maya_rotate_marking_menu");
   EXPECT_STREQ(tool_marking_menu_idname(MayaToolID::Scale),
                "VIEW3D_MT_maya_scale_marking_menu");
+  EXPECT_STREQ(tool_marking_menu_idname(MayaToolID::MultiCut),
+               "VIEW3D_MT_maya_multi_cut_marking_menu");
   EXPECT_EQ(tool_marking_menu_idname(MayaToolID::None), nullptr);
 }
 

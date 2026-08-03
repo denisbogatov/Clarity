@@ -3559,11 +3559,24 @@ def km_knife_tool_modal_map(_params):
         ("PANNING", {"type": 'LEFTMOUSE', "value": 'PRESS', "alt": True}, None),
         ("CONFIRM", {"type": 'RET', "value": 'PRESS', "any": True}, None),
         ("CONFIRM", {"type": 'NUMPAD_ENTER', "value": 'PRESS', "any": True}, None),
-        ("INSERT_EDGE_LOOP", {"type": 'LEFTMOUSE', "value": 'ANY', "ctrl": True}, None),
         ("INSERT_CENTERED_EDGE_LOOP", {"type": 'MIDDLEMOUSE', "value": 'ANY', "ctrl": True}, None),
+        # ADD_CUT routes Ctrl-click to an edge loop only before a point exists. Afterwards it must
+        # keep Ctrl+Shift-click available for Maya's perpendicular constraint.
         ("ADD_CUT", {"type": 'LEFTMOUSE', "value": 'ANY', "any": True}, None),
+        # A modal keymap owns Ctrl while Multi-Cut is active, so invoke the Maya viewport commands
+        # as explicit modal actions instead of relying on pass-through to the global keymap.
+        ("OBJECT_XRAY_TOGGLE", {"type": 'TWO', "value": 'PRESS', "ctrl": True}, None),
+        ("VIEW_XRAY_TOGGLE", {"type": 'THREE', "value": 'PRESS', "ctrl": True}, None),
+        # Number keys switch subdivision preview while preserving the active Multi-Cut tool.
+        ("SUBDIVISION_PREVIEW_OFF", {"type": 'ONE', "value": 'PRESS'}, None),
+        ("SUBDIVISION_PREVIEW_ON", {"type": 'TWO', "value": 'PRESS'}, None),
+        ("SUBDIVISION_PREVIEW_SURFACE", {"type": 'THREE', "value": 'PRESS'}, None),
         ("UNDO", {"type": 'BACK_SPACE', "value": 'PRESS', "any": True}, None),
         ("DELETE_HIGHLIGHTED", {"type": 'DEL', "value": 'PRESS', "any": True}, None),
+        # Keep Maya's Z/Shift-Z behavior and accept the preset's global undo/redo shortcuts while
+        # this modal tool owns events.
+        ("REDO", {"type": 'Z', "value": 'PRESS', "ctrl": True, "shift": True}, None),
+        ("UNDO", {"type": 'Z', "value": 'PRESS', "ctrl": True}, None),
         ("REDO", {"type": 'Z', "value": 'PRESS', "shift": True}, None),
         ("UNDO", {"type": 'Z', "value": 'PRESS'}, None),
         ("CONFIRM", {"type": 'RIGHTMOUSE', "value": 'PRESS'}, None),

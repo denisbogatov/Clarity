@@ -36,6 +36,7 @@
 #include "UI_resources.hh"
 
 #include "WM_api.hh"
+#include "WM_toolsystem.hh"
 #include "WM_types.hh"
 
 #include "maya_runtime.hh"
@@ -269,8 +270,9 @@ const char *tool_marking_menu_idname(const MayaToolID tool)
       return "VIEW3D_MT_maya_rotate_marking_menu";
     case MayaToolID::Scale:
       return "VIEW3D_MT_maya_scale_marking_menu";
-    case MayaToolID::None:
     case MayaToolID::MultiCut:
+      return "VIEW3D_MT_maya_multi_cut_marking_menu";
+    case MayaToolID::None:
     case MayaToolID::TargetWeld:
     case MayaToolID::QuadDraw:
       break;
@@ -760,6 +762,40 @@ static void maya_scale_marking_menu_draw(const bContext *C, Menu *menu)
   transform_common_list_draw(list, state, "Scale Options", false);
 }
 
+static bool maya_multi_cut_properties_get(const bContext *C, PointerRNA &r_properties)
+{
+  bToolRef *tool = WM_toolsystem_ref_from_context(C);
+  wmOperatorType *knife_type = WM_operatortype_find("MESH_OT_knife_tool", true);
+  return tool != nullptr && knife_type != nullptr &&
+         WM_toolsystem_ref_properties_get_from_operator(tool, knife_type, &r_properties);
+}
+
+static void maya_multi_cut_marking_menu_draw(const bContext *C, Menu *menu)
+{
+  PointerRNA properties;
+  if (!maya_multi_cut_properties_get(C, properties)) {
+    menu->layout->label("Multi-Cut Tool is not active", ICON_INFO);
+    return;
+  }
+
+  /* Keep Maya's directions: W, E, S, N, NW, NE, SW, SE. The native marking-menu path supplies
+   * the same compact radius, dead zone and release gesture as the other Maya tool menus. */
+  ui::Layout &pie = menu->layout->menu_pie();
+  pie.prop(&properties, "snap_step", UI_ITEM_NONE, "Snap Step %", ICON_NONE);       /* W */
+  pie.prop(&properties, "use_edge_flow", UI_ITEM_NONE, "Edge Flow", ICON_NONE);   /* E */
+  pie.prop(&properties, "subdivisions", UI_ITEM_NONE, "Subdivisions", ICON_NONE); /* S */
+  pie.prop(
+      &properties, "ignore_backfaces", UI_ITEM_NONE, "Ignore Backfaces", ICON_NONE); /* N */
+  pie.prop(&properties, "delete_faces", UI_ITEM_NONE, "Delete Faces", ICON_NONE);   /* NW */
+  pie.prop(&properties, "extract_faces", UI_ITEM_NONE, "Extract Faces", ICON_NONE); /* NE */
+  pie.op("MESH_OT_maya_multi_cut_reset",
+         "Reset Tool",
+         ICON_LOOP_BACK,
+         wm::OpCallContext::ExecDefault,
+         UI_ITEM_NONE); /* SW */
+  pie.prop(&properties, "use_live_surface", UI_ITEM_NONE, "Live Surface", ICON_NONE); /* SE */
+}
+
 /**
  * A submenu of the marking menu is one more panel of it, not a menu in its own right, so it is
  * backed in the same grey as the rows that opened it.
@@ -886,6 +922,8 @@ void register_marking_menu_types()
       "VIEW3D_MT_maya_rotate_marking_menu", maya_rotate_marking_menu_draw, true);
   marking_menutype_register(
       "VIEW3D_MT_maya_scale_marking_menu", maya_scale_marking_menu_draw, true);
+  marking_menutype_register(
+      "VIEW3D_MT_maya_multi_cut_marking_menu", maya_multi_cut_marking_menu_draw, true);
   marking_menutype_register(
       "VIEW3D_MT_maya_camera_based_selection", maya_camera_based_selection_draw, false);
   marking_menutype_register(

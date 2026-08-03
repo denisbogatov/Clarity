@@ -215,6 +215,31 @@ In Edit Mesh, `Ctrl+E` invokes only Blender's standard context Extrude-and-Move 
 event is consumed even when Extrude cannot run, so neither the Edge menu nor an Extrude tool switch
 may follow it.
 
+## Multi-Cut
+
+| Start mode | Tool before | Keys | Mouse | Geometry / preview | Tool after | Undo / redo |
+| --- | --- | --- | --- | --- | --- | --- |
+| Edit Mesh, no point placed | Multi-Cut | `Ctrl` | LMB over an edge ring | previews and inserts an edge loop | Multi-Cut | `Z` removes it; `Shift+Z` restores it |
+| Edit Mesh, no point placed, a large edge-loop preview is visible | Multi-Cut | `Ctrl` or `Ctrl Shift` | hover the edge ring | draws only the current loop preview markers; stale hover and cut-start markers are not drawn elsewhere in the viewport | Multi-Cut remains active | unchanged |
+| Edit Mesh, no point placed, a visually four-sided ring face has extra boundary vertices from a detailed cap | Multi-Cut | `Ctrl` or `Ctrl Shift` | LMB over the edge ring | treats the face as a logical quad, chooses its geometrically opposite edge, and inserts every previewed segment; a true triangle still stops the ring | Multi-Cut remains active | `Z` removes the loop in place; `Shift+Z` restores it without leaving Multi-Cut |
+| Edit Mesh, no point placed | Multi-Cut | none | MMB drag across the mesh | performs a Quick Slice immediately on release; the geometry is materialized and no slice control points remain | Multi-Cut remains active | `Z` removes the complete slice in place; redo restores it |
+| Edit Mesh, no point placed | Multi-Cut | none | finish a slice gesture whose expanded line misses the mesh | creates no cut and leaves no yellow/white control points or empty undo action | Multi-Cut remains active | unchanged |
+| Edit Mesh, no point placed | Multi-Cut | none or `Shift` | LMB slice drag, then release | keeps the editable slice result but hides its yellow/white drag handles as soon as the gesture ends; handles are drawn again only while an endpoint or the slice plane is actively moved | Multi-Cut remains active | `Z` removes the slice; redo restores it |
+| Edit Mesh, cut segment placed | Multi-Cut | `Ctrl Shift` | hover and click near the previous point | grey 90/180 degree guides appear and the active constrained cut is green | Multi-Cut | `Z` removes the point; `Shift+Z` restores it |
+| Edit Mesh, cut segment placed | Multi-Cut | `Ctrl Shift` | hover an existing edge | previews the perpendicular foot on that edge, highlights the target edge, and shows a green right-angle marker | Multi-Cut | clicking creates one point action; `Z`/`Shift+Z` undo/redo it |
+| Edit Mesh, several cut points placed | Multi-Cut | navigate the view, then edit a point | drag the last or an earlier point | only the edited endpoint and its connected segments change; every untouched cut vertex remains at its saved surface position | Multi-Cut | undo/redo restores the same surface positions in the new view |
+| Edit Mesh, an incomplete segment lies wholly inside one face | Multi-Cut | none | `RMB` or `Enter` | completes any valid face split; a dangling segment that cannot split the face is discarded together with its temporary vertices | Multi-Cut remains active | no isolated vertices are left in the mesh |
+| Edit Mesh | Multi-Cut | `1` / `2` / `3` | none | switches between control mesh, subdivision preview with cage, and subdivision surface preview; placed cuts are committed before the evaluated cage is rebuilt | Multi-Cut remains active | the committed cut and preview-mode change remain separate undo steps |
+| Edit Mesh | Multi-Cut | `Ctrl+2` / `Ctrl+3` | none | toggles Object X-Ray / Viewport X-Ray through the standard Maya viewport commands | Multi-Cut remains active | unchanged |
+
+The selection modifier plus/minus cursor is hidden while Multi-Cut owns the viewport. Its `Ctrl`
+and `Ctrl Shift` gestures belong to edge-loop and perpendicular-cut previews, not selection.
+The modal map also accepts the workspace aliases `Ctrl+Z` and `Ctrl+Shift+Z`, because global
+undo/redo shortcuts cannot receive those events while Multi-Cut owns the modal event loop.
+The workspace status line lists only Multi-Cut gestures and changes with the current state: loop and
+slice-start shortcuts before a point, point-edit constraints during a cut, and slice movement after
+a slice. Global viewport display commands remain available but are not presented as tool shortcuts.
+
 ## Marking menus
 
 Every Maya marking menu is visible on the press that invokes it; it has no hidden popup-delay
@@ -228,6 +253,9 @@ Preserve UVs, Preserve Children, and Tweak Mode rows keep one live state across 
 Select menu exposes Selection Constraints, Camera Based Selection, Highlight Backfaces, and the
 two Shift-drag toggles. In particular, `W+LMB` opens the Move orientation menu while Edit Pivot is
 active, including when `D` is still physically held and occupies Blender's generic key-modifier.
+Multi-Cut's `Ctrl+Shift+RMB` menu uses the same native Maya marking-menu registration, radius, dead
+zone, immediate visibility, directional selection, and release-to-confirm behavior as those tool
+menus; it is not a separate Python `call_menu_pie` implementation.
 
 ## Pivot usage (task items 3, 4, 10, 12)
 

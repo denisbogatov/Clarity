@@ -76,7 +76,9 @@ static bool maya_active_blender_tool_is(const bContext *C, const char *idname)
 
 static bool maya_selection_modifier_cursor_poll(bContext *C)
 {
-  if (!maya_viewport_window_interaction_enabled(C)) {
+  if (!maya_viewport_window_interaction_enabled(C) ||
+      maya_active_blender_tool_is(C, "builtin.knife"))
+  {
     return false;
   }
 

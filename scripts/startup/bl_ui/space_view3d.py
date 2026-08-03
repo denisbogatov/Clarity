@@ -6639,26 +6639,6 @@ _MAYA_MULTI_CUT_SETTING_IDS = (
 )
 
 
-class VIEW3D_MT_maya_multi_cut_marking_menu(Menu):
-    bl_label = "Multi-Cut Tool"
-
-    def draw(self, context):
-        pie = self.layout.menu_pie()
-        props = _maya_multi_cut_properties(context)
-        if props is None:
-            pie.label(text="Multi-Cut Tool is not active", icon='INFO')
-            return
-
-        pie.prop(props, "snap_step", text="Snap Step %")
-        pie.prop(props, "use_edge_flow", text="Edge Flow")
-        pie.prop(props, "subdivisions", text="Subdivisions")
-        pie.prop(props, "ignore_backfaces", text="Ignore Backfaces")
-        pie.prop(props, "delete_faces", text="Delete Faces")
-        pie.prop(props, "extract_faces", text="Extract Faces")
-        pie.operator("mesh.maya_multi_cut_reset", text="Reset Tool", icon='LOOP_BACK')
-        pie.prop(props, "use_live_surface", text="Live Surface")
-
-
 class MESH_OT_maya_multi_cut_reset(Operator):
     bl_idname = "mesh.maya_multi_cut_reset"
     bl_label = "Reset Multi-Cut Tool"
@@ -9898,7 +9878,6 @@ classes = (
     VIEW3D_PT_active_tool_duplicate,
     VIEW3D_PT_view3d_properties,
     VIEW3D_PT_view3d_lock,
-    VIEW3D_MT_maya_multi_cut_marking_menu,
     MESH_OT_maya_multi_cut_activate,
     MESH_OT_maya_multi_cut_reset,
     MESH_OT_maya_multi_cut_slice_plane,

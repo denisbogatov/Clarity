@@ -239,15 +239,23 @@ class Instance : public DrawEngine {
   void draw_to_mesh_pass(ObjectRef &ob_ref, bool is_transparent, F draw_callback)
   {
     const bool in_front = (ob_ref.object->dtx & OB_DRAW_IN_FRONT) != 0;
+    const bool object_xray = (ob_ref.object->dtx & OB_DRAWTRANSP) != 0;
+    /* Global X-ray uses a separate overlay depth buffer. Object X-ray instead leaves its depth
+     * out of the shared buffer so grids and other overlays remain visible through it. */
+    const bool write_transparent_depth = scene_state_.xray_mode || !object_xray;
 
     if (scene_state_.xray_mode || is_transparent) {
       if (in_front) {
         draw_callback(transparent_ps_.accumulation_in_front_ps_);
-        draw_callback(transparent_depth_ps_.in_front_ps_);
+        if (write_transparent_depth) {
+          draw_callback(transparent_depth_ps_.in_front_ps_);
+        }
       }
       else {
         draw_callback(transparent_ps_.accumulation_ps_);
-        draw_callback(transparent_depth_ps_.main_ps_);
+        if (write_transparent_depth) {
+          draw_callback(transparent_depth_ps_.main_ps_);
+        }
       }
     }
     else {
@@ -269,7 +277,11 @@ class Instance : public DrawEngine {
   {
     if (ob_ref.object->dtx & OB_DRAWTRANSP) {
       constexpr uint32_t alpha_mask = 0x00ff0000u;
-      constexpr uint32_t xray_alpha = 89u << 16;
+      const View3DShading &view_shading = draw_ctx->v3d ? draw_ctx->v3d->shading :
+                                                        scene_state_.scene->display.shading;
+      const float object_xray_alpha = scene_state_.xray_mode ? 1.0f :
+                                                               SHADING_XRAY_ALPHA(view_shading);
+      const uint32_t xray_alpha = uint32_t(unit_float_to_uchar_clamp(object_xray_alpha)) << 16;
       material.packed_data = (material.packed_data & ~alpha_mask) | xray_alpha;
     }
     resources_.material_buf.append(material);

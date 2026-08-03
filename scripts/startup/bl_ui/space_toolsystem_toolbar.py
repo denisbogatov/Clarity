@@ -1253,7 +1253,7 @@ class _defs_edit_mesh:
                 panel = section("show_shortcuts", "Keyboard/Mouse Shortcuts")
                 shortcuts = (
                     ("LMB click / drag", "Drop point / move dropped point"),
-                    ("Ctrl + LMB click / drag", "Preview / insert edge loop"),
+                    ("Ctrl + LMB click / drag", "Preview / insert edge loop before placing points"),
                     ("Ctrl + MMB", "Insert centered edge loop before placing points"),
                     ("Ctrl + Shift + LMB", "Snap edge loop by Snap Step % before placing points"),
                     ("LMB drag off mesh", "Slice faces"),
