@@ -29,6 +29,13 @@ def main():
     ]
     assert len(bridge_items) == 1
     assert bridge_items[0].idname == "mesh.bridge_edge_loops"
+    extrude_items = [
+        item for item in mesh_keymap.keymap_items
+        if item.type == 'E' and item.value == 'PRESS' and item.ctrl
+        and not item.shift and not item.alt and not item.oskey
+    ]
+    assert len(extrude_items) == 1
+    assert extrude_items[0].idname == "mesh.extrude_context_move"
     assert os.path.basename(os.path.normpath(bpy.utils.user_resource('CONFIG'))) == (
         "maya_fork_config"
     )

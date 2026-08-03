@@ -2542,6 +2542,8 @@ def km_object_mode(params):
     items.extend([
         ("view3d.maya_object_xray", {"type": 'TWO', "value": 'PRESS', "ctrl": True}, None),
         ("view3d.toggle_xray", {"type": 'THREE', "value": 'PRESS', "ctrl": True}, None),
+        ("mesh.maya_multi_cut_activate",
+         {"type": 'X', "value": 'PRESS', "ctrl": True, "shift": True}, None),
         ("object.transform_apply", {"type": 'F', "value": 'PRESS', "alt": True, "shift": True},
          {"properties": [("location", True), ("rotation", True), ("scale", True)]}),
         *_template_items_animation(),
@@ -3147,6 +3149,8 @@ def km_mesh(params):
         op_tool_cycle("builtin.bevel", {"type": 'B', "value": 'PRESS', "ctrl": True}),
         op_tool_cycle("builtin.inset_faces", {"type": 'I', "value": 'PRESS'}),
         op_tool_cycle("builtin.extrude_region", {"type": 'E', "value": 'PRESS', "ctrl": True}),
+        ("mesh.maya_multi_cut_activate",
+         {"type": 'X', "value": 'PRESS', "ctrl": True, "shift": True}, None),
         op_tool_cycle("builtin.knife", {"type": 'K', "value": 'PRESS'}),
         op_tool_cycle("builtin.loop_cut", {"type": 'C', "value": 'PRESS', "alt": True}),
 
@@ -3555,28 +3559,25 @@ def km_knife_tool_modal_map(_params):
         ("PANNING", {"type": 'LEFTMOUSE', "value": 'PRESS', "alt": True}, None),
         ("CONFIRM", {"type": 'RET', "value": 'PRESS', "any": True}, None),
         ("CONFIRM", {"type": 'NUMPAD_ENTER', "value": 'PRESS', "any": True}, None),
-        ("ADD_CUT_CLOSED", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK', "any": True}, None),
+        ("INSERT_EDGE_LOOP", {"type": 'LEFTMOUSE', "value": 'ANY', "ctrl": True}, None),
+        ("INSERT_CENTERED_EDGE_LOOP", {"type": 'MIDDLEMOUSE', "value": 'ANY', "ctrl": True}, None),
         ("ADD_CUT", {"type": 'LEFTMOUSE', "value": 'ANY', "any": True}, None),
-        ("UNDO", {"type": 'Z', "value": 'PRESS', "ctrl": True}, None),
-        ("NEW_CUT", {"type": 'RIGHTMOUSE', "value": 'PRESS'}, None),
-        ("SNAP_MIDPOINTS_ON", {"type": 'LEFT_CTRL', "value": 'PRESS'}, None),
-        ("SNAP_MIDPOINTS_OFF", {"type": 'LEFT_CTRL', "value": 'RELEASE'}, None),
-        ("SNAP_MIDPOINTS_ON", {"type": 'RIGHT_CTRL', "value": 'PRESS'}, None),
-        ("SNAP_MIDPOINTS_OFF", {"type": 'RIGHT_CTRL', "value": 'RELEASE'}, None),
-        ("IGNORE_SNAP_ON", {"type": 'LEFT_SHIFT', "value": 'PRESS', "any": True}, None),
-        ("IGNORE_SNAP_OFF", {"type": 'LEFT_SHIFT', "value": 'RELEASE', "any": True}, None),
-        ("IGNORE_SNAP_ON", {"type": 'RIGHT_SHIFT', "value": 'PRESS', "any": True}, None),
-        ("IGNORE_SNAP_OFF", {"type": 'RIGHT_SHIFT', "value": 'RELEASE', "any": True}, None),
-        ("X_AXIS", {"type": 'X', "value": 'PRESS'}, None),
-        ("Y_AXIS", {"type": 'Y', "value": 'PRESS'}, None),
-        ("Z_AXIS", {"type": 'Z', "value": 'PRESS'}, None),
-        ("ANGLE_SNAP_TOGGLE", {"type": 'A', "value": 'PRESS'}, None),
-        ("CYCLE_ANGLE_SNAP_EDGE", {"type": 'R', "value": 'PRESS'}, None),
-        ("CUT_THROUGH_TOGGLE", {"type": 'C', "value": 'PRESS'}, None),
+        ("UNDO", {"type": 'BACK_SPACE', "value": 'PRESS', "any": True}, None),
+        ("DELETE_HIGHLIGHTED", {"type": 'DEL', "value": 'PRESS', "any": True}, None),
+        ("REDO", {"type": 'Z', "value": 'PRESS', "shift": True}, None),
+        ("UNDO", {"type": 'Z', "value": 'PRESS'}, None),
+        ("CONFIRM", {"type": 'RIGHTMOUSE', "value": 'PRESS'}, None),
+        ("SNAP_MIDPOINTS_ON", {"type": 'LEFT_SHIFT', "value": 'PRESS', "any": True}, None),
+        ("SNAP_MIDPOINTS_OFF", {"type": 'LEFT_SHIFT', "value": 'RELEASE', "any": True}, None),
+        ("SNAP_MIDPOINTS_ON", {"type": 'RIGHT_SHIFT', "value": 'PRESS', "any": True}, None),
+        ("SNAP_MIDPOINTS_OFF", {"type": 'RIGHT_SHIFT', "value": 'RELEASE', "any": True}, None),
+        ("GRID_SNAP_ON", {"type": 'X', "value": 'PRESS'}, None),
+        ("GRID_SNAP_OFF", {"type": 'X', "value": 'RELEASE'}, None),
+        ("POINT_SNAP_ON", {"type": 'V', "value": 'PRESS'}, None),
+        ("POINT_SNAP_OFF", {"type": 'V', "value": 'RELEASE'}, None),
+        ("QUICK_SLICE", {"type": 'MIDDLEMOUSE', "value": 'ANY'}, None),
         ("PANNING", {"type": 'MIDDLEMOUSE', "value": 'PRESS', "alt": True}, None),
         ("PANNING", {"type": 'RIGHTMOUSE', "value": 'PRESS', "alt": True}, None),
-        ("SHOW_DISTANCE_ANGLE_TOGGLE", {"type": 'D', "value": 'PRESS'}, None),
-        ("DEPTH_TEST_TOGGLE", {"type": 'V', "value": 'PRESS'}, None),
     ])
 
     return keymap
@@ -3787,6 +3788,32 @@ def km_generic_gizmo_drag(_params):
     return keymap
 
 
+def km_3d_view_tool_edit_mesh_knife(params):
+    return (
+        "3D View Tool: Edit Mesh, Knife",
+        {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
+        {"items": [
+            ("mesh.knife_tool",
+             {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True, "shift": True},
+             {"properties": [("wait_for_input", False)]}),
+            ("mesh.knife_tool", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
+             {"properties": [("wait_for_input", False)]}),
+            ("mesh.knife_tool", {"type": 'MIDDLEMOUSE', "value": 'PRESS', "ctrl": True},
+             {"properties": [("wait_for_input", False)]}),
+            ("mesh.knife_tool", {"type": params.tool_mouse, "value": 'PRESS', "key_modifier": 'X'},
+             {"properties": [("wait_for_input", False)]}),
+            ("mesh.knife_tool", {"type": params.tool_mouse, "value": 'PRESS', "key_modifier": 'V'},
+             {"properties": [("wait_for_input", False)]}),
+            ("mesh.knife_tool", {"type": params.tool_mouse, "value": 'PRESS', "shift": True},
+             {"properties": [("wait_for_input", False)]}),
+            ("mesh.knife_tool", {"type": 'MIDDLEMOUSE', "value": 'PRESS'},
+             {"properties": [("wait_for_input", False)]}),
+            ("mesh.knife_tool", {"type": params.tool_mouse, "value": 'PRESS'},
+             {"properties": [("wait_for_input", False)]}),
+        ]},
+    )
+
+
 def km_generic_gizmo_maybe_drag(params):
     keymap = (
         "Generic Gizmo Maybe Drag",
@@ -3890,6 +3917,7 @@ def generate_keymaps_impl(params=None):
 
         # Tool System.
         km_3d_view_tool_select(params),
+        km_3d_view_tool_edit_mesh_knife(params),
         km_3d_view_tool_interactive_add(params),
         km_image_editor_tool_uv_select(params),
         km_sequencer_editor_tool_select_preview(params),

@@ -4,12 +4,15 @@
 
 #include "testing/testing.h"
 
+#include <utility>
+
 #include "BKE_context.hh"
 #include "BKE_gtest_base.hh"
 #include "BKE_lib_id.hh"
 #include "BKE_main.hh"
 #include "BKE_object.hh"
 #include "BKE_object_transform_maya.hh"
+#include "BKE_scene.hh"
 
 #include "ED_maya.hh"
 
@@ -17,6 +20,7 @@
 #include "wm_event_types.hh"
 
 #include "maya_input.hh"
+#include "maya_marking_menu.hh"
 #include "maya_runtime.hh"
 #include "maya_tools.hh"
 
@@ -208,6 +212,119 @@ TEST(maya_snap_keys, ReleaseResolvesWhateverModifiersCameWithIt)
 
   EXPECT_EQ(snap_key_event_mode_get(EVT_ZKEY, KM_PRESS, 0), MayaSnapMode::None);
   EXPECT_EQ(snap_key_event_mode_get(EVT_VKEY, KM_DBL_CLICK, 0), MayaSnapMode::None);
+}
+
+TEST(maya_input, CtrlEMapsExclusivelyToExtrude)
+{
+  wmEvent event{};
+  event.type = EVT_EKEY;
+  event.val = KM_PRESS;
+  event.modifier = KM_CTRL;
+
+  std::optional<MayaInputAction> action = ED_maya_input_translate(nullptr, event);
+  ASSERT_TRUE(action.has_value());
+  EXPECT_EQ(action->id, MayaActionID::Extrude);
+
+  event.modifier = wmEventModifierFlag(KM_CTRL | KM_SHIFT);
+  action = ED_maya_input_translate(nullptr, event);
+  ASSERT_TRUE(action.has_value());
+  EXPECT_EQ(action->id, MayaActionID::None);
+
+  event.modifier = KM_CTRL;
+  event.val = KM_RELEASE;
+  action = ED_maya_input_translate(nullptr, event);
+  ASSERT_TRUE(action.has_value());
+  EXPECT_EQ(action->id, MayaActionID::ToolHotkeyReleased);
+}
+
+TEST(maya_input, MarkingMenuGesturesMapToTheirOwnActions)
+{
+  wmEvent event{};
+  event.type = RIGHTMOUSE;
+  event.val = KM_PRESS;
+
+  std::optional<MayaInputAction> action = ED_maya_input_translate(nullptr, event);
+  ASSERT_TRUE(action.has_value());
+  EXPECT_EQ(action->id, MayaActionID::ComponentMarkingMenu);
+
+  event.modifier = KM_CTRL;
+  action = ED_maya_input_translate(nullptr, event);
+  ASSERT_TRUE(action.has_value());
+  EXPECT_EQ(action->id, MayaActionID::SelectionMarkingMenu);
+
+  event.modifier = wmEventModifierFlag(KM_CTRL | KM_SHIFT);
+  action = ED_maya_input_translate(nullptr, event);
+  ASSERT_TRUE(action.has_value());
+  EXPECT_EQ(action->id, MayaActionID::ToolMarkingMenu);
+  EXPECT_EQ(action->tool, MayaToolID::None);
+
+  wmEvent tool_press_under_edit_pivot{};
+  tool_press_under_edit_pivot.type = EVT_WKEY;
+  tool_press_under_edit_pivot.val = KM_PRESS;
+  tool_press_under_edit_pivot.keymodifier = EVT_DKEY;
+  action = ED_maya_input_translate(nullptr, tool_press_under_edit_pivot);
+  ASSERT_TRUE(action.has_value());
+  EXPECT_EQ(action->id, MayaActionID::ActivateTool);
+  EXPECT_EQ(action->tool, MayaToolID::Move);
+
+  event.type = LEFTMOUSE;
+  event.modifier = wmEventModifierFlag(0);
+  const std::pair<wmEventType, MayaToolID> tool_gestures[] = {
+      {EVT_QKEY, MayaToolID::Select},
+      {EVT_WKEY, MayaToolID::Move},
+      {EVT_EKEY, MayaToolID::Rotate},
+      {EVT_RKEY, MayaToolID::Scale},
+  };
+  for (const auto &[keymodifier, expected_tool] : tool_gestures) {
+    event.keymodifier = keymodifier;
+    action = ED_maya_input_translate(nullptr, event);
+    ASSERT_TRUE(action.has_value());
+    EXPECT_EQ(action->id, MayaActionID::ToolMarkingMenu);
+    EXPECT_EQ(action->tool, expected_tool);
+  }
+
+  EXPECT_STREQ(tool_marking_menu_idname(MayaToolID::Select),
+               "VIEW3D_MT_maya_select_marking_menu");
+  EXPECT_STREQ(tool_marking_menu_idname(MayaToolID::Move),
+               "VIEW3D_MT_maya_move_marking_menu");
+  EXPECT_STREQ(tool_marking_menu_idname(MayaToolID::Rotate),
+               "VIEW3D_MT_maya_rotate_marking_menu");
+  EXPECT_STREQ(tool_marking_menu_idname(MayaToolID::Scale),
+               "VIEW3D_MT_maya_scale_marking_menu");
+  EXPECT_EQ(tool_marking_menu_idname(MayaToolID::None), nullptr);
+}
+
+TEST_F(MayaRuntimeTest, TransformMarkingMenusKeepOrientationsIndependent)
+{
+  Main *bmain = BKE_main_new();
+  Scene *scene = BKE_scene_add(bmain, "MayaMarkingMenuScene");
+  bContext *context = CTX_create();
+  CTX_data_main_set(context, bmain);
+  CTX_data_scene_set(context, scene);
+
+  EXPECT_TRUE(
+      transform_orientation_set(context, MayaToolID::Move, MayaMoveOrientation::Object));
+  EXPECT_TRUE(
+      transform_orientation_set(context, MayaToolID::Rotate, MayaMoveOrientation::Component));
+  EXPECT_TRUE(
+      transform_orientation_set(context, MayaToolID::Scale, MayaMoveOrientation::World));
+
+  EXPECT_EQ(transform_orientation_get(context, MayaToolID::Move), MayaMoveOrientation::Object);
+  EXPECT_EQ(transform_orientation_get(context, MayaToolID::Rotate),
+            MayaMoveOrientation::Component);
+  EXPECT_EQ(transform_orientation_get(context, MayaToolID::Scale), MayaMoveOrientation::World);
+
+  EXPECT_TRUE(
+      transform_orientation_set(context, MayaToolID::Rotate, MayaMoveOrientation::Gimbal));
+  EXPECT_EQ(transform_orientation_get(context, MayaToolID::Move), MayaMoveOrientation::Object);
+  EXPECT_EQ(transform_orientation_get(context, MayaToolID::Rotate), MayaMoveOrientation::Gimbal);
+  EXPECT_FALSE(
+      transform_orientation_set(context, MayaToolID::Select, MayaMoveOrientation::Component));
+  EXPECT_FALSE(
+      transform_orientation_set(context, MayaToolID::Scale, MayaMoveOrientation::Gimbal));
+
+  CTX_free(context);
+  BKE_main_free(bmain);
 }
 
 /**

@@ -411,9 +411,9 @@ void Resources::update_theme_settings(const DRWContext *ctx, const State &state)
   gb.sizes.edge = max_ff(1.0f, ui::theme::get_value_f(TH_EDGE_WIDTH)) / 2.0f;
 
   if (state.ctx_mode == CTX_MODE_EDIT_MESH) {
-    /* Four-point component vertices and one-pixel edit edges at 1x display scale. */
+    /* Four-point component vertices and slightly subpixel edit edges at 1x display scale. */
     gb.sizes.vert = 2.0f;
-    gb.sizes.edge = 0.5f;
+    gb.sizes.edge = 0.4f;
   }
 
   /* Pixel size. */

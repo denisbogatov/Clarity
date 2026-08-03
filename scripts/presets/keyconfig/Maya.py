@@ -99,6 +99,30 @@ def apply_maya_selection_shortcuts(keyconfig_data):
                 properties["shift"] = True
 
 
+def apply_maya_modeling_shortcuts(keyconfig_data):
+    """Reserve Maya modeling chords for one direct operator each."""
+    for keymap_name, _keymap_args, keymap_content in keyconfig_data:
+        if keymap_name != "Mesh":
+            continue
+        items = keymap_content["items"]
+        items[:] = [
+            item for item in items
+            if not (
+                item[1].get("type") == 'E'
+                and item[1].get("value") == 'PRESS'
+                and item[1].get("ctrl", False)
+                and not item[1].get("shift", False)
+                and not item[1].get("alt", False)
+                and not item[1].get("oskey", False)
+            )
+        ]
+        items.append((
+            "mesh.extrude_context_move",
+            {"type": 'E', "value": 'PRESS', "ctrl": True},
+            None,
+        ))
+
+
 def allow_modifiers_on_gizmo_tweak(keyconfig_data):
     """Let a held modifier reach the manipulator.
 
@@ -147,6 +171,7 @@ def load():
     remove_maya_key_conflicts(keyconfig_data)
     allow_modifiers_on_gizmo_tweak(keyconfig_data)
     apply_maya_selection_shortcuts(keyconfig_data)
+    apply_maya_modeling_shortcuts(keyconfig_data)
 
     if platform == "darwin":
         from bl_keymap_utils.platform_helpers import keyconfig_data_oskey_from_ctrl_for_macos

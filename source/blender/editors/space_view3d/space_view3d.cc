@@ -119,12 +119,12 @@ static void view3d_maya_component_marking_menu_draw(const bContext *C, Menu *men
   /* Maya marking-menu order: left, right, bottom, top, top-left, top-right,
    * bottom-left, bottom-right. */
   view3d_maya_component_mode_item(pie, "Vertex", 1, component_modes_enabled);
-  view3d_maya_component_mode_item(pie, "Object Mode", 0, active_object != nullptr);
+  view3d_maya_component_mode_item(
+      pie, "UV (Experimental)", 4, component_modes_enabled);
   view3d_maya_component_mode_item(pie, "Face", 3, component_modes_enabled);
   view3d_maya_component_mode_item(pie, "Edge", 2, component_modes_enabled);
   pie.separator();
-  view3d_maya_component_mode_item(
-      pie, "UV (Experimental)", 4, component_modes_enabled);
+  view3d_maya_component_mode_item(pie, "Object Mode", 0, active_object != nullptr);
 
   view3d_maya_component_mode_item(
       pie, "Vertex Face (Experimental)", 5, component_modes_enabled);

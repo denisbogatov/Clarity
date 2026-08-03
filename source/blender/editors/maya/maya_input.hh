@@ -38,6 +38,7 @@ enum class MayaActionID : uint16_t {
   FrameSelected,
   Connect,
   BridgeOrFill,
+  Extrude,
   SubdivisionPreviewOff,
   SubdivisionPreviewOn,
   SubdivisionPreviewSurface,

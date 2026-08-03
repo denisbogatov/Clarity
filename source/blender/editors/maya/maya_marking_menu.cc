@@ -5,7 +5,7 @@
 /** \file
  * \ingroup editors
  *
- * The Maya Move Tool marking menu, its submenus and the state behind them.
+ * Maya Select, Move, Rotate and Scale marking menus, their submenus and shared state.
  */
 
 #include "maya_marking_menu.hh"
@@ -51,13 +51,46 @@ namespace ed::maya {
  * second truth that silently disagrees the moment the user changes one of them elsewhere.
  * \{ */
 
-static TransformOrientationSlot *move_orientation_slot_get(const bContext *C)
+static int transform_orientation_slot_flag_get(const MayaToolID tool)
+{
+  switch (tool) {
+    case MayaToolID::Move:
+      return SCE_ORIENT_TRANSLATE;
+    case MayaToolID::Rotate:
+      return SCE_ORIENT_ROTATE;
+    case MayaToolID::Scale:
+      return SCE_ORIENT_SCALE;
+    case MayaToolID::None:
+    case MayaToolID::Select:
+    case MayaToolID::MultiCut:
+    case MayaToolID::TargetWeld:
+    case MayaToolID::QuadDraw:
+      break;
+  }
+  return -1;
+}
+
+static TransformOrientationSlot *transform_orientation_slot_get(const bContext *C,
+                                                                 const MayaToolID tool,
+                                                                 const bool activate_tool_slot)
 {
   Scene *scene = CTX_data_scene(C);
   if (scene == nullptr) {
     return nullptr;
   }
-  return BKE_scene_orientation_slot_get(scene, SCE_ORIENT_TRANSLATE);
+  const int slot_flag = transform_orientation_slot_flag_get(tool);
+  if (slot_flag < 0) {
+    return nullptr;
+  }
+  if (!activate_tool_slot) {
+    return BKE_scene_orientation_slot_get(scene, slot_flag);
+  }
+
+  TransformOrientationSlot *slot = &scene->orientation_slots[slot_flag];
+  if (slot_flag != SCE_ORIENT_DEFAULT) {
+    slot->flag |= SELECT;
+  }
+  return slot;
 }
 
 static MayaMoveOrientation move_orientation_from_blender(const int orientation_type)
@@ -67,6 +100,8 @@ static MayaMoveOrientation move_orientation_from_blender(const int orientation_t
       return MayaMoveOrientation::Object;
     case V3D_ORIENT_NORMAL:
       return MayaMoveOrientation::Component;
+    case V3D_ORIENT_GIMBAL:
+      return MayaMoveOrientation::Gimbal;
     default:
       return MayaMoveOrientation::World;
   }
@@ -81,6 +116,8 @@ static int move_orientation_to_blender(const MayaMoveOrientation orientation)
       /* Maya builds the frame from the normals of the selected components and falls back to the
        * object's own axes for a whole object, which is what Blender's Normal orientation does. */
       return V3D_ORIENT_NORMAL;
+    case MayaMoveOrientation::Gimbal:
+      return V3D_ORIENT_GIMBAL;
     case MayaMoveOrientation::World:
       break;
   }
@@ -91,10 +128,7 @@ MayaMoveToolState move_tool_state_get(const bContext *C)
 {
   MayaMoveToolState state;
 
-  if (const TransformOrientationSlot *slot = move_orientation_slot_get(C)) {
-    state.orientation = move_orientation_from_blender(
-        BKE_scene_orientation_slot_get_index(slot));
-  }
+  state.orientation = transform_orientation_get(C, MayaToolID::Move);
 
   if (const ToolSettings *ts = CTX_data_tool_settings(C)) {
     state.preserve_uvs = (ts->uvcalc_flag & UVCALC_TRANSFORM_CORRECT) != 0;
@@ -112,6 +146,14 @@ MayaMoveToolState move_tool_state_get(const bContext *C)
   }
 
   return state;
+}
+
+MayaMoveOrientation transform_orientation_get(const bContext *C, const MayaToolID tool)
+{
+  if (const TransformOrientationSlot *slot = transform_orientation_slot_get(C, tool, false)) {
+    return move_orientation_from_blender(BKE_scene_orientation_slot_get_index(slot));
+  }
+  return MayaMoveOrientation::World;
 }
 
 bool move_option_get(const MayaMoveToolState &state, const MayaMoveOption option)
@@ -197,13 +239,43 @@ bool move_option_set(bContext *C, const MayaMoveOption option, const bool value)
 
 bool move_orientation_set(bContext *C, const MayaMoveOrientation orientation)
 {
-  TransformOrientationSlot *slot = move_orientation_slot_get(C);
+  return transform_orientation_set(C, MayaToolID::Move, orientation);
+}
+
+bool transform_orientation_set(bContext *C,
+                               const MayaToolID tool,
+                               const MayaMoveOrientation orientation)
+{
+  if (orientation == MayaMoveOrientation::Gimbal && tool != MayaToolID::Rotate) {
+    return false;
+  }
+  TransformOrientationSlot *slot = transform_orientation_slot_get(C, tool, true);
   if (slot == nullptr) {
     return false;
   }
   BKE_scene_orientation_slot_set_index(slot, move_orientation_to_blender(orientation));
   move_menu_state_changed(C, true);
   return true;
+}
+
+const char *tool_marking_menu_idname(const MayaToolID tool)
+{
+  switch (tool) {
+    case MayaToolID::Select:
+      return "VIEW3D_MT_maya_select_marking_menu";
+    case MayaToolID::Move:
+      return "VIEW3D_MT_maya_move_marking_menu";
+    case MayaToolID::Rotate:
+      return "VIEW3D_MT_maya_rotate_marking_menu";
+    case MayaToolID::Scale:
+      return "VIEW3D_MT_maya_scale_marking_menu";
+    case MayaToolID::None:
+    case MayaToolID::MultiCut:
+    case MayaToolID::TargetWeld:
+    case MayaToolID::QuadDraw:
+      break;
+  }
+  return nullptr;
 }
 
 bool selection_constraint_set(bContext *C, const MayaSelectionConstraint constraint)
@@ -250,6 +322,37 @@ static const EnumPropertyItem maya_move_orientation_items[] = {
      0,
      "Component",
      "Orient the manipulator along the averaged frame of the selected components"},
+    {int(MayaMoveOrientation::Gimbal),
+     "GIMBAL",
+     0,
+     "Gimbal",
+     "Orient the Rotate Tool along the object's Euler rotation axes"},
+    {0, nullptr, 0, nullptr, nullptr},
+};
+
+static const EnumPropertyItem maya_transform_tool_items[] = {
+    {int(MayaToolID::Move), "MOVE", 0, "Move", "Set the Move Tool orientation"},
+    {int(MayaToolID::Rotate), "ROTATE", 0, "Rotate", "Set the Rotate Tool orientation"},
+    {int(MayaToolID::Scale), "SCALE", 0, "Scale", "Set the Scale Tool orientation"},
+    {0, nullptr, 0, nullptr, nullptr},
+};
+
+static const EnumPropertyItem maya_camera_based_selection_menu_items[] = {
+    {int(MayaCameraBasedSelection::Off),
+     "OFF",
+     0,
+     "Off",
+     "Select through the mesh without camera-depth filtering"},
+    {int(MayaCameraBasedSelection::On),
+     "ON",
+     0,
+     "On",
+     "Use camera-depth filtering when the viewport supports it"},
+    {int(MayaCameraBasedSelection::Auto),
+     "AUTO",
+     0,
+     "Auto",
+     "Use camera-depth filtering in shaded non-X-Ray views"},
     {0, nullptr, 0, nullptr, nullptr},
 };
 
@@ -338,22 +441,29 @@ static const EnumPropertyItem maya_transform_constraint_items[] = {
     {0, nullptr, 0, nullptr, nullptr},
 };
 
-static wmOperatorStatus maya_move_orientation_set_exec(bContext *C, wmOperator *op)
+static wmOperatorStatus maya_transform_orientation_set_exec(bContext *C, wmOperator *op)
 {
   const MayaMoveOrientation orientation = MayaMoveOrientation(
       RNA_enum_get(op->ptr, "orientation"));
-  return move_orientation_set(C, orientation) ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+  const MayaToolID tool = MayaToolID(RNA_enum_get(op->ptr, "tool"));
+  return transform_orientation_set(C, tool, orientation) ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
 }
 
-static void MAYA_OT_move_orientation_set(wmOperatorType *ot)
+static void MAYA_OT_transform_orientation_set(wmOperatorType *ot)
 {
-  ot->name = "Maya Move Orientation";
-  ot->description = "Set the coordinate system the Move Tool manipulator is oriented in";
-  ot->idname = "MAYA_OT_move_orientation_set";
-  ot->exec = maya_move_orientation_set_exec;
+  ot->name = "Maya Transform Orientation";
+  ot->description = "Set the coordinate system of a Maya transform-tool manipulator";
+  ot->idname = "MAYA_OT_transform_orientation_set";
+  ot->exec = maya_transform_orientation_set_exec;
   ot->poll = ED_operator_view3d_active;
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
+  RNA_def_enum(ot->srna,
+               "tool",
+               maya_transform_tool_items,
+               int(MayaToolID::Move),
+               "Tool",
+               "");
   RNA_def_enum(ot->srna,
                "orientation",
                maya_move_orientation_items,
@@ -436,10 +546,10 @@ static void MAYA_OT_transform_constraint_set(wmOperatorType *ot)
                "");
 }
 
-static wmOperatorStatus maya_move_options_exec(bContext *C, wmOperator * /*op*/)
+static wmOperatorStatus maya_tool_options_exec(bContext *C, wmOperator * /*op*/)
 {
-  /* Maya's Move Options opens the Tool Settings of the active tool. The sidebar Tool tab is where
-   * this fork keeps them, so the command only has to make sure it is the visible one. */
+  /* Maya's tool Options rows open Tool Settings. The sidebar Tool tab is where this fork keeps
+   * them, so the command only has to make sure it is the visible one. */
   ScrArea *area = CTX_wm_area(C);
   if (area == nullptr || area->spacetype != SPACE_VIEW3D) {
     return OPERATOR_CANCELLED;
@@ -456,12 +566,12 @@ static wmOperatorStatus maya_move_options_exec(bContext *C, wmOperator * /*op*/)
   return OPERATOR_FINISHED;
 }
 
-static void MAYA_OT_move_options(wmOperatorType *ot)
+static void MAYA_OT_tool_options(wmOperatorType *ot)
 {
-  ot->name = "Maya Move Options";
-  ot->description = "Show the settings of the active Move Tool";
-  ot->idname = "MAYA_OT_move_options";
-  ot->exec = maya_move_options_exec;
+  ot->name = "Maya Tool Options";
+  ot->description = "Show the settings of the active Maya tool";
+  ot->idname = "MAYA_OT_tool_options";
+  ot->exec = maya_tool_options_exec;
   ot->poll = ED_operator_view3d_active;
 }
 
@@ -488,13 +598,15 @@ static int check_icon(const bool active)
 static void orientation_item(ui::Layout &layout,
                              const MayaMoveToolState &state,
                              const char *name,
+                             const MayaToolID tool,
                              const MayaMoveOrientation orientation)
 {
-  PointerRNA op_ptr = layout.op("MAYA_OT_move_orientation_set",
+  PointerRNA op_ptr = layout.op("MAYA_OT_transform_orientation_set",
                                 name,
                                 check_icon(state.orientation == orientation),
                                 wm::OpCallContext::ExecDefault,
                                 UI_ITEM_NONE);
+  RNA_enum_set(&op_ptr, "tool", int(tool));
   RNA_enum_set(&op_ptr, "orientation", int(orientation));
 }
 
@@ -511,26 +623,46 @@ static void option_item(ui::Layout &layout,
   RNA_enum_set(&op_ptr, "option", int(option));
 }
 
-static void maya_move_marking_menu_draw(const bContext *C, Menu *menu)
+static MayaMoveToolState transform_tool_state_get(const bContext *C, const MayaToolID tool)
 {
-  const MayaMoveToolState state = move_tool_state_get(C);
+  MayaMoveToolState state = move_tool_state_get(C);
+  state.orientation = transform_orientation_get(C, tool);
+  return state;
+}
 
-  /* Blender fills the eight radial slots in the order W, E, S, N, NW, NE, SW, SE. The empty ones
-   * are the four entries of Maya's own menu this fork does not implement yet, and a separator is
-   * how a slot is left free without shifting everything after it. */
-  ui::Layout &pie = menu->layout->menu_pie();
-  orientation_item(pie, state, "World", MayaMoveOrientation::World); /* W */
-  pie.separator();                                                   /* E */
-  pie.separator();                                                   /* S */
-  pie.separator();                                                   /* N */
-  orientation_item(pie, state, "Object", MayaMoveOrientation::Object);       /* NW */
-  orientation_item(pie, state, "Component", MayaMoveOrientation::Component); /* NE */
-  pie.separator();                                                          /* SW */
-  option_item(pie, state, "Keep Spacing", MayaMoveOption::KeepSpacing);      /* SE */
+static void transform_orientation_pie_draw(ui::Layout &pie,
+                                           const MayaMoveToolState &state,
+                                           const MayaToolID tool,
+                                           const bool show_keep_spacing,
+                                           const bool show_gimbal)
+{
+  /* Blender fills radial slots in the order W, E, S, N, NW, NE, SW, SE. Keep the coordinate
+   * systems in the same directions for every transform tool so the learned gesture transfers. */
+  orientation_item(pie, state, "World", tool, MayaMoveOrientation::World); /* W */
+  if (show_gimbal) {
+    orientation_item(pie, state, "Gimbal", tool, MayaMoveOrientation::Gimbal); /* E */
+  }
+  else {
+    pie.separator(); /* E */
+  }
+  pie.separator();                                                         /* S */
+  pie.separator();                                                         /* N */
+  orientation_item(pie, state, "Object", tool, MayaMoveOrientation::Object);       /* NW */
+  orientation_item(pie, state, "Component", tool, MayaMoveOrientation::Component); /* NE */
+  pie.separator();                                                                  /* SW */
+  if (show_keep_spacing) {
+    option_item(pie, state, "Keep Spacing", MayaMoveOption::KeepSpacing); /* SE */
+  }
+  else {
+    pie.separator(); /* SE */
+  }
+}
 
-  /* The linear part hangs under the wheel, exactly like Maya's. The blank icon puts the two
-   * submenu rows in the same column as the checks, so the list reads as one stack of buttons. */
-  ui::Layout &list = menu->layout->column(false);
+static void transform_common_list_draw(ui::Layout &list,
+                                       const MayaMoveToolState &state,
+                                       const char *options_label,
+                                       const bool show_update_triad)
+{
   list.menu("VIEW3D_MT_maya_selection_constraints", "Selection Constraints", ICON_BLANK1);
   list.menu("VIEW3D_MT_maya_transform_constraints", "Transform Constraints", ICON_BLANK1);
   list.separator();
@@ -539,14 +671,93 @@ static void maya_move_marking_menu_draw(const bContext *C, Menu *menu)
   option_item(list, state, "Preserve UVs", MayaMoveOption::PreserveUVs);
   option_item(list, state, "Preserve Children", MayaMoveOption::PreserveChildren);
   option_item(list, state, "Tweak Mode", MayaMoveOption::TweakMode);
-  option_item(list, state, "Update Triad", MayaMoveOption::UpdateTriad);
+  if (show_update_triad) {
+    option_item(list, state, "Update Triad", MayaMoveOption::UpdateTriad);
+  }
   list.separator();
-  /* An action, not a state, so it carries no check. */
-  list.op("MAYA_OT_move_options",
-          "Move Options",
+  list.op("MAYA_OT_tool_options",
+          options_label,
           ICON_BLANK1,
           wm::OpCallContext::ExecDefault,
           UI_ITEM_NONE);
+}
+
+static MayaSelectionSettings selection_settings_get(const bContext *C)
+{
+  if (const MayaWindowRuntime *runtime = runtime_get(C)) {
+    return runtime->selection_settings;
+  }
+  return {};
+}
+
+static void selection_boolean_item(ui::Layout &layout,
+                                   const char *name,
+                                   const char *property,
+                                   const bool value)
+{
+  PointerRNA op_ptr = layout.op("MAYA_OT_selection_settings_set",
+                                name,
+                                check_icon(value),
+                                wm::OpCallContext::ExecDefault,
+                                UI_ITEM_NONE);
+  RNA_boolean_set(&op_ptr, property, !value);
+}
+
+static void maya_select_marking_menu_draw(const bContext *C, Menu *menu)
+{
+  const MayaSelectionSettings selection = selection_settings_get(C);
+  const MayaMoveToolState common = move_tool_state_get(C);
+
+  ui::Layout &pie = menu->layout->menu_pie();
+  pie.menu("VIEW3D_MT_maya_selection_constraints", "Selection Constraints", ICON_NONE); /* W */
+  pie.menu("VIEW3D_MT_maya_camera_based_selection", "Camera Based Selection", ICON_NONE); /* E */
+  pie.separator();                                                                      /* S */
+  selection_boolean_item(
+      pie, "Highlight Backfaces", "highlight_backfaces", selection.highlight_backfaces); /* N */
+  pie.separator(); /* NW */
+  pie.separator(); /* NE */
+  pie.separator(); /* SW */
+  pie.separator(); /* SE */
+
+  ui::Layout &list = menu->layout->column(false);
+  option_item(list, common, "Shift Extrude", MayaMoveOption::ShiftExtrude);
+  option_item(list, common, "Shift Duplicate", MayaMoveOption::ShiftDuplicate);
+  list.separator();
+  list.op("MAYA_OT_tool_options",
+          "Select Options",
+          ICON_BLANK1,
+          wm::OpCallContext::ExecDefault,
+          UI_ITEM_NONE);
+}
+
+static void maya_move_marking_menu_draw(const bContext *C, Menu *menu)
+{
+  const MayaMoveToolState state = transform_tool_state_get(C, MayaToolID::Move);
+  ui::Layout &pie = menu->layout->menu_pie();
+  transform_orientation_pie_draw(pie, state, MayaToolID::Move, true, false);
+
+  ui::Layout &list = menu->layout->column(false);
+  transform_common_list_draw(list, state, "Move Options", true);
+}
+
+static void maya_rotate_marking_menu_draw(const bContext *C, Menu *menu)
+{
+  const MayaMoveToolState state = transform_tool_state_get(C, MayaToolID::Rotate);
+  ui::Layout &pie = menu->layout->menu_pie();
+  transform_orientation_pie_draw(pie, state, MayaToolID::Rotate, false, true);
+
+  ui::Layout &list = menu->layout->column(false);
+  transform_common_list_draw(list, state, "Rotate Options", false);
+}
+
+static void maya_scale_marking_menu_draw(const bContext *C, Menu *menu)
+{
+  const MayaMoveToolState state = transform_tool_state_get(C, MayaToolID::Scale);
+  ui::Layout &pie = menu->layout->menu_pie();
+  transform_orientation_pie_draw(pie, state, MayaToolID::Scale, false, false);
+
+  ui::Layout &list = menu->layout->column(false);
+  transform_common_list_draw(list, state, "Scale Options", false);
 }
 
 /**
@@ -557,6 +768,24 @@ static void maya_submenu_style_set(Menu *menu)
 {
   if (ui::Block *block = menu->layout->block()) {
     ui::block_theme_style_set(block, ui::BLOCK_THEME_STYLE_MAYA_MENU);
+  }
+}
+
+static void maya_camera_based_selection_draw(const bContext *C, Menu *menu)
+{
+  maya_submenu_style_set(menu);
+
+  const MayaCameraBasedSelection active = selection_settings_get(C).camera_based_selection;
+  for (const EnumPropertyItem *item = maya_camera_based_selection_menu_items;
+       item->identifier != nullptr;
+       item++)
+  {
+    PointerRNA op_ptr = menu->layout->op("MAYA_OT_selection_settings_set",
+                                         item->name,
+                                         check_icon(active == MayaCameraBasedSelection(item->value)),
+                                         wm::OpCallContext::ExecDefault,
+                                         UI_ITEM_NONE);
+    RNA_enum_set(&op_ptr, "camera_based_selection", item->value);
   }
 }
 
@@ -628,9 +857,9 @@ static void maya_transform_constraints_draw(const bContext *C, Menu *menu)
   }
 }
 
-static void move_menutype_register(const char *idname,
-                                   void (*draw)(const bContext *, Menu *),
-                                   const bool with_poll)
+static void marking_menutype_register(const char *idname,
+                                      void (*draw)(const bContext *, Menu *),
+                                      const bool with_poll)
 {
   MenuType *type = MEM_new<MenuType>(__func__);
   STRNCPY_UTF8(type->idname, idname);
@@ -643,18 +872,27 @@ static void move_menutype_register(const char *idname,
 
 void register_marking_menu_types()
 {
-  WM_operatortype_append(MAYA_OT_move_orientation_set);
+  WM_operatortype_append(MAYA_OT_transform_orientation_set);
   WM_operatortype_append(MAYA_OT_move_option_toggle);
   WM_operatortype_append(MAYA_OT_selection_constraint_set);
   WM_operatortype_append(MAYA_OT_transform_constraint_set);
-  WM_operatortype_append(MAYA_OT_move_options);
+  WM_operatortype_append(MAYA_OT_tool_options);
 
-  move_menutype_register("VIEW3D_MT_maya_move_marking_menu", maya_move_marking_menu_draw, true);
-  move_menutype_register(
+  marking_menutype_register(
+      "VIEW3D_MT_maya_select_marking_menu", maya_select_marking_menu_draw, true);
+  marking_menutype_register(
+      "VIEW3D_MT_maya_move_marking_menu", maya_move_marking_menu_draw, true);
+  marking_menutype_register(
+      "VIEW3D_MT_maya_rotate_marking_menu", maya_rotate_marking_menu_draw, true);
+  marking_menutype_register(
+      "VIEW3D_MT_maya_scale_marking_menu", maya_scale_marking_menu_draw, true);
+  marking_menutype_register(
+      "VIEW3D_MT_maya_camera_based_selection", maya_camera_based_selection_draw, false);
+  marking_menutype_register(
       "VIEW3D_MT_maya_selection_constraints", maya_selection_constraints_draw, false);
-  move_menutype_register(
+  marking_menutype_register(
       "VIEW3D_MT_maya_selection_constraint_angle", maya_selection_constraint_angle_draw, false);
-  move_menutype_register(
+  marking_menutype_register(
       "VIEW3D_MT_maya_transform_constraints", maya_transform_constraints_draw, false);
 }
 

@@ -193,6 +193,12 @@ std::optional<ed::maya::MayaInputAction> ED_maya_input_translate(
     action.id = ed::maya::MayaActionID::BridgeOrFill;
     action.phase = ed::maya::MayaActionPhase::Begin;
   }
+  else if (event.type == EVT_EKEY && event.val == KM_PRESS && action.ctrl && !action.shift &&
+           !action.alt)
+  {
+    action.id = ed::maya::MayaActionID::Extrude;
+    action.phase = ed::maya::MayaActionPhase::Begin;
+  }
   else if (event.type == EVT_TWOKEY && event.val == KM_PRESS && action.ctrl && !action.shift &&
            !action.alt)
   {

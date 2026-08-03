@@ -7915,6 +7915,16 @@ def km_3d_view_tool_edit_mesh_knife(params):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             # No need for `tool_modifier` since this takes all input.
+            ("mesh.knife_tool", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True, "shift": True},
+             {"properties": [("wait_for_input", False)]}),
+            ("mesh.knife_tool", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
+             {"properties": [("wait_for_input", False)]}),
+            ("mesh.knife_tool", {"type": params.tool_mouse, "value": 'PRESS', "key_modifier": 'X'},
+             {"properties": [("wait_for_input", False)]}),
+            ("mesh.knife_tool", {"type": params.tool_mouse, "value": 'PRESS', "key_modifier": 'V'},
+             {"properties": [("wait_for_input", False)]}),
+            ("mesh.knife_tool", {"type": params.tool_mouse, "value": 'PRESS', "shift": True},
+             {"properties": [("wait_for_input", False)]}),
             ("mesh.knife_tool", {"type": params.tool_mouse, "value": 'PRESS'},
              {"properties": [("wait_for_input", False)]}),
         ]},

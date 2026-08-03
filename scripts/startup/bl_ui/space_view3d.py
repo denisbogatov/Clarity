@@ -7,6 +7,7 @@ import os
 from bpy.types import (
     Header,
     Menu,
+    Operator,
     Panel,
     SurfaceCurve
 )
@@ -6606,6 +6607,194 @@ def unregister_props():
     del bpy.types.WindowManager.maya_navigation_debug
 
 
+def _maya_multi_cut_properties(context):
+    tool = context.workspace.tools.from_space_view3d_mode(context.mode, create=False)
+    if tool is None or tool.idname != "builtin.knife":
+        return None
+    return tool.operator_properties("mesh.knife_tool")
+
+
+_MAYA_MULTI_CUT_SETTING_IDS = (
+    "snap_step",
+    "smoothing_angle",
+    "use_edge_flow",
+    "edge_flow_factor",
+    "subdivisions",
+    "ignore_backfaces",
+    "delete_faces",
+    "extract_faces",
+    "extract_offset",
+    "line_color",
+    "edge_point_color",
+    "vertex_point_color",
+    "face_point_color",
+    "use_live_surface",
+    "wireframe_overlay",
+    "wireframe_color",
+    "mesh_overlay",
+    "mesh_color",
+    "mesh_alpha",
+    "surface_offset",
+    "snap_to_backfaces",
+)
+
+
+class VIEW3D_MT_maya_multi_cut_marking_menu(Menu):
+    bl_label = "Multi-Cut Tool"
+
+    def draw(self, context):
+        pie = self.layout.menu_pie()
+        props = _maya_multi_cut_properties(context)
+        if props is None:
+            pie.label(text="Multi-Cut Tool is not active", icon='INFO')
+            return
+
+        pie.prop(props, "snap_step", text="Snap Step %")
+        pie.prop(props, "use_edge_flow", text="Edge Flow")
+        pie.prop(props, "subdivisions", text="Subdivisions")
+        pie.prop(props, "ignore_backfaces", text="Ignore Backfaces")
+        pie.prop(props, "delete_faces", text="Delete Faces")
+        pie.prop(props, "extract_faces", text="Extract Faces")
+        pie.operator("mesh.maya_multi_cut_reset", text="Reset Tool", icon='LOOP_BACK')
+        pie.prop(props, "use_live_surface", text="Live Surface")
+
+
+class MESH_OT_maya_multi_cut_reset(Operator):
+    bl_idname = "mesh.maya_multi_cut_reset"
+    bl_label = "Reset Multi-Cut Tool"
+    bl_description = "Restore Maya Multi-Cut settings to their defaults"
+
+    def execute(self, context):
+        props = _maya_multi_cut_properties(context)
+        if props is None:
+            return {'CANCELLED'}
+
+        for identifier in _MAYA_MULTI_CUT_SETTING_IDS:
+            props.property_unset(identifier)
+
+        if context.area:
+            context.area.tag_redraw()
+        return {'FINISHED'}
+
+
+class MESH_OT_maya_multi_cut_activate(Operator):
+    bl_idname = "mesh.maya_multi_cut_activate"
+    bl_label = "Activate Multi-Cut Tool"
+    bl_description = "Enter mesh edit mode and start the Maya Multi-Cut tool with hover preview"
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and obj.type == 'MESH' and context.mode in {'OBJECT', 'EDIT_MESH'}
+
+    def execute(self, context):
+        if context.mode == 'OBJECT':
+            bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.wm.tool_set_by_id(name="builtin.knife")
+
+        props = _maya_multi_cut_properties(context)
+        if props is None:
+            return {'CANCELLED'}
+
+        operator_props = {}
+        for identifier in _MAYA_MULTI_CUT_SETTING_IDS:
+            value = getattr(props, identifier)
+            operator_props[identifier] = tuple(value) if hasattr(value, "__len__") else value
+
+        result = bpy.ops.mesh.knife_tool(
+            'INVOKE_DEFAULT',
+            wait_for_input=True,
+            **operator_props,
+        )
+        return {'FINISHED'} if 'RUNNING_MODAL' in result else result
+
+
+class MESH_OT_maya_multi_cut_slice_plane(Operator):
+    bl_idname = "mesh.maya_multi_cut_slice_plane"
+    bl_label = "Multi-Cut Slice Along Plane"
+    bl_description = "Slice the edited mesh through its center along a Maya Multi-Cut plane"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    axis: bpy.props.EnumProperty(
+        name="Plane",
+        items=(
+            ('YZ', "YZ", "Slice along the YZ plane"),
+            ('ZX', "ZX", "Slice along the ZX plane"),
+            ('XY', "XY", "Slice along the XY plane"),
+        ),
+        default='YZ',
+    )
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and context.edit_object is not None
+
+    def execute(self, context):
+        import bmesh
+        from mathutils import Vector
+
+        props = _maya_multi_cut_properties(context)
+        if props is None:
+            return {'CANCELLED'}
+
+        objects = [obj for obj in context.objects_in_mode_unique_data if obj.type == 'MESH']
+        minimum = Vector((float('inf'),) * 3)
+        maximum = Vector((float('-inf'),) * 3)
+        has_vertices = False
+        for obj in objects:
+            bm = bmesh.from_edit_mesh(obj.data)
+            for vert in bm.verts:
+                world = obj.matrix_world @ vert.co
+                minimum.x = min(minimum.x, world.x)
+                minimum.y = min(minimum.y, world.y)
+                minimum.z = min(minimum.z, world.z)
+                maximum.x = max(maximum.x, world.x)
+                maximum.y = max(maximum.y, world.y)
+                maximum.z = max(maximum.z, world.z)
+                has_vertices = True
+
+        if not has_vertices:
+            return {'CANCELLED'}
+
+        plane_center = (minimum + maximum) * 0.5
+        plane_normal = {
+            'YZ': Vector((1.0, 0.0, 0.0)),
+            'ZX': Vector((0.0, 1.0, 0.0)),
+            'XY': Vector((0.0, 0.0, 1.0)),
+        }[self.axis]
+
+        bpy.ops.mesh.select_all(action='SELECT')
+        extract_faces = props.extract_faces
+        bpy.ops.mesh.bisect(
+            plane_co=plane_center,
+            plane_no=plane_normal,
+            clear_inner=False,
+            clear_outer=props.delete_faces and not extract_faces,
+            use_fill=False,
+        )
+
+        if extract_faces:
+            for obj in objects:
+                bm = bmesh.from_edit_mesh(obj.data)
+                for face in bm.faces:
+                    center_world = obj.matrix_world @ face.calc_center_median()
+                    face.select = (center_world - plane_center).dot(plane_normal) > 0.0
+                bm.select_flush_mode()
+                bmesh.update_edit_mesh(obj.data, loop_triangles=False, destructive=False)
+
+            bpy.ops.mesh.split()
+            offset_world = Vector(props.extract_offset)
+            for obj in objects:
+                bm = bmesh.from_edit_mesh(obj.data)
+                offset_local = obj.matrix_world.inverted_safe().to_3x3() @ offset_world
+                selected_vertices = [vert for vert in bm.verts if vert.select]
+                if selected_vertices:
+                    bmesh.ops.translate(bm, verts=selected_vertices, vec=offset_local)
+                    bmesh.update_edit_mesh(obj.data, loop_triangles=True, destructive=True)
+
+        return {'FINISHED'}
+
+
 class VIEW3D_PT_maya_navigation_debug(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -9709,6 +9898,10 @@ classes = (
     VIEW3D_PT_active_tool_duplicate,
     VIEW3D_PT_view3d_properties,
     VIEW3D_PT_view3d_lock,
+    VIEW3D_MT_maya_multi_cut_marking_menu,
+    MESH_OT_maya_multi_cut_activate,
+    MESH_OT_maya_multi_cut_reset,
+    MESH_OT_maya_multi_cut_slice_plane,
     VIEW3D_PT_maya_interaction,
     VIEW3D_PT_maya_pivot_settings,
     VIEW3D_PT_maya_navigation_debug,

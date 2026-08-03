@@ -11,8 +11,8 @@
  * now. Maya's own menus work the same way, and it is the only arrangement that cannot drift, which
  * matters here because most of these settings can also be changed from somewhere else.
  *
- * Deliberately its own header instead of a section of `maya_runtime.hh`: only the menu, the runtime
- * and the two operators that write these settings need the types.
+ * Deliberately its own header instead of a section of `maya_runtime.hh`: only the menus, runtime
+ * and operators that write these settings need the types.
  */
 
 #pragma once
@@ -27,9 +27,11 @@ struct bContext;
 
 namespace ed::maya {
 
+enum class MayaToolID : uint8_t;
+
 /**
- * Which space the Move Tool manipulator is oriented in. One state, not three checkboxes: the three
- * modes exclude each other, exactly like `manipMoveContext -mode` in Maya.
+ * Which space a transform-tool manipulator is oriented in. One state, not independent checkboxes:
+ * the modes exclude each other, as they do in Maya's Move, Rotate and Scale contexts.
  */
 enum class MayaMoveOrientation : uint8_t {
   /** Maya `mode = 0`: the local axes of each object. */
@@ -38,6 +40,8 @@ enum class MayaMoveOrientation : uint8_t {
   World = 1,
   /** Maya `mode = 10`: the averaged frame of the selected components, driven by their normals. */
   Component = 2,
+  /** Rotate Tool only: derive axes from the object's Euler rotation order. */
+  Gimbal = 3,
 };
 
 /**
@@ -85,7 +89,7 @@ struct MayaMoveToolSettings {
   MayaTransformConstraint transform_constraint = MayaTransformConstraint::Off;
 };
 
-/** Snapshot of everything the Move Tool marking menu shows, gathered from the real owners. */
+/** Snapshot of the shared transform-menu state, gathered from the real owners. */
 struct MayaMoveToolState {
   MayaMoveOrientation orientation = MayaMoveOrientation::World;
   bool keep_spacing = true;
@@ -102,12 +106,21 @@ struct MayaMoveToolState {
 /** Read the live state. Falls back to the defaults when there is no Maya runtime yet. */
 MayaMoveToolState move_tool_state_get(const bContext *C);
 
+/** Resolve the transform orientation owned by one Maya transform tool. */
+MayaMoveOrientation transform_orientation_get(const bContext *C, MayaToolID tool);
+
 bool move_option_get(const MayaMoveToolState &state, MayaMoveOption option);
 bool move_option_set(bContext *C, MayaMoveOption option, bool value);
 
 bool move_orientation_set(bContext *C, MayaMoveOrientation orientation);
+bool transform_orientation_set(bContext *C,
+                               MayaToolID tool,
+                               MayaMoveOrientation orientation);
 bool selection_constraint_set(bContext *C, MayaSelectionConstraint constraint);
 bool transform_constraint_set(bContext *C, MayaTransformConstraint constraint);
+
+/** Registered marking menu for a Maya tool, or null for tools without one. */
+const char *tool_marking_menu_idname(MayaToolID tool);
 
 void register_marking_menu_types();
 

@@ -25,6 +25,7 @@
 #include "BLI_math_vector_types.hh"
 
 #include "BLI_memarena.h"
+#include "BLI_rect.h"
 #include "BLI_set.hh"
 #include "BLI_stack.h"
 #include "BLI_string_utf8.h"
@@ -46,6 +47,7 @@
 #include "GPU_matrix.hh"
 #include "GPU_state.hh"
 
+#include "ED_maya.hh"
 #include "ED_mesh.hh"
 #include "ED_numinput.hh"
 #include "ED_screen.hh"
@@ -54,6 +56,7 @@
 #include "ED_view3d.hh"
 
 #include "WM_api.hh"
+#include "WM_toolsystem.hh"
 #include "WM_types.hh"
 
 #include "DNA_mesh_types.h"
@@ -66,6 +69,9 @@
 #include "RNA_define.hh"
 
 #include "DEG_depsgraph_query.hh"
+
+#include "bmesh_tools.hh"
+#include "tools/bmesh_separate.hh"
 
 #include "mesh_intern.hh" /* Own include. */
 
@@ -103,6 +109,37 @@ struct KnifeColors {
   uchar yaxis[3];
   uchar zaxis[3];
   uchar axis_extra[3];
+  uchar face_point[3];
+  uchar wireframe[3];
+  uchar mesh[3];
+};
+
+struct KnifeMayaLoopPreviewPoint {
+  BMEdge *edge;
+  float3 cage;
+};
+
+struct KnifeEdge;
+
+enum class KnifeMayaRedoType : uint8_t {
+  Point,
+  StartPoint,
+  DeleteEdge,
+  Slice,
+};
+
+struct KnifeMayaRedoAction {
+  KnifeMayaRedoType type;
+  float2 mval;
+  float2 slice_start;
+  float2 slice_end;
+  KnifeEdge *edge;
+};
+
+struct KnifeMayaCutPoint {
+  float2 mval;
+  float3 cage;
+  bool grid_point;
 };
 
 /* Knife-tool Operator. */
@@ -184,6 +221,8 @@ struct KnifeUndoFrame {
   int splits;       /* Number of edges split. */
   KnifePosData pos; /* Store previous KnifePosData. */
   KnifeMeasureData mdata;
+  bool maya_prev_grid_point;
+  KnifeEdge *maya_deleted_edge;
 };
 
 struct KnifeBVH {
@@ -196,6 +235,7 @@ struct KnifeBVH {
   /* Use #bm_ray_cast_cb_elem_not_in_face_check. */
   bool (*filter_cb)(BMFace *f, void *userdata);
   void *filter_data;
+  bool cull_backfaces;
 };
 
 /** Additional per-object data. */
@@ -323,6 +363,73 @@ struct KnifeTool_OpData {
   bool is_drag_undo;
 
   bool depth_test;
+
+  /* Maya Multi-Cut presentation and interaction settings. */
+  bool maya_style;
+  float snap_step;
+  float smoothing_angle;
+  bool edge_flow;
+  float edge_flow_factor;
+  int subdivisions;
+  bool ignore_backfaces;
+  bool delete_faces;
+  bool extract_faces;
+  float3 extract_offset;
+  bool use_live_surface;
+  bool wireframe_overlay;
+  bool mesh_overlay;
+  float mesh_alpha;
+  float surface_offset;
+  bool snap_to_backfaces;
+
+  bool snap_to_grid;
+  bool snap_to_points;
+  bool maya_curr_grid_point;
+  bool maya_prev_grid_point;
+  bool maya_quick_slice;
+  bool maya_slice_drag;
+  bool maya_slice_result;
+  bool maya_slice_move;
+  size_t maya_slice_undo_count;
+  bool maya_tweak_last;
+  bool maya_tweak_first;
+  bool maya_perpendicular;
+  bool maya_perpendicular_preview_valid;
+  bool maya_has_committed_changes;
+  bool maya_lmb_down;
+  bool maya_lmb_dragged;
+  bool maya_lmb_started_cut;
+  bool maya_lmb_added_cut;
+  bool maya_snap_step_drag;
+  bool maya_replaying_redo;
+  bool maya_loop_insert_down;
+  bool maya_loop_insert_centered;
+  bool maya_loop_preview_has_origin;
+  bool maya_cut_start_valid;
+  int maya_loop_preview_ob_index;
+  int maya_perpendicular_snap_index;
+  int maya_tweak_point_index;
+  int maya_slice_tweak_endpoint;
+  BMEdge *maya_loop_preview_edge;
+  float maya_loop_preview_factor;
+  float2 maya_loop_preview_origin_mval;
+  float3 maya_cut_start_cage;
+  std::array<float3, 3> maya_perpendicular_dirs;
+  float2 maya_drag_start;
+  float2 maya_slice_start;
+  float2 maya_slice_end;
+  float2 maya_slice_control_start;
+  float2 maya_slice_control_end;
+  float2 maya_slice_tweak_original_start;
+  float2 maya_slice_tweak_original_end;
+  float2 maya_slice_move_start;
+  float2 maya_slice_move_end;
+  float2 maya_slice_move_control_start;
+  float2 maya_slice_move_control_end;
+  Vector<std::array<float3, 2>> maya_loop_preview_lines;
+  Vector<KnifeMayaLoopPreviewPoint> maya_loop_preview_points;
+  Vector<KnifeMayaRedoAction> maya_redo_actions;
+  Vector<KnifeMayaCutPoint> maya_cut_points;
 };
 
 enum {
@@ -345,6 +452,15 @@ enum {
   KNF_MODAL_Y_AXIS,
   KNF_MODAL_Z_AXIS,
   KNF_MODAL_ADD_CUT_CLOSED,
+  KNF_MODAL_GRID_SNAP_ON,
+  KNF_MODAL_GRID_SNAP_OFF,
+  KNF_MODAL_POINT_SNAP_ON,
+  KNF_MODAL_POINT_SNAP_OFF,
+  KNF_MODAL_QUICK_SLICE,
+  KNF_MODAL_INSERT_EDGE_LOOP,
+  KNF_MODAL_INSERT_CENTERED_EDGE_LOOP,
+  KNF_MODAL_REDO,
+  KNF_MODAL_DELETE_HIGHLIGHTED,
 };
 
 enum {
@@ -714,7 +830,9 @@ static void knifetool_draw_visible_angles(const KnifeTool_OpData *kcd)
     float *end;
 
     /* If using relative angle snapping, always draw angle to reference edge. */
-    if (kcd->is_angle_snapping && kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE) {
+    if (kcd->is_angle_snapping && !kcd->maya_perpendicular &&
+        kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE)
+    {
       kfe = kcd->snap_ref_edge;
       if (kfe->v1 != kfv) {
         tempkfv = kfe->v1;
@@ -828,6 +946,400 @@ static void knifetool_draw_dist_angle(const KnifeTool_OpData *kcd)
   }
 }
 
+static void knife_bm_tri_cagecos_get_worldspace(const KnifeTool_OpData *kcd,
+                                                 int ob_index,
+                                                 int tri_index,
+                                                 float cos[3][3]);
+static void knife_project_v2(const KnifeTool_OpData *kcd, const float co[3], float sco[2]);
+static bool knife_maya_first_edge_preview_get(const KnifeTool_OpData *kcd,
+                                              float3 &r_start);
+
+static void knifetool_draw_maya_overlay(const KnifeTool_OpData *kcd)
+{
+  if (!kcd->maya_style || !kcd->use_live_surface ||
+      (!kcd->mesh_overlay && !kcd->wireframe_overlay))
+  {
+    return;
+  }
+
+  GPU_blend(GPU_BLEND_ALPHA);
+  GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
+
+  uint pos = GPU_vertformat_attr_add(
+      immVertexFormat(), "pos", gpu::VertAttrType::SFLOAT_32_32_32);
+  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+
+  if (kcd->mesh_overlay) {
+    const uchar alpha = uchar(clamp_f(kcd->mesh_alpha, 0.0f, 1.0f) * 255.0f);
+    immUniformColor4ub(kcd->colors.mesh[0], kcd->colors.mesh[1], kcd->colors.mesh[2], alpha);
+
+    int triangle_count = 0;
+    for (const KnifeObjectInfo &obinfo : kcd->objects_info) {
+      triangle_count += obinfo.em->looptris.size();
+    }
+
+    if (triangle_count > 0) {
+      immBegin(GPU_PRIM_TRIS, triangle_count * 3);
+      for (const int ob_index : kcd->objects.index_range()) {
+        const KnifeObjectInfo &obinfo = kcd->objects_info[ob_index];
+        for (const int tri_index : obinfo.em->looptris.index_range()) {
+          float tri_cos[3][3];
+          knife_bm_tri_cagecos_get_worldspace(kcd, ob_index, tri_index, tri_cos);
+          for (float *co : tri_cos) {
+            madd_v3_v3fl(co, kcd->vc.rv3d->viewinv[2], kcd->surface_offset);
+          }
+          immVertex3fv(pos, tri_cos[0]);
+          immVertex3fv(pos, tri_cos[1]);
+          immVertex3fv(pos, tri_cos[2]);
+        }
+      }
+      immEnd();
+    }
+  }
+
+  if (kcd->wireframe_overlay) {
+    GPU_depth_test(GPU_DEPTH_NONE);
+    immUniformColor4ub(kcd->colors.wireframe[0],
+                       kcd->colors.wireframe[1],
+                       kcd->colors.wireframe[2],
+                       255);
+    GPU_line_width(1.0f);
+
+    int edge_count = 0;
+    for (const KnifeObjectInfo &obinfo : kcd->objects_info) {
+      edge_count += obinfo.em->bm->totedge;
+    }
+
+    if (edge_count > 0) {
+      immBegin(GPU_PRIM_LINES, edge_count * 2);
+      for (const int ob_index : kcd->objects.index_range()) {
+        const Object *ob = kcd->objects[ob_index];
+        const KnifeObjectInfo &obinfo = kcd->objects_info[ob_index];
+        BMIter iter;
+        BMEdge *edge;
+        BM_ITER_MESH (edge, &iter, obinfo.em->bm, BM_EDGES_OF_MESH) {
+          float v1[3], v2[3];
+          mul_v3_m4v3(v1,
+                      ob->object_to_world().ptr(),
+                      obinfo.positions_cage[BM_elem_index_get(edge->v1)]);
+          mul_v3_m4v3(v2,
+                      ob->object_to_world().ptr(),
+                      obinfo.positions_cage[BM_elem_index_get(edge->v2)]);
+          madd_v3_v3fl(v1, kcd->vc.rv3d->viewinv[2], kcd->surface_offset);
+          madd_v3_v3fl(v2, kcd->vc.rv3d->viewinv[2], kcd->surface_offset);
+          immVertex3fv(pos, v1);
+          immVertex3fv(pos, v2);
+        }
+      }
+      immEnd();
+    }
+  }
+
+  immUnbindProgram();
+  GPU_blend(GPU_BLEND_NONE);
+  GPU_depth_test(GPU_DEPTH_NONE);
+}
+
+static void knifetool_draw_maya_edge_percentage(const KnifeTool_OpData *kcd)
+{
+  if (!kcd->maya_style || kcd->maya_slice_drag || kcd->maya_quick_slice) {
+    return;
+  }
+
+  float factor;
+  float2 position;
+  if (kcd->maya_loop_preview_has_origin && !kcd->maya_loop_preview_lines.is_empty()) {
+    factor = kcd->maya_loop_preview_factor;
+    position = kcd->maya_loop_preview_origin_mval;
+  }
+  else {
+    if (kcd->curr.edge == nullptr || kcd->curr.vert != nullptr || kcd->maya_curr_grid_point) {
+      return;
+    }
+
+    const KnifeEdge *edge = kcd->curr.edge;
+    if (len_squared_v3v3(edge->v1->cageco, edge->v2->cageco) <= KNIFE_FLT_EPS_SQUARED) {
+      return;
+    }
+    factor = clamp_f(
+        line_point_factor_v3(kcd->curr.cage, edge->v1->cageco, edge->v2->cageco), 0.0f, 1.0f);
+    position = kcd->curr.mval;
+  }
+
+  char label[32];
+  SNPRINTF_UTF8(label, "%.2f%%", factor * 100.0f);
+
+  GPU_matrix_push_projection();
+  GPU_matrix_push();
+  GPU_matrix_identity_set();
+  wmOrtho2_region_pixelspace(kcd->region);
+
+  const int font_id = BLF_default();
+  const float shadow_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+  BLF_size(font_id, 11.0f * UI_SCALE_FAC);
+  BLF_color3ubv(font_id, kcd->colors.point);
+  BLF_shadow(font_id, FontShadowType::Outline, shadow_color);
+  BLF_shadow_offset(font_id, 0, 0);
+  BLF_enable(font_id, BLF_SHADOW);
+  BLF_position(font_id,
+               position[0] + 3.0f * UI_SCALE_FAC,
+               position[1] + 5.0f * UI_SCALE_FAC,
+               0.0f);
+  BLF_draw(font_id, label, sizeof(label));
+  BLF_disable(font_id, BLF_SHADOW);
+
+  GPU_matrix_pop();
+  GPU_matrix_pop_projection();
+}
+
+static void knifetool_draw_maya_points_overlay(const KnifeTool_OpData *kcd)
+{
+  if (!kcd->maya_style) {
+    return;
+  }
+
+  GPU_matrix_push_projection();
+  GPU_matrix_push();
+  GPU_matrix_identity_set();
+  wmOrtho2_region_pixelspace(kcd->region);
+
+  const uint pos = GPU_vertformat_attr_add(
+      immVertexFormat(), "pos", gpu::VertAttrType::SFLOAT_32_32);
+  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+  const uchar committed_point_color[3] = {255, 255, 255};
+
+  auto draw_square = [&](const float3 &cage, const uchar color[3], const float size) {
+    float2 screen;
+    knife_project_v2(kcd, cage, screen);
+    const float half_size = size * UI_SCALE_FAC * 0.5f;
+    immUniformColor3ubv(color);
+    immRectf(pos,
+             screen[0] - half_size,
+             screen[1] - half_size,
+             screen[0] + half_size,
+             screen[1] + half_size);
+  };
+  auto draw_screen_square = [&](const float2 &screen, const uchar color[3], const float size) {
+    const float half_size = size * UI_SCALE_FAC * 0.5f;
+    immUniformColor3ubv(color);
+    immRectf(pos,
+             screen[0] - half_size,
+             screen[1] - half_size,
+             screen[0] + half_size,
+             screen[1] + half_size);
+  };
+
+  if (kcd->curr.vert != nullptr) {
+    draw_square(kcd->curr.cage, kcd->colors.point, 7.0f);
+  }
+  else if (kcd->curr.edge != nullptr) {
+    draw_square(kcd->curr.cage, kcd->colors.curpoint, 6.0f);
+  }
+  else if (kcd->curr.bmface != nullptr) {
+    draw_square(kcd->curr.cage, kcd->colors.face_point, 6.0f);
+  }
+
+  if (kcd->maya_tweak_point_index >= 0) {
+    for (const int point_index : kcd->maya_cut_points.index_range()) {
+      draw_square(kcd->maya_cut_points[point_index].cage,
+                  point_index == 0 ? kcd->colors.point : committed_point_color,
+                  point_index == 0 ? 7.0f : 6.0f);
+    }
+  }
+  else if (kcd->totkedge > 0) {
+    BLI_mempool_iter iter;
+    BLI_mempool_iternew(kcd->kedges, &iter);
+    for (KnifeEdge *kfe = static_cast<KnifeEdge *>(BLI_mempool_iterstep(&iter)); kfe;
+         kfe = static_cast<KnifeEdge *>(BLI_mempool_iterstep(&iter)))
+    {
+      if (!kfe->is_cut || kfe->is_invalid) {
+        continue;
+      }
+      draw_square(kfe->v1->cageco, committed_point_color, 6.0f);
+      draw_square(kfe->v2->cageco, committed_point_color, 6.0f);
+
+      for (int subdivision = 1; subdivision < kcd->subdivisions; subdivision++) {
+        float3 point;
+        interp_v3_v3v3(
+            point, kfe->v1->cageco, kfe->v2->cageco, float(subdivision) / kcd->subdivisions);
+        const uchar black[3] = {0, 0, 0};
+        draw_square(point, black, 5.0f);
+      }
+    }
+  }
+
+  if (kcd->maya_snap_step_drag && kcd->curr.edge != nullptr) {
+    const float step = clamp_f(kcd->snap_step * 0.01f, 0.01f, 1.0f);
+    const int point_count = max_ii(int(ceilf(1.0f / step)) - 1, 0);
+    const uchar black[3] = {0, 0, 0};
+    for (int point_index = 1; point_index <= point_count; point_index++) {
+      const float factor = min_ff(float(point_index) * step, 1.0f - FLT_EPSILON);
+      float3 point;
+      interp_v3_v3v3(
+          point, kcd->curr.edge->v1->cageco, kcd->curr.edge->v2->cageco, factor);
+      draw_square(point, black, 5.0f);
+    }
+  }
+
+  if (!kcd->maya_loop_preview_lines.is_empty()) {
+    for (const std::array<float3, 2> &line : kcd->maya_loop_preview_lines) {
+      draw_square(line[0], kcd->colors.curpoint, 6.0f);
+      draw_square(line[1], kcd->colors.curpoint, 6.0f);
+      for (int subdivision = 1; subdivision < kcd->subdivisions; subdivision++) {
+        float3 point;
+        interp_v3_v3v3(
+            point, line[0], line[1], float(subdivision) / kcd->subdivisions);
+        const uchar black[3] = {0, 0, 0};
+        draw_square(point, black, 5.0f);
+      }
+    }
+  }
+
+  float3 first_edge_start;
+  if (knife_maya_first_edge_preview_get(kcd, first_edge_start)) {
+    draw_square(first_edge_start, kcd->colors.point, 7.0f);
+  }
+  if (kcd->maya_cut_start_valid) {
+    draw_square(kcd->maya_cut_start_cage, kcd->colors.point, 7.0f);
+  }
+  if (kcd->maya_slice_result || kcd->maya_slice_tweak_endpoint >= 0) {
+    draw_screen_square(kcd->maya_slice_control_start, kcd->colors.point, 7.0f);
+    draw_screen_square(kcd->maya_slice_control_end, committed_point_color, 6.0f);
+  }
+
+  if (kcd->maya_slice_move || kcd->maya_slice_tweak_endpoint >= 0) {
+    immUniformColor3ubv(kcd->colors.line);
+    GPU_line_width(2.0f);
+    immBegin(GPU_PRIM_LINES, 2);
+    immVertex2fv(pos, kcd->maya_slice_start);
+    immVertex2fv(pos, kcd->maya_slice_end);
+    immEnd();
+  }
+
+  immUnbindProgram();
+  GPU_matrix_pop();
+  GPU_matrix_pop_projection();
+}
+
+static void knifetool_draw_maya_perpendicular_preview(const KnifeTool_OpData *kcd)
+{
+  if (!kcd->maya_style || !kcd->maya_perpendicular ||
+      !kcd->maya_perpendicular_preview_valid || kcd->mode != MODE_DRAGGING)
+  {
+    return;
+  }
+
+  GPU_matrix_push_projection();
+  GPU_matrix_push();
+  GPU_matrix_identity_set();
+  wmOrtho2_region_pixelspace(kcd->region);
+
+  const uint pos = GPU_vertformat_attr_add(
+      immVertexFormat(), "pos", gpu::VertAttrType::SFLOAT_32_32);
+  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+
+  const float2 origin = kcd->prev.mval;
+  std::array<float2, 3> screen_dirs;
+  for (int index = 0; index < 3; index++) {
+    float2 projected;
+    knife_project_v2(
+        kcd, kcd->prev.cage + kcd->maya_perpendicular_dirs[index], projected);
+    const float length = math::length(projected - origin);
+    if (length <= FLT_EPSILON) {
+      immUnbindProgram();
+      GPU_matrix_pop();
+      GPU_matrix_pop_projection();
+      return;
+    }
+    screen_dirs[index] = (projected - origin) / length;
+  }
+
+  const uchar protractor_color[3] = {178, 178, 178};
+  const uchar active_color[3] = {0, 255, 48};
+  const float guide_start = 14.0f * UI_SCALE_FAC;
+  const float guide_end = 58.0f * UI_SCALE_FAC;
+
+  auto draw_dashed_line = [&](const float2 &start,
+                              const float2 &end,
+                              const uchar color[3],
+                              const float segment_length,
+                              const float gap_length,
+                              const float width) {
+    float length;
+    const float2 direction = math::normalize_and_get_length(end - start, length);
+    if (length <= FLT_EPSILON) {
+      return;
+    }
+    immUniformColor3ubv(color);
+    GPU_line_width(width);
+    for (float distance = 0.0f; distance < length; distance += segment_length + gap_length) {
+      const float segment_end = min_ff(distance + segment_length, length);
+      immBegin(GPU_PRIM_LINES, 2);
+      immVertex2fv(pos, start + direction * distance);
+      immVertex2fv(pos, start + direction * segment_end);
+      immEnd();
+    }
+  };
+
+  for (int index = 0; index < 3; index++) {
+    const uchar *color = index == kcd->maya_perpendicular_snap_index ? active_color :
+                                                                          protractor_color;
+    draw_dashed_line(origin + screen_dirs[index] * guide_start,
+                     origin + screen_dirs[index] * guide_end,
+                     color,
+                     2.5f * UI_SCALE_FAC,
+                     4.0f * UI_SCALE_FAC,
+                     1.5f);
+  }
+
+  const float2 arc_forward = screen_dirs[0];
+  const float2 arc_side = {-arc_forward[1], arc_forward[0]};
+  const float arc_radius = 34.0f * UI_SCALE_FAC;
+  immUniformColor3ubv(protractor_color);
+  GPU_line_width(1.5f);
+  constexpr int arc_step_count = 18;
+  immBegin(GPU_PRIM_LINES, (arc_step_count + 1) * 2);
+  for (int step = 0; step <= arc_step_count; step++) {
+    const float angle = -float(M_PI_2) + float(M_PI) * float(step) / arc_step_count;
+    const float2 radial = arc_forward * cosf(angle) + arc_side * sinf(angle);
+    const float2 tangent = arc_forward * -sinf(angle) + arc_side * cosf(angle);
+    const float2 point = origin + radial * arc_radius;
+    immVertex2fv(pos, point - tangent * (1.3f * UI_SCALE_FAC));
+    immVertex2fv(pos, point + tangent * (1.3f * UI_SCALE_FAC));
+  }
+  immEnd();
+
+  if (kcd->maya_perpendicular_snap_index >= 0 && kcd->is_angle_snapping) {
+    const float2 active_dir = screen_dirs[kcd->maya_perpendicular_snap_index];
+    const float active_length = max_ff(
+        math::length(kcd->curr.mval - origin), guide_end);
+    draw_dashed_line(origin,
+                     origin + active_dir * active_length,
+                     active_color,
+                     3.0f * UI_SCALE_FAC,
+                     3.0f * UI_SCALE_FAC,
+                     2.0f);
+
+    if (kcd->maya_perpendicular_snap_index != 0) {
+      const float marker_size = 10.0f * UI_SCALE_FAC;
+      const float2 marker_forward = origin + screen_dirs[0] * marker_size;
+      const float2 marker_side = origin + active_dir * marker_size;
+      const float2 marker_corner = marker_forward + active_dir * marker_size;
+      immUniformColor3ubv(active_color);
+      GPU_line_width(2.0f);
+      immBegin(GPU_PRIM_LINE_STRIP, 3);
+      immVertex2fv(pos, marker_forward);
+      immVertex2fv(pos, marker_corner);
+      immVertex2fv(pos, marker_side);
+      immEnd();
+    }
+  }
+
+  immUnbindProgram();
+  GPU_matrix_pop();
+  GPU_matrix_pop_projection();
+}
+
 /* Modal loop selection drawing callback. */
 static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *arg)
 {
@@ -836,6 +1348,8 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
 
   GPU_matrix_push_projection();
   GPU_polygon_offset(1.0f, 1.0f);
+
+  knifetool_draw_maya_overlay(kcd);
 
   GPUVertFormat *format = immVertexFormat();
   uint pos = GPU_vertformat_attr_add(format, "pos", gpu::VertAttrType::SFLOAT_32_32_32);
@@ -847,58 +1361,54 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
   /* Needed for AA points. */
   GPU_blend(GPU_BLEND_ALPHA);
 
-  if (kcd->prev.vert) {
-    immUniformColor3ubv(kcd->colors.point);
-    immUniform1f("size", 11 * UI_SCALE_FAC);
+  if (!kcd->maya_style) {
+    if (kcd->prev.vert) {
+      immUniformColor3ubv(kcd->colors.point);
+      immUniform1f("size", 11 * UI_SCALE_FAC);
 
-    immBegin(GPU_PRIM_POINTS, 1);
-    immVertex3fv(pos, kcd->prev.cage);
-    immEnd();
+      immBegin(GPU_PRIM_POINTS, 1);
+      immVertex3fv(pos, kcd->prev.cage);
+      immEnd();
+    }
+
+    if (kcd->prev.bmface || kcd->prev.edge) {
+      immUniformColor3ubv(kcd->prev.edge ? kcd->colors.curpoint : kcd->colors.face_point);
+      immUniform1f("size", 9 * UI_SCALE_FAC);
+
+      immBegin(GPU_PRIM_POINTS, 1);
+      immVertex3fv(pos, kcd->prev.cage);
+      immEnd();
+    }
+
+    if (kcd->curr.vert) {
+      immUniformColor3ubv(kcd->colors.point);
+      immUniform1f("size", 11 * UI_SCALE_FAC);
+
+      immBegin(GPU_PRIM_POINTS, 1);
+      immVertex3fv(pos, kcd->curr.cage);
+      immEnd();
+    }
+
+    if (kcd->curr.bmface || kcd->curr.edge) {
+      immUniformColor3ubv(kcd->curr.edge ? kcd->colors.curpoint : kcd->colors.face_point);
+      immUniform1f("size", 9 * UI_SCALE_FAC);
+
+      immBegin(GPU_PRIM_POINTS, 1);
+      immVertex3fv(pos, kcd->curr.cage);
+      immEnd();
+    }
   }
 
-  if (kcd->prev.bmface || kcd->prev.edge) {
-    immUniformColor3ubv(kcd->colors.curpoint);
-    immUniform1f("size", 9 * UI_SCALE_FAC);
-
-    immBegin(GPU_PRIM_POINTS, 1);
-    immVertex3fv(pos, kcd->prev.cage);
-    immEnd();
-  }
-
-  if (kcd->curr.vert) {
-    immUniformColor3ubv(kcd->colors.point);
-    immUniform1f("size", 11 * UI_SCALE_FAC);
-
-    immBegin(GPU_PRIM_POINTS, 1);
-    immVertex3fv(pos, kcd->curr.cage);
-    immEnd();
-  }
-  else if (kcd->curr.edge) {
-    /* Lines (handled below.) */
-  }
-
-  if (kcd->curr.bmface || kcd->curr.edge) {
-    immUniformColor3ubv(kcd->colors.curpoint);
-    immUniform1f("size", 9 * UI_SCALE_FAC);
-
-    immBegin(GPU_PRIM_POINTS, 1);
-    immVertex3fv(pos, kcd->curr.cage);
-    immEnd();
-  }
-
-  if (kcd->depth_test) {
+  if (kcd->depth_test && !kcd->maya_style) {
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }
 
-  if (kcd->totkvert > 0) {
+  if (kcd->totkvert > 0 && !kcd->maya_style) {
     BLI_mempool_iter iter;
     KnifeVert *kfv;
-
-    immUniformColor3ubv(kcd->colors.point);
     immUniform1f("size", 5.0 * UI_SCALE_FAC);
 
-    gpu::Batch *batch = immBeginBatchAtMost(GPU_PRIM_POINTS, BLI_mempool_len(kcd->kverts));
-
+    int point_counts[3] = {0, 0, 0};
     BLI_mempool_iternew(kcd->kverts, &iter);
     for (kfv = static_cast<KnifeVert *>(BLI_mempool_iterstep(&iter)); kfv;
          kfv = static_cast<KnifeVert *>(BLI_mempool_iterstep(&iter)))
@@ -906,14 +1416,33 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
       if (!kfv->is_cut || kfv->is_invalid) {
         continue;
       }
-
-      immVertex3fv(pos, kfv->cageco);
+      point_counts[kfv->v ? 0 : (kfv->is_splitting ? 1 : 2)]++;
     }
 
-    immEnd();
+    const uchar *point_colors[3] = {
+        kcd->colors.point, kcd->colors.curpoint, kcd->colors.face_point};
+    for (int point_type = 0; point_type < 3; point_type++) {
+      if (point_counts[point_type] == 0) {
+        continue;
+      }
 
-    GPU_batch_draw(batch);
-    GPU_batch_discard(batch);
+      immUniformColor3ubv(point_colors[point_type]);
+      immBegin(GPU_PRIM_POINTS, point_counts[point_type]);
+      BLI_mempool_iternew(kcd->kverts, &iter);
+      for (kfv = static_cast<KnifeVert *>(BLI_mempool_iterstep(&iter)); kfv;
+           kfv = static_cast<KnifeVert *>(BLI_mempool_iterstep(&iter)))
+      {
+        if (!kfv->is_cut || kfv->is_invalid) {
+          continue;
+        }
+        const int kfv_point_type = kfv->v ? 0 : (kfv->is_splitting ? 1 : 2);
+        if (kfv_point_type == point_type) {
+          immVertex3fv(pos, kfv->cageco);
+        }
+      }
+
+      immEnd();
+    }
   }
 
   GPU_blend(GPU_BLEND_NONE);
@@ -923,14 +1452,59 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
   /* Draw lines. */
   immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
-  if (kcd->mode == MODE_DRAGGING) {
+  if (!kcd->maya_loop_preview_lines.is_empty()) {
+    immUniformColor3ubv(kcd->colors.line);
+    GPU_line_width(2.0f);
+    immBegin(GPU_PRIM_LINES, int(kcd->maya_loop_preview_lines.size()) * 2);
+    for (const std::array<float3, 2> &line : kcd->maya_loop_preview_lines) {
+      immVertex3fv(pos, line[0]);
+      immVertex3fv(pos, line[1]);
+    }
+    immEnd();
+  }
+
+  if (kcd->maya_tweak_point_index >= 0 && kcd->maya_cut_points.size() > 1) {
+    immUniformColor3ubv(kcd->colors.line);
+    GPU_line_width(2.0f);
+    immBegin(GPU_PRIM_LINE_STRIP, int(kcd->maya_cut_points.size()));
+    for (const KnifeMayaCutPoint &point : kcd->maya_cut_points) {
+      immVertex3fv(pos, point.cage);
+    }
+    immEnd();
+  }
+
+  float3 first_edge_start;
+  if (knife_maya_first_edge_preview_get(kcd, first_edge_start)) {
+    immUniformColor3ubv(kcd->colors.line);
+    GPU_line_width(2.0f);
+    immBegin(GPU_PRIM_LINES, 2);
+    immVertex3fv(pos, first_edge_start);
+    immVertex3fv(pos, kcd->curr.cage);
+    immEnd();
+  }
+
+  if (kcd->mode == MODE_DRAGGING && kcd->maya_tweak_point_index < 0) {
     immUniformColor3ubv(kcd->colors.line);
     GPU_line_width(2.0);
 
-    immBegin(GPU_PRIM_LINES, 2);
-    immVertex3fv(pos, kcd->prev.cage);
-    immVertex3fv(pos, kcd->curr.cage);
-    immEnd();
+    if (kcd->maya_style && (kcd->maya_slice_drag || kcd->maya_quick_slice) &&
+        !compare_v3v3(kcd->prev.cage, kcd->curr.cage, KNIFE_FLT_EPSBIG))
+    {
+      const float3 direction = math::normalize(kcd->curr.cage - kcd->prev.cage) *
+                               kcd->vc.v3d->clip_end;
+      const float3 line_start = kcd->prev.cage - direction;
+      const float3 line_end = kcd->prev.cage + direction;
+      immBegin(GPU_PRIM_LINES, 2);
+      immVertex3fv(pos, line_start);
+      immVertex3fv(pos, line_end);
+      immEnd();
+    }
+    else {
+      immBegin(GPU_PRIM_LINES, 2);
+      immVertex3fv(pos, kcd->prev.cage);
+      immVertex3fv(pos, kcd->curr.cage);
+      immEnd();
+    }
   }
 
   if (kcd->curr.vert) {
@@ -946,7 +1520,7 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
     immEnd();
   }
 
-  if (kcd->totkedge > 0) {
+  if (kcd->totkedge > 0 && kcd->maya_tweak_point_index < 0) {
     BLI_mempool_iter iter;
     KnifeEdge *kfe;
 
@@ -974,7 +1548,9 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
   }
 
   /* Draw relative angle snapping reference edge. */
-  if (kcd->is_angle_snapping && kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE) {
+  if (kcd->is_angle_snapping && !kcd->maya_perpendicular &&
+      kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE)
+  {
     immUniformColor3ubv(kcd->colors.edge_extra);
     GPU_line_width(2.0);
 
@@ -1033,8 +1609,12 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
 
   GPU_depth_test(GPU_DEPTH_NONE);
 
+  knifetool_draw_maya_perpendicular_preview(kcd);
+  knifetool_draw_maya_points_overlay(kcd);
+  knifetool_draw_maya_edge_percentage(kcd);
+
   if (kcd->mode == MODE_DRAGGING) {
-    if (kcd->is_angle_snapping) {
+    if (kcd->is_angle_snapping && !kcd->maya_perpendicular) {
       knifetool_draw_angle_snapping(kcd);
     }
     else if (kcd->axis_constrained) {
@@ -1065,6 +1645,17 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
   };
 
   WorkspaceStatus status(C);
+  if (kcd->maya_style) {
+    status.opmodal(IFACE_("Drop / Edit Point"), op->type, KNF_MODAL_ADD_CUT);
+    status.opmodal(IFACE_("Quick Slice"), op->type, KNF_MODAL_QUICK_SLICE);
+    status.opmodal(IFACE_("Undo Point"), op->type, KNF_MODAL_UNDO);
+    status.opmodal(IFACE_("Grid Snap"), op->type, KNF_MODAL_GRID_SNAP_ON, kcd->snap_to_grid);
+    status.opmodal(
+        IFACE_("Point Snap"), op->type, KNF_MODAL_POINT_SNAP_ON, kcd->snap_to_points);
+    status.opmodal(IFACE_("Confirm"), op->type, KNF_MODAL_CONFIRM);
+    status.opmodal(IFACE_("Cancel"), op->type, KNF_MODAL_CANCEL);
+    return;
+  }
   status.opmodal(IFACE_("Cut"), op->type, KNF_MODAL_ADD_CUT);
   status.opmodal(IFACE_("Close"), op->type, KNF_MODAL_ADD_CUT_CLOSED);
   status.opmodal(IFACE_("Stop"), op->type, KNF_MODAL_NEW_CUT);
@@ -1299,6 +1890,13 @@ static void knife_bvh_raycast_cb(void *userdata,
 
   float tri_cos[3][3];
   knife_bm_tri_cagecos_get_worldspace(kcd, ob_index, index, tri_cos);
+  if (kcd->bvh.cull_backfaces) {
+    float tri_no[3];
+    normal_tri_v3(tri_no, tri_cos[0], tri_cos[1], tri_cos[2]);
+    if (dot_v3v3(tri_no, ray->direction) >= 0.0f) {
+      return;
+    }
+  }
   isect = (ray->radius > 0.0f ?
                isect_ray_tri_epsilon_v3(
                    ray->origin, ray->direction, UNPACK3(tri_cos), &dist, nullptr, ray->radius) :
@@ -1801,6 +2399,7 @@ static void knife_snap_curr(KnifeTool_OpData *kcd,
                             const float3 &ray_dir,
                             const float3 *curr_cage_constrain,
                             const float3 *fallback);
+static void knife_maya_snap_curr_to_grid(KnifeTool_OpData *kcd);
 
 /* User has just clicked for first time or first time after a restart (E key).
  * Copy the current position data into prev. */
@@ -1812,7 +2411,9 @@ static void knife_start_cut(KnifeTool_OpData *kcd, const float2 &mval)
       kcd->vc.depsgraph, kcd->region, kcd->vc.v3d, mval, ray_orig, ray_dir, false);
 
   knife_snap_curr(kcd, mval, ray_orig, ray_dir, nullptr, nullptr);
+  knife_maya_snap_curr_to_grid(kcd);
   kcd->prev = kcd->curr;
+  kcd->maya_prev_grid_point = kcd->maya_curr_grid_point;
   kcd->mdata.is_stored = false;
 }
 
@@ -2299,13 +2900,19 @@ static void knife_make_cuts(KnifeTool_OpData *kcd, int ob_index)
 static void knife_add_cut(KnifeTool_OpData *kcd)
 {
 
+  if (kcd->maya_style && !kcd->maya_replaying_redo) {
+    kcd->maya_redo_actions.clear();
+  }
+
   /* Allocate new undo frame on stack, unless cut is being dragged. */
   if (!kcd->is_drag_undo) {
     kcd->undo = static_cast<KnifeUndoFrame *>(BLI_stack_push_r(kcd->undostack));
     kcd->undo->pos = kcd->prev;
+    kcd->undo->maya_prev_grid_point = kcd->maya_prev_grid_point;
     kcd->undo->cuts = 0;
     kcd->undo->splits = 0;
     kcd->undo->mdata = kcd->mdata;
+    kcd->undo->maya_deleted_edge = nullptr;
     kcd->is_drag_undo = true;
   }
 
@@ -2318,6 +2925,7 @@ static void knife_add_cut(KnifeTool_OpData *kcd)
   if (kcd->linehits.is_empty()) {
     if (kcd->is_drag_hold == false) {
       kcd->prev = kcd->curr;
+      kcd->maya_prev_grid_point = kcd->maya_curr_grid_point;
     }
     return;
   }
@@ -2358,6 +2966,7 @@ static void knife_add_cut(KnifeTool_OpData *kcd)
 
   /* Set up for next cut. */
   kcd->prev = kcd->curr;
+  kcd->maya_prev_grid_point = kcd->maya_curr_grid_point;
 
   if (kcd->prev.bmface) {
     /* Was "in face" but now we have a KnifeVert it is snapped to. */
@@ -3087,7 +3696,9 @@ static bool knife_find_closest_face(KnifeTool_OpData *kcd,
   BMFace *f;
   float dist = KMAXDIST;
 
+  kcd->bvh.cull_backfaces = kcd->maya_style && !kcd->snap_to_backfaces;
   f = knife_bvh_raycast(kcd, ray_orig, ray_dir, 0.0f, nullptr, cage, &ob_index);
+  kcd->bvh.cull_backfaces = false;
 
   if (f && kcd->only_select && BM_elem_flag_test(f, BM_ELEM_SELECT) == 0) {
     f = nullptr;
@@ -3304,7 +3915,17 @@ static bool knife_find_closest_edge_of_face(KnifeTool_OpData *kcd,
 
     r_kpd->edge = kfe;
     if (kcd->snap_midpoints) {
-      mid_v3_v3v3(r_kpd->cage, kfe->v1->cageco, kfe->v2->cageco);
+      if (kcd->maya_style && kcd->maya_snap_step_drag) {
+        const float step = clamp_f(kcd->snap_step * 0.01f, 0.01f, 1.0f);
+        const float edge_factor = clamp_f(
+            line_point_factor_v3(test_cagep, kfe->v1->cageco, kfe->v2->cageco), 0.0f, 1.0f);
+        const float snapped_factor = clamp_f(roundf(edge_factor / step) * step, 0.0f, 1.0f);
+        interp_v3_v3v3(
+            r_kpd->cage, kfe->v1->cageco, kfe->v2->cageco, snapped_factor);
+      }
+      else {
+        mid_v3_v3v3(r_kpd->cage, kfe->v1->cageco, kfe->v2->cageco);
+      }
       knife_project_v2(kcd, r_kpd->cage, r_kpd->mval);
     }
     else {
@@ -3441,6 +4062,90 @@ static bool knife_snap_angle_screen(const KnifeTool_OpData *kcd,
   const float3 vec_x = kcd->vc.rv3d->viewinv[0];
   const float3 vec_z = kcd->vc.rv3d->viewinv[2];
   return knife_snap_angle_impl(kcd, vec_x, vec_z, ray_orig, ray_dir, r_cage, r_angle);
+}
+
+static bool knife_maya_snap_angle_perpendicular(KnifeTool_OpData *kcd,
+                                                const float3 &ray_orig,
+                                                const float3 &ray_dir,
+                                                float3 &r_cage,
+                                                float &r_angle)
+{
+  kcd->maya_perpendicular_preview_valid = false;
+  kcd->maya_perpendicular_snap_index = -1;
+  if (!kcd->mdata.is_stored || kcd->prev.is_space() ||
+      compare_v3v3(kcd->mdata.cage, kcd->prev.cage, KNIFE_FLT_EPSBIG))
+  {
+    return false;
+  }
+
+  int ob_index = -1;
+  BMFace *face = knife_bvh_raycast(
+      kcd, ray_orig, ray_dir, 0.0f, nullptr, nullptr, &ob_index);
+  if (face == nullptr || ob_index < 0) {
+    return false;
+  }
+
+  float3 face_normal = face->no;
+  mul_transposed_mat3_m4_v3(kcd->objects[ob_index]->world_to_object().ptr(), face_normal);
+  if (normalize_v3(face_normal) <= FLT_EPSILON) {
+    return false;
+  }
+
+  float3 forward;
+  sub_v3_v3v3(forward, kcd->prev.cage, kcd->mdata.cage);
+  madd_v3_v3fl(forward, face_normal, -dot_v3v3(forward, face_normal));
+  if (normalize_v3(forward) <= FLT_EPSILON) {
+    return false;
+  }
+
+  float3 perpendicular;
+  cross_v3_v3v3(perpendicular, face_normal, forward);
+  if (normalize_v3(perpendicular) <= FLT_EPSILON) {
+    return false;
+  }
+
+  kcd->maya_perpendicular_dirs[0] = forward;
+  kcd->maya_perpendicular_dirs[1] = perpendicular;
+  kcd->maya_perpendicular_dirs[2] = -perpendicular;
+  kcd->maya_perpendicular_preview_valid = true;
+
+  float3 cursor_on_plane;
+  if (!isect_line_plane_v3(
+          cursor_on_plane, ray_orig, ray_orig + ray_dir, kcd->prev.cage, face_normal))
+  {
+    return false;
+  }
+
+  const float3 cursor_delta = cursor_on_plane - kcd->prev.cage;
+  float3 cursor_direction = cursor_delta;
+  if (normalize_v3(cursor_direction) <= FLT_EPSILON) {
+    return false;
+  }
+
+  int best_index = -1;
+  float best_alignment = -FLT_MAX;
+  for (int index = 0; index < 3; index++) {
+    const float alignment = dot_v3v3(cursor_direction, kcd->maya_perpendicular_dirs[index]);
+    if (alignment > best_alignment) {
+      best_alignment = alignment;
+      best_index = index;
+    }
+  }
+
+  constexpr float snap_tolerance = DEG2RADF(12.0f);
+  if (best_index < 0 || best_alignment < cosf(snap_tolerance)) {
+    return false;
+  }
+
+  const float distance = dot_v3v3(cursor_delta, kcd->maya_perpendicular_dirs[best_index]);
+  if (distance <= KNIFE_FLT_EPS) {
+    return false;
+  }
+
+  r_cage = kcd->prev.cage + kcd->maya_perpendicular_dirs[best_index] * distance;
+  r_angle = best_index == 0 ? float(M_PI) : float(M_PI_2);
+  kcd->maya_perpendicular_snap_index = best_index;
+  return true;
 }
 
 /* Snap to required angle along the plane of the face nearest to kcd->prev. */
@@ -3702,6 +4407,29 @@ static void knife_snap_curr(KnifeTool_OpData *kcd,
  * In this case the selection-buffer is used to select the face,
  * then the closest `vert` or `edge` is set, and those will enable `is_co_set`.
  */
+static void knife_maya_snap_curr_to_grid(KnifeTool_OpData *kcd)
+{
+  kcd->maya_curr_grid_point = false;
+  if (!kcd->maya_style || !kcd->snap_to_grid) {
+    return;
+  }
+
+  const float grid_size = ED_view3d_grid_view_scale(
+      kcd->scene, kcd->vc.v3d, kcd->region, nullptr);
+  if (grid_size <= FLT_EPSILON) {
+    return;
+  }
+
+  float3 snapped = kcd->curr.cage;
+  for (int axis = 0; axis < 3; axis++) {
+    snapped[axis] = roundf(snapped[axis] / grid_size) * grid_size;
+  }
+  knife_pos_data_clear(&kcd->curr);
+  kcd->curr.cage = snapped;
+  knife_project_v2(kcd, kcd->curr.cage, kcd->curr.mval);
+  kcd->maya_curr_grid_point = true;
+}
+
 static void knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float2 &mval)
 {
   /* Mouse and ray with snapping applied. */
@@ -3718,9 +4446,17 @@ static void knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float2 &mva
 
   bool is_constrained = false;
   kcd->is_angle_snapping = false;
+  if (!kcd->maya_perpendicular) {
+    kcd->maya_perpendicular_preview_valid = false;
+    kcd->maya_perpendicular_snap_index = -1;
+  }
   if (kcd->mode == MODE_DRAGGING) {
     if (kcd->angle_snapping) {
-      if (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_SCREEN) {
+      if (kcd->maya_style && kcd->maya_perpendicular) {
+        kcd->is_angle_snapping = knife_maya_snap_angle_perpendicular(
+            kcd, ray_orig, ray_dir, kcd->curr.cage, kcd->angle);
+      }
+      else if (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_SCREEN) {
         kcd->is_angle_snapping = knife_snap_angle_screen(
             kcd, ray_orig, ray_dir, kcd->curr.cage, kcd->angle);
       }
@@ -3768,6 +4504,8 @@ static void knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float2 &mva
                   ray_dir,
                   is_constrained ? &curr_cage_constrain : nullptr,
                   is_constrained ? &fallback : nullptr);
+
+  knife_maya_snap_curr_to_grid(kcd);
 }
 
 /**
@@ -3785,6 +4523,15 @@ static void knifetool_undo(KnifeTool_OpData *kcd)
   BLI_mempool_iter iterkfe;
 
   undo = static_cast<KnifeUndoFrame *>(BLI_stack_peek(kcd->undostack));
+
+  if (undo->maya_deleted_edge != nullptr) {
+    undo->maya_deleted_edge->is_invalid = false;
+    kcd->prev = undo->pos;
+    kcd->maya_prev_grid_point = undo->maya_prev_grid_point;
+    kcd->mdata = undo->mdata;
+    BLI_stack_discard(kcd->undostack);
+    return;
+  }
 
   /* Undo edge splitting. */
   for (int i = 0; i < undo->splits; i++) {
@@ -3843,6 +4590,7 @@ static void knifetool_undo(KnifeTool_OpData *kcd)
   if (ELEM(kcd->mode, MODE_DRAGGING, MODE_IDLE)) {
     /* Restore kcd->prev. */
     kcd->prev = undo->pos;
+    kcd->maya_prev_grid_point = undo->maya_prev_grid_point;
   }
 
   /* Restore data for distance and angle measurements. */
@@ -3913,11 +4661,67 @@ static void knife_init_colors(KnifeColors *colors)
   ui::theme::get_color_type_3ubv(TH_VERTEX, SPACE_VIEW3D, colors->point);
   ui::theme::get_color_type_3ubv(TH_VERTEX, SPACE_VIEW3D, colors->point_a);
   colors->point_a[3] = 102;
+  copy_v3_v3_uchar(colors->face_point, colors->curpoint);
+  ui::theme::get_color_type_3ubv(TH_WIRE, SPACE_VIEW3D, colors->wireframe);
+  ui::theme::get_color_type_3ubv(TH_FACE, SPACE_VIEW3D, colors->mesh);
 
   ui::theme::get_color_type_3ubv(TH_AXIS_X, SPACE_VIEW3D, colors->xaxis);
   ui::theme::get_color_type_3ubv(TH_AXIS_Y, SPACE_VIEW3D, colors->yaxis);
   ui::theme::get_color_type_3ubv(TH_AXIS_Z, SPACE_VIEW3D, colors->zaxis);
   ui::theme::get_color_type_3ubv(TH_TRANSFORM, SPACE_VIEW3D, colors->axis_extra);
+}
+
+static void knife_maya_settings_from_properties(PointerRNA *properties, KnifeTool_OpData *kcd)
+{
+  kcd->snap_step = RNA_float_get(properties, "snap_step");
+  kcd->smoothing_angle = RNA_float_get(properties, "smoothing_angle");
+  kcd->edge_flow = RNA_boolean_get(properties, "use_edge_flow");
+  kcd->edge_flow_factor = RNA_float_get(properties, "edge_flow_factor");
+  kcd->subdivisions = RNA_int_get(properties, "subdivisions");
+  kcd->ignore_backfaces = RNA_boolean_get(properties, "ignore_backfaces");
+  kcd->delete_faces = RNA_boolean_get(properties, "delete_faces");
+  kcd->extract_faces = RNA_boolean_get(properties, "extract_faces");
+  RNA_float_get_array(properties, "extract_offset", kcd->extract_offset);
+  kcd->use_live_surface = RNA_boolean_get(properties, "use_live_surface");
+  kcd->wireframe_overlay = RNA_boolean_get(properties, "wireframe_overlay");
+  kcd->mesh_overlay = RNA_boolean_get(properties, "mesh_overlay");
+  kcd->mesh_alpha = RNA_float_get(properties, "mesh_alpha");
+  kcd->surface_offset = RNA_float_get(properties, "surface_offset");
+  kcd->snap_to_backfaces = RNA_boolean_get(properties, "snap_to_backfaces");
+
+  float color[3];
+  RNA_float_get_array(properties, "line_color", color);
+  rgb_float_to_uchar(kcd->colors.line, color);
+  RNA_float_get_array(properties, "edge_point_color", color);
+  rgb_float_to_uchar(kcd->colors.edge, color);
+  rgb_float_to_uchar(kcd->colors.curpoint, color);
+  copy_v3_v3_uchar(kcd->colors.curpoint_a, kcd->colors.curpoint);
+  kcd->colors.curpoint_a[3] = 102;
+  RNA_float_get_array(properties, "vertex_point_color", color);
+  rgb_float_to_uchar(kcd->colors.point, color);
+  rgb_float_to_uchar(kcd->colors.point_a, color);
+  kcd->colors.point_a[3] = 102;
+  RNA_float_get_array(properties, "face_point_color", color);
+  rgb_float_to_uchar(kcd->colors.face_point, color);
+  RNA_float_get_array(properties, "wireframe_color", color);
+  rgb_float_to_uchar(kcd->colors.wireframe, color);
+  RNA_float_get_array(properties, "mesh_color", color);
+  rgb_float_to_uchar(kcd->colors.mesh, color);
+}
+
+static void knife_maya_settings_sync(const bContext *C,
+                                     const wmOperator *op,
+                                     KnifeTool_OpData *kcd)
+{
+  PointerRNA tool_properties;
+  bToolRef *tref = WM_toolsystem_ref_from_context(C);
+  if (tref != nullptr &&
+      WM_toolsystem_ref_properties_get_from_operator(tref, op->type, &tool_properties))
+  {
+    knife_maya_settings_from_properties(&tool_properties, kcd);
+    return;
+  }
+  knife_maya_settings_from_properties(op->ptr, kcd);
 }
 
 /* called when modal loop selection gets set up... */
@@ -3969,6 +4773,17 @@ static void knifetool_init(ViewContext *vc,
   kcd->angle_snapping_mode = angle_snapping;
   kcd->angle_snapping = (kcd->angle_snapping_mode != KNF_CONSTRAIN_ANGLE_MODE_NONE);
   kcd->angle_snapping_increment = angle_snapping_increment;
+  kcd->maya_loop_preview_has_origin = false;
+  kcd->maya_loop_preview_ob_index = -1;
+  kcd->maya_loop_preview_edge = nullptr;
+  kcd->maya_perpendicular = false;
+  kcd->maya_perpendicular_preview_valid = false;
+  kcd->maya_perpendicular_snap_index = -1;
+  kcd->maya_cut_start_valid = false;
+  kcd->maya_replaying_redo = false;
+  kcd->maya_tweak_point_index = -1;
+  kcd->maya_slice_move = false;
+  kcd->maya_slice_tweak_endpoint = -1;
 
   kcd->arena = BLI_memarena_new(MEM_SIZE_OPTIMAL(1 << 15), "knife");
 #ifdef USE_NET_ISLAND_CONNECT
@@ -4094,15 +4909,188 @@ static void knifetool_update_mval(KnifeTool_OpData *kcd, const float2 &mval)
   }
 }
 
+static bool knife_maya_slice_line_expand(const KnifeTool_OpData *kcd,
+                                         const float2 &control_start,
+                                         const float2 &control_end,
+                                         float2 &r_slice_start,
+                                         float2 &r_slice_end)
+{
+  float2 direction = control_end - control_start;
+  const float drag_length = math::length(direction);
+  if (drag_length < 3.0f * UI_SCALE_FAC) {
+    return false;
+  }
+
+  direction /= drag_length;
+  const float2 center = (control_start + control_end) * 0.5f;
+  const float extent = float(max_ii(kcd->region->winx, kcd->region->winy)) * 2.0f;
+  r_slice_start = center - direction * extent;
+  r_slice_end = center + direction * extent;
+  return true;
+}
+
+static bool knife_maya_commit_slice(KnifeTool_OpData *kcd,
+                                    const float2 &drag_start,
+                                    const float2 &drag_end)
+{
+  float2 slice_start;
+  float2 slice_end;
+  if (!knife_maya_slice_line_expand(kcd, drag_start, drag_end, slice_start, slice_end)) {
+    return false;
+  }
+  const size_t undo_count = BLI_stack_count(kcd->undostack);
+
+  knife_finish_cut(kcd);
+  knife_pos_data_clear(&kcd->prev);
+  knife_pos_data_clear(&kcd->curr);
+  kcd->mode = MODE_IDLE;
+  kcd->is_drag_hold = false;
+  kcd->cut_through = !kcd->ignore_backfaces;
+
+  knife_start_cut(kcd, slice_start);
+  kcd->mode = MODE_DRAGGING;
+  kcd->init = kcd->curr;
+  knifetool_update_mval(kcd, slice_end);
+  knife_add_cut(kcd);
+  knife_finish_cut(kcd);
+  kcd->mode = MODE_IDLE;
+  kcd->no_cuts = false;
+  kcd->maya_slice_result = true;
+  kcd->maya_slice_undo_count = undo_count;
+  kcd->maya_slice_start = slice_start;
+  kcd->maya_slice_end = slice_end;
+  kcd->maya_slice_control_start = drag_start;
+  kcd->maya_slice_control_end = drag_end;
+  return true;
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Finalization
  * \{ */
 
+static bool knife_maya_face_tag_test(const BMFace *face, void * /*user_data*/)
+{
+  return BM_elem_flag_test(face, BM_ELEM_TAG);
+}
+
+static void knife_maya_apply_cut_settings(KnifeTool_OpData *kcd, const int ob_index)
+{
+  BMesh *bm = BKE_editmesh_from_object(kcd->objects[ob_index])->bm;
+  bool has_cut_edges = false;
+
+  BLI_mempool_iter iter;
+  BLI_mempool_iternew(kcd->kedges, &iter);
+  for (KnifeEdge *kfe = static_cast<KnifeEdge *>(BLI_mempool_iterstep(&iter)); kfe;
+       kfe = static_cast<KnifeEdge *>(BLI_mempool_iterstep(&iter)))
+  {
+    if (!kfe->is_cut || kfe->is_invalid || kfe->e == nullptr ||
+        kfe->v1->ob_index != ob_index)
+    {
+      continue;
+    }
+
+    const bool smooth = kcd->smoothing_angle >= float(M_PI) - 1e-5f ||
+                        (kcd->smoothing_angle > 0.0f &&
+                         BM_edge_calc_face_angle(kfe->e) <= kcd->smoothing_angle);
+    BM_elem_flag_set(kfe->e, BM_ELEM_SMOOTH, smooth);
+    BM_elem_flag_enable(kfe->e, BM_ELEM_TAG);
+    has_cut_edges = true;
+  }
+
+  if (has_cut_edges && kcd->subdivisions > 1) {
+    BM_mesh_esubdivide(bm,
+                       BM_ELEM_TAG,
+                       kcd->edge_flow ? kcd->edge_flow_factor : 0.0f,
+                       SUBD_FALLOFF_LIN,
+                       false,
+                       0.0f,
+                       0.0f,
+                       kcd->subdivisions - 1,
+                       SUBDIV_SELECT_NONE,
+                       SUBD_CORNER_STRAIGHT_CUT,
+                       false,
+                       false,
+                       false,
+                       0);
+
+  }
+  BM_mesh_elem_hflag_disable_all(bm, BM_EDGE, BM_ELEM_TAG, false);
+}
+
+static void knife_maya_apply_slice_result(KnifeTool_OpData *kcd, const int ob_index)
+{
+  if (!kcd->maya_slice_result || (!kcd->delete_faces && !kcd->extract_faces)) {
+    return;
+  }
+
+  Object *ob = kcd->objects[ob_index];
+  BMesh *bm = BKE_editmesh_from_object(ob)->bm;
+  const float2 line = kcd->maya_slice_end - kcd->maya_slice_start;
+  if (math::length_squared(line) <= FLT_EPSILON) {
+    return;
+  }
+
+  BM_mesh_elem_hflag_disable_all(bm, BM_FACE, BM_ELEM_TAG, false);
+  BMIter iter;
+  BMFace *face;
+  BM_ITER_MESH (face, &iter, bm, BM_FACES_OF_MESH) {
+    float center_local[3], center_world[3], center_screen[2];
+    BM_face_calc_center_median(face, center_local);
+    mul_v3_m4v3(center_world, ob->object_to_world().ptr(), center_local);
+    if (ED_view3d_project_float_global(
+            kcd->region, center_world, center_screen, V3D_PROJ_TEST_NOP) != V3D_PROJ_RET_OK)
+    {
+      continue;
+    }
+    const float2 relative = float2(center_screen) - kcd->maya_slice_start;
+    if (line.x * relative.y - line.y * relative.x < 0.0f) {
+      BM_elem_flag_enable(face, BM_ELEM_TAG);
+    }
+  }
+
+  if (kcd->extract_faces) {
+    BM_mesh_separate_faces(bm, knife_maya_face_tag_test, nullptr);
+
+    BM_mesh_elem_hflag_disable_all(bm, BM_VERT, BM_ELEM_TAG, false);
+    BM_ITER_MESH (face, &iter, bm, BM_FACES_OF_MESH) {
+      if (!BM_elem_flag_test(face, BM_ELEM_TAG)) {
+        continue;
+      }
+      BMLoop *loop = face->l_first;
+      do {
+        BM_elem_flag_enable(loop->v, BM_ELEM_TAG);
+      } while ((loop = loop->next) != face->l_first);
+    }
+
+    float object_to_local[4][4];
+    float offset_local[3] = {kcd->extract_offset.x, kcd->extract_offset.y, kcd->extract_offset.z};
+    invert_m4_m4(object_to_local, ob->object_to_world().ptr());
+    mul_mat3_m4_v3(object_to_local, offset_local);
+
+    BMVert *vert;
+    BM_ITER_MESH (vert, &iter, bm, BM_VERTS_OF_MESH) {
+      if (BM_elem_flag_test(vert, BM_ELEM_TAG)) {
+        add_v3_v3(vert->co, offset_local);
+      }
+    }
+    BM_mesh_elem_hflag_disable_all(bm, BM_VERT, BM_ELEM_TAG, false);
+  }
+  else {
+    BM_mesh_delete_hflag_context(bm, BM_ELEM_TAG, DEL_FACES);
+  }
+
+  BM_mesh_elem_hflag_disable_all(bm, BM_FACE, BM_ELEM_TAG, false);
+}
+
 static void knifetool_finish_single_pre(KnifeTool_OpData *kcd, int ob_index)
 {
   knife_make_cuts(kcd, ob_index);
+  if (kcd->maya_style) {
+    knife_maya_apply_cut_settings(kcd, ob_index);
+    knife_maya_apply_slice_result(kcd, ob_index);
+  }
 }
 
 /**
@@ -4154,6 +5142,17 @@ static void knifetool_cancel(bContext * /*C*/, wmOperator *op)
   knifetool_exit(op);
 }
 
+static wmOperatorStatus knife_maya_insert_edge_loop_and_restart(bContext *C,
+                                                                wmOperator *op,
+                                                                const wmEvent *event,
+                                                                bool centered);
+static wmOperatorStatus knife_maya_restart_session(bContext *C,
+                                                   wmOperator *op,
+                                                   const wmEvent *event,
+                                                   bool commit_current);
+static void knife_maya_cut_path_seed_from_face(KnifeTool_OpData *kcd,
+                                               const float3 &start_cage);
+
 wmKeyMap *knifetool_modal_keymap(wmKeyConfig *keyconf)
 {
   static const EnumPropertyItem modal_items[] = {
@@ -4184,6 +5183,23 @@ wmKeyMap *knifetool_modal_keymap(wmKeyConfig *keyconf)
       {KNF_MODAL_X_AXIS, "X_AXIS", 0, "X Axis Locking", ""},
       {KNF_MODAL_Y_AXIS, "Y_AXIS", 0, "Y Axis Locking", ""},
       {KNF_MODAL_Z_AXIS, "Z_AXIS", 0, "Z Axis Locking", ""},
+      {KNF_MODAL_GRID_SNAP_ON, "GRID_SNAP_ON", 0, "Grid Snap On", ""},
+      {KNF_MODAL_GRID_SNAP_OFF, "GRID_SNAP_OFF", 0, "Grid Snap Off", ""},
+      {KNF_MODAL_POINT_SNAP_ON, "POINT_SNAP_ON", 0, "Point Snap On", ""},
+      {KNF_MODAL_POINT_SNAP_OFF, "POINT_SNAP_OFF", 0, "Point Snap Off", ""},
+      {KNF_MODAL_QUICK_SLICE, "QUICK_SLICE", 0, "Quick Slice", ""},
+      {KNF_MODAL_INSERT_EDGE_LOOP, "INSERT_EDGE_LOOP", 0, "Insert Edge Loop", ""},
+      {KNF_MODAL_INSERT_CENTERED_EDGE_LOOP,
+       "INSERT_CENTERED_EDGE_LOOP",
+       0,
+       "Insert Centered Edge Loop",
+       ""},
+      {KNF_MODAL_REDO, "REDO", 0, "Redo", ""},
+      {KNF_MODAL_DELETE_HIGHLIGHTED,
+       "DELETE_HIGHLIGHTED",
+       0,
+       "Delete Highlighted Edge",
+       ""},
       {0, nullptr, 0, nullptr, nullptr},
   };
 
@@ -4217,6 +5233,490 @@ static void knifetool_disable_orientation_locking(KnifeTool_OpData *kcd)
   kcd->axis_constrained = false;
 }
 
+static BMVert *knife_maya_face_closest_vertex(const KnifeTool_OpData *kcd,
+                                              const KnifePosData &face_point,
+                                              float3 &r_cage_world)
+{
+  if (face_point.bmface == nullptr || face_point.edge != nullptr || face_point.vert != nullptr ||
+      face_point.ob_index < 0)
+  {
+    return nullptr;
+  }
+
+  BMVert *closest_vert = nullptr;
+  float closest_dist_sq = FLT_MAX;
+  BMIter iter;
+  BMVert *vert;
+  BM_ITER_ELEM (vert, &iter, face_point.bmface, BM_VERTS_OF_FACE) {
+    const float3 cage_local =
+        kcd->objects_info[face_point.ob_index].positions_cage[BM_elem_index_get(vert)];
+    float3 cage_world;
+    mul_v3_m4v3(cage_world,
+                kcd->objects[face_point.ob_index]->object_to_world().ptr(),
+                cage_local);
+    float2 screen;
+    knife_project_v2(kcd, cage_world, screen);
+    const float dist_sq = math::distance_squared(screen, face_point.mval);
+    if (dist_sq < closest_dist_sq) {
+      closest_dist_sq = dist_sq;
+      closest_vert = vert;
+      r_cage_world = cage_world;
+    }
+  }
+  return closest_vert;
+}
+
+static bool knife_maya_first_edge_preview_get(const KnifeTool_OpData *kcd, float3 &r_start)
+{
+  if (!kcd->maya_style || kcd->mode != MODE_IDLE ||
+      !kcd->maya_loop_preview_lines.is_empty())
+  {
+    return false;
+  }
+  return knife_maya_face_closest_vertex(kcd, kcd->curr, r_start) != nullptr;
+}
+
+static bool knife_maya_seed_cut_from_face(KnifeTool_OpData *kcd)
+{
+  const KnifePosData face_point = kcd->prev;
+  if (face_point.bmface == nullptr || face_point.edge != nullptr || face_point.vert != nullptr ||
+      face_point.ob_index < 0)
+  {
+    return false;
+  }
+
+  BM_mesh_elem_index_ensure(
+      kcd->objects_info[face_point.ob_index].em->bm, BM_VERT);
+  float3 closest_cage;
+  BMVert *closest_vert = knife_maya_face_closest_vertex(kcd, face_point, closest_cage);
+  if (closest_vert == nullptr) {
+    return false;
+  }
+
+  KnifeVert *knife_vert = get_bm_knife_vert(kcd, closest_vert, face_point.ob_index);
+  knife_pos_data_clear(&kcd->prev);
+  kcd->prev.vert = knife_vert;
+  kcd->prev.ob_index = face_point.ob_index;
+  kcd->prev.cage = knife_vert->cageco;
+  kcd->maya_prev_grid_point = false;
+  kcd->maya_cut_start_valid = true;
+  kcd->maya_cut_start_cage = closest_cage;
+  knife_project_v2(kcd, kcd->prev.cage, kcd->prev.mval);
+  knifetool_update_mval(kcd, face_point.mval);
+  knife_add_cut(kcd);
+  knife_maya_cut_path_seed_from_face(kcd, closest_cage);
+  return true;
+}
+
+static float3 knife_maya_vert_world(const KnifeTool_OpData *kcd,
+                                    const int ob_index,
+                                    const BMVert *vert)
+{
+  const float3 cage_local =
+      kcd->objects_info[ob_index].positions_cage[BM_elem_index_get(vert)];
+  float3 cage_world;
+  mul_v3_m4v3(cage_world, kcd->objects[ob_index]->object_to_world().ptr(), cage_local);
+  return cage_world;
+}
+
+static BMEdge *knife_maya_face_edge_closest_to_mval(const KnifeTool_OpData *kcd,
+                                                    const int ob_index,
+                                                    BMFace *face,
+                                                    const float2 &mval)
+{
+  BM_mesh_elem_index_ensure(kcd->objects_info[ob_index].em->bm, BM_VERT);
+  BMEdge *closest_edge = nullptr;
+  float closest_dist_sq = FLT_MAX;
+  BMIter iter;
+  BMEdge *edge;
+  BM_ITER_ELEM (edge, &iter, face, BM_EDGES_OF_FACE) {
+    const float3 edge_world[2] = {
+        knife_maya_vert_world(kcd, ob_index, edge->v1),
+        knife_maya_vert_world(kcd, ob_index, edge->v2),
+    };
+    float2 edge_screen[2];
+    knife_project_v2(kcd, edge_world[0], edge_screen[0]);
+    knife_project_v2(kcd, edge_world[1], edge_screen[1]);
+    const float dist_sq = dist_squared_to_line_segment_v2(mval, edge_screen[0], edge_screen[1]);
+    if (dist_sq < closest_dist_sq) {
+      closest_dist_sq = dist_sq;
+      closest_edge = edge;
+    }
+  }
+  return closest_edge;
+}
+
+static BMLoop *knife_maya_face_loop_for_edge(BMFace *face, const BMEdge *edge)
+{
+  BMLoop *loop = BM_FACE_FIRST_LOOP(face);
+  BMLoop *loop_iter = loop;
+  do {
+    if (loop_iter->e == edge) {
+      return loop_iter;
+    }
+  } while ((loop_iter = loop_iter->next) != loop);
+  return nullptr;
+}
+
+static void knife_maya_loop_preview_point_add(KnifeTool_OpData *kcd,
+                                              BMEdge *edge,
+                                              const float3 &cage)
+{
+  for (const KnifeMayaLoopPreviewPoint &point : kcd->maya_loop_preview_points) {
+    if (point.edge == edge) {
+      return;
+    }
+  }
+  kcd->maya_loop_preview_points.append(KnifeMayaLoopPreviewPoint{edge, cage});
+}
+
+static void knife_maya_loop_preview_walk(KnifeTool_OpData *kcd,
+                                         const int ob_index,
+                                         BMEdge *start_edge,
+                                         BMFace *start_face,
+                                         const float3 &start_point,
+                                         Set<BMFace *> &visited_faces)
+{
+  BMEdge *edge = start_edge;
+  BMFace *face = start_face;
+  float3 point = start_point;
+
+  while (face != nullptr && face->len == 4 && !visited_faces.contains(face)) {
+    visited_faces.add(face);
+    BMLoop *loop = knife_maya_face_loop_for_edge(face, edge);
+    if (loop == nullptr) {
+      break;
+    }
+
+    const float3 edge_start = knife_maya_vert_world(kcd, ob_index, loop->v);
+    const float3 edge_end = knife_maya_vert_world(kcd, ob_index, loop->next->v);
+    const float factor = clamp_f(line_point_factor_v3(point, edge_start, edge_end), 0.0f, 1.0f);
+    BMLoop *opposite = loop->next->next;
+    const float3 opposite_start = knife_maya_vert_world(kcd, ob_index, opposite->next->v);
+    const float3 opposite_end = knife_maya_vert_world(kcd, ob_index, opposite->v);
+    float3 opposite_point;
+    interp_v3_v3v3(opposite_point, opposite_start, opposite_end, factor);
+    knife_maya_loop_preview_point_add(kcd, edge, point);
+    knife_maya_loop_preview_point_add(kcd, opposite->e, opposite_point);
+    kcd->maya_loop_preview_lines.append({point, opposite_point});
+
+    BMFace *next_face = nullptr;
+    BMLoop *radial = opposite->radial_next;
+    while (radial != opposite) {
+      if (radial->f != face && !visited_faces.contains(radial->f)) {
+        next_face = radial->f;
+        break;
+      }
+      radial = radial->radial_next;
+    }
+    edge = opposite->e;
+    face = next_face;
+    point = opposite_point;
+  }
+}
+
+static void knife_maya_loop_preview_update(KnifeTool_OpData *kcd,
+                                           const float2 &mval,
+                                           const wmEventModifierFlag modifier)
+{
+  kcd->maya_loop_preview_lines.clear();
+  kcd->maya_loop_preview_points.clear();
+  kcd->maya_loop_preview_has_origin = false;
+  kcd->maya_loop_preview_ob_index = -1;
+  kcd->maya_loop_preview_edge = nullptr;
+  if (kcd->mode == MODE_DRAGGING || kcd->maya_slice_result ||
+      ((modifier & KM_CTRL) == 0 && !kcd->maya_loop_insert_down) || kcd->curr.ob_index < 0)
+  {
+    return;
+  }
+
+  const int ob_index = kcd->curr.ob_index;
+  BMEdge *edge = kcd->curr.edge != nullptr ? kcd->curr.edge->e : nullptr;
+  if (edge == nullptr && kcd->curr.bmface != nullptr) {
+    edge = knife_maya_face_edge_closest_to_mval(kcd, ob_index, kcd->curr.bmface, mval);
+  }
+  if (edge == nullptr || edge->l == nullptr) {
+    return;
+  }
+
+  BM_mesh_elem_index_ensure(kcd->objects_info[ob_index].em->bm, BM_VERT);
+  const float3 edge_start = knife_maya_vert_world(kcd, ob_index, edge->v1);
+  const float3 edge_end = knife_maya_vert_world(kcd, ob_index, edge->v2);
+  float2 edge_screen[2];
+  knife_project_v2(kcd, edge_start, edge_screen[0]);
+  knife_project_v2(kcd, edge_end, edge_screen[1]);
+  float factor = kcd->maya_loop_insert_centered ?
+                     0.5f :
+                     clamp_f(line_point_factor_v2(mval, edge_screen[0], edge_screen[1]), 0.0f, 1.0f);
+  if (!kcd->maya_loop_insert_centered && (modifier & KM_SHIFT) != 0) {
+    const float step = clamp_f(kcd->snap_step * 0.01f, 0.01f, 1.0f);
+    factor = clamp_f(roundf(factor / step) * step, 0.0f, 1.0f);
+  }
+
+  float3 start_point;
+  interp_v3_v3v3(start_point, edge_start, edge_end, factor);
+  Set<BMFace *> visited_faces;
+  BMLoop *radial = edge->l;
+  BMLoop *radial_iter = radial;
+  do {
+    knife_maya_loop_preview_walk(
+        kcd, ob_index, edge, radial_iter->f, start_point, visited_faces);
+  } while ((radial_iter = radial_iter->radial_next) != radial);
+
+  if (!kcd->maya_loop_preview_lines.is_empty()) {
+    kcd->maya_loop_preview_has_origin = true;
+    kcd->maya_loop_preview_ob_index = ob_index;
+    kcd->maya_loop_preview_edge = edge;
+    kcd->maya_loop_preview_factor = factor;
+    knife_project_v2(kcd, start_point, kcd->maya_loop_preview_origin_mval);
+  }
+}
+
+static KnifeMayaCutPoint knife_maya_cut_point_from_pos(const KnifePosData &pos,
+                                                       const bool grid_point)
+{
+  KnifeMayaCutPoint point{};
+  point.mval = pos.mval;
+  point.cage = pos.cage;
+  point.grid_point = grid_point;
+  return point;
+}
+
+static void knife_maya_cut_path_append_current(KnifeTool_OpData *kcd)
+{
+  kcd->maya_cut_points.append(
+      knife_maya_cut_point_from_pos(kcd->prev, kcd->maya_prev_grid_point));
+}
+
+static void knife_maya_cut_path_seed_from_face(KnifeTool_OpData *kcd,
+                                               const float3 &start_cage)
+{
+  kcd->maya_cut_points.clear();
+  KnifeMayaCutPoint start{};
+  start.cage = start_cage;
+  knife_project_v2(kcd, start.cage, start.mval);
+  kcd->maya_cut_points.append(start);
+  knife_maya_cut_path_append_current(kcd);
+}
+
+static int knife_maya_cut_path_point_find(const KnifeTool_OpData *kcd, const float2 &mval)
+{
+  int closest_index = -1;
+  float closest_distance = square_f(12.0f * UI_SCALE_FAC);
+  for (const int point_index : kcd->maya_cut_points.index_range()) {
+    float2 screen;
+    knife_project_v2(kcd, kcd->maya_cut_points[point_index].cage, screen);
+    const float distance = math::distance_squared(screen, mval);
+    if (distance <= closest_distance) {
+      closest_distance = distance;
+      closest_index = point_index;
+    }
+  }
+  return closest_index;
+}
+
+static void knife_maya_cut_path_rebuild(KnifeTool_OpData *kcd)
+{
+  kcd->maya_replaying_redo = true;
+  while (!BLI_stack_is_empty(kcd->undostack)) {
+    knifetool_undo(kcd);
+  }
+
+  knife_pos_data_clear(&kcd->prev);
+  knife_pos_data_clear(&kcd->curr);
+  kcd->mdata.is_stored = false;
+  kcd->mode = MODE_IDLE;
+  kcd->is_drag_undo = false;
+  kcd->maya_cut_start_valid = false;
+
+  if (kcd->maya_cut_points.is_empty()) {
+    kcd->no_cuts = true;
+    kcd->maya_replaying_redo = false;
+    return;
+  }
+
+  const KnifeMayaCutPoint &first = kcd->maya_cut_points.first();
+  if (first.grid_point) {
+    knife_pos_data_clear(&kcd->curr);
+    kcd->curr.cage = first.cage;
+    kcd->curr.mval = first.mval;
+    kcd->prev = kcd->curr;
+    kcd->maya_curr_grid_point = true;
+    kcd->maya_prev_grid_point = true;
+  }
+  else {
+    knife_start_cut(kcd, first.mval);
+  }
+  kcd->mode = MODE_DRAGGING;
+  kcd->init = kcd->prev;
+  kcd->maya_cut_start_valid = true;
+  kcd->maya_cut_start_cage = kcd->prev.cage;
+
+  for (const int point_index : kcd->maya_cut_points.index_range().drop_front(1)) {
+    const KnifeMayaCutPoint &point = kcd->maya_cut_points[point_index];
+    if (point.grid_point) {
+      knife_pos_data_clear(&kcd->curr);
+      kcd->curr.cage = point.cage;
+      kcd->curr.mval = point.mval;
+      kcd->maya_curr_grid_point = true;
+      knife_find_line_hits(kcd);
+    }
+    else {
+      knifetool_update_mval(kcd, point.mval);
+    }
+    knife_add_cut(kcd);
+    kcd->is_drag_undo = false;
+  }
+
+  kcd->curr = kcd->prev;
+  kcd->no_cuts = kcd->maya_cut_points.size() < 2;
+  kcd->maya_replaying_redo = false;
+}
+
+static bool knife_maya_delete_highlighted_edge(KnifeTool_OpData *kcd)
+{
+  KnifeEdge *edge = kcd->curr.edge;
+  if (edge == nullptr || !edge->is_cut || edge->is_invalid) {
+    return false;
+  }
+
+  KnifeUndoFrame *undo = static_cast<KnifeUndoFrame *>(BLI_stack_push_r(kcd->undostack));
+  undo->cuts = 0;
+  undo->splits = 0;
+  undo->pos = kcd->prev;
+  undo->mdata = kcd->mdata;
+  undo->maya_prev_grid_point = kcd->maya_prev_grid_point;
+  undo->maya_deleted_edge = edge;
+  edge->is_invalid = true;
+  kcd->maya_redo_actions.clear();
+  return true;
+}
+
+static bool knife_maya_undo_action(KnifeTool_OpData *kcd)
+{
+  if (BLI_stack_is_empty(kcd->undostack)) {
+    if (kcd->mode != MODE_DRAGGING) {
+      return false;
+    }
+
+    KnifeMayaRedoAction action{};
+    action.type = KnifeMayaRedoType::StartPoint;
+    action.mval = kcd->prev.mval;
+    kcd->maya_redo_actions.append(action);
+    kcd->maya_cut_points.clear();
+    knife_pos_data_clear(&kcd->prev);
+    knife_pos_data_clear(&kcd->curr);
+    kcd->mode = MODE_IDLE;
+    kcd->no_cuts = true;
+    kcd->maya_lmb_down = false;
+    kcd->maya_slice_drag = false;
+    kcd->maya_quick_slice = false;
+    kcd->maya_slice_move = false;
+    kcd->maya_slice_tweak_endpoint = -1;
+    kcd->maya_cut_start_valid = false;
+    return true;
+  }
+
+  const KnifeUndoFrame *undo = static_cast<const KnifeUndoFrame *>(
+      BLI_stack_peek(kcd->undostack));
+  KnifeMayaRedoAction action{};
+  if (undo->maya_deleted_edge != nullptr) {
+    action.type = KnifeMayaRedoType::DeleteEdge;
+    action.edge = undo->maya_deleted_edge;
+  }
+  else if (kcd->maya_slice_result) {
+    action.type = KnifeMayaRedoType::Slice;
+    action.slice_start = kcd->maya_slice_control_start;
+    action.slice_end = kcd->maya_slice_control_end;
+  }
+  else {
+    action.type = KnifeMayaRedoType::Point;
+    action.mval = kcd->prev.mval;
+  }
+  kcd->maya_redo_actions.append(action);
+
+  knifetool_undo(kcd);
+  if (action.type == KnifeMayaRedoType::Slice) {
+    kcd->maya_slice_result = false;
+    kcd->maya_slice_move = false;
+    kcd->maya_slice_tweak_endpoint = -1;
+  }
+  else if (action.type == KnifeMayaRedoType::Point && !kcd->maya_cut_points.is_empty()) {
+    kcd->maya_cut_points.remove_last();
+  }
+  return true;
+}
+
+static bool knife_maya_redo_action(KnifeTool_OpData *kcd)
+{
+  if (kcd->maya_redo_actions.is_empty()) {
+    return false;
+  }
+
+  const KnifeMayaRedoAction action = kcd->maya_redo_actions.last();
+  bool redone = false;
+  kcd->maya_replaying_redo = true;
+  switch (action.type) {
+    case KnifeMayaRedoType::StartPoint:
+      if (kcd->mode == MODE_IDLE) {
+        knife_start_cut(kcd, action.mval);
+        kcd->mode = MODE_DRAGGING;
+        kcd->init = kcd->curr;
+        kcd->maya_cut_start_valid = true;
+        kcd->maya_cut_start_cage = kcd->prev.cage;
+        kcd->maya_cut_points.append(
+            knife_maya_cut_point_from_pos(kcd->prev, kcd->maya_prev_grid_point));
+        redone = true;
+      }
+      break;
+    case KnifeMayaRedoType::Point:
+      if (kcd->mode == MODE_DRAGGING) {
+        knifetool_update_mval(kcd, action.mval);
+        knife_add_cut(kcd);
+        kcd->is_drag_undo = false;
+        knife_maya_cut_path_append_current(kcd);
+        redone = true;
+      }
+      break;
+    case KnifeMayaRedoType::DeleteEdge:
+      if (action.edge != nullptr && !action.edge->is_invalid) {
+        KnifeUndoFrame *undo = static_cast<KnifeUndoFrame *>(
+            BLI_stack_push_r(kcd->undostack));
+        undo->cuts = 0;
+        undo->splits = 0;
+        undo->pos = kcd->prev;
+        undo->mdata = kcd->mdata;
+        undo->maya_prev_grid_point = kcd->maya_prev_grid_point;
+        undo->maya_deleted_edge = action.edge;
+        action.edge->is_invalid = true;
+        redone = true;
+      }
+      break;
+    case KnifeMayaRedoType::Slice:
+      kcd->maya_cut_points.clear();
+      redone = knife_maya_commit_slice(kcd, action.slice_start, action.slice_end);
+      break;
+  }
+  kcd->maya_replaying_redo = false;
+
+  if (redone) {
+    kcd->maya_redo_actions.remove_last();
+  }
+  return redone;
+}
+
+static void knife_maya_marking_menu_invoke(bContext *C, const wmEvent *event)
+{
+  wmOperatorType *ot = WM_operatortype_find("WM_OT_call_menu_pie", false);
+  if (ot == nullptr) {
+    return;
+  }
+  PointerRNA props = WM_operator_properties_create_ptr(ot);
+  RNA_string_set(&props, "name", "VIEW3D_MT_maya_multi_cut_marking_menu");
+  WM_operator_name_call_ptr(C, ot, wm::OpCallContext::InvokeDefault, &props, event);
+  WM_operator_properties_free(&props);
+}
+
 static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   KnifeTool_OpData *kcd = static_cast<KnifeTool_OpData *>(op->customdata);
@@ -4229,17 +5729,110 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
     return OPERATOR_FINISHED;
   }
 
+  const short event_type = event->type == EVT_MODAL_MAP ? event->prev_type : event->type;
+  const bScreen *screen = CTX_wm_screen(C);
+  const bool mouse_over_popup = screen != nullptr &&
+                                BKE_screen_find_region_xy(
+                                    screen, RGN_TYPE_TEMPORARY, event->xy) != nullptr;
+  const ARegion *mouse_region = ED_area_find_region_xy_visual(
+      CTX_wm_area(C), RGN_TYPE_ANY, event->xy);
+  const bool mouse_over_editor_ui = mouse_region != nullptr && mouse_region != kcd->vc.region;
+  if (kcd->maya_style && ISMOUSE(event_type) && !kcd->maya_lmb_down &&
+      !kcd->maya_loop_insert_down && !kcd->maya_quick_slice &&
+      (mouse_over_popup || mouse_over_editor_ui ||
+       !BLI_rcti_isect_pt(&kcd->vc.region->winrct, event->xy[0], event->xy[1])))
+  {
+    return OPERATOR_PASS_THROUGH;
+  }
+
   kcd->region = kcd->vc.region;
+  if (kcd->maya_style) {
+    knife_maya_settings_sync(C, op, kcd);
+  }
 
   ED_view3d_init_mats_rv3d(ob, kcd->vc.rv3d); /* Needed to initialize clipping. */
 
-  if (kcd->mode == MODE_PANNING) {
-    kcd->mode = KnifeMode(kcd->prevmode);
+  if (kcd->maya_style && kcd->mode == MODE_PANNING) {
+    const bool navigation_ended =
+        (ELEM(event->type, EVT_LEFTALTKEY, EVT_RIGHTALTKEY) && event->val == KM_RELEASE) ||
+        ((event->modifier & KM_ALT) == 0 && event->type == MOUSEMOVE);
+    if (navigation_ended) {
+      kcd->mode = KnifeMode(kcd->prevmode);
+      const float2 navigation_mval = {float(event->mval[0]), float(event->mval[1])};
+      knifetool_update_mval(kcd, navigation_mval);
+      ED_region_tag_redraw(kcd->region);
+    }
+    return OPERATOR_PASS_THROUGH;
+  }
+
+  if (kcd->maya_style && event->val == KM_PRESS &&
+      ELEM(event->type, EVT_QKEY, EVT_WKEY, EVT_EKEY, EVT_RKEY) &&
+      (event->modifier & (KM_SHIFT | KM_CTRL | KM_ALT | KM_OSKEY)) == 0)
+  {
+    const bool changed = kcd->maya_has_committed_changes || kcd->totkvert != 0;
+    if (kcd->totkvert != 0) {
+      knifetool_finish(op);
+    }
+    knifetool_exit(op);
+    ED_workspace_status_text(C, nullptr);
+    return (changed ? OPERATOR_FINISHED : OPERATOR_CANCELLED) | OPERATOR_PASS_THROUGH;
+  }
+
+  if (kcd->maya_style && event_type == RIGHTMOUSE && event->val == KM_PRESS &&
+      (event->modifier & (KM_CTRL | KM_SHIFT | KM_ALT)) == (KM_CTRL | KM_SHIFT))
+  {
+    knife_maya_marking_menu_invoke(C, event);
+    return OPERATOR_RUNNING_MODAL;
   }
 
   bool handled = false;
   float snapping_increment_temp;
   const float2 mval = {float(event->mval[0]), float(event->mval[1])};
+
+  if (kcd->maya_style) {
+    const ed::maya::MayaSnapMode snap_mode = ED_maya_snap_override_get(C);
+    const bool snap_to_grid = snap_mode == ed::maya::MayaSnapMode::Grid;
+    const bool snap_to_points = snap_mode == ed::maya::MayaSnapMode::Point;
+    if (snap_to_grid != kcd->snap_to_grid || snap_to_points != kcd->snap_to_points) {
+      kcd->snap_to_grid = snap_to_grid;
+      kcd->snap_to_points = snap_to_points;
+      kcd->ignore_edge_snapping = snap_to_points;
+      kcd->ignore_vert_snapping = false;
+      knife_update_active(kcd, mval);
+      do_refresh = true;
+    }
+
+    const bool snap_midpoints = (event->modifier & KM_SHIFT) != 0 &&
+                                (event->modifier & KM_CTRL) == 0;
+    if (snap_midpoints != kcd->snap_midpoints) {
+      kcd->snap_midpoints = snap_midpoints;
+      knife_update_active(kcd, mval);
+      do_refresh = true;
+    }
+
+    const bool perpendicular = kcd->mode == MODE_DRAGGING &&
+                               (event->modifier & (KM_CTRL | KM_SHIFT)) ==
+                                   (KM_CTRL | KM_SHIFT);
+    if (perpendicular != kcd->maya_perpendicular) {
+      kcd->maya_perpendicular = perpendicular;
+      if (perpendicular) {
+        kcd->angle_snapping_mode = KNF_CONSTRAIN_ANGLE_MODE_RELATIVE;
+        kcd->angle_snapping = true;
+        kcd->angle_snapping_increment = 90.0f;
+        knifetool_disable_orientation_locking(kcd);
+      }
+      else {
+        kcd->maya_perpendicular_preview_valid = false;
+        kcd->maya_perpendicular_snap_index = -1;
+        kcd->angle_snapping_mode = RNA_enum_get(op->ptr, "angle_snapping");
+        kcd->angle_snapping = kcd->angle_snapping_mode != KNF_CONSTRAIN_ANGLE_MODE_NONE;
+        kcd->angle_snapping_increment = RAD2DEGF(
+            RNA_float_get(op->ptr, "angle_snapping_increment"));
+      }
+      knife_update_active(kcd, mval);
+      do_refresh = true;
+    }
+  }
 
   if (kcd->angle_snapping) {
     if (kcd->num.str_cur >= 3 ||
@@ -4269,6 +5862,9 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
   if (event->type == EVT_MODAL_MAP) {
     switch (event->val) {
       case KNF_MODAL_CANCEL:
+        if (kcd->maya_style) {
+          return knife_maya_restart_session(C, op, event, false);
+        }
         /* finish */
         ED_region_tag_redraw(kcd->region);
 
@@ -4277,6 +5873,9 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
 
         return OPERATOR_CANCELLED;
       case KNF_MODAL_CONFIRM: {
+        if (kcd->maya_style) {
+          return knife_maya_restart_session(C, op, event, true);
+        }
         const bool changed = (kcd->totkvert != 0);
         /* finish */
         ED_region_tag_redraw(kcd->region);
@@ -4292,6 +5891,22 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
         return OPERATOR_FINISHED;
       }
       case KNF_MODAL_UNDO:
+        if (kcd->maya_style) {
+          if (BLI_stack_is_empty(kcd->undostack) && kcd->mode == MODE_IDLE &&
+              kcd->maya_has_committed_changes)
+          {
+            /* Materialized loop cuts and completed sessions live in Blender's outer undo step.
+             * Finish this modal owner and let the same Z event reach global undo. */
+            knifetool_exit(op);
+            ED_workspace_status_text(C, nullptr);
+            return OPERATOR_FINISHED | OPERATOR_PASS_THROUGH;
+          }
+          knife_maya_undo_action(kcd);
+          knife_update_active(kcd, mval);
+          do_refresh = true;
+          handled = true;
+          break;
+        }
         if (BLI_stack_is_empty(kcd->undostack)) {
           ED_region_tag_redraw(kcd->region);
           knifetool_exit(op);
@@ -4299,23 +5914,54 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
           return OPERATOR_CANCELLED;
         }
         knifetool_undo(kcd);
+        if (kcd->maya_style && kcd->maya_slice_result &&
+            BLI_stack_count(kcd->undostack) <= kcd->maya_slice_undo_count)
+        {
+          kcd->maya_slice_result = false;
+        }
         knife_update_active(kcd, mval);
         ED_region_tag_redraw(kcd->region);
         handled = true;
         break;
+      case KNF_MODAL_REDO:
+        if (kcd->maya_style) {
+          knife_maya_redo_action(kcd);
+          knife_update_active(kcd, mval);
+          do_refresh = true;
+          handled = true;
+        }
+        break;
+      case KNF_MODAL_DELETE_HIGHLIGHTED:
+        if (kcd->maya_style) {
+          if (!knife_maya_delete_highlighted_edge(kcd)) {
+            knife_maya_undo_action(kcd);
+          }
+          knife_update_active(kcd, mval);
+          do_refresh = true;
+          handled = true;
+        }
+        break;
       case KNF_MODAL_MIDPOINT_ON:
-        kcd->snap_midpoints = true;
+        kcd->snap_midpoints = !kcd->maya_style || (event->modifier & KM_CTRL) == 0;
+        kcd->maya_snap_step_drag = false;
 
         knife_recalc_ortho(kcd);
         knife_update_active(kcd, mval);
+        if (kcd->maya_style) {
+          knife_maya_loop_preview_update(kcd, mval, event->modifier);
+        }
         do_refresh = true;
         handled = true;
         break;
       case KNF_MODAL_MIDPOINT_OFF:
         kcd->snap_midpoints = false;
+        kcd->maya_snap_step_drag = false;
 
         knife_recalc_ortho(kcd);
         knife_update_active(kcd, mval);
+        if (kcd->maya_style) {
+          knife_maya_loop_preview_update(kcd, mval, event->modifier);
+        }
         do_refresh = true;
         handled = true;
         break;
@@ -4381,6 +6027,14 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
         handled = true;
         break;
       case KNF_MODAL_NEW_CUT:
+        if (kcd->maya_style) {
+          const bool changed = (kcd->totkvert != 0);
+          ED_region_tag_redraw(kcd->region);
+          knifetool_finish(op);
+          knifetool_exit(op);
+          ED_workspace_status_text(C, nullptr);
+          return changed ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+        }
         /* If no cuts have been made, exit.
          * Preserves right click cancel workflow which most tools use,
          * but stops accidentally deleting entire cuts with right click.
@@ -4397,6 +6051,175 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
         handled = true;
         break;
       case KNF_MODAL_ADD_CUT:
+        if (kcd->maya_style) {
+          if (kcd->maya_loop_insert_down) {
+            if (event->prev_val == KM_RELEASE) {
+              return knife_maya_insert_edge_loop_and_restart(
+                  C, op, event, kcd->maya_loop_insert_centered);
+            }
+            handled = true;
+            break;
+          }
+
+          if (event->prev_val != KM_RELEASE) {
+            kcd->maya_redo_actions.clear();
+            if (kcd->maya_slice_result) {
+              const float start_distance = math::distance_squared(
+                  mval, kcd->maya_slice_control_start);
+              const float end_distance = math::distance_squared(
+                  mval, kcd->maya_slice_control_end);
+              const float point_radius = square_f(12.0f * UI_SCALE_FAC);
+              if (min_ff(start_distance, end_distance) <= point_radius) {
+                kcd->maya_slice_tweak_endpoint = start_distance <= end_distance ? 0 : 1;
+                kcd->maya_slice_tweak_original_start = kcd->maya_slice_control_start;
+                kcd->maya_slice_tweak_original_end = kcd->maya_slice_control_end;
+                kcd->maya_lmb_down = true;
+                kcd->maya_drag_start = mval;
+                handled = true;
+                do_refresh = true;
+                break;
+              }
+            }
+            if (kcd->mode != MODE_DRAGGING && !kcd->maya_slice_result &&
+                (event->modifier & KM_CTRL) != 0)
+            {
+              knifetool_update_mval(kcd, mval);
+              kcd->maya_loop_insert_down = true;
+              kcd->maya_loop_insert_centered = false;
+              knife_maya_loop_preview_update(kcd, mval, event->modifier);
+              do_refresh = true;
+              handled = true;
+              break;
+            }
+
+            kcd->maya_loop_preview_lines.clear();
+            kcd->maya_loop_preview_points.clear();
+            kcd->maya_loop_preview_has_origin = false;
+            kcd->maya_loop_preview_ob_index = -1;
+            kcd->maya_loop_preview_edge = nullptr;
+            kcd->maya_slice_result = false;
+            kcd->no_cuts = false;
+            knife_recalc_ortho(kcd);
+            kcd->maya_lmb_down = true;
+            kcd->maya_lmb_dragged = false;
+            kcd->maya_lmb_started_cut = false;
+            kcd->maya_lmb_added_cut = false;
+            const int tweak_point_index =
+                kcd->mode == MODE_DRAGGING && !kcd->maya_slice_result ?
+                    knife_maya_cut_path_point_find(kcd, mval) :
+                    -1;
+            if (tweak_point_index >= 0) {
+              kcd->maya_tweak_point_index = tweak_point_index;
+              if (tweak_point_index == int(kcd->maya_cut_points.size()) - 1 &&
+                  !BLI_stack_is_empty(kcd->undostack))
+              {
+                knifetool_undo(kcd);
+                kcd->maya_tweak_last = true;
+              }
+              else if (kcd->maya_cut_points.size() == 1) {
+                kcd->maya_tweak_first = true;
+              }
+              kcd->mode = MODE_DRAGGING;
+              knifetool_update_mval(kcd, mval);
+            }
+            else if (kcd->mode == MODE_DRAGGING) {
+              if (kcd->prev.is_space() && !kcd->maya_prev_grid_point &&
+                  knife_maya_commit_slice(kcd, kcd->prev.mval, mval))
+              {
+                kcd->maya_slice_drag = false;
+              }
+              else {
+                knife_add_cut(kcd);
+                knife_maya_cut_path_append_current(kcd);
+                kcd->maya_lmb_added_cut = true;
+              }
+            }
+            else if (kcd->mode != MODE_PANNING) {
+              knife_start_cut(kcd, mval);
+              kcd->mode = MODE_DRAGGING;
+              const bool slice_from_face = (event->modifier & KM_SHIFT) != 0 &&
+                                           kcd->prev.bmface != nullptr &&
+                                           kcd->prev.edge == nullptr && kcd->prev.vert == nullptr;
+              bool seeded_from_face = false;
+              if (!slice_from_face) {
+                seeded_from_face = knife_maya_seed_cut_from_face(kcd);
+                kcd->maya_lmb_added_cut = seeded_from_face;
+              }
+              kcd->init = kcd->curr;
+              kcd->maya_drag_start = mval;
+              kcd->maya_lmb_started_cut = true;
+              kcd->maya_slice_drag = (kcd->prev.is_space() && !kcd->maya_prev_grid_point) ||
+                                     slice_from_face;
+              if (kcd->maya_slice_drag) {
+                kcd->maya_cut_points.clear();
+                kcd->maya_cut_start_valid = false;
+              }
+              else if (!seeded_from_face) {
+                kcd->maya_cut_points.clear();
+                knife_maya_cut_path_append_current(kcd);
+                kcd->maya_cut_start_valid = true;
+                kcd->maya_cut_start_cage = kcd->prev.cage;
+              }
+            }
+            kcd->is_drag_hold = false;
+          }
+          else {
+            if (kcd->maya_slice_tweak_endpoint >= 0) {
+              const float2 control_start = kcd->maya_slice_control_start;
+              const float2 control_end = kcd->maya_slice_control_end;
+              while (BLI_stack_count(kcd->undostack) > kcd->maya_slice_undo_count) {
+                knifetool_undo(kcd);
+              }
+              kcd->maya_slice_result = false;
+              knife_pos_data_clear(&kcd->prev);
+              knife_pos_data_clear(&kcd->curr);
+              kcd->mode = MODE_IDLE;
+              if (!knife_maya_commit_slice(kcd, control_start, control_end)) {
+                knife_maya_commit_slice(kcd,
+                                        kcd->maya_slice_tweak_original_start,
+                                        kcd->maya_slice_tweak_original_end);
+              }
+              kcd->maya_slice_tweak_endpoint = -1;
+            }
+            else if (kcd->maya_tweak_point_index >= 0) {
+              kcd->maya_cut_points[kcd->maya_tweak_point_index] =
+                  knife_maya_cut_point_from_pos(kcd->curr, kcd->maya_curr_grid_point);
+              knife_maya_cut_path_rebuild(kcd);
+              kcd->maya_tweak_point_index = -1;
+              kcd->maya_tweak_last = false;
+              kcd->maya_tweak_first = false;
+            }
+            else if (kcd->maya_slice_drag) {
+              if (!knife_maya_commit_slice(kcd, kcd->maya_drag_start, mval)) {
+                knife_pos_data_clear(&kcd->prev);
+                knife_pos_data_clear(&kcd->curr);
+                kcd->mode = MODE_IDLE;
+                kcd->maya_cut_start_valid = false;
+              }
+            }
+            else if (kcd->maya_lmb_started_cut && kcd->maya_lmb_dragged) {
+              kcd->prev = kcd->curr;
+              kcd->maya_prev_grid_point = kcd->maya_curr_grid_point;
+              if (!kcd->maya_cut_points.is_empty()) {
+                kcd->maya_cut_points.last() =
+                    knife_maya_cut_point_from_pos(kcd->prev, kcd->maya_prev_grid_point);
+              }
+            }
+            kcd->maya_slice_drag = false;
+            kcd->maya_lmb_down = false;
+            kcd->maya_lmb_dragged = false;
+            kcd->maya_lmb_started_cut = false;
+            kcd->maya_lmb_added_cut = false;
+            kcd->maya_snap_step_drag = false;
+            kcd->is_drag_undo = false;
+            knifetool_update_mval(kcd, mval);
+          }
+
+          ED_region_tag_redraw(kcd->region);
+          handled = true;
+          break;
+        }
+
         kcd->no_cuts = false;
         knife_recalc_ortho(kcd);
 
@@ -4427,6 +6250,128 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
           knifetool_update_mval(kcd, kcd->curr.mval);
         }
 
+        ED_region_tag_redraw(kcd->region);
+        handled = true;
+        break;
+      case KNF_MODAL_GRID_SNAP_ON:
+      case KNF_MODAL_GRID_SNAP_OFF:
+        kcd->snap_to_grid = event->val == KNF_MODAL_GRID_SNAP_ON;
+        knife_update_active(kcd, mval);
+        do_refresh = true;
+        handled = true;
+        break;
+      case KNF_MODAL_POINT_SNAP_ON:
+      case KNF_MODAL_POINT_SNAP_OFF:
+        kcd->snap_to_points = event->val == KNF_MODAL_POINT_SNAP_ON;
+        kcd->ignore_edge_snapping = kcd->snap_to_points;
+        kcd->ignore_vert_snapping = false;
+        knife_update_active(kcd, mval);
+        do_refresh = true;
+        handled = true;
+        break;
+      case KNF_MODAL_INSERT_EDGE_LOOP:
+      case KNF_MODAL_INSERT_CENTERED_EDGE_LOOP:
+        if (event->prev_val != KM_RELEASE) {
+          if (kcd->mode == MODE_DRAGGING || kcd->maya_slice_result) {
+            handled = true;
+            break;
+          }
+          kcd->maya_loop_insert_down = true;
+          kcd->maya_loop_insert_centered = event->val == KNF_MODAL_INSERT_CENTERED_EDGE_LOOP;
+          knifetool_update_mval(kcd, mval);
+          knife_maya_loop_preview_update(kcd, mval, event->modifier);
+          do_refresh = true;
+        }
+        else if (kcd->maya_loop_insert_down) {
+          return knife_maya_insert_edge_loop_and_restart(
+              C, op, event, kcd->maya_loop_insert_centered);
+        }
+        handled = true;
+        break;
+      case KNF_MODAL_QUICK_SLICE:
+        if (kcd->maya_loop_insert_down) {
+          if (event->prev_val == KM_RELEASE) {
+            return knife_maya_insert_edge_loop_and_restart(
+                C, op, event, kcd->maya_loop_insert_centered);
+          }
+          handled = true;
+          break;
+        }
+        if (event->prev_val != KM_RELEASE) {
+          kcd->maya_redo_actions.clear();
+          if (kcd->maya_slice_result &&
+              dist_squared_to_line_segment_v2(
+                  mval, kcd->maya_slice_start, kcd->maya_slice_end) <=
+                  square_f(12.0f * UI_SCALE_FAC))
+          {
+            kcd->maya_slice_move = true;
+            kcd->maya_slice_move_start = kcd->maya_slice_start;
+            kcd->maya_slice_move_end = kcd->maya_slice_end;
+            kcd->maya_slice_move_control_start = kcd->maya_slice_control_start;
+            kcd->maya_slice_move_control_end = kcd->maya_slice_control_end;
+          }
+          kcd->maya_drag_start = mval;
+          if (kcd->maya_slice_move) {
+            /* Keep the original cut visible until release; mouse motion draws the translated
+             * plane preview without changing its angle. */
+          }
+          else if (kcd->mode == MODE_DRAGGING) {
+            kcd->maya_tweak_point_index = kcd->maya_cut_points.is_empty() ?
+                                              -1 :
+                                              int(kcd->maya_cut_points.size()) - 1;
+            if (!BLI_stack_is_empty(kcd->undostack)) {
+              knifetool_undo(kcd);
+              kcd->maya_tweak_last = true;
+            }
+            else {
+              kcd->maya_tweak_first = true;
+            }
+            kcd->mode = MODE_DRAGGING;
+            knifetool_update_mval(kcd, mval);
+          }
+          else {
+            kcd->maya_quick_slice = true;
+            kcd->maya_cut_points.clear();
+            knife_start_cut(kcd, mval);
+            kcd->mode = MODE_DRAGGING;
+            kcd->init = kcd->curr;
+          }
+        }
+        else if (kcd->maya_slice_move) {
+          const float2 translated_start = kcd->maya_slice_control_start;
+          const float2 translated_end = kcd->maya_slice_control_end;
+          while (BLI_stack_count(kcd->undostack) > kcd->maya_slice_undo_count) {
+            knifetool_undo(kcd);
+          }
+          kcd->maya_slice_result = false;
+          knife_pos_data_clear(&kcd->prev);
+          knife_pos_data_clear(&kcd->curr);
+          kcd->mode = MODE_IDLE;
+          knife_maya_commit_slice(kcd, translated_start, translated_end);
+          kcd->maya_slice_move = false;
+        }
+        else if (kcd->maya_tweak_point_index >= 0) {
+          kcd->maya_cut_points[kcd->maya_tweak_point_index] =
+              knife_maya_cut_point_from_pos(kcd->curr, kcd->maya_curr_grid_point);
+          knife_maya_cut_path_rebuild(kcd);
+          kcd->maya_tweak_point_index = -1;
+          kcd->maya_tweak_last = false;
+          kcd->maya_tweak_first = false;
+          kcd->is_drag_undo = false;
+        }
+        else if (kcd->maya_tweak_first) {
+          kcd->prev = kcd->curr;
+          kcd->maya_prev_grid_point = kcd->maya_curr_grid_point;
+          kcd->maya_tweak_first = false;
+        }
+        else if (kcd->maya_quick_slice) {
+          if (!knife_maya_commit_slice(kcd, kcd->maya_drag_start, mval)) {
+            knife_pos_data_clear(&kcd->prev);
+            knife_pos_data_clear(&kcd->curr);
+            kcd->mode = MODE_IDLE;
+          }
+          kcd->maya_quick_slice = false;
+        }
         ED_region_tag_redraw(kcd->region);
         handled = true;
         break;
@@ -4480,7 +6425,53 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
         return OPERATOR_PASS_THROUGH;
       case MOUSEMOVE: /* Mouse moved somewhere to select another loop. */
         if (kcd->mode != MODE_PANNING) {
+          if (kcd->maya_style && kcd->maya_slice_tweak_endpoint >= 0) {
+            if (kcd->maya_slice_tweak_endpoint == 0) {
+              kcd->maya_slice_control_start = mval;
+            }
+            else {
+              kcd->maya_slice_control_end = mval;
+            }
+            knife_maya_slice_line_expand(kcd,
+                                         kcd->maya_slice_control_start,
+                                         kcd->maya_slice_control_end,
+                                         kcd->maya_slice_start,
+                                         kcd->maya_slice_end);
+          }
+          else if (kcd->maya_style && kcd->maya_slice_move) {
+            const float2 offset = mval - kcd->maya_drag_start;
+            kcd->maya_slice_start = kcd->maya_slice_move_start + offset;
+            kcd->maya_slice_end = kcd->maya_slice_move_end + offset;
+            kcd->maya_slice_control_start = kcd->maya_slice_move_control_start + offset;
+            kcd->maya_slice_control_end = kcd->maya_slice_move_control_end + offset;
+          }
+          if (kcd->maya_style && kcd->maya_lmb_down && !kcd->maya_lmb_dragged &&
+              math::distance_squared(kcd->maya_drag_start, mval) >
+                  square_f(3.0f * UI_SCALE_FAC))
+          {
+            kcd->maya_lmb_dragged = true;
+            kcd->maya_snap_step_drag = (event->modifier & KM_SHIFT) != 0 &&
+                                       !kcd->maya_slice_drag;
+            if (kcd->maya_lmb_added_cut && !kcd->maya_slice_drag &&
+                !BLI_stack_is_empty(kcd->undostack))
+            {
+              knifetool_undo(kcd);
+              kcd->is_drag_undo = false;
+              kcd->maya_tweak_last = true;
+              kcd->maya_tweak_point_index = int(kcd->maya_cut_points.size()) - 1;
+              kcd->maya_lmb_added_cut = false;
+            }
+          }
           knifetool_update_mval(kcd, mval);
+          if (kcd->maya_style) {
+            if (kcd->maya_tweak_point_index >= 0 &&
+                (kcd->maya_lmb_down || kcd->maya_tweak_last || kcd->maya_tweak_first))
+            {
+              kcd->maya_cut_points[kcd->maya_tweak_point_index] =
+                  knife_maya_cut_point_from_pos(kcd->curr, kcd->maya_curr_grid_point);
+            }
+            knife_maya_loop_preview_update(kcd, mval, event->modifier);
+          }
           do_refresh = true;
 
           if (kcd->is_drag_hold) {
@@ -4492,6 +6483,12 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
 
         break;
       default: {
+        if (kcd->maya_style &&
+            ELEM(event->type, EVT_LEFTCTRLKEY, EVT_RIGHTCTRLKEY, EVT_LEFTSHIFTKEY, EVT_RIGHTSHIFTKEY))
+        {
+          knife_maya_loop_preview_update(kcd, mval, event->modifier);
+          do_refresh = true;
+        }
         break;
       }
     }
@@ -4522,7 +6519,7 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
   }
 
   /* Constrain axes with X,Y,Z keys. */
-  if (event->type == EVT_MODAL_MAP) {
+  if (event->type == EVT_MODAL_MAP && !kcd->maya_style) {
     if (ELEM(event->val, KNF_MODAL_X_AXIS, KNF_MODAL_Y_AXIS, KNF_MODAL_Z_AXIS)) {
       if (event->val == KNF_MODAL_X_AXIS && kcd->constrain_axis != KNF_CONSTRAIN_AXIS_X) {
         kcd->constrain_axis = KNF_CONSTRAIN_AXIS_X;
@@ -4576,8 +6573,236 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
   return OPERATOR_RUNNING_MODAL;
 }
 
+static wmOperatorStatus knife_maya_insert_edge_loop(bContext *C,
+                                                    wmOperator *knife_op,
+                                                    const wmEvent * /*event*/,
+                                                    const bool /*centered*/,
+                                                    const KnifeTool_OpData *kcd)
+{
+  if (kcd == nullptr || !kcd->maya_loop_preview_has_origin ||
+      kcd->maya_loop_preview_edge == nullptr || kcd->maya_loop_preview_ob_index < 0 ||
+      kcd->maya_loop_preview_ob_index >= int(kcd->objects.size()) ||
+      kcd->maya_loop_preview_points.is_empty())
+  {
+    BKE_report(knife_op->reports, RPT_WARNING, "No edge-loop preview to insert");
+    return OPERATOR_CANCELLED;
+  }
+
+  ViewContext vc = em_setup_viewcontext(C);
+  Vector<Base *> bases = BKE_view_layer_array_from_bases_in_edit_mode(
+      *vc.bmain, vc.scene, vc.view_layer, vc.v3d);
+
+  uint base_index = 0;
+  bool base_found = false;
+  Object *ob = kcd->objects[kcd->maya_loop_preview_ob_index];
+  for (const int index : bases.index_range()) {
+    if (bases[index]->object == ob) {
+      base_index = uint(index);
+      base_found = true;
+      break;
+    }
+  }
+  if (!base_found) {
+    BKE_report(knife_op->reports, RPT_WARNING, "Preview object is no longer editable");
+    return OPERATOR_CANCELLED;
+  }
+
+  BMEdge *edge = kcd->maya_loop_preview_edge;
+  ED_view3d_viewcontext_init_object(&vc, ob);
+  BM_mesh_elem_index_ensure(vc.em->bm, BM_VERT | BM_EDGE);
+
+  struct LoopPreviewPlacement {
+    BMVert *v1;
+    BMVert *v2;
+    float3 center;
+    float3 target;
+  };
+  Vector<LoopPreviewPlacement> placements;
+  placements.reserve(kcd->maya_loop_preview_points.size());
+
+  for (const KnifeMayaLoopPreviewPoint &preview_point : kcd->maya_loop_preview_points) {
+    const BMEdge *preview_edge = preview_point.edge;
+    const float3 cage_world[2] = {
+        knife_maya_vert_world(
+            kcd, kcd->maya_loop_preview_ob_index, preview_edge->v1),
+        knife_maya_vert_world(
+            kcd, kcd->maya_loop_preview_ob_index, preview_edge->v2),
+    };
+    const float factor = clamp_f(
+        line_point_factor_v3(preview_point.cage, cage_world[0], cage_world[1]), 0.0f, 1.0f);
+    LoopPreviewPlacement placement;
+    placement.v1 = preview_edge->v1;
+    placement.v2 = preview_edge->v2;
+    mid_v3_v3v3(placement.center, preview_edge->v1->co, preview_edge->v2->co);
+    interp_v3_v3v3(
+        placement.target, preview_edge->v1->co, preview_edge->v2->co, factor);
+    placements.append(placement);
+  }
+
+  wmOperatorType *loopcut_type = WM_operatortype_find("MESH_OT_loopcut", true);
+  PointerRNA loopcut_props = WM_operator_properties_create_ptr(loopcut_type);
+  RNA_int_set(&loopcut_props, "number_cuts", 1);
+  RNA_float_set(&loopcut_props, "smoothness", 0.0f);
+  RNA_int_set(&loopcut_props, "object_index", int(base_index));
+  RNA_int_set(&loopcut_props, "edge_index", BM_elem_index_get(edge));
+  const wmOperatorStatus loopcut_status = WM_operator_name_call_ptr(
+      C, loopcut_type, wm::OpCallContext::ExecDefault, &loopcut_props, nullptr);
+  WM_operator_properties_free(&loopcut_props);
+  if (!(loopcut_status & OPERATOR_FINISHED)) {
+    return loopcut_status;
+  }
+
+  bool placement_failed = false;
+  for (const LoopPreviewPlacement &placement : placements) {
+    BMVert *inserted_vert = nullptr;
+    float best_distance = FLT_MAX;
+    BMIter iter;
+    BMEdge *split_edge;
+    BM_ITER_ELEM (split_edge, &iter, placement.v1, BM_EDGES_OF_VERT) {
+      BMVert *candidate = BM_edge_other_vert(split_edge, placement.v1);
+      if (candidate == placement.v2 || BM_edge_exists(candidate, placement.v2) == nullptr) {
+        continue;
+      }
+      const float distance = len_squared_v3v3(candidate->co, placement.center);
+      if (distance < best_distance) {
+        best_distance = distance;
+        inserted_vert = candidate;
+      }
+    }
+    if (inserted_vert == nullptr) {
+      placement_failed = true;
+      continue;
+    }
+    copy_v3_v3(inserted_vert->co, placement.target);
+  }
+  if (placement_failed) {
+    BKE_report(knife_op->reports,
+               RPT_WARNING,
+               "Some loop vertices could not be matched to the displayed preview");
+  }
+
+  EDBMUpdate_Params placement_update_params{};
+  placement_update_params.calc_looptris = true;
+  placement_update_params.calc_normals = true;
+  placement_update_params.is_destructive = true;
+  EDBM_update(id_cast<Mesh *>(ob->data), &placement_update_params);
+
+  wmOperatorType *sharp_type = WM_operatortype_find("MESH_OT_set_sharpness_by_angle", true);
+  PointerRNA sharp_props = WM_operator_properties_create_ptr(sharp_type);
+  RNA_float_set(&sharp_props, "angle", kcd->smoothing_angle);
+  RNA_boolean_set(&sharp_props, "extend", false);
+  WM_operator_name_call_ptr(C, sharp_type, wm::OpCallContext::ExecDefault, &sharp_props, nullptr);
+  WM_operator_properties_free(&sharp_props);
+
+  const int subdivisions = kcd->subdivisions;
+  if (subdivisions > 1) {
+    BM_mesh_esubdivide(vc.em->bm,
+                       BM_ELEM_SELECT,
+                       kcd->edge_flow ? kcd->edge_flow_factor : 0.0f,
+                       SUBD_FALLOFF_LIN,
+                       false,
+                       0.0f,
+                       0.0f,
+                       subdivisions - 1,
+                       SUBDIV_SELECT_ORIG,
+                       SUBD_CORNER_STRAIGHT_CUT,
+                       false,
+                       false,
+                       false,
+                       0);
+
+    EDBMUpdate_Params update_params{};
+    update_params.calc_looptris = true;
+    update_params.calc_normals = true;
+    update_params.is_destructive = true;
+    EDBM_update(id_cast<Mesh *>(ob->data), &update_params);
+  }
+
+  for (Base *base : bases) {
+    Object *object = base->object;
+    BMEditMesh *em = BKE_editmesh_from_object(object);
+    EDBM_flag_disable_all(em, BM_ELEM_SELECT);
+    DEG_id_tag_update(object->data, ID_RECALC_SELECT);
+    WM_main_add_notifier(NC_GEOM | ND_SELECT, object->data);
+  }
+
+  return OPERATOR_FINISHED;
+}
+
+static wmOperatorStatus knife_maya_insert_edge_loop_and_restart(bContext *C,
+                                                                wmOperator *op,
+                                                                const wmEvent *event,
+                                                                const bool centered)
+{
+  KnifeTool_OpData *kcd = static_cast<KnifeTool_OpData *>(op->customdata);
+  bool has_committed_changes = kcd->maya_has_committed_changes;
+  if (knife_maya_insert_edge_loop(C, op, event, centered, kcd) & OPERATOR_FINISHED) {
+    has_committed_changes = true;
+  }
+  knifetool_exit(op);
+
+  const wmOperatorStatus status = knife_maya_restart_session(C, op, event, false);
+  static_cast<KnifeTool_OpData *>(op->customdata)->maya_has_committed_changes =
+      has_committed_changes;
+  return status;
+}
+
+static wmOperatorStatus knife_maya_restart_session(bContext *C,
+                                                   wmOperator *op,
+                                                   const wmEvent *event,
+                                                   const bool commit_current)
+{
+  KnifeTool_OpData *kcd = static_cast<KnifeTool_OpData *>(op->customdata);
+  bool has_committed_changes = false;
+  if (kcd != nullptr) {
+    has_committed_changes = kcd->maya_has_committed_changes;
+    if (commit_current && kcd->totkvert != 0) {
+      knifetool_finish(op);
+      has_committed_changes = true;
+    }
+    knifetool_exit(op);
+  }
+
+  const bool only_select = RNA_boolean_get(op->ptr, "only_selected");
+  const bool cut_through = !RNA_boolean_get(op->ptr, "use_occlude_geometry");
+  const bool xray = !RNA_boolean_get(op->ptr, "xray");
+  const int visible_measurements = RNA_enum_get(op->ptr, "visible_measurements");
+  const int angle_snapping = RNA_enum_get(op->ptr, "angle_snapping");
+  const float angle_snapping_increment = RAD2DEGF(
+      RNA_float_get(op->ptr, "angle_snapping_increment"));
+
+  ViewContext vc = em_setup_viewcontext(C);
+  kcd = MEM_new<KnifeTool_OpData>(__func__);
+  op->customdata = kcd;
+  knifetool_init(&vc,
+                 kcd,
+                 BKE_view_layer_array_from_objects_in_edit_mode_unique_data(
+                     *vc.bmain, vc.scene, vc.view_layer, vc.v3d),
+                 only_select,
+                 cut_through,
+                 xray,
+                 visible_measurements,
+                 angle_snapping,
+                 angle_snapping_increment,
+                 true);
+  kcd->maya_style = true;
+  kcd->maya_has_committed_changes = has_committed_changes;
+  knife_maya_settings_sync(C, op, kcd);
+  kcd->snap_to_grid = ED_maya_snap_override_get(C) == ed::maya::MayaSnapMode::Grid;
+  kcd->snap_to_points = ED_maya_snap_override_get(C) == ed::maya::MayaSnapMode::Point;
+
+  op->flag |= OP_IS_MODAL_CURSOR_REGION;
+  WM_cursor_modal_set(CTX_wm_window(C), WM_CURSOR_KNIFE);
+  const float2 mval = {float(event->mval[0]), float(event->mval[1])};
+  knifetool_update_mval(kcd, mval);
+  knife_update_header(C, op, kcd);
+  ED_region_tag_redraw(kcd->region);
+  return OPERATOR_RUNNING_MODAL;
+}
+
 static wmOperatorStatus knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
+  const bool maya_style = ED_maya_interaction_preset_enabled(C);
   const bool only_select = RNA_boolean_get(op->ptr, "only_selected");
   const bool cut_through = !RNA_boolean_get(op->ptr, "use_occlude_geometry");
   const bool xray = !RNA_boolean_get(op->ptr, "xray");
@@ -4603,6 +6828,16 @@ static wmOperatorStatus knifetool_invoke(bContext *C, wmOperator *op, const wmEv
                  angle_snapping,
                  angle_snapping_increment,
                  true);
+  kcd->maya_style = maya_style;
+  if (maya_style) {
+    knife_maya_settings_sync(C, op, kcd);
+    kcd->snap_to_grid = event->keymodifier == EVT_XKEY ||
+                        ED_maya_snap_override_get(C) == ed::maya::MayaSnapMode::Grid;
+    kcd->snap_to_points = event->keymodifier == EVT_VKEY ||
+                          ED_maya_snap_override_get(C) == ed::maya::MayaSnapMode::Point;
+    kcd->snap_midpoints = (event->modifier & KM_SHIFT) != 0 &&
+                          (event->modifier & KM_CTRL) == 0;
+  }
 
   if (only_select) {
     bool faces_selected = false;
@@ -4631,7 +6866,16 @@ static wmOperatorStatus knifetool_invoke(bContext *C, wmOperator *op, const wmEv
     wmEvent event_modal{};
     event_modal.prev_val = KM_NOTHING;
     event_modal.type = EVT_MODAL_MAP;
-    event_modal.val = KNF_MODAL_ADD_CUT;
+    if (maya_style && (event->modifier & KM_CTRL) != 0) {
+      event_modal.val = event->type == MIDDLEMOUSE ? KNF_MODAL_INSERT_CENTERED_EDGE_LOOP :
+                                                    KNF_MODAL_INSERT_EDGE_LOOP;
+    }
+    else {
+      event_modal.val = (maya_style && event->type == MIDDLEMOUSE) ? KNF_MODAL_QUICK_SLICE :
+                                                                    KNF_MODAL_ADD_CUT;
+    }
+    event_modal.modifier = event->modifier;
+    event_modal.keymodifier = event->keymodifier;
 
     copy_v2_v2_int(event_modal.mval, event->mval);
 
@@ -4649,9 +6893,9 @@ static wmOperatorStatus knifetool_invoke(bContext *C, wmOperator *op, const wmEv
 void MESH_OT_knife_tool(wmOperatorType *ot)
 {
   /* Description. */
-  ot->name = "Knife Topology Tool";
+  ot->name = "Multi-Cut Topology Tool";
   ot->idname = "MESH_OT_knife_tool";
-  ot->description = "Cut new topology";
+  ot->description = "Cut, slice, and insert edge loops with Maya Multi-Cut interactions";
 
   /* Callbacks. */
   ot->invoke = knifetool_invoke;
@@ -4717,6 +6961,208 @@ void MESH_OT_knife_tool(wmOperatorType *ot)
                        DEG2RADF(KNIFE_MIN_ANGLE_SNAPPING_INCREMENT),
                        DEG2RADF(KNIFE_MAX_ANGLE_SNAPPING_INCREMENT));
   RNA_def_property_subtype(prop, PROP_ANGLE);
+
+  RNA_def_float_percentage(ot->srna,
+                           "snap_step",
+                           10.0f,
+                           1.0f,
+                           100.0f,
+                           "Snap Step",
+                           "Percentage increments used when Shift-snapping cut points or inserting loops",
+                           1.0f,
+                           100.0f);
+  RNA_def_boolean(ot->srna,
+                  "show_cut_options",
+                  true,
+                  "Cut / Insert Edge Loop Tool",
+                  "Show cut and edge-loop options");
+  RNA_def_boolean(ot->srna,
+                  "show_slice_options",
+                  true,
+                  "Slice Tool",
+                  "Show slice options");
+  RNA_def_boolean(ot->srna,
+                  "show_color_options",
+                  true,
+                  "Color Settings",
+                  "Show preview color settings");
+  RNA_def_boolean(ot->srna,
+                  "show_live_options",
+                  true,
+                  "Live Constraint Options",
+                  "Show live-surface constraint options");
+  RNA_def_boolean(ot->srna,
+                  "show_shortcuts",
+                  false,
+                  "Keyboard/Mouse Shortcuts",
+                  "Show Multi-Cut shortcuts");
+  prop = RNA_def_float(ot->srna,
+                       "smoothing_angle",
+                       float(M_PI),
+                       0.0f,
+                       float(M_PI),
+                       "Smoothing Angle",
+                       "Automatically soften or harden newly inserted edges",
+                       0.0f,
+                       float(M_PI));
+  RNA_def_property_subtype(prop, PROP_ANGLE);
+  RNA_def_boolean(ot->srna,
+                  "use_edge_flow",
+                  false,
+                  "Edge Flow",
+                  "Fit inserted loops and subdivisions to the surrounding surface curvature");
+  RNA_def_float(ot->srna,
+                "edge_flow_factor",
+                1.0f,
+                -1.0f,
+                1.0f,
+                "Edge Flow Factor",
+                "Strength of the curvature fit",
+                -1.0f,
+                1.0f);
+  RNA_def_int(ot->srna,
+              "subdivisions",
+              1,
+              1,
+              100,
+              "Subdivisions",
+              "Number of subdivisions created by cuts and inserted loops",
+              1,
+              20);
+
+  RNA_def_boolean(ot->srna,
+                  "ignore_backfaces",
+                  false,
+                  "Ignore Backfaces",
+                  "Limit slice operations to camera-visible faces");
+  RNA_def_boolean(ot->srna,
+                  "delete_faces",
+                  false,
+                  "Delete Faces",
+                  "Delete faces on one side of a slice plane");
+  RNA_def_boolean(ot->srna,
+                  "extract_faces",
+                  false,
+                  "Extract Faces",
+                  "Disconnect and offset faces on one side of a slice plane");
+  prop = RNA_def_float_vector_xyz(ot->srna,
+                                  "extract_offset",
+                                  3,
+                                  nullptr,
+                                  -FLT_MAX,
+                                  FLT_MAX,
+                                  "Extract Offset",
+                                  "World-space offset applied to extracted faces",
+                                  -10.0f,
+                                  10.0f);
+  static const float extract_offset_default[3] = {0.5f, 0.5f, 0.5f};
+  RNA_def_property_float_array_default(prop, extract_offset_default);
+
+  static const float line_color_default[3] = {1.0f, 0.55f, 0.0f};
+  static const float edge_point_color_default[3] = {0.02f, 0.02f, 1.0f};
+  static const float vertex_point_color_default[3] = {0.82f, 0.86f, 0.0f};
+  static const float face_point_color_default[3] = {0.7f, 0.7f, 0.7f};
+  static const float wireframe_color_default[3] = {0.0f, 0.0f, 0.0f};
+  static const float mesh_color_default[3] = {0.0f, 0.62f, 0.82f};
+  RNA_def_float_color(ot->srna,
+                      "line_color",
+                      3,
+                      line_color_default,
+                      0.0f,
+                      1.0f,
+                      "Line",
+                      "Preview and committed cut line color",
+                      0.0f,
+                      1.0f);
+  RNA_def_float_color(ot->srna,
+                      "edge_point_color",
+                      3,
+                      edge_point_color_default,
+                      0.0f,
+                      1.0f,
+                      "Edge Point",
+                      "Color of points snapped to edges",
+                      0.0f,
+                      1.0f);
+  RNA_def_float_color(ot->srna,
+                      "vertex_point_color",
+                      3,
+                      vertex_point_color_default,
+                      0.0f,
+                      1.0f,
+                      "Vertex Point",
+                      "Color of points snapped to vertices",
+                      0.0f,
+                      1.0f);
+  RNA_def_float_color(ot->srna,
+                      "face_point_color",
+                      3,
+                      face_point_color_default,
+                      0.0f,
+                      1.0f,
+                      "Face Point",
+                      "Color of points placed on faces",
+                      0.0f,
+                      1.0f);
+
+  RNA_def_boolean(ot->srna,
+                  "use_live_surface",
+                  false,
+                  "Live Surface",
+                  "Enable Maya-style live-surface display and constraint options");
+  RNA_def_boolean(ot->srna,
+                  "wireframe_overlay",
+                  true,
+                  "Wireframe Overlay",
+                  "Draw the edit mesh wireframe over the live surface");
+  RNA_def_float_color(ot->srna,
+                      "wireframe_color",
+                      3,
+                      wireframe_color_default,
+                      0.0f,
+                      1.0f,
+                      "Wireframe Color",
+                      "Live constraint wireframe color",
+                      0.0f,
+                      1.0f);
+  RNA_def_boolean(ot->srna,
+                  "mesh_overlay",
+                  true,
+                  "Mesh Color",
+                  "Draw a translucent mesh overlay while cutting");
+  RNA_def_float_color(ot->srna,
+                      "mesh_color",
+                      3,
+                      mesh_color_default,
+                      0.0f,
+                      1.0f,
+                      "Mesh Color",
+                      "Live constraint mesh color",
+                      0.0f,
+                      1.0f);
+  RNA_def_float_factor(ot->srna,
+                       "mesh_alpha",
+                       0.75f,
+                       0.0f,
+                       1.0f,
+                       "Mesh Alpha",
+                       "Opacity of the live constraint mesh overlay",
+                       0.0f,
+                       1.0f);
+  RNA_def_float(ot->srna,
+                "surface_offset",
+                0.0044f,
+                0.0f,
+                1.0f,
+                "Surface Offset",
+                "Depth offset used to keep the working mesh visible",
+                0.0f,
+                0.1f);
+  RNA_def_boolean(ot->srna,
+                  "snap_to_backfaces",
+                  true,
+                  "Snap to Backfaces",
+                  "Allow cut points to snap to back-facing geometry");
 
   prop = RNA_def_boolean(ot->srna, "wait_for_input", true, "Wait for Input", "");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);

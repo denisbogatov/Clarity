@@ -63,6 +63,8 @@ struct MayaManipulatorPivotState {
 struct MayaToolState {
   MayaToolID active = MayaToolID::Select;
   MayaToolID previous = MayaToolID::Select;
+  /** Physical `Q/W/E/R` currently held, independent of Blender's single generic key-modifier. */
+  MayaToolID held_hotkey = MayaToolID::None;
   uint64_t revision = 0;
   /**
    * The window runtime is not serialized, so a fresh runtime adopts the tool from the 3D View

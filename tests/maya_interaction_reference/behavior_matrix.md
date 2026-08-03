@@ -211,6 +211,24 @@ base `mesh.loop_select` and `mesh.edgering_select` double-click items for exactl
 that reason, and `Shift` `.` / `Shift` `,` are left unbound by the base keymap.
 `Alt` stays reserved for navigation: `Alt` double click selects nothing.
 
+In Edit Mesh, `Ctrl+E` invokes only Blender's standard context Extrude-and-Move operator. The
+event is consumed even when Extrude cannot run, so neither the Edge menu nor an Extrude tool switch
+may follow it.
+
+## Marking menus
+
+Every Maya marking menu is visible on the press that invokes it; it has no hidden popup-delay
+phase. Plain `RMB`, `Ctrl+RMB`, and `Ctrl+Shift+RMB` remain distinct component, selection-conversion,
+and active-transform-tool menus. Holding `Q`, `W`, `E`, or `R` while pressing `LMB` opens the
+Select, Move, Rotate, or Scale menu respectively, independently of which tool was active before the
+gesture. Move, Rotate, and Scale each write World, Object, and Component orientation to their own
+Blender transform-orientation slot; Rotate additionally exposes Gimbal. The shared constraint,
+Shift Extrude, Shift Duplicate,
+Preserve UVs, Preserve Children, and Tweak Mode rows keep one live state across the menus. The
+Select menu exposes Selection Constraints, Camera Based Selection, Highlight Backfaces, and the
+two Shift-drag toggles. In particular, `W+LMB` opens the Move orientation menu while Edit Pivot is
+active, including when `D` is still physically held and occupies Blender's generic key-modifier.
+
 ## Pivot usage (task items 3, 4, 10, 12)
 
 | Start mode | Tool before | Keys | Mouse | Selection | Pivot | Tool after | Snapping | Cancel | Undo |

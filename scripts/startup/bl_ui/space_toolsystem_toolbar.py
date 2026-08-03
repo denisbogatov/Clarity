@@ -1170,9 +1170,113 @@ class _defs_edit_mesh:
 
     @ToolDef.from_fn
     def knife():
-        def draw_settings(_context, layout, tool, *, extra=False):
+        def draw_settings(context, layout, tool, *, extra=False):
             show_extra = False
             props = tool.operator_properties("mesh.knife_tool")
+            maya_style = context.preferences.inputs.interaction_preset == 'MAYA'
+
+            if maya_style:
+                if not extra:
+                    layout.prop(props, "snap_step", text="Snap Step %")
+                    if context.region.type == 'TOOL_HEADER':
+                        layout.popover("TOPBAR_PT_tool_settings_extra", text="Multi-Cut")
+                    return
+
+                layout.ui_units_x = 26
+                layout.use_property_decorate = False
+                layout.use_property_split = True
+
+                layout.operator("mesh.maya_multi_cut_reset", text="Reset Tool")
+
+                layout.prop(props, "snap_step", text="Snap Step %")
+
+                def section(property_name, label):
+                    box = layout.box()
+                    header = box.row()
+                    is_open = getattr(props, property_name)
+                    header.prop(
+                        props,
+                        property_name,
+                        text=label,
+                        icon='TRIA_DOWN' if is_open else 'TRIA_RIGHT',
+                        emboss=False,
+                    )
+                    return box.column() if is_open else None
+
+                panel = section("show_cut_options", "Cut / Insert Edge Loop Tool")
+                if panel:
+                    panel.prop(props, "smoothing_angle")
+                    panel.prop(props, "use_edge_flow")
+                    flow = panel.column()
+                    flow.active = props.use_edge_flow
+                    flow.prop(props, "edge_flow_factor", text="Factor")
+                    panel.prop(props, "subdivisions")
+
+                panel = section("show_slice_options", "Slice Tool")
+                if panel:
+                    panel.prop(props, "ignore_backfaces")
+                    panel.prop(props, "delete_faces")
+                    panel.prop(props, "extract_faces")
+                    offset = panel.column()
+                    offset.active = props.extract_faces
+                    offset.prop(props, "extract_offset", text="")
+                    row = panel.row(align=True)
+                    row.label(text="Slice Along Plane")
+                    for axis in ('YZ', 'ZX', 'XY'):
+                        op = row.operator("mesh.maya_multi_cut_slice_plane", text=axis)
+                        op.axis = axis
+
+                panel = section("show_color_options", "Color Settings")
+                if panel:
+                    panel.prop(props, "line_color")
+                    panel.prop(props, "edge_point_color")
+                    panel.prop(props, "vertex_point_color")
+                    panel.prop(props, "face_point_color")
+
+                panel = section("show_live_options", "Live Constraint Options")
+                if panel:
+                    panel.prop(props, "use_live_surface")
+                    live = panel.column()
+                    live.active = props.use_live_surface
+                    row = live.row(align=True)
+                    row.prop(props, "wireframe_overlay")
+                    row.prop(props, "wireframe_color", text="")
+                    row = live.row(align=True)
+                    row.prop(props, "mesh_overlay")
+                    row.prop(props, "mesh_color", text="")
+                    alpha = live.column()
+                    alpha.active = props.mesh_overlay
+                    alpha.prop(props, "mesh_alpha")
+                    live.prop(props, "surface_offset")
+                    live.prop(props, "snap_to_backfaces")
+
+                panel = section("show_shortcuts", "Keyboard/Mouse Shortcuts")
+                shortcuts = (
+                    ("LMB click / drag", "Drop point / move dropped point"),
+                    ("Ctrl + LMB click / drag", "Preview / insert edge loop"),
+                    ("Ctrl + MMB", "Insert centered edge loop before placing points"),
+                    ("Ctrl + Shift + LMB", "Snap edge loop by Snap Step % before placing points"),
+                    ("LMB drag off mesh", "Slice faces"),
+                    ("Shift + LMB drag on faces", "Slice through faces"),
+                    ("MMB drag", "Quick slice / tweak point / move slice"),
+                    ("Backspace", "Undo last point"),
+                    ("Del", "Delete highlighted cut edge / undo last point"),
+                    ("Z / Shift + Z", "Undo / redo any Multi-Cut action"),
+                    ("Shift + LMB click", "Snap to edge midpoint"),
+                    ("Shift + LMB drag", "Snap along edge by Snap Step %"),
+                    ("Ctrl + Shift + LMB", "Perpendicular constraint after placing points"),
+                    ("Hold X / V + LMB", "Grid / point snap"),
+                    ("Ctrl + Shift + RMB", "Open Multi-Cut marking menu"),
+                    ("RMB / Enter", "Complete cut or slice"),
+                    ("Esc", "Cancel current cut or slice"),
+                )
+                if panel:
+                    for key, action in shortcuts:
+                        row = panel.row()
+                        row.label(text=key)
+                        row.label(text=action)
+                return
+
             if not extra:
                 layout.prop(props, "use_occlude_geometry")
                 layout.prop(props, "only_selected")
@@ -1193,7 +1297,7 @@ class _defs_edit_mesh:
                 layout.popover("TOPBAR_PT_tool_settings_extra", text="...")
         return dict(
             idname="builtin.knife",
-            label="Knife",
+            label="Multi-Cut",
             cursor='KNIFE',
             icon="ops.mesh.knife_tool",
             widget=None,

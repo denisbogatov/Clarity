@@ -832,7 +832,11 @@ class ToolSelectPanelHelper:
             draw_settings(context, layout, tool)
 
         idname_fallback = tool.idname_fallback
-        if idname_fallback and idname_fallback != item.idname:
+        hide_fallback = (
+            item.idname == "builtin.knife" and
+            context.preferences.inputs.interaction_preset == 'MAYA'
+        )
+        if idname_fallback and idname_fallback != item.idname and not hide_fallback:
             tool_settings = context.tool_settings
 
             # Show popover which looks like an enum but isn't one.

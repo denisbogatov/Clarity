@@ -12,6 +12,7 @@
 #include "DNA_space_enums.h"
 #include "DNA_userdef_types.h"
 #include "DNA_vec_types.h"
+#include "DNA_workspace_types.h"
 
 #include "BLI_assert.h"
 #include "BLI_path_utils.hh"
@@ -22,12 +23,14 @@
 #include "BKE_wm_runtime.hh"
 
 #include "WM_api.hh"
+#include "WM_toolsystem.hh"
 #include "WM_types.hh"
 #include "wm_event_types.hh"
 
 #include "UI_interface_c.hh"
 
 #include "maya_input.hh"
+#include "maya_marking_menu.hh"
 #include "maya_navigation.hh"
 #include "maya_runtime.hh"
 #include "maya_session.hh"
@@ -63,6 +66,12 @@ static bool maya_viewport_window_interaction_enabled(const bContext *C)
   const ARegion *region = CTX_wm_region(C);
   return ED_maya_interaction_enabled(C) && region != nullptr &&
          region->regiontype == RGN_TYPE_WINDOW;
+}
+
+static bool maya_active_blender_tool_is(const bContext *C, const char *idname)
+{
+  const bToolRef *tref = WM_toolsystem_ref_from_context(C);
+  return tref != nullptr && STREQ(tref->idname, idname);
 }
 
 static bool maya_selection_modifier_cursor_poll(bContext *C)
@@ -181,9 +190,8 @@ static ed::maya::MayaDispatchResult maya_dispatch_to_active_session(
 /**
  * Menu a marking-menu action asks for, or null when this fork has none for it yet.
  *
- * Maya has a marking menu per transform tool; only the Move one is implemented here, so holding
- * another tool key falls through to whatever the event would otherwise do instead of opening a
- * menu that would be a lie.
+ * Component and selection-conversion menus are gesture-specific. Tool gestures resolve through
+ * the active or explicitly held Maya tool so `Q/W/E/R + LMB` and `Ctrl+Shift+RMB` share one path.
  */
 static const char *maya_marking_menu_idname(const ed::maya::MayaWindowRuntime &runtime,
                                             const ed::maya::MayaInputAction &action)
@@ -196,12 +204,12 @@ static const char *maya_marking_menu_idname(const ed::maya::MayaWindowRuntime &r
   }
   const ed::maya::MayaToolID tool = action.tool != ed::maya::MayaToolID::None ? action.tool :
                                                                                 runtime.tool.active;
-  return tool == ed::maya::MayaToolID::Move ? "VIEW3D_MT_maya_move_marking_menu" : nullptr;
+  return ed::maya::tool_marking_menu_idname(tool);
 }
 
 static ed::maya::MayaDispatchResult maya_marking_menu_open(
     bContext *C,
-    const ed::maya::MayaWindowRuntime &runtime,
+    ed::maya::MayaWindowRuntime &runtime,
     const ed::maya::MayaInputAction &action)
 {
   const char *idname = maya_marking_menu_idname(runtime, action);
@@ -212,14 +220,15 @@ static ed::maya::MayaDispatchResult maya_marking_menu_open(
   /* The menu owns the keyboard until it closes, so a snap key released over it never reaches the
    * dispatcher. Letting the held keys go with the menu is the only state that stays truthful. */
   ED_maya_snap_override_release_all(C);
+  runtime.tool.held_hotkey = ed::maya::MayaToolID::None;
 
-  /* Maya's own numbers: a small dead zone so a resting pointer selects nothing, a ring close enough
-   * that the boxes read as a legend for the directions, and `MarkingMenuPopupDelay`, which is what
-   * lets a practised stroke run without the menu ever being drawn. */
+  /* Keep Maya's compact dead zone and radius, but draw the menu on the invoking press. Hiding it
+   * behind Maya's 0.3 second popup delay made a tap reveal it immediately while a held invocation
+   * stayed blank, so the same gesture appeared to work only intermittently. */
   ui::MarkingMenuStyle style;
   style.threshold = 10.0f;
   style.radius = 76.0f;
-  style.popup_delay = 0.3f;
+  style.popup_delay = 0.0f;
   const wmOperatorStatus status = ui::marking_menu_invoke(C, idname, action.source_event, style);
   return (status & OPERATOR_INTERFACE) ? ed::maya::MayaDispatchResult::Handled :
                                         ed::maya::MayaDispatchResult::PassThrough;
@@ -238,11 +247,27 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     ed::maya::selection_constraint_apply_pending(C, runtime);
   }
 
-  if (ed::maya::left_mouse_marquee_drag_handle(C, runtime, action)) {
+  const bool active_tool_owns_pointer = maya_active_blender_tool_is(C, "builtin.knife");
+  if (!active_tool_owns_pointer && ed::maya::left_mouse_marquee_drag_handle(C, runtime, action)) {
     return ed::maya::MayaDispatchResult::Handled;
   }
-  if (ed::maya::middle_mouse_axis_drag_handle(C, runtime, action)) {
+  if (!active_tool_owns_pointer && ed::maya::middle_mouse_axis_drag_handle(C, runtime, action)) {
     return ed::maya::MayaDispatchResult::Handled;
+  }
+
+  /* Blender remembers only one ordinary key as `keymodifier`. While `D` is held for Edit Pivot,
+   * a later `W` press activates Move but cannot replace `D` there, so its following LMB press has
+   * to use the independently tracked Maya tool key. */
+  if (action.id == ed::maya::MayaActionID::None &&
+      action.pointer_button == ed::maya::MayaPointerButton::Left &&
+      action.phase == ed::maya::MayaActionPhase::Begin && !action.shift && !action.ctrl &&
+      !action.alt && action.source_event != nullptr && action.source_event->val == KM_PRESS &&
+      runtime.tool.held_hotkey != ed::maya::MayaToolID::None)
+  {
+    ed::maya::MayaInputAction menu_action = action;
+    menu_action.id = ed::maya::MayaActionID::ToolMarkingMenu;
+    menu_action.tool = runtime.tool.held_hotkey;
+    return maya_marking_menu_open(C, runtime, menu_action);
   }
 
   /* Keep the snap preview under the cursor. The update itself is a no-op unless Edit Pivot owns a
@@ -256,11 +281,13 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     return pivot_click_result;
   }
 
-  const ed::maya::MayaDispatchResult selection_result =
-      ed::maya::selection_handle_action(C, runtime, action);
-  if (selection_result != ed::maya::MayaDispatchResult::PassThrough) {
-    ed::maya::pivot_edit_selection_changed(C, runtime);
-    return selection_result;
+  if (!active_tool_owns_pointer) {
+    const ed::maya::MayaDispatchResult selection_result =
+        ed::maya::selection_handle_action(C, runtime, action);
+    if (selection_result != ed::maya::MayaDispatchResult::PassThrough) {
+      ed::maya::pivot_edit_selection_changed(C, runtime);
+      return selection_result;
+    }
   }
 
   if (action.id == ed::maya::MayaActionID::EditPivotKeyPressed) {
@@ -295,6 +322,7 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
   }
   if (action.id == ed::maya::MayaActionID::FocusLost) {
     ed::maya::pivot_edit_input_reset(C, runtime);
+    runtime.tool.held_hotkey = ed::maya::MayaToolID::None;
     return ed::maya::MayaDispatchResult::PassThrough;
   }
   if (action.id == ed::maya::MayaActionID::TemporarySnap) {
@@ -305,6 +333,9 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
                ed::maya::MayaDispatchResult::PassThrough;
   }
   if (action.id == ed::maya::MayaActionID::BlockViewportNavigation) {
+    if (maya_active_blender_tool_is(C, "builtin.knife")) {
+      return ed::maya::MayaDispatchResult::PassThrough;
+    }
     return ed::maya::MayaDispatchResult::Handled;
   }
   if (action.id == ed::maya::MayaActionID::ActivateTool) {
@@ -315,6 +346,7 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     {
       return ed::maya::MayaDispatchResult::Handled;
     }
+    runtime.tool.held_hotkey = action.tool;
     const ed::maya::MayaToolActivationResult result = ED_maya_tool_activate(
         C, action.tool, ed::maya::MayaToolActivationReason::Hotkey);
     /* #MayaToolActivationResult::AlreadyActive still ran the activation callback, which neutralizes
@@ -331,6 +363,9 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
     return ed::maya::MayaDispatchResult::Handled;
   }
   if (action.id == ed::maya::MayaActionID::ToolHotkeyReleased) {
+    if (runtime.tool.held_hotkey == action.tool) {
+      runtime.tool.held_hotkey = ed::maya::MayaToolID::None;
+    }
     return ed::maya::MayaDispatchResult::Handled;
   }
   if (action.id == ed::maya::MayaActionID::FrameSelected) {
@@ -357,6 +392,16 @@ static ed::maya::MayaDispatchResult maya_dispatch_idle_action(
         action.source_event);
     return (status & OPERATOR_CANCELLED) ? ed::maya::MayaDispatchResult::PassThrough :
                                           ed::maya::MayaDispatchResult::Handled;
+  }
+  if (action.id == ed::maya::MayaActionID::Extrude) {
+    WM_operator_name_call(C,
+                          "MESH_OT_extrude_context_move",
+                          wm::OpCallContext::InvokeDefault,
+                          nullptr,
+                          action.source_event);
+    /* `Ctrl+E` belongs exclusively to Extrude. Even a failed poll must not fall through to the
+     * Industry Compatible tool-cycle binding or Blender's Edge menu. */
+    return ed::maya::MayaDispatchResult::Handled;
   }
   if (action.id == ed::maya::MayaActionID::SubdivisionPreviewOff) {
     WM_operator_name_call(C,
@@ -472,11 +517,13 @@ ed::maya::MayaDispatchResult ED_maya_event_dispatch(bContext *C, const wmEvent *
          * keys can be wrong here: their release will never be delivered to us, so temporary
          * snapping has to be let go of, while Edit Pivot survives the trip outside the viewport. */
         ED_maya_snap_override_release_all(C);
+        runtime->tool.held_hotkey = ed::maya::MayaToolID::None;
       }
       else {
         /* Leaving the Maya preset must drop the mode, unlike merely losing window focus. */
         ed::maya::pivot_edit_input_reset(C, *runtime);
         ed::maya::pivot_edit_end(C, *runtime);
+        runtime->tool.held_hotkey = ed::maya::MayaToolID::None;
       }
     }
     return ed::maya::MayaDispatchResult::PassThrough;
@@ -490,6 +537,7 @@ ed::maya::MayaDispatchResult ED_maya_event_dispatch(bContext *C, const wmEvent *
       runtime->active_session.reset();
     }
     ed::maya::pivot_edit_input_reset(C, *runtime);
+    runtime->tool.held_hotkey = ed::maya::MayaToolID::None;
     return ed::maya::MayaDispatchResult::PassThrough;
   }
   if (runtime != nullptr) {
