@@ -1173,9 +1173,9 @@ class _defs_edit_mesh:
         def draw_settings(context, layout, tool, *, extra=False):
             show_extra = False
             props = tool.operator_properties("mesh.knife_tool")
-            maya_style = context.preferences.inputs.interaction_preset == 'MAYA'
+            clarity_style = context.preferences.inputs.interaction_preset == 'CLARITY'
 
-            if maya_style:
+            if clarity_style:
                 if not extra:
                     layout.prop(props, "snap_step", text="Snap Step %")
                     if context.region.type == 'TOOL_HEADER':
@@ -1186,7 +1186,7 @@ class _defs_edit_mesh:
                 layout.use_property_decorate = False
                 layout.use_property_split = True
 
-                layout.operator("mesh.maya_multi_cut_reset", text="Reset Tool")
+                layout.operator("mesh.clarity_multi_cut_reset", text="Reset Tool")
 
                 layout.prop(props, "snap_step", text="Snap Step %")
 
@@ -1223,7 +1223,7 @@ class _defs_edit_mesh:
                     row = panel.row(align=True)
                     row.label(text="Slice Along Plane")
                     for axis in ('YZ', 'ZX', 'XY'):
-                        op = row.operator("mesh.maya_multi_cut_slice_plane", text=axis)
+                        op = row.operator("mesh.clarity_multi_cut_slice_plane", text=axis)
                         op.axis = axis
 
                 panel = section("show_color_options", "Color Settings")

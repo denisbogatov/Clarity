@@ -23,7 +23,7 @@ set(LIB
   PRIVATE bf::render
   PRIVATE bf::sequencer
   PRIVATE bf::windowmanager
-  PRIVATE bf_editor_maya
+  PRIVATE bf_editor_clarity
   PRIVATE bf::dependencies::opencolorio
 )
 

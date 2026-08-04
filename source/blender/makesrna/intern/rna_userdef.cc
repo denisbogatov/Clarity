@@ -927,20 +927,20 @@ static void rna_userdef_interaction_preset_update(bContext *C, PointerRNA *ptr)
 {
   UserDef *userdef = static_cast<UserDef *>(ptr->data);
   Main *bmain = C != nullptr ? CTX_data_main(C) : nullptr;
-  const bool use_maya = userdef->interaction_preset == INTERACTION_PRESET_MAYA;
-  STRNCPY(userdef->keyconfigstr, use_maya ? "Maya" : "Blender");
-  userdef->maya_interaction_defaults_initialized = true;
+  const bool use_clarity = userdef->interaction_preset == INTERACTION_PRESET_CLARITY;
+  STRNCPY(userdef->keyconfigstr, use_clarity ? "Clarity" : "Blender");
+  userdef->clarity_interaction_defaults_initialized = true;
   if (bmain != nullptr) {
     for (wmWindowManager &wm : bmain->wm) {
       if (wm.runtime == nullptr) {
         continue;
       }
-      if (wm.runtime->maya_interaction_enabled != use_maya) {
-        wm.runtime->maya_interaction_revision++;
+      if (wm.runtime->clarity_interaction_enabled != use_clarity) {
+        wm.runtime->clarity_interaction_revision++;
       }
-      wm.runtime->maya_interaction_enabled = use_maya;
-      if (!use_maya) {
-        wm.runtime->maya_snap_temporary_mode = 0;
+      wm.runtime->clarity_interaction_enabled = use_clarity;
+      if (!use_clarity) {
+        wm.runtime->clarity_snap_temporary_mode = 0;
       }
     }
   }
@@ -6664,11 +6664,16 @@ static void rna_def_userdef_input(BlenderRNA *brna)
   RNA_def_struct_ui_text(srna, "Input", "Settings for input devices");
 
   static const EnumPropertyItem interaction_preset_items[] = {
+      {INTERACTION_PRESET_CLARITY,
+       "CLARITY",
+       0,
+       "Clarity",
+       "Use Clarity viewport navigation, selection, tools, and pivot workflow"},
       {INTERACTION_PRESET_MAYA,
        "MAYA",
        0,
-       "Maya",
-       "Use Maya-style viewport navigation, selection, tools, and pivot workflow"},
+       "Clarity (Legacy API)",
+       "Deprecated identifier retained for existing Python scripts"},
       {INTERACTION_PRESET_BLENDER,
        "BLENDER",
        0,

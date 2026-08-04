@@ -28,7 +28,7 @@
 #include "DNA_mesh_types.h"
 #include "DNA_userdef_types.h"
 
-#include "ED_maya.hh"
+#include "ED_clarity.hh"
 #include "ED_view3d.hh"
 
 #include "GPU_capabilities.hh"
@@ -44,22 +44,22 @@ constexpr int overlay_edit_text = V3D_OVERLAY_EDIT_EDGE_LEN | V3D_OVERLAY_EDIT_F
                                   V3D_OVERLAY_EDIT_FACE_ANG | V3D_OVERLAY_EDIT_EDGE_ANG |
                                   V3D_OVERLAY_EDIT_INDICES;
 
-inline bool maya_face_centers_visible(const Object &object)
+inline bool clarity_face_centers_visible(const Object &object)
 {
   const Object *object_orig = DEG_get_original(&object);
   return object_orig != nullptr && (object_orig->dtx & OB_DRAW_FACE_CENTERS) != 0;
 }
 
 /**
- * Highlight the mesh component under the pointer while Maya Edit Pivot snapping is active.
+ * Highlight the mesh component under the pointer while Clarity Edit Pivot snapping is active.
  */
-class MayaPivotSnapPreview : Overlay {
+class ClarityPivotSnapPreview : Overlay {
  private:
-  PassSimple ps_ = {"Maya Pivot Snap Preview"};
+  PassSimple ps_ = {"Clarity Pivot Snap Preview"};
   LinePrimitiveBuf lines_;
-  StorageVectorBuffer<VertexData> points_ = {"maya_pivot_snap_preview_points"};
+  StorageVectorBuffer<VertexData> points_ = {"clarity_pivot_snap_preview_points"};
 
-  ed::maya::MayaPivotSnapResult target_;
+  ed::clarity::ClarityPivotSnapResult target_;
   float4 color_ = float4(0.15f, 1.0f, 0.35f, 1.0f);
   bool object_synced_ = false;
   bool in_front_ = false;
@@ -90,8 +90,8 @@ class MayaPivotSnapPreview : Overlay {
   }
 
  public:
-  MayaPivotSnapPreview(const SelectionType selection_type)
-      : lines_(selection_type, "maya_pivot_snap_preview_lines")
+  ClarityPivotSnapPreview(const SelectionType selection_type)
+      : lines_(selection_type, "clarity_pivot_snap_preview_lines")
   {
   }
 
@@ -111,12 +111,12 @@ class MayaPivotSnapPreview : Overlay {
 
     const DRWContext *draw_ctx = DRW_context_get();
     enabled_ = draw_ctx != nullptr && draw_ctx->evil_C != nullptr &&
-               ED_maya_pivot_snap_preview_get(draw_ctx->evil_C, target_) &&
+               ED_clarity_pivot_snap_preview_get(draw_ctx->evil_C, target_) &&
                target_.position_world.has_value() &&
                ELEM(target_.type,
-                    ed::maya::MayaPivotSnapTargetType::Vertex,
-                    ed::maya::MayaPivotSnapTargetType::Edge,
-                    ed::maya::MayaPivotSnapTargetType::Face);
+                    ed::clarity::ClarityPivotSnapTargetType::Vertex,
+                    ed::clarity::ClarityPivotSnapTargetType::Edge,
+                    ed::clarity::ClarityPivotSnapTargetType::Face);
     if (!enabled_) {
       return;
     }
@@ -142,7 +142,7 @@ class MayaPivotSnapPreview : Overlay {
     object_synced_ = true;
     in_front_ = state.use_in_front && (ob_ref.object->dtx & OB_DRAW_IN_FRONT);
 
-    if (target_.type == ed::maya::MayaPivotSnapTargetType::Vertex ||
+    if (target_.type == ed::clarity::ClarityPivotSnapTargetType::Vertex ||
         target_.component_index < 0)
     {
       return;
@@ -156,7 +156,7 @@ class MayaPivotSnapPreview : Overlay {
     BMEditMesh *edit_mesh = object_orig != nullptr ? BKE_editmesh_from_object(object_orig) :
                                                     nullptr;
     if (edit_mesh != nullptr) {
-      if (target_.type == ed::maya::MayaPivotSnapTargetType::Edge) {
+      if (target_.type == ed::clarity::ClarityPivotSnapTargetType::Edge) {
         const BMEdge *edge = BM_edge_at_index_find(edit_mesh->bm, target_.component_index);
         if (edge != nullptr) {
           lines_.append(position_world(float3(edge->v1->co)),
@@ -183,7 +183,7 @@ class MayaPivotSnapPreview : Overlay {
 
     Mesh &mesh = DRW_object_get_data_for_drawing<Mesh>(*ob_ref.object);
     const Span<float3> positions = mesh.vert_positions();
-    if (target_.type == ed::maya::MayaPivotSnapTargetType::Edge) {
+    if (target_.type == ed::clarity::ClarityPivotSnapTargetType::Edge) {
       const Span<int2> edges = mesh.edges();
       if (!edges.index_range().contains(target_.component_index)) {
         return;

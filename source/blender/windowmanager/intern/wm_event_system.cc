@@ -60,7 +60,7 @@
 #include "ED_geometry.hh"
 #include "ED_info.hh"
 #include "ED_markers.hh"
-#include "ED_maya.hh"
+#include "ED_clarity.hh"
 #include "ED_render.hh"
 #include "ED_screen.hh"
 #include "ED_undo.hh"
@@ -489,8 +489,8 @@ static bool wm_notifier_is_clear(const wmNotifier *note)
 
 void wm_event_do_depsgraph(bContext *C, bool is_after_open_file)
 {
-  const bool maya_debug = ED_maya_navigation_debug_active(C);
-  const double depsgraph_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+  const bool clarity_debug = ED_clarity_navigation_debug_active(C);
+  const double depsgraph_start = clarity_debug ? BLI_time_now_seconds() : 0.0;
   const Main *bmain = CTX_data_main(C);
   wmWindowManager *wm = CTX_wm_manager(C);
   /* The whole idea of locked interface is to prevent viewport and whatever thread from
@@ -544,10 +544,10 @@ void wm_event_do_depsgraph(bContext *C, bool is_after_open_file)
   }
 
   wm_surfaces_do_depsgraph(C);
-  if (maya_debug) {
-    ED_maya_navigation_debug_stage_sample(
+  if (clarity_debug) {
+    ED_clarity_navigation_debug_stage_sample(
         C,
-        ed::maya::MayaNavigationDebugStage::DepsgraphUpdate,
+        ed::clarity::ClarityNavigationDebugStage::DepsgraphUpdate,
         (BLI_time_now_seconds() - depsgraph_start) * 1000.0);
   }
 }
@@ -4377,8 +4377,8 @@ void wm_event_do_handlers(bContext *C)
       action |= wm_event_drag_and_drop_test(wm, &win, event);
 
       if ((action & WM_HANDLER_BREAK) == 0) {
-        const ed::maya::MayaDispatchResult maya_result = ED_maya_event_dispatch(C, event);
-        if (maya_result != ed::maya::MayaDispatchResult::PassThrough) {
+        const ed::clarity::ClarityDispatchResult clarity_result = ED_clarity_event_dispatch(C, event);
+        if (clarity_result != ed::clarity::ClarityDispatchResult::PassThrough) {
           action |= WM_HANDLER_BREAK;
           /* A button event consumed here must not also become a click or a drag, exactly as
            * #wm_handlers_do gives up on both once a key-map handled one. The pending click is what

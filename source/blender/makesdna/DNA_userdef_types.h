@@ -907,7 +907,9 @@ struct bUserAssetShelfSettings {
 };
 
 enum eInteractionPreset : uint8_t {
-  INTERACTION_PRESET_MAYA = 0,
+  INTERACTION_PRESET_CLARITY = 0,
+  /** Deprecated source compatibility; use #INTERACTION_PRESET_CLARITY. */
+  INTERACTION_PRESET_MAYA = INTERACTION_PRESET_CLARITY,
   INTERACTION_PRESET_BLENDER = 1,
 };
 
@@ -1077,9 +1079,9 @@ struct UserDef {
   ListBaseT<bUserExtensionRepo> extension_repos = {nullptr, nullptr};
   ListBaseT<bUserAssetShelfSettings> asset_shelves_settings = {nullptr, nullptr};
 
-  char keyconfigstr[64] = "Maya";
-  eInteractionPreset interaction_preset = INTERACTION_PRESET_MAYA;
-  uint8_t maya_interaction_defaults_initialized = 0;
+  char keyconfigstr[64] = "Clarity";
+  eInteractionPreset interaction_preset = INTERACTION_PRESET_CLARITY;
+  uint8_t clarity_interaction_defaults_initialized = 0;
   uint8_t _pad_interaction[6] = {};
 
   /** Index of the extension repo in the Preferences UI. */

@@ -674,12 +674,12 @@ def km_view3d(params):
     )
 
     items.extend([
-        # Maya viewport display.
-        ("view3d.maya_object_xray", {"type": 'TWO', "value": 'PRESS', "ctrl": True}, None),
+        # Clarity viewport display.
+        ("view3d.clarity_object_xray", {"type": 'TWO', "value": 'PRESS', "ctrl": True}, None),
         ("view3d.toggle_xray", {"type": 'THREE', "value": 'PRESS', "ctrl": True}, None),
-        ("view3d.maya_face_centers_toggle",
+        ("view3d.clarity_face_centers_toggle",
          {"type": 'Z', "value": 'PRESS', "ctrl": True, "shift": True}, None),
-        ("view3d.maya_wireframe_on_shaded_toggle",
+        ("view3d.clarity_wireframe_on_shaded_toggle",
          {"type": 'FIVE', "value": 'PRESS', "alt": True}, None),
         op_panel("TOPBAR_PT_name", {"type": 'RET', "value": 'PRESS'}, [("keep_open", False)]),
         ("wm.search_menu", {"type": 'TAB', "value": 'PRESS'}, None),
@@ -2540,9 +2540,9 @@ def km_object_mode(params):
     )
 
     items.extend([
-        ("view3d.maya_object_xray", {"type": 'TWO', "value": 'PRESS', "ctrl": True}, None),
+        ("view3d.clarity_object_xray", {"type": 'TWO', "value": 'PRESS', "ctrl": True}, None),
         ("view3d.toggle_xray", {"type": 'THREE', "value": 'PRESS', "ctrl": True}, None),
-        ("mesh.maya_multi_cut_activate",
+        ("mesh.clarity_multi_cut_activate",
          {"type": 'X', "value": 'PRESS', "ctrl": True, "shift": True}, None),
         ("object.transform_apply", {"type": 'F', "value": 'PRESS', "alt": True, "shift": True},
          {"properties": [("location", True), ("rotation", True), ("scale", True)]}),
@@ -3081,11 +3081,11 @@ def km_mesh(params):
     )
 
     items.extend([
-        ("view3d.maya_object_xray", {"type": 'TWO', "value": 'PRESS', "ctrl": True}, None),
+        ("view3d.clarity_object_xray", {"type": 'TWO', "value": 'PRESS', "ctrl": True}, None),
         ("view3d.toggle_xray", {"type": 'THREE', "value": 'PRESS', "ctrl": True}, None),
-        ("view3d.maya_face_centers_toggle",
+        ("view3d.clarity_face_centers_toggle",
          {"type": 'Z', "value": 'PRESS', "ctrl": True, "shift": True}, None),
-        # Maya modeling.
+        # Clarity modeling.
         ("mesh.remove_doubles", {"type": 'L', "value": 'PRESS', "ctrl": True}, None),
         op_tool_cycle("builtin.poly_build", {"type": 'K', "value": 'PRESS', "ctrl": True}),
         ("mesh.loopcut_slide", {"type": 'J', "value": 'PRESS', "ctrl": True},
@@ -3149,7 +3149,7 @@ def km_mesh(params):
         op_tool_cycle("builtin.bevel", {"type": 'B', "value": 'PRESS', "ctrl": True}),
         op_tool_cycle("builtin.inset_faces", {"type": 'I', "value": 'PRESS'}),
         op_tool_cycle("builtin.extrude_region", {"type": 'E', "value": 'PRESS', "ctrl": True}),
-        ("mesh.maya_multi_cut_activate",
+        ("mesh.clarity_multi_cut_activate",
          {"type": 'X', "value": 'PRESS', "ctrl": True, "shift": True}, None),
         op_tool_cycle("builtin.knife", {"type": 'K', "value": 'PRESS'}),
         op_tool_cycle("builtin.loop_cut", {"type": 'C', "value": 'PRESS', "alt": True}),
@@ -3561,9 +3561,9 @@ def km_knife_tool_modal_map(_params):
         ("CONFIRM", {"type": 'NUMPAD_ENTER', "value": 'PRESS', "any": True}, None),
         ("INSERT_CENTERED_EDGE_LOOP", {"type": 'MIDDLEMOUSE', "value": 'ANY', "ctrl": True}, None),
         # ADD_CUT routes Ctrl-click to an edge loop only before a point exists. Afterwards it must
-        # keep Ctrl+Shift-click available for Maya's perpendicular constraint.
+        # keep Ctrl+Shift-click available for Clarity's perpendicular constraint.
         ("ADD_CUT", {"type": 'LEFTMOUSE', "value": 'ANY', "any": True}, None),
-        # A modal keymap owns Ctrl while Multi-Cut is active, so invoke the Maya viewport commands
+        # A modal keymap owns Ctrl while Multi-Cut is active, so invoke the Clarity viewport commands
         # as explicit modal actions instead of relying on pass-through to the global keymap.
         ("OBJECT_XRAY_TOGGLE", {"type": 'TWO', "value": 'PRESS', "ctrl": True}, None),
         ("VIEW_XRAY_TOGGLE", {"type": 'THREE', "value": 'PRESS', "ctrl": True}, None),
@@ -3573,7 +3573,7 @@ def km_knife_tool_modal_map(_params):
         ("SUBDIVISION_PREVIEW_SURFACE", {"type": 'THREE', "value": 'PRESS'}, None),
         ("UNDO", {"type": 'BACK_SPACE', "value": 'PRESS', "any": True}, None),
         ("DELETE_HIGHLIGHTED", {"type": 'DEL', "value": 'PRESS', "any": True}, None),
-        # Keep Maya's Z/Shift-Z behavior and accept the preset's global undo/redo shortcuts while
+        # Keep Clarity's Z/Shift-Z behavior and accept the preset's global undo/redo shortcuts while
         # this modal tool owns events.
         ("REDO", {"type": 'Z', "value": 'PRESS', "ctrl": True, "shift": True}, None),
         ("UNDO", {"type": 'Z', "value": 'PRESS', "ctrl": True}, None),

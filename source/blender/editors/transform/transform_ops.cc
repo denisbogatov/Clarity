@@ -45,7 +45,7 @@
 #include "UI_resources.hh"
 
 #include "ED_screen.hh"
-#include "ED_maya.hh"
+#include "ED_clarity.hh"
 #include "ED_transform_snap_object_context.hh"
 #include "ED_view3d.hh"
 /** For #USE_LOOPSLIDE_HACK only. */
@@ -54,7 +54,7 @@
 #include "transform.hh"
 #include "transform_convert.hh"
 #include "transform_snap.hh"
-#include "transform_snap_maya.hh"
+#include "transform_snap_clarity.hh"
 
 namespace blender {
 
@@ -90,8 +90,8 @@ static const char OP_EDGE_BWEIGHT[] = "TRANSFORM_OT_edge_bevelweight";
 static const char OP_SEQ_SLIDE[] = "TRANSFORM_OT_seq_slide";
 static const char OP_NORMAL_ROTATION[] = "TRANSFORM_OT_rotate_normal";
 
-/** Size an unlimited Maya snap tolerance resolves to for a region-sized query. */
-static int transform_maya_region_extent(const ARegion *region)
+/** Size an unlimited Clarity snap tolerance resolves to for a region-sized query. */
+static int transform_clarity_region_extent(const ARegion *region)
 {
   if (region == nullptr) {
     return 0;
@@ -99,7 +99,7 @@ static int transform_maya_region_extent(const ARegion *region)
   return region->winx > region->winy ? region->winx : region->winy;
 }
 
-static void transform_maya_pivot_update(const bContext *C, const TransInfo *t)
+static void transform_clarity_pivot_update(const bContext *C, const TransInfo *t)
 {
   if (t->mode != TFM_TRANSLATION) {
     return;
@@ -107,10 +107,10 @@ static void transform_maya_pivot_update(const bContext *C, const TransInfo *t)
 
   float world_translation[3];
   mul_v3_m3v3(world_translation, t->spacemtx, t->values_final);
-  ED_maya_transform_update(C, world_translation);
+  ED_clarity_transform_update(C, world_translation);
 }
 
-static void transform_maya_snap_apply(const bContext *C,
+static void transform_clarity_snap_apply(const bContext *C,
                                       TransInfo *t,
                                       wmOperator *op,
                                       const bool restore_from_scene)
@@ -119,48 +119,48 @@ static void transform_maya_snap_apply(const bContext *C,
     transform_snap_reset_from_mode(t, op);
   }
 
-  t->tsnap.maya_mode_active = false;
-  t->tsnap.maya_curve_targets_only = false;
-  t->tsnap.maya_include_object_pivots = false;
-  t->tsnap.maya_view_plane = false;
-  t->tsnap.maya_mesh_center = false;
-  t->tsnap.maya_snap_dist_px = 0.0f;
-  if (!ED_maya_interaction_enabled(C)) {
+  t->tsnap.clarity_mode_active = false;
+  t->tsnap.clarity_curve_targets_only = false;
+  t->tsnap.clarity_include_object_pivots = false;
+  t->tsnap.clarity_view_plane = false;
+  t->tsnap.clarity_mesh_center = false;
+  t->tsnap.clarity_snap_dist_px = 0.0f;
+  if (!ED_clarity_interaction_enabled(C)) {
     return;
   }
 
-  MayaSnapPlanInput plan_input;
-  plan_input.mode = ED_maya_snap_override_get(C);
-  if (plan_input.mode == ed::maya::MayaSnapMode::None) {
-    plan_input.mode = ED_maya_snap_mode_get(C);
+  ClaritySnapPlanInput plan_input;
+  plan_input.mode = ED_clarity_snap_override_get(C);
+  if (plan_input.mode == ed::clarity::ClaritySnapMode::None) {
+    plan_input.mode = ED_clarity_snap_mode_get(C);
   }
   plan_input.is_translation = t->mode == TFM_TRANSLATION;
   plan_input.is_rotation = ELEM(t->mode, TFM_ROTATION, TFM_TRACKBALL);
   plan_input.orientation_is_global = t->orient[t->orient_curr].type == V3D_ORIENT_GLOBAL;
   plan_input.space_is_view3d = t->spacetype == SPACE_VIEW3D;
-  plan_input.keep_spacing = ED_maya_move_keep_spacing_get(C);
-  plan_input.transform_constraint = ED_maya_transform_constraint_get(C);
+  plan_input.keep_spacing = ED_clarity_move_keep_spacing_get(C);
+  plan_input.transform_constraint = ED_clarity_transform_constraint_get(C);
   plan_input.is_component_edit = CTX_data_edit_object(C) != nullptr;
-  plan_input.step = ED_maya_snap_step_settings_get(C);
-  const MayaSnapPlan plan = transform_snap_maya_plan_get(plan_input);
+  plan_input.step = ED_clarity_snap_step_settings_get(C);
+  const ClaritySnapPlan plan = transform_snap_clarity_plan_get(plan_input);
 
-  /* The Maya state is the only thing that snaps in this interaction model. Blender's magnet and its
+  /* The Clarity state is the only thing that snaps in this interaction model. Blender's magnet and its
    * `Ctrl` invert are not part of it, so they are taken out of the decision instead of being left
    * to snap on their own: that is what quantized every transform to the increment grid with no key
-   * held, and what kept Maya's own modes from snapping while the magnet was off. */
-  t->tsnap.maya_mode_active = plan.use_snap || plan.view_plane;
+   * held, and what kept Clarity's own modes from snapping while the magnet was off. */
+  t->tsnap.clarity_mode_active = plan.use_snap || plan.view_plane;
   t->tsnap.mode = plan.snap_to;
-  t->tsnap.maya_curve_targets_only = plan.curve_targets_only;
-  t->tsnap.maya_include_object_pivots = plan.include_object_pivots;
-  t->tsnap.maya_mesh_center = plan.mesh_center;
-  t->tsnap.maya_view_plane = plan.view_plane;
+  t->tsnap.clarity_curve_targets_only = plan.curve_targets_only;
+  t->tsnap.clarity_include_object_pivots = plan.include_object_pivots;
+  t->tsnap.clarity_mesh_center = plan.mesh_center;
+  t->tsnap.clarity_view_plane = plan.view_plane;
   SET_FLAG_FROM_TEST(t->tsnap.flag, plan.absolute_grid, SCE_SNAP_ABS_GRID);
   SET_FLAG_FROM_TEST(t->modifiers, plan.use_snap, MOD_SNAP);
   t->modifiers &= ~MOD_SNAP_INVERT;
   transform_snap_flag_from_modifiers_set(t);
 
-  if (plan.view_plane && is_zero_v3(t->tsnap.maya_view_plane_normal)) {
-    normalize_v3_v3(t->tsnap.maya_view_plane_normal, t->viewinv[2]);
+  if (plan.view_plane && is_zero_v3(t->tsnap.clarity_view_plane_normal)) {
+    normalize_v3_v3(t->tsnap.clarity_view_plane_normal, t->viewinv[2]);
   }
   if (plan.source_is_center) {
     t->tsnap.source_operation = SCE_SNAP_SOURCE_CENTER;
@@ -171,35 +171,35 @@ static void transform_maya_snap_apply(const bContext *C,
     t->increment = float3(plan.increment);
   }
   if (plan.use_snap) {
-    /* Maya only magnets onto a target the pointer is actually near, so the search is restricted to
+    /* Clarity only magnets onto a target the pointer is actually near, so the search is restricted to
      * the snap tolerance; outside it the transform follows the pointer as if nothing was held. */
-    t->tsnap.maya_snap_dist_px = ED_maya_snap_tolerance_px_get(
-        C, transform_maya_region_extent(t->region));
+    t->tsnap.clarity_snap_dist_px = ED_clarity_snap_tolerance_px_get(
+        C, transform_clarity_region_extent(t->region));
   }
   transform_snap_callbacks_update(t);
 }
 
-static bool transform_maya_snap_event(const bContext *C,
+static bool transform_clarity_snap_event(const bContext *C,
                                       TransInfo *t,
                                       wmOperator *op,
                                       const wmEvent *event)
 {
-  if (!ED_maya_interaction_enabled(C)) {
-    if (t->tsnap.maya_mode_active) {
-      transform_maya_snap_apply(C, t, op, true);
+  if (!ED_clarity_interaction_enabled(C)) {
+    if (t->tsnap.clarity_mode_active) {
+      transform_clarity_snap_apply(C, t, op, true);
       t->redraw |= TREDRAW_HARD;
     }
     return false;
   }
   if (event->type == WINDEACTIVATE) {
-    transform_maya_snap_apply(C, t, op, true);
+    transform_clarity_snap_apply(C, t, op, true);
     t->redraw |= TREDRAW_HARD;
     return false;
   }
   /* The modal keymap rewrites matched keys into #EVT_MODAL_MAP before the operator sees them and
    * keeps the physical key in `prev_type`/`prev_val`. Without resolving it back, `X` would arrive
-   * as `AXIS_X` and `C` as `CONS_OFF`, so Maya's grid and curve snapping would never trigger
-   * during a running transform. Maya owns these keys, so snapping wins over the modal map. */
+   * as `AXIS_X` and `C` as `CONS_OFF`, so Clarity's grid and curve snapping would never trigger
+   * during a running transform. Clarity owns these keys, so snapping wins over the modal map. */
   wmEventType key_type = event->type;
   short key_val = event->val;
   if (event->type == EVT_MODAL_MAP) {
@@ -207,10 +207,10 @@ static bool transform_maya_snap_event(const bContext *C,
     key_val = event->prev_val;
   }
 
-  if (!ED_maya_snap_key_event_apply(C, int(key_type), key_val, event->modifier)) {
+  if (!ED_clarity_snap_key_event_apply(C, int(key_type), key_val, event->modifier)) {
     return false;
   }
-  transform_maya_snap_apply(C, t, op, true);
+  transform_clarity_snap_apply(C, t, op, true);
   t->redraw |= TREDRAW_HARD;
   return true;
 }
@@ -549,10 +549,10 @@ static int transformops_data(bContext *C, wmOperator *op, const wmEvent *event)
 
 static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  ED_maya_pivot_event_pre_modal(C, event);
+  ED_clarity_pivot_event_pre_modal(C, event);
 
-  const bool maya_debug = ED_maya_navigation_debug_active(C);
-  const double modal_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+  const bool clarity_debug = ED_clarity_navigation_debug_active(C);
+  const double modal_start = clarity_debug ? BLI_time_now_seconds() : 0.0;
   wmOperatorStatus exit_code = OPERATOR_PASS_THROUGH;
 
   TransInfo *t = static_cast<TransInfo *>(op->customdata);
@@ -571,17 +571,17 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
   /* XXX insert keys are called here, and require context. */
   t->context = C;
 
-  const double event_start = maya_debug ? BLI_time_now_seconds() : 0.0;
-  if (transform_maya_snap_event(C, t, op, event)) {
+  const double event_start = clarity_debug ? BLI_time_now_seconds() : 0.0;
+  if (transform_clarity_snap_event(C, t, op, event)) {
     exit_code = OPERATOR_RUNNING_MODAL;
   }
   else {
     exit_code = transformEvent(t, op, event);
   }
-  if (maya_debug) {
-    ED_maya_navigation_debug_stage_sample(
+  if (clarity_debug) {
+    ED_clarity_navigation_debug_stage_sample(
         C,
-        ed::maya::MayaNavigationDebugStage::TransformEvent,
+        ed::clarity::ClarityNavigationDebugStage::TransformEvent,
         (BLI_time_now_seconds() - event_start) * 1000.0);
   }
   t->context = nullptr;
@@ -606,10 +606,10 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
         /* Navigation is running. */
 
         /* Do not update transform while navigating. This can be distracting. */
-        if (maya_debug) {
-          ED_maya_navigation_debug_stage_sample(
+        if (clarity_debug) {
+          ED_clarity_navigation_debug_stage_sample(
               C,
-              ed::maya::MayaNavigationDebugStage::TransformModalTotal,
+              ed::clarity::ClarityNavigationDebugStage::TransformModalTotal,
               (BLI_time_now_seconds() - modal_start) * 1000.0);
         }
         return OPERATOR_RUNNING_MODAL;
@@ -630,7 +630,7 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
   }
 
   transformApply(C, t);
-  transform_maya_pivot_update(C, t);
+  transform_clarity_pivot_update(C, t);
 
   exit_code |= transformEnd(C, t);
 
@@ -662,14 +662,14 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
     }
   }
 
-  if (maya_debug) {
-    ED_maya_navigation_debug_stage_sample(
+  if (clarity_debug) {
+    ED_clarity_navigation_debug_stage_sample(
         C,
-        ed::maya::MayaNavigationDebugStage::TransformModalTotal,
+        ed::clarity::ClarityNavigationDebugStage::TransformModalTotal,
         (BLI_time_now_seconds() - modal_start) * 1000.0);
   }
   if (is_finished) {
-    ED_maya_transform_end(C, (exit_code & OPERATOR_CANCELLED) != 0);
+    ED_clarity_transform_end(C, (exit_code & OPERATOR_CANCELLED) != 0);
   }
 
   return exit_code;
@@ -682,7 +682,7 @@ static void transform_cancel(bContext *C, wmOperator *op)
   t->state = TRANS_CANCEL;
   transformEnd(C, t);
   transformops_exit(C, op);
-  ED_maya_transform_end(C, true);
+  ED_clarity_transform_end(C, true);
 }
 
 static wmOperatorStatus transform_exec(bContext *C, wmOperator *op)
@@ -699,12 +699,12 @@ static wmOperatorStatus transform_exec(bContext *C, wmOperator *op)
   t->options |= CTX_AUTOCONFIRM;
 
   transformApply(C, t);
-  transform_maya_pivot_update(C, t);
+  transform_clarity_pivot_update(C, t);
 
   transformEnd(C, t);
 
   transformops_exit(C, op);
-  ED_maya_transform_end(C, false);
+  ED_clarity_transform_end(C, false);
 
   WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, nullptr);
 
@@ -716,14 +716,14 @@ static wmOperatorStatus transform_invoke(bContext *C, wmOperator *op, const wmEv
   /* The Edge transform constraint replaces the translation with a slide, so it is asked before any
    * transform data is built. It answers no unless the constraint is on and the selection can
    * actually slide, which leaves the ordinary translation in charge. */
-  if (ED_maya_transform_slide_invoke(C, op, event)) {
+  if (ED_clarity_transform_slide_invoke(C, op, event)) {
     return OPERATOR_CANCELLED;
   }
 
-  const bool maya_shift_transform = ED_maya_shift_transform_prepare(C, op, event);
+  const bool clarity_shift_transform = ED_clarity_shift_transform_prepare(C, op, event);
   if (!transformops_data(C, op, event)) {
-    if (maya_shift_transform) {
-      ED_maya_transform_end(C, true);
+    if (clarity_shift_transform) {
+      ED_clarity_transform_end(C, true);
     }
     G.moving = 0;
     return OPERATOR_CANCELLED;
@@ -731,12 +731,12 @@ static wmOperatorStatus transform_invoke(bContext *C, wmOperator *op, const wmEv
 
   const Scene *scene = CTX_data_scene(C);
   TransInfo *t = static_cast<TransInfo *>(op->customdata);
-  transform_maya_snap_apply(C, t, op, false);
-  ED_maya_transform_begin(C,
+  transform_clarity_snap_apply(C, t, op, false);
+  ED_clarity_transform_begin(C,
                           op->type->idname,
                           int(CTX_data_mode_enum(C)),
                           scene && scene->toolsettings ? scene->toolsettings->selectmode : 0,
-                          (t->options & CTX_MAYA_PIVOT) != 0);
+                          (t->options & CTX_CLARITY_PIVOT) != 0);
 
   /* When modal, allow 'value' to set initial offset. */
   if ((event == nullptr) && RNA_struct_property_is_set(op->ptr, "value")) {
@@ -752,7 +752,7 @@ static wmOperatorStatus transform_invoke(bContext *C, wmOperator *op, const wmEv
   }
   if (UNLIKELY(!is_zero_v4(t->values_modal_offset))) {
     transformApply(C, t);
-    transform_maya_pivot_update(C, t);
+    transform_clarity_pivot_update(C, t);
   }
 
   return OPERATOR_RUNNING_MODAL;
@@ -975,7 +975,7 @@ void properties_register(wmOperatorType *ot, int flags)
     prop = RNA_def_boolean(ot->srna, "cursor_transform", false, "Transform Cursor", "");
     RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
     prop = RNA_def_boolean(
-        ot->srna, "maya_pivot_transform", false, "Transform Maya Pivot", "");
+        ot->srna, "clarity_pivot_transform", false, "Transform Clarity Pivot", "");
     RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
   }
 
@@ -1116,9 +1116,9 @@ static void TRANSFORM_OT_resize(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 
   prop = RNA_def_boolean(ot->srna,
-                         "use_maya_scale_behavior",
+                         "use_clarity_scale_behavior",
                          false,
-                         "Maya Scale Behavior",
+                         "Clarity Scale Behavior",
                          "Project mouse input onto the active scale axis and stop at zero");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 
@@ -1728,38 +1728,38 @@ static void TRANSFORM_OT_from_gizmo(wmOperatorType *ot)
   ot->invoke = transform_from_gizmo_invoke;
 }
 
-enum eMayaSnapToggleMode {
-  MAYA_SNAP_TOGGLE_GRID = 0,
-  MAYA_SNAP_TOGGLE_CURVE,
-  MAYA_SNAP_TOGGLE_POINT,
-  MAYA_SNAP_TOGGLE_VIEW_PLANE,
-  MAYA_SNAP_TOGGLE_MESH_CENTER,
-  MAYA_SNAP_TOGGLE_STEP,
+enum eClaritySnapToggleMode {
+  CLARITY_SNAP_TOGGLE_GRID = 0,
+  CLARITY_SNAP_TOGGLE_CURVE,
+  CLARITY_SNAP_TOGGLE_POINT,
+  CLARITY_SNAP_TOGGLE_VIEW_PLANE,
+  CLARITY_SNAP_TOGGLE_MESH_CENTER,
+  CLARITY_SNAP_TOGGLE_STEP,
 };
 
-static const EnumPropertyItem maya_snap_toggle_mode_items[] = {
-    {MAYA_SNAP_TOGGLE_GRID, "GRID", ICON_SNAP_GRID, "Grid", "Snap the transform pivot to the grid"},
-    {MAYA_SNAP_TOGGLE_CURVE,
+static const EnumPropertyItem clarity_snap_toggle_mode_items[] = {
+    {CLARITY_SNAP_TOGGLE_GRID, "GRID", ICON_SNAP_GRID, "Grid", "Snap the transform pivot to the grid"},
+    {CLARITY_SNAP_TOGGLE_CURVE,
      "CURVE",
      ICON_SNAP_EDGE,
      "Curve",
      "Snap the transform pivot continuously along curves"},
-    {MAYA_SNAP_TOGGLE_POINT,
+    {CLARITY_SNAP_TOGGLE_POINT,
      "POINT",
      ICON_SNAP_VERTEX,
      "Point",
      "Snap the transform pivot to vertices, control points, and pivots"},
-    {MAYA_SNAP_TOGGLE_VIEW_PLANE,
+    {CLARITY_SNAP_TOGGLE_VIEW_PLANE,
      "VIEW_PLANE",
      ICON_SNAP_FACE,
      "View Plane",
      "Constrain free movement to the view plane captured at transform start"},
-    {MAYA_SNAP_TOGGLE_MESH_CENTER,
+    {CLARITY_SNAP_TOGGLE_MESH_CENTER,
      "MESH_CENTER",
      ICON_SNAP_FACE_CENTER,
      "Mesh Center",
      "Snap midway between the front and back hits of the nearest mesh object"},
-    {MAYA_SNAP_TOGGLE_STEP,
+    {CLARITY_SNAP_TOGGLE_STEP,
      "STEP",
      ICON_SNAP_INCREMENT,
      "Step",
@@ -1767,68 +1767,68 @@ static const EnumPropertyItem maya_snap_toggle_mode_items[] = {
     {0, nullptr, 0, nullptr, nullptr},
 };
 
-static ed::maya::MayaSnapMode maya_snap_toggle_mode_get(const int mode)
+static ed::clarity::ClaritySnapMode clarity_snap_toggle_mode_get(const int mode)
 {
   switch (mode) {
-    case MAYA_SNAP_TOGGLE_GRID:
-      return ed::maya::MayaSnapMode::Grid;
-    case MAYA_SNAP_TOGGLE_CURVE:
-      return ed::maya::MayaSnapMode::Curve;
-    case MAYA_SNAP_TOGGLE_POINT:
-      return ed::maya::MayaSnapMode::Point;
-    case MAYA_SNAP_TOGGLE_VIEW_PLANE:
-      return ed::maya::MayaSnapMode::ViewPlane;
-    case MAYA_SNAP_TOGGLE_MESH_CENTER:
-      return ed::maya::MayaSnapMode::MeshCenter;
-    case MAYA_SNAP_TOGGLE_STEP:
-      return ed::maya::MayaSnapMode::Step;
+    case CLARITY_SNAP_TOGGLE_GRID:
+      return ed::clarity::ClaritySnapMode::Grid;
+    case CLARITY_SNAP_TOGGLE_CURVE:
+      return ed::clarity::ClaritySnapMode::Curve;
+    case CLARITY_SNAP_TOGGLE_POINT:
+      return ed::clarity::ClaritySnapMode::Point;
+    case CLARITY_SNAP_TOGGLE_VIEW_PLANE:
+      return ed::clarity::ClaritySnapMode::ViewPlane;
+    case CLARITY_SNAP_TOGGLE_MESH_CENTER:
+      return ed::clarity::ClaritySnapMode::MeshCenter;
+    case CLARITY_SNAP_TOGGLE_STEP:
+      return ed::clarity::ClaritySnapMode::Step;
   }
   BLI_assert_unreachable();
-  return ed::maya::MayaSnapMode::None;
+  return ed::clarity::ClaritySnapMode::None;
 }
 
-static bool maya_snap_toggle_poll(bContext *C)
+static bool clarity_snap_toggle_poll(bContext *C)
 {
-  return ED_operator_view3d_active(C) && ED_maya_interaction_enabled(C);
+  return ED_operator_view3d_active(C) && ED_clarity_interaction_enabled(C);
 }
 
-static wmOperatorStatus maya_snap_toggle_exec(bContext *C, wmOperator *op)
+static wmOperatorStatus clarity_snap_toggle_exec(bContext *C, wmOperator *op)
 {
-  if (!ED_maya_interaction_enabled(C)) {
+  if (!ED_clarity_interaction_enabled(C)) {
     return OPERATOR_CANCELLED;
   }
 
-  const ed::maya::MayaSnapMode mode = maya_snap_toggle_mode_get(
+  const ed::clarity::ClaritySnapMode mode = clarity_snap_toggle_mode_get(
       RNA_enum_get(op->ptr, "mode"));
-  const ed::maya::MayaSnapMode next_mode = ED_maya_snap_mode_get(C) == mode ?
-                                               ed::maya::MayaSnapMode::None :
+  const ed::clarity::ClaritySnapMode next_mode = ED_clarity_snap_mode_get(C) == mode ?
+                                               ed::clarity::ClaritySnapMode::None :
                                                mode;
-  ED_maya_snap_mode_set(C, next_mode);
+  ED_clarity_snap_mode_set(C, next_mode);
 
   return OPERATOR_FINISHED;
 }
 
-static void TRANSFORM_OT_maya_snap_toggle(wmOperatorType *ot)
+static void TRANSFORM_OT_clarity_snap_toggle(wmOperatorType *ot)
 {
-  ot->name = "Toggle Maya Snap Mode";
-  ot->description = "Toggle a Maya-style transform snapping mode";
-  ot->idname = "TRANSFORM_OT_maya_snap_toggle";
+  ot->name = "Toggle Clarity Snap Mode";
+  ot->description = "Toggle a Clarity-style transform snapping mode";
+  ot->idname = "TRANSFORM_OT_clarity_snap_toggle";
 
-  ot->exec = maya_snap_toggle_exec;
-  ot->poll = maya_snap_toggle_poll;
+  ot->exec = clarity_snap_toggle_exec;
+  ot->poll = clarity_snap_toggle_poll;
 
   RNA_def_enum(
-      ot->srna, "mode", maya_snap_toggle_mode_items, MAYA_SNAP_TOGGLE_POINT, "Mode", "");
+      ot->srna, "mode", clarity_snap_toggle_mode_items, CLARITY_SNAP_TOGGLE_POINT, "Mode", "");
 }
 
-static wmOperatorStatus maya_pivot_click_exec(bContext *C, wmOperator *op)
+static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
 {
   ARegion *region = CTX_wm_region(C);
   View3D *view = CTX_wm_view3d(C);
   RegionView3D *region_view = region != nullptr ?
                                  static_cast<RegionView3D *>(region->regiondata) :
                                  nullptr;
-  if (ED_maya_pivot_edit_target_get(C) == ed::maya::MayaPivotEditTarget::None ||
+  if (ED_clarity_pivot_edit_target_get(C) == ed::clarity::ClarityPivotEditTarget::None ||
       region == nullptr || region->regiontype != RGN_TYPE_WINDOW || view == nullptr ||
       region_view == nullptr)
   {
@@ -1843,12 +1843,12 @@ static wmOperatorStatus maya_pivot_click_exec(bContext *C, wmOperator *op)
   const bool orientation_only = ctrl && !shift;
   const bool aim_axis = ctrl && shift;
 
-  std::unique_ptr<ed::maya::MayaPivotEditTargetBackend> target =
-      ED_maya_pivot_edit_target_create(C);
+  std::unique_ptr<ed::clarity::ClarityPivotEditTargetBackend> target =
+      ED_clarity_pivot_edit_target_create(C);
   if (!target) {
     return OPERATOR_CANCELLED;
   }
-  ed::maya::MayaPivotFrame frame = target->frame_get();
+  ed::clarity::ClarityPivotFrame frame = target->frame_get();
   frame.position_valid = true;
 
   ed::transform::SnapObjectContext *snap_context =
@@ -1874,8 +1874,8 @@ static wmOperatorStatus maya_pivot_click_exec(bContext *C, wmOperator *op)
   const float previous_position[3] = {float(frame.position_world.x),
                                       float(frame.position_world.y),
                                       float(frame.position_world.z)};
-  float snap_distance = ED_maya_snap_tolerance_px_get(
-      C, transform_maya_region_extent(region));
+  float snap_distance = ED_clarity_snap_tolerance_px_get(
+      C, transform_clarity_region_extent(region));
   const eSnapMode hit_type = ed::transform::snap_object_project_view3d_ex(
       snap_context,
       CTX_data_ensure_evaluated_depsgraph(C),
@@ -1901,14 +1901,14 @@ static wmOperatorStatus maya_pivot_click_exec(bContext *C, wmOperator *op)
   }
   const bool has_orientation = has_position && !is_zero_v3(hit_normal);
 
-  ed::maya::MayaPivotSnapResult snap_result;
+  ed::clarity::ClarityPivotSnapResult snap_result;
   if (has_position) {
     snap_result.position_world = double3(hit_position);
     snap_result.type = hit_type & SCE_SNAP_TO_VERTEX ?
-                           ed::maya::MayaPivotSnapTargetType::Vertex :
+                           ed::clarity::ClarityPivotSnapTargetType::Vertex :
                            (hit_type & SCE_SNAP_TO_EDGE ?
-                                ed::maya::MayaPivotSnapTargetType::Edge :
-                                ed::maya::MayaPivotSnapTargetType::Face);
+                                ed::clarity::ClarityPivotSnapTargetType::Edge :
+                                ed::clarity::ClarityPivotSnapTargetType::Face);
     snap_result.object = const_cast<Object *>(hit_object);
     snap_result.component_index = hit_index;
   }
@@ -1919,14 +1919,14 @@ static wmOperatorStatus maya_pivot_click_exec(bContext *C, wmOperator *op)
     ED_view3d_win_to_3d_int(view, region, pivot_depth, mouse, hit_position);
     has_position = true;
     snap_result.position_world = double3(hit_position);
-    snap_result.type = ed::maya::MayaPivotSnapTargetType::ViewPlane;
+    snap_result.type = ed::clarity::ClarityPivotSnapTargetType::ViewPlane;
   }
   if (!has_position || (orientation_only && !has_orientation)) {
     return OPERATOR_CANCELLED;
   }
 
-  ed::maya::MayaPivotToolSettings settings;
-  if (!ED_maya_pivot_tool_settings_get(C, settings)) {
+  ed::clarity::ClarityPivotToolSettings settings;
+  if (!ED_clarity_pivot_tool_settings_get(C, settings)) {
     return OPERATOR_CANCELLED;
   }
   const bool apply_position = !orientation_only && !aim_axis && settings.snap_position;
@@ -1937,7 +1937,7 @@ static wmOperatorStatus maya_pivot_click_exec(bContext *C, wmOperator *op)
       const double3 orientation_target = aim_axis ?
                                              double3(hit_position) :
                                              frame.position_world + double3(hit_normal);
-      if (!ED_maya_pivot_orientation_aim(frame,
+      if (!ED_clarity_pivot_orientation_aim(frame,
                                          orientation_target,
                                          aim_axis ? settings.active_axis : 2,
                                          double3(region_view->viewinv[1])))
@@ -1953,7 +1953,7 @@ static wmOperatorStatus maya_pivot_click_exec(bContext *C, wmOperator *op)
     return OPERATOR_FINISHED;
   }
 
-  ED_maya_pivot_undo_begin(C);
+  ED_clarity_pivot_undo_begin(C);
   bool changed = true;
   if (apply_position) {
     changed = target->position_set(*snap_result.position_world, true);
@@ -1963,7 +1963,7 @@ static wmOperatorStatus maya_pivot_click_exec(bContext *C, wmOperator *op)
   }
   if (!changed) {
     target->cancel();
-    ED_maya_undo_step_clear(C);
+    ED_clarity_undo_step_clear(C);
     return OPERATOR_CANCELLED;
   }
 
@@ -1972,13 +1972,13 @@ static wmOperatorStatus maya_pivot_click_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static void TRANSFORM_OT_maya_pivot_click(wmOperatorType *ot)
+static void TRANSFORM_OT_clarity_pivot_click(wmOperatorType *ot)
 {
-  ot->name = "Maya Pivot Component Click";
-  ot->description = "Apply a Maya custom-pivot component click workflow";
-  ot->idname = "TRANSFORM_OT_maya_pivot_click";
-  ot->exec = maya_pivot_click_exec;
-  ot->poll = maya_snap_toggle_poll;
+  ot->name = "Clarity Pivot Component Click";
+  ot->description = "Apply a Clarity custom-pivot component click workflow";
+  ot->idname = "TRANSFORM_OT_clarity_pivot_click";
+  ot->exec = clarity_pivot_click_exec;
+  ot->poll = clarity_snap_toggle_poll;
   ot->flag = OPTYPE_UNDO | OPTYPE_INTERNAL;
 
   PropertyRNA *property = RNA_def_int_vector(ot->srna,
@@ -2011,8 +2011,18 @@ void transform_operatortypes()
   WM_operatortype_append(TRANSFORM_OT_delete_orientation);
 
   WM_operatortype_append(TRANSFORM_OT_from_gizmo);
-  WM_operatortype_append(TRANSFORM_OT_maya_snap_toggle);
-  WM_operatortype_append(TRANSFORM_OT_maya_pivot_click);
+  WM_operatortype_append(TRANSFORM_OT_clarity_snap_toggle);
+  WM_operatortype_append(TRANSFORM_OT_clarity_pivot_click);
+  WM_operatortype_append([](wmOperatorType *ot) {
+    TRANSFORM_OT_clarity_snap_toggle(ot);
+    ot->idname = "TRANSFORM_OT_maya_snap_toggle";
+    ot->flag |= OPTYPE_INTERNAL;
+  });
+  WM_operatortype_append([](wmOperatorType *ot) {
+    TRANSFORM_OT_clarity_pivot_click(ot);
+    ot->idname = "TRANSFORM_OT_maya_pivot_click";
+    ot->flag |= OPTYPE_INTERNAL;
+  });
 }
 
 void keymap_transform(wmKeyConfig *keyconf)

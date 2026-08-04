@@ -93,7 +93,7 @@ static void outliner_main_region_draw(const bContext *C, ARegion *region)
 {
   View2D *v2d = &region->v2d;
 
-  /* Keep the Outliner background consistent with the Maya-style workspace. */
+  /* Keep the Outliner background consistent with the Clarity-style workspace. */
   uchar *background = ui::theme::theme_get()->space_outliner.back;
   background[0] = 55;
   background[1] = 55;

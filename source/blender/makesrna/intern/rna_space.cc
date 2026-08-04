@@ -4682,7 +4682,7 @@ static void rna_def_space_view3d_shading(BlenderRNA *brna)
        "WORLD",
        0,
        "Ambient Occlusion",
-       "Maya-style ambient occlusion computed with a screen-space sampling radius"},
+       "Clarity ambient occlusion computed with a screen-space sampling radius"},
       {V3D_SHADING_CAVITY_CURVATURE,
        "SCREEN",
        0,

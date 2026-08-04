@@ -127,33 +127,33 @@ struct WindowManagerRuntime {
   wmMsgBus *message_bus = nullptr;
 
   /**
-   * Non-persistent Maya interaction and snapping state.
+   * Non-persistent Clarity interaction and snapping state.
    *
    * Keep extension state at the end so adding it does not change offsets of the core runtime
    * fields used across editor and window-manager translation units.
    */
-  bool maya_interaction_enabled;
-  /** #ed::maya::MayaToolID of the globally active Maya tool, mirrored for UI reads. */
-  uint8_t maya_tool;
-  uint8_t maya_snap_mode;
-  uint8_t maya_snap_temporary_mode;
-  /** #ed::maya::eMayaStepSnapMode of the Step Snap widget. */
-  uint8_t maya_snap_step_mode;
+  bool clarity_interaction_enabled;
+  /** #ed::clarity::ClarityToolID of the globally active Clarity tool, mirrored for UI reads. */
+  uint8_t clarity_tool;
+  uint8_t clarity_snap_mode;
+  uint8_t clarity_snap_temporary_mode;
+  /** #ed::clarity::eClarityStepSnapMode of the Step Snap widget. */
+  uint8_t clarity_snap_step_mode;
   /** Translation step in scene units, rotation step in radians. */
-  float maya_snap_step_size;
-  float maya_snap_step_angle;
-  /** Maya's "Use snap tolerance" and "Snap tolerance" in pixels. */
-  bool maya_snap_use_tolerance;
-  int maya_snap_tolerance;
+  float clarity_snap_step_size;
+  float clarity_snap_step_angle;
+  /** Clarity's "Use snap tolerance" and "Snap tolerance" in pixels. */
+  bool clarity_snap_use_tolerance;
+  int clarity_snap_tolerance;
   /**
-   * Angle tolerance of Maya's `polySelectConstraint -a`, in radians.
+   * Angle tolerance of Clarity's `polySelectConstraint -a`, in radians.
    *
    * Global, like the constraint itself, and settable from the marking menu, so it lives here rather
    * than in a per-window runtime: a slider needs an RNA property, and this is the runtime an RNA
    * property can reach.
    */
-  float maya_selection_constraint_angle;
-  uint64_t maya_interaction_revision;
+  float clarity_selection_constraint_angle;
+  uint64_t clarity_interaction_revision;
 
   WindowManagerRuntime();
   ~WindowManagerRuntime();

@@ -744,8 +744,8 @@ void ElementRotation_ex(const TransInfo *t,
     }
   }
   else {
-    const float (*rotation_mtx)[3] = (td->flag & TD_MAYA_TRANSFORM) ? td_ext->r_mtx : td->mtx;
-    const float (*rotation_smtx)[3] = (td->flag & TD_MAYA_TRANSFORM) ? td_ext->r_smtx : td->smtx;
+    const float (*rotation_mtx)[3] = (td->flag & TD_CLARITY_TRANSFORM) ? td_ext->r_mtx : td->mtx;
+    const float (*rotation_smtx)[3] = (td->flag & TD_CLARITY_TRANSFORM) ? td_ext->r_smtx : td->smtx;
 
     if ((td->flag & TD_NO_LOC) == 0) {
       /* Translation. */

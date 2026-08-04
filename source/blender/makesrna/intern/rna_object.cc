@@ -269,21 +269,26 @@ static const EnumPropertyItem rna_enum_object_transform_model_items[] = {
      0,
      "Blender",
      "Use Blender location, rotation and scale"},
+    {OBJECT_TRANSFORM_CLARITY,
+     "CLARITY",
+     0,
+     "Clarity",
+     "Use Clarity transform channels, pivots, shear and offset parent matrix"},
     {OBJECT_TRANSFORM_MAYA,
      "MAYA",
      0,
-     "Maya",
-     "Use Maya transform channels, pivots, shear and offset parent matrix"},
+     "Clarity (Legacy API)",
+     "Deprecated identifier retained for existing Python scripts"},
     {0, nullptr, 0, nullptr, nullptr},
 };
 
-static const EnumPropertyItem rna_enum_maya_rotation_order_items[] = {
-    {MAYA_ROT_ORDER_XYZ, "XYZ", 0, "XYZ", ""},
-    {MAYA_ROT_ORDER_YZX, "YZX", 0, "YZX", ""},
-    {MAYA_ROT_ORDER_ZXY, "ZXY", 0, "ZXY", ""},
-    {MAYA_ROT_ORDER_XZY, "XZY", 0, "XZY", ""},
-    {MAYA_ROT_ORDER_YXZ, "YXZ", 0, "YXZ", ""},
-    {MAYA_ROT_ORDER_ZYX, "ZYX", 0, "ZYX", ""},
+static const EnumPropertyItem rna_enum_clarity_rotation_order_items[] = {
+    {CLARITY_ROT_ORDER_XYZ, "XYZ", 0, "XYZ", ""},
+    {CLARITY_ROT_ORDER_YZX, "YZX", 0, "YZX", ""},
+    {CLARITY_ROT_ORDER_ZXY, "ZXY", 0, "ZXY", ""},
+    {CLARITY_ROT_ORDER_XZY, "XZY", 0, "XZY", ""},
+    {CLARITY_ROT_ORDER_YXZ, "YXZ", 0, "YXZ", ""},
+    {CLARITY_ROT_ORDER_ZYX, "ZYX", 0, "ZYX", ""},
     {0, nullptr, 0, nullptr, nullptr},
 };
 
@@ -356,7 +361,7 @@ const EnumPropertyItem rna_enum_object_axis_flip_items[] = {
 #  include "BKE_object.hh"
 #  include "BKE_object_custom_pivot.hh"
 #  include "BKE_object_deform.h"
-#  include "BKE_object_transform_maya.hh"
+#  include "BKE_object_transform_clarity.hh"
 #  include "BKE_particle.h"
 #  include "BKE_scene.hh"
 
@@ -384,13 +389,13 @@ static void rna_Object_transform_model_set(PointerRNA *ptr, const int value)
   BKE_object_transform_model_set(*object, value);
 }
 
-static PointerRNA rna_Object_maya_transform_get(PointerRNA *ptr)
+static PointerRNA rna_Object_clarity_transform_get(PointerRNA *ptr)
 {
   Object *object = static_cast<Object *>(ptr->data);
-  if (!BKE_object_uses_maya_transform(object)) {
+  if (!BKE_object_uses_clarity_transform(object)) {
     return PointerRNA_NULL;
   }
-  return RNA_pointer_create_with_parent(*ptr, RNA_MayaObjectTransformRNA, object->maya_transform);
+  return RNA_pointer_create_with_parent(*ptr, RNA_ClarityObjectTransformRNA, object->clarity_transform);
 }
 
 static PointerRNA rna_Object_custom_pivot_get(PointerRNA *ptr)
@@ -444,27 +449,27 @@ static void rna_ObjectCustomPivot_orientation_set(PointerRNA *ptr, const float *
   pivot->orientation_valid = true;
 }
 
-static std::optional<std::string> rna_MayaObjectTransformRNA_path(const PointerRNA * /*ptr*/)
+static std::optional<std::string> rna_ClarityObjectTransformRNA_path(const PointerRNA * /*ptr*/)
 {
-  return "maya_transform";
+  return "clarity_transform";
 }
 
-static void rna_MayaObjectTransformRNA_rotation_order_set(PointerRNA *ptr, const int value)
+static void rna_ClarityObjectTransformRNA_rotation_order_set(PointerRNA *ptr, const int value)
 {
-  MayaObjectTransform *transform = static_cast<MayaObjectTransform *>(ptr->data);
-  BKE_maya_transform_set_rotation_order(*transform, eMayaRotationOrder(value), true);
+  ClarityObjectTransform *transform = static_cast<ClarityObjectTransform *>(ptr->data);
+  BKE_clarity_transform_set_rotation_order(*transform, eClarityRotationOrder(value), true);
 }
 
-static void rna_MayaObjectTransformRNA_rotate_pivot_set(PointerRNA *ptr, const float *values)
+static void rna_ClarityObjectTransformRNA_rotate_pivot_set(PointerRNA *ptr, const float *values)
 {
-  MayaObjectTransform *transform = static_cast<MayaObjectTransform *>(ptr->data);
-  BKE_maya_transform_set_rotate_pivot(*transform, double3(values), true);
+  ClarityObjectTransform *transform = static_cast<ClarityObjectTransform *>(ptr->data);
+  BKE_clarity_transform_set_rotate_pivot(*transform, double3(values), true);
 }
 
-static void rna_MayaObjectTransformRNA_scale_pivot_set(PointerRNA *ptr, const float *values)
+static void rna_ClarityObjectTransformRNA_scale_pivot_set(PointerRNA *ptr, const float *values)
 {
-  MayaObjectTransform *transform = static_cast<MayaObjectTransform *>(ptr->data);
-  BKE_maya_transform_set_scale_pivot(*transform, double3(values), true);
+  ClarityObjectTransform *transform = static_cast<ClarityObjectTransform *>(ptr->data);
+  BKE_clarity_transform_set_scale_pivot(*transform, double3(values), true);
 }
 
 static void rna_Object_internal_update_draw(Main * /*bmain*/, Scene * /*scene*/, PointerRNA *ptr)
@@ -477,16 +482,16 @@ static void rna_Object_matrix_world_update(Main *bmain, Scene *scene, PointerRNA
 {
   /* Don't use compatibility so we get predictable rotation. */
   Object *ob = reinterpret_cast<Object *>(ptr->owner_id);
-  if (BKE_object_uses_maya_transform(ob)) {
+  if (BKE_object_uses_clarity_transform(ob)) {
     double4x4 parent_effect = double4x4::identity();
     if (ob->parent != nullptr) {
       float parent_effect_float[4][4];
       BKE_object_get_parent_matrix(ob, ob->parent, parent_effect_float);
       parent_effect = double4x4(float4x4(parent_effect_float));
     }
-    MayaTransformSetOptions options;
+    ClarityTransformSetOptions options;
     options.use_compatible_euler = false;
-    BKE_object_maya_set_world_matrix(
+    BKE_object_clarity_set_world_matrix(
         *ob, parent_effect, double4x4(ob->object_to_world()), options);
   }
   else {
@@ -543,10 +548,10 @@ static void rna_Object_matrix_local_get(PointerRNA *ptr, float values[16])
 static void rna_Object_matrix_local_set(PointerRNA *ptr, const float values[16])
 {
   Object *ob = reinterpret_cast<Object *>(ptr->owner_id);
-  if (BKE_object_uses_maya_transform(ob)) {
-    MayaTransformSetOptions options;
+  if (BKE_object_uses_clarity_transform(ob)) {
+    ClarityTransformSetOptions options;
     options.use_compatible_euler = false;
-    BKE_object_maya_set_dag_local_matrix(*ob, double4x4(float4x4(values)), options);
+    BKE_object_clarity_set_dag_local_matrix(*ob, double4x4(float4x4(values)), options);
     return;
   }
 
@@ -572,8 +577,8 @@ static void rna_Object_matrix_local_set(PointerRNA *ptr, const float values[16])
 static void rna_Object_matrix_basis_get(PointerRNA *ptr, float values[16])
 {
   Object *ob = reinterpret_cast<Object *>(ptr->owner_id);
-  if (BKE_object_uses_maya_transform(ob)) {
-    const float4x4 matrix(BKE_maya_transform_channel_matrix(*ob->maya_transform));
+  if (BKE_object_uses_clarity_transform(ob)) {
+    const float4x4 matrix(BKE_clarity_transform_channel_matrix(*ob->clarity_transform));
     std::copy_n(matrix.base_ptr(), 16, values);
   }
   else {
@@ -584,11 +589,11 @@ static void rna_Object_matrix_basis_get(PointerRNA *ptr, float values[16])
 static void rna_Object_matrix_basis_set(PointerRNA *ptr, const float values[16])
 {
   Object *ob = reinterpret_cast<Object *>(ptr->owner_id);
-  if (BKE_object_uses_maya_transform(ob)) {
-    MayaTransformSetOptions options;
+  if (BKE_object_uses_clarity_transform(ob)) {
+    ClarityTransformSetOptions options;
     options.use_compatible_euler = false;
-    BKE_maya_transform_set_channel_matrix(
-        *ob->maya_transform, double4x4(float4x4(values)), options);
+    BKE_clarity_transform_set_channel_matrix(
+        *ob->clarity_transform, double4x4(float4x4(values)), options);
   }
   else {
     BKE_object_apply_mat4(
@@ -3311,12 +3316,21 @@ static void rna_def_object(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Transform Model", "Storage and evaluation model for transforms");
   RNA_def_property_update(prop, NC_OBJECT | ND_TRANSFORM, "rna_Object_internal_update");
 
-  prop = RNA_def_property(srna, "maya_transform", PROP_POINTER, PROP_NONE);
-  RNA_def_property_struct_type(prop, "MayaObjectTransformRNA");
-  RNA_def_property_pointer_funcs(prop, "rna_Object_maya_transform_get", nullptr, nullptr, nullptr);
+  prop = RNA_def_property(srna, "clarity_transform", PROP_POINTER, PROP_NONE);
+  RNA_def_property_struct_type(prop, "ClarityObjectTransformRNA");
+  RNA_def_property_pointer_funcs(prop, "rna_Object_clarity_transform_get", nullptr, nullptr, nullptr);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(
-      prop, "Maya Transform", "Maya transform channels when the Maya model is active");
+      prop, "Clarity Transform", "Clarity transform channels when the Clarity model is active");
+
+  /* Deprecated API alias. Keep old animation paths and external scripts resolving while all newly
+   * generated paths use `clarity_transform`. */
+  prop = RNA_def_property(srna, "maya_transform", PROP_POINTER, PROP_NONE);
+  RNA_def_property_struct_type(prop, "ClarityObjectTransformRNA");
+  RNA_def_property_pointer_funcs(prop, "rna_Object_clarity_transform_get", nullptr, nullptr, nullptr);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_flag(prop, PROP_HIDDEN);
+  RNA_def_property_ui_text(prop, "Clarity Transform (Legacy API)", "Deprecated Clarity transform alias");
 
   prop = RNA_def_property(srna, "custom_pivot", PROP_POINTER, PROP_NONE);
   RNA_def_property_struct_type(prop, "ObjectCustomPivot");
@@ -3980,58 +3994,58 @@ static void rna_def_object(BlenderRNA *brna)
   RNA_api_object(srna);
 }
 
-static void rna_def_maya_object_transform(BlenderRNA *brna)
+static void rna_def_clarity_object_transform(BlenderRNA *brna)
 {
-  StructRNA *srna = RNA_def_struct(brna, "MayaObjectTransformRNA", nullptr);
-  RNA_def_struct_sdna(srna, "MayaObjectTransform");
+  StructRNA *srna = RNA_def_struct(brna, "ClarityObjectTransformRNA", nullptr);
+  RNA_def_struct_sdna(srna, "ClarityObjectTransform");
   RNA_def_struct_nested(brna, srna, "Object");
-  RNA_def_struct_path_func(srna, "rna_MayaObjectTransformRNA_path");
+  RNA_def_struct_path_func(srna, "rna_ClarityObjectTransformRNA_path");
   RNA_def_struct_ui_text(
-      srna, "Maya Object Transform", "Maya-compatible object transform channels");
+      srna, "Clarity Object Transform", "Clarity-compatible object transform channels");
 
   PropertyRNA *prop = RNA_def_property(srna, "translation", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_float_sdna(prop, nullptr, "translation");
   RNA_def_property_ui_range(prop, -FLT_MAX, FLT_MAX, 1, RNA_TRANSLATION_PREC_DEFAULT);
-  RNA_def_property_ui_text(prop, "Translation", "Maya translation channels");
+  RNA_def_property_ui_text(prop, "Translation", "Clarity translation channels");
   RNA_def_property_update(prop, NC_OBJECT | ND_TRANSFORM, "rna_Object_internal_update");
 
   prop = RNA_def_property(srna, "rotation", PROP_FLOAT, PROP_EULER);
   RNA_def_property_float_sdna(prop, nullptr, "rotation");
   RNA_def_property_ui_range(prop, -FLT_MAX, FLT_MAX, 100, RNA_TRANSLATION_PREC_DEFAULT);
-  RNA_def_property_ui_text(prop, "Rotation", "Maya Euler rotation channels");
+  RNA_def_property_ui_text(prop, "Rotation", "Clarity Euler rotation channels");
   RNA_def_property_update(prop, NC_OBJECT | ND_TRANSFORM, "rna_Object_internal_update");
 
   prop = RNA_def_property(srna, "rotation_order", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, nullptr, "rotation_order");
-  RNA_def_property_enum_items(prop, rna_enum_maya_rotation_order_items);
+  RNA_def_property_enum_items(prop, rna_enum_clarity_rotation_order_items);
   RNA_def_property_enum_funcs(
-      prop, nullptr, "rna_MayaObjectTransformRNA_rotation_order_set", nullptr);
-  RNA_def_property_ui_text(prop, "Rotation Order", "Maya Euler rotation order");
+      prop, nullptr, "rna_ClarityObjectTransformRNA_rotation_order_set", nullptr);
+  RNA_def_property_ui_text(prop, "Rotation Order", "Clarity Euler rotation order");
   RNA_def_property_update(prop, NC_OBJECT | ND_TRANSFORM, "rna_Object_internal_update");
 
   prop = RNA_def_property(srna, "rotate_axis", PROP_FLOAT, PROP_EULER);
   RNA_def_property_float_sdna(prop, nullptr, "rotate_axis");
   RNA_def_property_ui_range(prop, -FLT_MAX, FLT_MAX, 100, RNA_TRANSLATION_PREC_DEFAULT);
-  RNA_def_property_ui_text(prop, "Rotate Axis", "Maya rotateAxis channels in fixed XYZ order");
+  RNA_def_property_ui_text(prop, "Rotate Axis", "Clarity rotateAxis channels in fixed XYZ order");
   RNA_def_property_update(prop, NC_OBJECT | ND_TRANSFORM, "rna_Object_internal_update");
 
   prop = RNA_def_property(srna, "scale", PROP_FLOAT, PROP_XYZ);
   RNA_def_property_float_sdna(prop, nullptr, "scale");
   RNA_def_property_flag(prop, PROP_PROPORTIONAL);
   RNA_def_property_ui_range(prop, -FLT_MAX, FLT_MAX, 1, 3);
-  RNA_def_property_ui_text(prop, "Scale", "Maya scale channels");
+  RNA_def_property_ui_text(prop, "Scale", "Clarity scale channels");
   RNA_def_property_update(prop, NC_OBJECT | ND_TRANSFORM, "rna_Object_internal_update");
 
   prop = RNA_def_property(srna, "shear", PROP_FLOAT, PROP_XYZ);
   RNA_def_property_float_sdna(prop, nullptr, "shear");
   RNA_def_property_ui_range(prop, -FLT_MAX, FLT_MAX, 1, 3);
-  RNA_def_property_ui_text(prop, "Shear", "Maya XY, XZ and YZ shear channels");
+  RNA_def_property_ui_text(prop, "Shear", "Clarity XY, XZ and YZ shear channels");
   RNA_def_property_update(prop, NC_OBJECT | ND_TRANSFORM, "rna_Object_internal_update");
 
   prop = RNA_def_property(srna, "rotate_pivot", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_float_sdna(prop, nullptr, "rotate_pivot");
   RNA_def_property_float_funcs(
-      prop, nullptr, "rna_MayaObjectTransformRNA_rotate_pivot_set", nullptr);
+      prop, nullptr, "rna_ClarityObjectTransformRNA_rotate_pivot_set", nullptr);
   RNA_def_property_ui_text(prop, "Rotate Pivot", "Rotation pivot with automatic compensation");
   RNA_def_property_update(prop, NC_OBJECT | ND_TRANSFORM, "rna_Object_internal_update");
 
@@ -4043,7 +4057,7 @@ static void rna_def_maya_object_transform(BlenderRNA *brna)
   prop = RNA_def_property(srna, "scale_pivot", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_float_sdna(prop, nullptr, "scale_pivot");
   RNA_def_property_float_funcs(
-      prop, nullptr, "rna_MayaObjectTransformRNA_scale_pivot_set", nullptr);
+      prop, nullptr, "rna_ClarityObjectTransformRNA_scale_pivot_set", nullptr);
   RNA_def_property_ui_text(prop, "Scale Pivot", "Scale pivot with automatic compensation");
   RNA_def_property_update(prop, NC_OBJECT | ND_TRANSFORM, "rna_Object_internal_update");
 
@@ -4063,6 +4077,16 @@ static void rna_def_maya_object_transform(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, nullptr, "inherits_transform", 1);
   RNA_def_property_ui_text(prop, "Inherits Transform", "Inherit the DAG parent effect");
   RNA_def_property_update(prop, NC_OBJECT | ND_TRANSFORM, "rna_Object_internal_update");
+}
+
+static void rna_def_maya_object_transform_compatibility(BlenderRNA *brna)
+{
+  StructRNA *srna = RNA_def_struct(
+      brna, "MayaObjectTransformRNA", "ClarityObjectTransformRNA");
+  RNA_def_struct_sdna(srna, "ClarityObjectTransform");
+  RNA_def_struct_nested(brna, srna, "Object");
+  RNA_def_struct_ui_text(
+      srna, "Clarity Object Transform (Legacy API)", "Deprecated Clarity RNA type alias");
 }
 
 static void rna_def_object_custom_pivot(BlenderRNA *brna)
@@ -4158,7 +4182,8 @@ void RNA_def_object(BlenderRNA *brna)
 {
   rna_def_object(brna);
   rna_def_object_custom_pivot(brna);
-  rna_def_maya_object_transform(brna);
+  rna_def_clarity_object_transform(brna);
+  rna_def_maya_object_transform_compatibility(brna);
 
   RNA_define_animate_sdna(false);
   rna_def_vertex_group(brna);

@@ -883,9 +883,9 @@ bool block_has_active_default_button(const Block *block);
  */
 Button *but_find_mouse_over(const ARegion *region, const wmEvent *event) ATTR_WARN_UNUSED_RESULT;
 
-/** An insertion position for a Maya-style shelf drag, see #shelf_drop_target_find. */
+/** An insertion position for a Clarity-style shelf drag, see #shelf_drop_target_find. */
 struct ShelfDropTarget {
-  /** `maya_shelf_item_id` of the shelf entry nearest to the cursor. */
+  /** `clarity_shelf_item_id` of the shelf entry nearest to the cursor. */
   StringRefNull item_id;
   /** Insert after `item_id` rather than before it. */
   bool after;
@@ -1002,7 +1002,7 @@ wmOperatorStatus pie_menu_invoke_with_threshold(bContext *C,
                                                 const wmEvent *event,
                                                 float threshold);
 /**
- * Geometry and behavior of a Maya marking menu.
+ * Geometry and behavior of a Clarity marking menu.
  *
  * Zero keeps the matching user preference, so a caller only has to name what it wants to differ
  * from a stock pie.
@@ -1014,7 +1014,7 @@ struct MarkingMenuStyle {
   float radius = 0.0f;
   /**
    * Seconds the menu stays invisible after it opens, so a stroke that is finished inside that time
-   * never draws a menu at all. Maya's own `MarkingMenuPopupDelay`. Zero draws it right away.
+   * never draws a menu at all. Clarity's own `MarkingMenuPopupDelay`. Zero draws it right away.
    */
   float popup_delay = 0.0f;
 };
@@ -1145,10 +1145,10 @@ enum {
   BLOCK_THEME_STYLE_REGULAR = 0,
   BLOCK_THEME_STYLE_POPUP = 1,
   /**
-   * A sub-menu of a Maya marking menu. It is opened from a row of the menu and reads as part of
+   * A sub-menu of a Clarity marking menu. It is opened from a row of the menu and reads as part of
    * it, so it is backed in the button grey rather than the near-black of a regular menu.
    */
-  BLOCK_THEME_STYLE_MAYA_MENU = 2,
+  BLOCK_THEME_STYLE_CLARITY_MENU = 2,
 };
 void block_theme_style_set(Block *block, char theme_style);
 EmbossType block_emboss_get(Block *block);

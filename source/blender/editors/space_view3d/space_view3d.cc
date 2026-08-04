@@ -81,7 +81,7 @@
 
 namespace blender {
 
-static bool view3d_maya_component_marking_menu_poll(const bContext *C, MenuType * /*mt*/)
+static bool view3d_clarity_component_marking_menu_poll(const bContext *C, MenuType * /*mt*/)
 {
   const ARegion *region = CTX_wm_region(C);
   if (CTX_wm_view3d(C) == nullptr || region == nullptr || region->regiontype != RGN_TYPE_WINDOW) {
@@ -93,14 +93,14 @@ static bool view3d_maya_component_marking_menu_poll(const bContext *C, MenuType 
          (active_object->type == OB_MESH && (active_object->mode & OB_MODE_EDIT));
 }
 
-static void view3d_maya_component_mode_item(ui::Layout &layout,
+static void view3d_clarity_component_mode_item(ui::Layout &layout,
                                             const char *name,
                                             const int component_mode,
                                             const bool enabled)
 {
   ui::Layout &item = layout.row(false);
   item.enabled_set(enabled);
-  PointerRNA op_ptr = item.op("MAYA_OT_component_mode_set",
+  PointerRNA op_ptr = item.op("CLARITY_OT_component_mode_set",
                               name,
                               ICON_NONE,
                               wm::OpCallContext::ExecDefault,
@@ -108,7 +108,7 @@ static void view3d_maya_component_mode_item(ui::Layout &layout,
   RNA_enum_set(&op_ptr, "mode", component_mode);
 }
 
-static void view3d_maya_component_marking_menu_draw(const bContext *C, Menu *menu)
+static void view3d_clarity_component_marking_menu_draw(const bContext *C, Menu *menu)
 {
   const Object *active_object = CTX_data_active_object(C);
   const bool component_modes_enabled = active_object != nullptr &&
@@ -116,30 +116,30 @@ static void view3d_maya_component_marking_menu_draw(const bContext *C, Menu *men
                                        ELEM(active_object->mode, OB_MODE_OBJECT, OB_MODE_EDIT);
   ui::Layout &pie = menu->layout->menu_pie();
 
-  /* Maya marking-menu order: left, right, bottom, top, top-left, top-right,
+  /* Clarity marking-menu order: left, right, bottom, top, top-left, top-right,
    * bottom-left, bottom-right. */
-  view3d_maya_component_mode_item(pie, "Vertex", 1, component_modes_enabled);
-  view3d_maya_component_mode_item(
+  view3d_clarity_component_mode_item(pie, "Vertex", 1, component_modes_enabled);
+  view3d_clarity_component_mode_item(
       pie, "UV (Experimental)", 4, component_modes_enabled);
-  view3d_maya_component_mode_item(pie, "Face", 3, component_modes_enabled);
-  view3d_maya_component_mode_item(pie, "Edge", 2, component_modes_enabled);
+  view3d_clarity_component_mode_item(pie, "Face", 3, component_modes_enabled);
+  view3d_clarity_component_mode_item(pie, "Edge", 2, component_modes_enabled);
   pie.separator();
-  view3d_maya_component_mode_item(pie, "Object Mode", 0, active_object != nullptr);
+  view3d_clarity_component_mode_item(pie, "Object Mode", 0, active_object != nullptr);
 
-  view3d_maya_component_mode_item(
+  view3d_clarity_component_mode_item(
       pie, "Vertex Face (Experimental)", 5, component_modes_enabled);
-  view3d_maya_component_mode_item(pie,
+  view3d_clarity_component_mode_item(pie,
                                   "Multi",
                                   6,
                                   component_modes_enabled);
 }
 
-static MenuType view3d_maya_component_marking_menu()
+static MenuType view3d_clarity_component_marking_menu()
 {
   MenuType type{};
-  STRNCPY_UTF8(type.idname, "VIEW3D_MT_maya_component_marking_menu");
-  type.poll = view3d_maya_component_marking_menu_poll;
-  type.draw = view3d_maya_component_marking_menu_draw;
+  STRNCPY_UTF8(type.idname, "VIEW3D_MT_clarity_component_marking_menu");
+  type.poll = view3d_clarity_component_marking_menu_poll;
+  type.draw = view3d_clarity_component_marking_menu_draw;
   return type;
 }
 
@@ -1858,7 +1858,11 @@ void ED_spacetype_view3d()
   WM_menutype_add(MEM_new<MenuType>(__func__, ed::geometry::node_group_operator_assets_menu()));
   WM_menutype_add(
       MEM_new<MenuType>(__func__, ed::geometry::node_group_operator_assets_menu_unassigned()));
-  WM_menutype_add(MEM_new<MenuType>(__func__, view3d_maya_component_marking_menu()));
+  WM_menutype_add(MEM_new<MenuType>(__func__, view3d_clarity_component_marking_menu()));
+  MenuType legacy_clarity_component_menu = view3d_clarity_component_marking_menu();
+  STRNCPY_UTF8(legacy_clarity_component_menu.idname,
+               "VIEW3D_MT_maya_component_marking_menu");
+  WM_menutype_add(MEM_new<MenuType>(__func__, legacy_clarity_component_menu));
 
   BKE_spacetype_register(std::move(st));
 }

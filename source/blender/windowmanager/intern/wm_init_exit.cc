@@ -120,14 +120,18 @@
 
 namespace blender {
 
-static void wm_maya_interaction_defaults_ensure()
+static void wm_clarity_interaction_defaults_ensure()
 {
-  if (U.maya_interaction_defaults_initialized) {
+  if (U.interaction_preset == INTERACTION_PRESET_CLARITY && STREQ(U.keyconfigstr, "Maya")) {
+    STRNCPY(U.keyconfigstr, "Clarity");
+    U.runtime.is_dirty = true;
+  }
+  if (U.clarity_interaction_defaults_initialized) {
     return;
   }
-  U.interaction_preset = INTERACTION_PRESET_MAYA;
-  STRNCPY(U.keyconfigstr, "Maya");
-  U.maya_interaction_defaults_initialized = true;
+  U.interaction_preset = INTERACTION_PRESET_CLARITY;
+  STRNCPY(U.keyconfigstr, "Clarity");
+  U.clarity_interaction_defaults_initialized = true;
   U.runtime.is_dirty = true;
 
   if (G_MAIN == nullptr) {
@@ -135,8 +139,8 @@ static void wm_maya_interaction_defaults_ensure()
   }
   for (wmWindowManager &wm : G_MAIN->wm) {
     if (wm.runtime != nullptr) {
-      wm.runtime->maya_interaction_enabled = true;
-      wm.runtime->maya_interaction_revision++;
+      wm.runtime->clarity_interaction_enabled = true;
+      wm.runtime->clarity_interaction_revision++;
     }
   }
 }
@@ -337,7 +341,7 @@ void WM_init(bContext *C, int argc, const char **argv)
   wm_startup_trace("WM_INIT homefile read begin");
   wm_homefile_read_ex(C, &read_homefile_params, nullptr, &params_file_read_post);
   wm_startup_trace("WM_INIT homefile read end");
-  wm_maya_interaction_defaults_ensure();
+  wm_clarity_interaction_defaults_ensure();
 
   /* NOTE: leave `G_MAIN->filepath` set to an empty string since this
    * matches behavior after loading a new file. */

@@ -24,22 +24,22 @@ namespace blender::bke {
 
 WindowManagerRuntime::WindowManagerRuntime()
 {
-  this->maya_interaction_enabled = U.interaction_preset == INTERACTION_PRESET_MAYA;
-  /* #ed::maya::MayaToolID::Select, the tool a fresh runtime starts on. */
-  this->maya_tool = 1;
-  this->maya_snap_mode = 0;
-  this->maya_snap_temporary_mode = 0;
-  /* Maya's own defaults: relative steps of one unit and of 15 degrees. */
-  this->maya_snap_step_mode = 0;
-  this->maya_snap_step_size = 1.0f;
-  this->maya_snap_step_angle = DEG2RADF(15.0f);
-  /* Unlike Maya, the tolerance starts on: snapping the whole viewport away from the pointer is
-   * surprising, and Maya's own value is what it is turned on with. */
-  this->maya_snap_use_tolerance = true;
-  this->maya_snap_tolerance = 10;
-  /* Maya's own default angle tolerance for the Angle selection constraint. */
-  this->maya_selection_constraint_angle = DEG2RADF(45.0f);
-  this->maya_interaction_revision = 0;
+  this->clarity_interaction_enabled = U.interaction_preset == INTERACTION_PRESET_CLARITY;
+  /* #ed::clarity::ClarityToolID::Select, the tool a fresh runtime starts on. */
+  this->clarity_tool = 1;
+  this->clarity_snap_mode = 0;
+  this->clarity_snap_temporary_mode = 0;
+  /* Clarity's own defaults: relative steps of one unit and of 15 degrees. */
+  this->clarity_snap_step_mode = 0;
+  this->clarity_snap_step_size = 1.0f;
+  this->clarity_snap_step_angle = DEG2RADF(15.0f);
+  /* Unlike Clarity, the tolerance starts on: snapping the whole viewport away from the pointer is
+   * surprising, and Clarity's own value is what it is turned on with. */
+  this->clarity_snap_use_tolerance = true;
+  this->clarity_snap_tolerance = 10;
+  /* Clarity's own default angle tolerance for the Angle selection constraint. */
+  this->clarity_selection_constraint_angle = DEG2RADF(45.0f);
+  this->clarity_interaction_revision = 0;
   BKE_reports_init(&this->reports, RPT_STORE);
 }
 

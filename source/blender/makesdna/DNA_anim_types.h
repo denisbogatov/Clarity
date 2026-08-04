@@ -546,8 +546,8 @@ struct NlaTrack {
  * Path for use in KeyingSet definitions (ksp)
  *
  * Paths may be either specific (specifying the exact sub-ID
- * dynamic data-block - such as PoseChannels - to act upon, ala
- * Maya's 'Character Sets' and XSI's 'Marking Sets'), or they may
+ * dynamic data-block - such as PoseChannels - to act upon, as in
+ * character and marking sets from other DCC applications), or they may
  * be generic (using various placeholder template tags that will be
  * replaced with appropriate information from the context).
  */

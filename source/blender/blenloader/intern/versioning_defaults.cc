@@ -205,7 +205,7 @@ static void blo_update_defaults_screen(bScreen *screen,
     }
     else if (area.spacetype == SPACE_VIEW3D) {
       View3D *v3d = static_cast<View3D *>(area.spacedata.first);
-      /* Match Maya's default 54.43 degree horizontal angle of view. */
+      /* Use Clarity's default 54.43 degree horizontal angle of view. */
       v3d->lens = 35.0f;
       /* Screen space cavity by default for faster performance. */
       v3d->shading.cavity_type = V3D_SHADING_CAVITY_CURVATURE;
@@ -232,7 +232,7 @@ static void blo_update_defaults_screen(bScreen *screen,
       v3d->overlay.normals_constant_screen_size = 7.0f;
       /* Always enable Grease Pencil vertex color overlay by default. */
       v3d->overlay.gpencil_vertex_paint_opacity = 1.0f;
-      /* Show Maya-style polygon statistics in every factory-default viewport. */
+      /* Show Clarity polygon statistics in every factory-default viewport. */
       v3d->overlay.flag |= V3D_OVERLAY_STATS;
       /* Always use theme color for wireframe by default. */
       v3d->shading.wire_color_type = V3D_SHADING_SINGLE_COLOR;

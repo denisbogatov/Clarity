@@ -38,7 +38,7 @@ void main()
     out_color = float4(0.0f, 0.0f, 0.0f, 1.0f);
   }
   else if (flag_test(grid_flag, GRID_FINITE)) {
-    /* Linear-light equivalent of Maya's sRGB #404040 grid color. */
+    /* Linear-light equivalent of Clarity's sRGB #404040 grid color. */
     out_color = float4(float3(0.05126946f), 1.0f);
   }
   else if (axis_mask.x) {
@@ -56,7 +56,7 @@ void main()
 
   /* Fragment alpha. */
   out_color.a *= vertex_out_flat.alpha;
-  /* Keep the 3D viewport grid crisp like Maya: it has a finite, hard boundary and does not
+  /* Keep the 3D viewport grid crisp like Clarity: it has a finite, hard boundary and does not
    * disappear with distance or viewing angle. The image editor still needs its edge fade for
    * very small UV units. */
   if (flag_test(grid_flag, GRID_SIMA)) {

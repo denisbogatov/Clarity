@@ -24,7 +24,7 @@
 
 #include "ED_clip.hh"
 #include "ED_image.hh"
-#include "ED_maya.hh"
+#include "ED_clarity.hh"
 #include "ED_screen.hh"
 #include "ED_space_api.hh"
 #include "ED_uvedit.hh"
@@ -77,7 +77,7 @@ void transform_view_vector_calc(const TransInfo *t, const float focus[3], float 
 
 bool transdata_check_local_islands(TransInfo *t, short around)
 {
-  if (t->options & (CTX_CURSOR | CTX_TEXTURE_SPACE | CTX_MAYA_PIVOT)) {
+  if (t->options & (CTX_CURSOR | CTX_TEXTURE_SPACE | CTX_CLARITY_PIVOT)) {
     return false;
   }
   return ((around == V3D_AROUND_LOCAL_ORIGINS) &&
@@ -1988,10 +1988,10 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
   t->state = TRANS_STARTING;
 
-  if ((prop = RNA_struct_find_property(op->ptr, "maya_pivot_transform")) &&
+  if ((prop = RNA_struct_find_property(op->ptr, "clarity_pivot_transform")) &&
       RNA_property_is_set(op->ptr, prop) && RNA_property_boolean_get(op->ptr, prop))
   {
-    options |= CTX_MAYA_PIVOT;
+    options |= CTX_CLARITY_PIVOT;
   }
 
   if ((prop = RNA_struct_find_property(op->ptr, "cursor_transform")) &&
@@ -2256,19 +2256,19 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
 void transformApply(bContext *C, TransInfo *t)
 {
-  const bool maya_debug = ED_maya_navigation_debug_active(C);
-  const double apply_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+  const bool clarity_debug = ED_clarity_navigation_debug_active(C);
+  const double apply_start = clarity_debug ? BLI_time_now_seconds() : 0.0;
   t->context = C;
 
   if (t->redraw == TREDRAW_HARD) {
     selectConstraint(t);
     if (t->mode_info) {
-      const double geometry_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+      const double geometry_start = clarity_debug ? BLI_time_now_seconds() : 0.0;
       t->mode_info->transform_fn(t); /* Calls #recalc_data(). */
-      if (maya_debug) {
-        ED_maya_navigation_debug_stage_sample(
+      if (clarity_debug) {
+        ED_clarity_navigation_debug_stage_sample(
             C,
-            ed::maya::MayaNavigationDebugStage::GeometryUpdate,
+            ed::clarity::ClarityNavigationDebugStage::GeometryUpdate,
             (BLI_time_now_seconds() - geometry_start) * 1000.0);
       }
     }
@@ -2286,10 +2286,10 @@ void transformApply(bContext *C, TransInfo *t)
   }
 
   t->context = nullptr;
-  if (maya_debug) {
-    ED_maya_navigation_debug_stage_sample(
+  if (clarity_debug) {
+    ED_clarity_navigation_debug_stage_sample(
         C,
-        ed::maya::MayaNavigationDebugStage::TransformApply,
+        ed::clarity::ClarityNavigationDebugStage::TransformApply,
         (BLI_time_now_seconds() - apply_start) * 1000.0);
   }
 }

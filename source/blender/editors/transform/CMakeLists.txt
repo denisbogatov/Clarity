@@ -25,7 +25,7 @@ set(SRC
   transform_convert_grease_pencil.cc
   transform_convert_lattice.cc
   transform_convert_mask.cc
-  transform_convert_maya_pivot.cc
+  transform_convert_clarity_pivot.cc
   transform_convert_mball.cc
   transform_convert_mesh.cc
   transform_convert_mesh_edge.cc
@@ -103,11 +103,11 @@ set(SRC
   transform_convert.hh
   transform_draw_cursors.hh
   transform_gizmo.hh
-  transform_gizmo_maya_cache.hh
+  transform_gizmo_clarity_cache.hh
   transform_mode.hh
   transform_orientations.hh
   transform_snap.hh
-  transform_snap_maya.hh
+  transform_snap_clarity.hh
   transform_snap_object.hh
 )
 
@@ -120,7 +120,7 @@ set(LIB
   PRIVATE bf::bmesh
   PRIVATE bf::depsgraph
   PRIVATE bf::dna
-  bf_editor_maya
+  bf_editor_clarity
   bf_editor_mask
   PRIVATE bf::gpu
   PRIVATE bf::imbuf

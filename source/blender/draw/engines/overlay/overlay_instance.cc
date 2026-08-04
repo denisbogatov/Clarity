@@ -265,7 +265,7 @@ void Resources::update_theme_settings(const DRWContext *ctx, const State &state)
   ui::theme::get_color_4fv(TH_VERTEX, gb.colors.vert);
   ui::theme::get_color_4fv(TH_VERTEX_SELECT, gb.colors.vert_select);
   ui::theme::get_color_4fv(TH_VERTEX_UNREFERENCED, gb.colors.vert_unreferenced);
-  /* Maya component display: cyan unselected vertices and polygon centers. */
+  /* Clarity component display: cyan unselected vertices and polygon centers. */
   gb.colors.vert = rgba_uchar_to_float(0x64, 0xDC, 0xFF, 0xFF);
   gb.colors.vert_missing_data = rgba_uchar_to_float(0xB0, 0x00, 0xB0, 0xFF);
   ui::theme::get_color_4fv(TH_EDITMESH_ACTIVE, gb.colors.edit_mesh_active);
@@ -477,7 +477,7 @@ void Instance::begin_sync()
   motion_paths.begin_sync(resources, state);
   origins.begin_sync(resources, state);
   outline.begin_sync(resources, state);
-  maya_pivot_snap_preview.begin_sync(resources, state);
+  clarity_pivot_snap_preview.begin_sync(resources, state);
 
   auto begin_sync_layer = [&](OverlayLayer &layer) {
     layer.armatures.begin_sync(resources, state);
@@ -532,7 +532,7 @@ void Instance::object_sync(ObjectRef &ob_ref, Manager &manager)
 
   OverlayLayer &layer = object_is_in_front(ob_ref.object, state) ? infront : regular;
 
-  maya_pivot_snap_preview.object_sync(manager, ob_ref, resources, state);
+  clarity_pivot_snap_preview.object_sync(manager, ob_ref, resources, state);
   layer.mode_transfer.object_sync(manager, ob_ref, resources, state);
 
   if (needs_prepass) {
@@ -632,14 +632,14 @@ void Instance::object_sync(ObjectRef &ob_ref, Manager &manager)
     switch (ob_ref.object->type) {
       case OB_MESH:
         if (!in_edit_mode) {
-          if (maya_face_centers_visible(*ob_ref.object)) {
+          if (clarity_face_centers_visible(*ob_ref.object)) {
             Mesh &mesh = DRW_object_get_data_for_drawing<Mesh>(*ob_ref.object);
             const Span<float3> positions = mesh.vert_positions();
             const OffsetIndices faces = mesh.faces();
             const Span<int> corner_verts = mesh.corner_verts();
             const float4x4 &object_to_world = ob_ref.object->object_to_world();
             float4 center_color = resources.theme.colors.vert;
-            /* Negative alpha marks Maya face centers for the shared loose-point shader. */
+            /* Negative alpha marks Clarity face centers for the shared loose-point shader. */
             center_color.w = -1.0f;
 
             for (const int face : faces.index_range()) {
@@ -712,7 +712,7 @@ void Instance::object_sync(ObjectRef &ob_ref, Manager &manager)
 void Instance::end_sync()
 {
   origins.end_sync(resources, state);
-  maya_pivot_snap_preview.end_sync(resources, state);
+  clarity_pivot_snap_preview.end_sync(resources, state);
   resources.end_sync();
 
   auto end_sync_layer = [&](OverlayLayer &layer) {
@@ -1002,7 +1002,7 @@ void Instance::draw_v3d(Manager &manager, View &view)
 
     regular.meshes.draw_line(resources.overlay_line_fb, manager, view);
     infront.meshes.draw_line(resources.overlay_line_in_front_fb, manager, view);
-    maya_pivot_snap_preview.draw_line(maya_pivot_snap_preview.is_in_front() ?
+    clarity_pivot_snap_preview.draw_line(clarity_pivot_snap_preview.is_in_front() ?
                                           resources.overlay_line_in_front_fb :
                                           resources.overlay_line_fb,
                                       manager,

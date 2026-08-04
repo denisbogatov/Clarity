@@ -47,7 +47,7 @@ static float verts_plane[4][3] = {
 
 /**
  * Inner marks of #ED_GIZMO_PRIMITIVE_STYLE_PLANE_CIRCLE, in units of the plane's half width. Both
- * sit inside the plane, matching the proportions of Maya's Edit Pivot centre handle.
+ * sit inside the plane, matching the proportions of Clarity's Edit Pivot centre handle.
  */
 static float verts_diamond[4][3] = {
     {-0.3f, 0, 0},

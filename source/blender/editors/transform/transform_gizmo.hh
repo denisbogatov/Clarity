@@ -83,47 +83,47 @@ enum {
 /**
  * Whether \a axis_idx is still drawn while \a axis_idx_active is being dragged.
  *
- * Maya keeps the whole manipulator on screen for the duration of the drag, so a handle that was
+ * Clarity keeps the whole manipulator on screen for the duration of the drag, so a handle that was
  * visible stays visible; Blender shows only the dragged handle, plus the translate arrows as a
  * visual reference. \a visible_before_drag keeps the handles that the view-alignment rules had
  * already hidden out of the way.
  */
-bool gizmo_3d_axis_visible_during_drag(bool use_maya_style,
+bool gizmo_3d_axis_visible_during_drag(bool use_clarity_style,
                                        int axis_idx_active,
                                        int axis_idx,
                                        bool visible_before_drag);
 
 /**
- * Draw style (`ED_GIZMO_PRIMITIVE_STYLE_*`) of the translate center handle. Maya draws a square
+ * Draw style (`ED_GIZMO_PRIMITIVE_STYLE_*`) of the translate center handle. Clarity draws a square
  * that becomes a circle for the duration of the drag; Blender draws a circle either way.
  *
  * Edit Pivot is the exception: the square with a diamond and a circle is the indicator that the mode
  * is on, so it is drawn as long as the mode lasts, the drag included.
  */
-int gizmo_3d_translate_center_style_get(bool use_maya_style, bool is_dragging, bool is_edit_pivot);
+int gizmo_3d_translate_center_style_get(bool use_clarity_style, bool is_dragging, bool is_edit_pivot);
 
 /**
  * Manipulator layout of the mode, from the layout the active tool asks for.
  *
- * Edit Pivot adds the rotation rings on top of it, the way Maya's pivot manipulator does, and a tool
+ * Edit Pivot adds the rotation rings on top of it, the way Clarity's pivot manipulator does, and a tool
  * with no manipulator of its own still gets the translate handles to drag the pivot by.
  */
-int gizmo_3d_twtype_resolve(bool maya_edit_pivot, int tool_twtype);
+int gizmo_3d_twtype_resolve(bool clarity_edit_pivot, int tool_twtype);
 
 /**
  * Layout the translate handles are drawn with.
  *
- * Maya's pivot manipulator puts the rotation rings *around* the Move handles without touching them.
+ * Clarity's pivot manipulator puts the rotation rings *around* the Move handles without touching them.
  * Feeding the rings to the translate handles is what shortened the arrows, took their stems away and
  * hid the plane handles, which made turning the mode on look like the manipulator was rebuilt.
  */
-int gizmo_3d_translate_layout_twtype_get(bool use_maya_style, int twtype);
+int gizmo_3d_translate_layout_twtype_get(bool use_clarity_style, int twtype);
 
 /**
- * Draw style (`ED_GIZMO_PRIMITIVE_STYLE_*`) of the scale center handle. Maya draws a cube that the
+ * Draw style (`ED_GIZMO_PRIMITIVE_STYLE_*`) of the scale center handle. Clarity draws a cube that the
  * drag keeps, Blender an annulus that the drag turns into a circle.
  */
-int gizmo_3d_scale_center_style_get(bool use_maya_style, bool is_dragging);
+int gizmo_3d_scale_center_style_get(bool use_clarity_style, bool is_dragging);
 
 void gizmo_prepare_mat(const bContext *C, RegionView3D *rv3d, const TransformBounds *tbounds);
 void gizmo_xform_message_subscribe(wmGizmoGroup *gzgroup,

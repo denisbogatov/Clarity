@@ -37,7 +37,7 @@
 #include "ED_lattice.hh"
 #include "ED_markers.hh"
 #include "ED_mask.hh"
-#include "ED_maya.hh"
+#include "ED_clarity.hh"
 #include "ED_mball.hh"
 #include "ED_mesh.hh"
 #include "ED_node.hh"
@@ -103,7 +103,7 @@ void ED_spacetypes_init()
   object::operatortypes_object();
   ED_operatortypes_lattice();
   ED_operatortypes_mesh();
-  ED_operatortypes_maya();
+  ED_operatortypes_clarity();
   geometry::operatortypes_geometry();
   sculpt_paint::operatortypes_sculpt();
   ED_operatortypes_sculpt_curves();

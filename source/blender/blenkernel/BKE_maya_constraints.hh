@@ -4,65 +4,49 @@
 
 #pragma once
 
-#include <optional>
+/** Deprecated compatibility layer. New code must include `BKE_clarity_constraints.hh`. */
 
-#include "DNA_object_types.h"
-
-#include "BLI_math_matrix_types.hh"
-#include "BLI_math_vector_types.hh"
+#include "BKE_clarity_constraints.hh"
 
 namespace blender {
 
-struct Depsgraph;
-struct Object;
-struct Scene;
-
-enum eMayaTransformChannel {
-  MAYA_TRANSFORM_CHANNEL_TRANSLATION = 0,
-  MAYA_TRANSFORM_CHANNEL_ROTATION = 1,
-  MAYA_TRANSFORM_CHANNEL_SCALE = 2,
-};
-
-struct MayaConstraintChannelOutput {
-  std::optional<double3> translation;
-  std::optional<double3> rotation;
-  std::optional<double3> scale;
-  bool translation_mask[3] = {};
-  bool rotation_mask[3] = {};
-  bool scale_mask[3] = {};
-};
-
-struct MayaConstraintEvalContext {
-  Object &object;
-  const double4x4 &parent_effect;
-};
-
-MayaConstraint *BKE_maya_constraint_add(Object &object,
-                                         eMayaConstraintType type,
-                                         const char *name);
-MayaConstraintTarget *BKE_maya_constraint_target_add(MayaConstraint &constraint,
-                                                      Object &target,
-                                                      double weight);
-bool BKE_maya_constraint_maintain_offset_set(Object &object,
-                                             MayaConstraint &constraint,
-                                             bool enabled);
-void BKE_maya_constraint_remove(Object &object, MayaConstraint &constraint);
-void BKE_maya_constraints_clear(Object &object);
-
-double3 BKE_maya_constraint_target_pivot_world_get(const Object &target);
-bool BKE_maya_point_constraint_evaluate(const MayaConstraint &constraint,
-                                        const MayaConstraintEvalContext &context,
-                                        MayaConstraintChannelOutput &r_output);
-void BKE_maya_constraint_output_apply(Object &object,
-                                      const MayaConstraintChannelOutput &output);
-
-void BKE_object_eval_maya_channels_init(Depsgraph *depsgraph, Object *object);
-void BKE_object_eval_maya_constraints(Depsgraph *depsgraph, Scene *scene, Object *object);
-void BKE_object_eval_maya_local_transform(Depsgraph *depsgraph, Object *object);
-void BKE_object_maya_evaluated_channels_invalidate(Object &object);
-
-bool BKE_object_maya_channel_is_driven(const Object &object,
-                                       eMayaTransformChannel channel,
-                                       int axis);
+using MayaConstraint = ClarityConstraint;
+using MayaConstraintTarget = ClarityConstraintTarget;
+using MayaAimConstraintSettings = ClarityAimConstraintSettings;
+using eMayaConstraintType = eClarityConstraintType;
+using eMayaWorldUpType = eClarityWorldUpType;
+using eMayaTransformChannel = eClarityTransformChannel;
 
 }  // namespace blender
+
+#define MAYA_CONSTRAINT_POINT CLARITY_CONSTRAINT_POINT
+#define MAYA_CONSTRAINT_ORIENT CLARITY_CONSTRAINT_ORIENT
+#define MAYA_CONSTRAINT_SCALE CLARITY_CONSTRAINT_SCALE
+#define MAYA_CONSTRAINT_PARENT CLARITY_CONSTRAINT_PARENT
+#define MAYA_CONSTRAINT_AIM CLARITY_CONSTRAINT_AIM
+
+#define MAYA_WORLD_UP_SCENE CLARITY_WORLD_UP_SCENE
+#define MAYA_WORLD_UP_OBJECT CLARITY_WORLD_UP_OBJECT
+#define MAYA_WORLD_UP_OBJECT_ROTATION CLARITY_WORLD_UP_OBJECT_ROTATION
+#define MAYA_WORLD_UP_VECTOR CLARITY_WORLD_UP_VECTOR
+#define MAYA_WORLD_UP_NONE CLARITY_WORLD_UP_NONE
+
+#define MAYA_TRANSFORM_CHANNEL_TRANSLATION CLARITY_TRANSFORM_CHANNEL_TRANSLATION
+#define MAYA_TRANSFORM_CHANNEL_ROTATION CLARITY_TRANSFORM_CHANNEL_ROTATION
+#define MAYA_TRANSFORM_CHANNEL_SCALE CLARITY_TRANSFORM_CHANNEL_SCALE
+
+#define BKE_maya_constraint_add BKE_clarity_constraint_add
+#define BKE_maya_constraint_maintain_offset_set BKE_clarity_constraint_maintain_offset_set
+#define BKE_maya_constraint_output_apply BKE_clarity_constraint_output_apply
+#define BKE_maya_constraint_remove BKE_clarity_constraint_remove
+#define BKE_maya_constraint_target_add BKE_clarity_constraint_target_add
+#define BKE_maya_constraint_target_pivot_world_get \
+  BKE_clarity_constraint_target_pivot_world_get
+#define BKE_maya_constraints_clear BKE_clarity_constraints_clear
+#define BKE_maya_point_constraint_evaluate BKE_clarity_point_constraint_evaluate
+
+#define BKE_object_eval_maya_channels_init BKE_object_eval_clarity_channels_init
+#define BKE_object_eval_maya_local_transform BKE_object_eval_clarity_local_transform
+#define BKE_object_maya_evaluated_channels_invalidate \
+  BKE_object_clarity_evaluated_channels_invalidate
+#define BKE_object_maya_channel_is_driven BKE_object_clarity_channel_is_driven

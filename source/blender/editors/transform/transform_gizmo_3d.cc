@@ -53,7 +53,7 @@
 #include "ED_gizmo_utils.hh"
 #include "ED_gpencil_legacy.hh"
 #include "ED_grease_pencil.hh"
-#include "ED_maya.hh"
+#include "ED_clarity.hh"
 #include "ED_object.hh"
 #include "ED_particle.hh"
 #include "ED_screen.hh"
@@ -69,7 +69,7 @@
 #include "transform.hh"
 #include "transform_convert.hh"
 #include "transform_gizmo.hh"
-#include "transform_gizmo_maya_cache.hh"
+#include "transform_gizmo_clarity_cache.hh"
 #include "transform_snap.hh"
 
 namespace blender::ed::transform {
@@ -79,12 +79,12 @@ static wmGizmoGroupType *g_GGT_xform_gizmo_context = nullptr;
 
 /**
  * Diagnostic trace of every path that can take the manipulator off screen, enabled by setting the
- * `BLENDER_MAYA_GIZMO_TRACE` environment variable. Temporary: remove once the Maya manipulator
+ * `BLENDER_CLARITY_GIZMO_TRACE` environment variable. Temporary: remove once the Clarity manipulator
  * lifecycle is settled.
  */
 static bool gizmo_trace_enabled()
 {
-  return ED_maya_gizmo_trace_enabled();
+  return ED_clarity_gizmo_trace_enabled();
 }
 
 #define GIZMO_TRACE(...) \
@@ -146,9 +146,9 @@ struct GizmoGroup {
   int twtype_init;
   int twtype_prev;
   int use_twtype_refresh;
-  bool use_maya_center_style;
-  bool use_maya_edit_pivot_style;
-  MayaGizmoStyleCache maya_style_cache;
+  bool use_clarity_center_style;
+  bool use_clarity_edit_pivot_style;
+  ClarityGizmoStyleCache clarity_style_cache;
 
   /* Only for view orientation. */
   struct {
@@ -199,7 +199,7 @@ static short gizmo_get_axis_type(const int axis_idx)
   return -1;
 }
 
-bool gizmo_3d_axis_visible_during_drag(const bool use_maya_style,
+bool gizmo_3d_axis_visible_during_drag(const bool use_clarity_style,
                                        const int axis_idx_active,
                                        const int axis_idx,
                                        const bool visible_before_drag)
@@ -213,15 +213,15 @@ bool gizmo_3d_axis_visible_during_drag(const bool use_maya_style,
   {
     return true;
   }
-  /* Maya never takes the manipulator apart while it is used. */
-  return use_maya_style && visible_before_drag;
+  /* Clarity never takes the manipulator apart while it is used. */
+  return use_clarity_style && visible_before_drag;
 }
 
-int gizmo_3d_translate_center_style_get(const bool use_maya_style,
+int gizmo_3d_translate_center_style_get(const bool use_clarity_style,
                                        const bool is_dragging,
                                        const bool is_edit_pivot)
 {
-  if (!use_maya_style) {
+  if (!use_clarity_style) {
     return ED_GIZMO_PRIMITIVE_STYLE_CIRCLE;
   }
   if (is_edit_pivot) {
@@ -231,9 +231,9 @@ int gizmo_3d_translate_center_style_get(const bool use_maya_style,
   return is_dragging ? ED_GIZMO_PRIMITIVE_STYLE_CIRCLE : ED_GIZMO_PRIMITIVE_STYLE_PLANE;
 }
 
-int gizmo_3d_twtype_resolve(const bool maya_edit_pivot, const int tool_twtype)
+int gizmo_3d_twtype_resolve(const bool clarity_edit_pivot, const int tool_twtype)
 {
-  if (!maya_edit_pivot) {
+  if (!clarity_edit_pivot) {
     return tool_twtype;
   }
   /* A tool without a manipulator of its own still has to offer the pivot handles. */
@@ -241,17 +241,17 @@ int gizmo_3d_twtype_resolve(const bool maya_edit_pivot, const int tool_twtype)
   return base | V3D_GIZMO_SHOW_OBJECT_ROTATE;
 }
 
-int gizmo_3d_translate_layout_twtype_get(const bool use_maya_style, const int twtype)
+int gizmo_3d_translate_layout_twtype_get(const bool use_clarity_style, const int twtype)
 {
-  if (!use_maya_style) {
+  if (!use_clarity_style) {
     return twtype;
   }
   return twtype & ~V3D_GIZMO_SHOW_OBJECT_ROTATE;
 }
 
-int gizmo_3d_scale_center_style_get(const bool use_maya_style, const bool is_dragging)
+int gizmo_3d_scale_center_style_get(const bool use_clarity_style, const bool is_dragging)
 {
-  if (use_maya_style) {
+  if (use_clarity_style) {
     return ED_GIZMO_PRIMITIVE_STYLE_CUBE;
   }
   return is_dragging ? ED_GIZMO_PRIMITIVE_STYLE_CIRCLE : ED_GIZMO_PRIMITIVE_STYLE_ANNULUS;
@@ -377,12 +377,12 @@ static bool gizmo_is_axis_visible(const RegionView3D *rv3d,
 
 static void gizmo_get_axis_color(const int axis_idx,
                                  const float idot[3],
-                                 const bool use_maya_palette,
+                                 const bool use_clarity_palette,
                                  float r_col[4],
                                  float r_col_hi[4])
 {
   /* Alpha values for normal/highlighted states. */
-  const float alpha = use_maya_palette ? 1.0f : 0.6f;
+  const float alpha = use_clarity_palette ? 1.0f : 0.6f;
   const float alpha_hi = 1.0f;
   float alpha_fac;
 
@@ -418,7 +418,7 @@ static void gizmo_get_axis_color(const int axis_idx,
     case MAN_AXIS_SCALE_X:
     case MAN_AXIS_TRANS_YZ:
     case MAN_AXIS_SCALE_YZ:
-      if (use_maya_palette) {
+      if (use_clarity_palette) {
         ARRAY_SET_ITEMS(r_col, 1.0f, 0.0f, 0.0f, 1.0f);
       }
       else {
@@ -430,7 +430,7 @@ static void gizmo_get_axis_color(const int axis_idx,
     case MAN_AXIS_SCALE_Y:
     case MAN_AXIS_TRANS_ZX:
     case MAN_AXIS_SCALE_ZX:
-      if (use_maya_palette) {
+      if (use_clarity_palette) {
         ARRAY_SET_ITEMS(r_col, 0.0f, 1.0f, 0.0f, 1.0f);
       }
       else {
@@ -442,7 +442,7 @@ static void gizmo_get_axis_color(const int axis_idx,
     case MAN_AXIS_SCALE_Z:
     case MAN_AXIS_TRANS_XY:
     case MAN_AXIS_SCALE_XY:
-      if (use_maya_palette) {
+      if (use_clarity_palette) {
         ARRAY_SET_ITEMS(r_col, 0.0f, 0.0f, 1.0f, 1.0f);
       }
       else {
@@ -451,8 +451,8 @@ static void gizmo_get_axis_color(const int axis_idx,
       break;
     case MAN_AXIS_ROT_C:
     case MAN_AXIS_ROT_T:
-      if (use_maya_palette) {
-        /* Sampled from Maya's view aligned circle. */
+      if (use_clarity_palette) {
+        /* Sampled from Clarity's view aligned circle. */
         ARRAY_SET_ITEMS(r_col, 0.34f, 0.86f, 1.0f, 1.0f);
       }
       else {
@@ -461,7 +461,7 @@ static void gizmo_get_axis_color(const int axis_idx,
       break;
     case MAN_AXIS_TRANS_C:
     case MAN_AXIS_SCALE_C:
-      if (use_maya_palette) {
+      if (use_clarity_palette) {
         ARRAY_SET_ITEMS(r_col, 1.0f, 1.0f, 0.0f, 1.0f);
       }
       else {
@@ -471,7 +471,7 @@ static void gizmo_get_axis_color(const int axis_idx,
   }
 
   r_col[3] = alpha * alpha_fac;
-  if (use_maya_palette) {
+  if (use_clarity_palette) {
     ARRAY_SET_ITEMS(r_col_hi, 1.0f, 1.0f, 0.0f, alpha_hi * alpha_fac);
   }
   else {
@@ -1103,17 +1103,17 @@ int calc_gizmo_stats(const bContext *C,
 
   reset_tw_center(tbounds);
 
-  /* The Maya pivot override owns #RegionView3D::twmat while it is active. */
-  float maya_pivot_matrix[4][4];
-  const bool maya_pivot_override = rv3d != nullptr &&
-                                   ED_maya_pivot_custom_matrix_get(
-                                       C, ed::maya::MayaPivotUsage::Display, maya_pivot_matrix);
+  /* The Clarity pivot override owns #RegionView3D::twmat while it is active. */
+  float clarity_pivot_matrix[4][4];
+  const bool clarity_pivot_override = rv3d != nullptr &&
+                                   ED_clarity_pivot_custom_matrix_get(
+                                       C, ed::clarity::ClarityPivotUsage::Display, clarity_pivot_matrix);
 
   if (rv3d) {
-    /* Transform widget centroid/center. Not while a Maya pivot override is placing the
+    /* Transform widget centroid/center. Not while a Clarity pivot override is placing the
      * manipulator: this runs on every gizmo statistics pass, and overwriting the matrix here made
      * the pivot manipulator jump back to the selection centre on those frames. */
-    if (!maya_pivot_override) {
+    if (!clarity_pivot_override) {
       copy_m4_m3(rv3d->twmat, tbounds->axis);
     }
     rv3d->twdrawflag = short(0xFFFF);
@@ -1158,7 +1158,7 @@ int calc_gizmo_stats(const bContext *C,
 
   if (rv3d) {
     if (totsel == 0) {
-      if (!maya_pivot_override) {
+      if (!clarity_pivot_override) {
         unit_m4(rv3d->twmat);
       }
       unit_m3(rv3d->tw_axis_matrix);
@@ -1260,7 +1260,7 @@ static bool gizmo_3d_calc_pos(const bContext *C,
 
 void gizmo_prepare_mat(const bContext *C, RegionView3D *rv3d, const TransformBounds *tbounds)
 {
-  if (ED_maya_pivot_custom_matrix_get(C, ed::maya::MayaPivotUsage::Display, rv3d->twmat)) {
+  if (ED_clarity_pivot_custom_matrix_get(C, ed::clarity::ClarityPivotUsage::Display, rv3d->twmat)) {
     return;
   }
   Scene *scene = CTX_data_scene(C);
@@ -1867,10 +1867,10 @@ static wmOperatorStatus gizmo_modal(bContext *C,
             "incremental_angle",
             transform_snap_increment_get(static_cast<const TransInfo *>(op->customdata)));
 
-        /* Maya turns the manipulator with the rotation instead of leaving it behind until the button
+        /* Clarity turns the manipulator with the rotation instead of leaving it behind until the button
          * is released. The dragged dial keeps the matrix its drag was set up with — that one carries
          * the angle feedback — so only the other handles follow. */
-        if (ggd->use_maya_center_style &&
+        if (ggd->use_clarity_center_style &&
             transform_apply_matrix(static_cast<TransInfo *>(op->customdata), twmat))
         {
           MAN_ITER_AXES_BEGIN (axis, axis_idx_other) {
@@ -1961,7 +1961,7 @@ static void gizmogroup_init_properties_from_twtype(wmGizmoGroup *gzgroup)
     }
   }
   MAN_ITER_AXES_END;
-  ggd->maya_style_cache.invalidate();
+  ggd->clarity_style_cache.invalidate();
 }
 
 static void WIDGETGROUP_gizmo_setup(const bContext *C, wmGizmoGroup *gzgroup)
@@ -2094,7 +2094,7 @@ static void gizmogroup_refresh_from_matrix(wmGizmoGroup *gzgroup,
  * The manipulator is one system: every pass that can change its appearance recomputes the same two
  * inputs. Style transitions apply atomically; unchanged draws stop at the cache.
  */
-static bool gizmogroup_maya_style_calc(const wmGizmoGroup *gzgroup, const View3D *v3d)
+static bool gizmogroup_clarity_style_calc(const wmGizmoGroup *gzgroup, const View3D *v3d)
 {
   return gzgroup->type == g_GGT_xform_gizmo_context && (v3d->gizmo_flag & V3D_GIZMO_HIDE_TOOL) != 0;
 }
@@ -2103,54 +2103,54 @@ static bool gizmogroup_maya_style_calc(const wmGizmoGroup *gzgroup, const View3D
 static int gizmogroup_twtype_calc(const bContext *C,
                                   const GizmoGroup *ggd,
                                   const View3D *v3d,
-                                  bool *r_maya_edit_pivot)
+                                  bool *r_clarity_edit_pivot)
 {
-  const bool maya_edit_pivot = ED_maya_pivot_edit_target_get(C) !=
-                               ed::maya::MayaPivotEditTarget::None;
-  if (r_maya_edit_pivot != nullptr) {
-    *r_maya_edit_pivot = maya_edit_pivot;
+  const bool clarity_edit_pivot = ED_clarity_pivot_edit_target_get(C) !=
+                               ed::clarity::ClarityPivotEditTarget::None;
+  if (r_clarity_edit_pivot != nullptr) {
+    *r_clarity_edit_pivot = clarity_edit_pivot;
   }
-  return gizmo_3d_twtype_resolve(maya_edit_pivot, v3d->gizmo_show_object & ggd->twtype_init);
+  return gizmo_3d_twtype_resolve(clarity_edit_pivot, v3d->gizmo_show_object & ggd->twtype_init);
 }
 
-static void gizmogroup_apply_maya_center_style(GizmoGroup *ggd,
-                                               const bool use_maya_style,
+static void gizmogroup_apply_clarity_center_style(GizmoGroup *ggd,
+                                               const bool use_clarity_style,
                                                const bool use_edit_pivot_style)
 {
-  if (!ggd->maya_style_cache.update_needed(use_maya_style, use_edit_pivot_style, ggd->twtype)) {
+  if (!ggd->clarity_style_cache.update_needed(use_clarity_style, use_edit_pivot_style, ggd->twtype)) {
     return;
   }
 
   wmGizmo *translate_center = ggd->gizmos[MAN_AXIS_TRANS_C];
   RNA_enum_set(translate_center->ptr,
                "draw_style",
-               gizmo_3d_translate_center_style_get(use_maya_style, false, use_edit_pivot_style));
+               gizmo_3d_translate_center_style_get(use_clarity_style, false, use_edit_pivot_style));
   RNA_boolean_set(translate_center->ptr, "draw_inner", false);
 
   wmGizmo *scale_center = ggd->gizmos[MAN_AXIS_SCALE_C];
   RNA_enum_set(scale_center->ptr,
                "draw_style",
-               gizmo_3d_scale_center_style_get(use_maya_style, false));
+               gizmo_3d_scale_center_style_get(use_clarity_style, false));
   RNA_boolean_set(scale_center->ptr, "draw_inner", false);
-  WM_gizmo_set_scale(scale_center, use_maya_style ? 0.065f : 0.2f);
+  WM_gizmo_set_scale(scale_center, use_clarity_style ? 0.065f : 0.2f);
   if (wmGizmoOpElem *gzop = WM_gizmo_operator_get(scale_center, 0)) {
-    RNA_float_set(&gzop->ptr, "mouse_sensitivity", use_maya_style ? 0.2f : 1.0f);
+    RNA_float_set(&gzop->ptr, "mouse_sensitivity", use_clarity_style ? 0.2f : 1.0f);
   }
 
   /* The rings Edit Pivot adds surround the translate handles instead of rearranging them. */
-  const int translate_twtype = gizmo_3d_translate_layout_twtype_get(use_maya_style, ggd->twtype);
+  const int translate_twtype = gizmo_3d_translate_layout_twtype_get(use_clarity_style, ggd->twtype);
   for (int axis_idx = MAN_AXIS_RANGE_TRANS_START; axis_idx < MAN_AXIS_RANGE_TRANS_END; axis_idx++) {
     gizmo_3d_setup_draw_from_twtype(ggd->gizmos[axis_idx], axis_idx, translate_twtype);
   }
-  /* Maya draws the whole ring, not just the half facing the view, and draws it thin: measured on the
+  /* Clarity draws the whole ring, not just the half facing the view, and draws it thin: measured on the
    * reference capture the rings are about two pixels and the axis stems one, against Blender's three
    * and two. */
   for (int axis_idx = MAN_AXIS_ROT_X; axis_idx <= MAN_AXIS_ROT_Z; axis_idx++) {
     RNA_enum_set(ggd->gizmos[axis_idx]->ptr,
                  "draw_options",
-                 use_maya_style ? 0 : ED_GIZMO_DIAL_DRAW_FLAG_CLIP);
+                 use_clarity_style ? 0 : ED_GIZMO_DIAL_DRAW_FLAG_CLIP);
     WM_gizmo_set_line_width(ggd->gizmos[axis_idx],
-                            use_maya_style ? GIZMO_AXIS_LINE_WIDTH :
+                            use_clarity_style ? GIZMO_AXIS_LINE_WIDTH :
                                              GIZMO_AXIS_LINE_WIDTH + 1.0f);
   }
   for (const int axis_idx : {MAN_AXIS_TRANS_X,
@@ -2161,12 +2161,12 @@ static void gizmogroup_apply_maya_center_style(GizmoGroup *ggd,
                              MAN_AXIS_SCALE_Z})
   {
     WM_gizmo_set_line_width(ggd->gizmos[axis_idx],
-                            use_maya_style ? 1.0f : GIZMO_AXIS_LINE_WIDTH);
+                            use_clarity_style ? 1.0f : GIZMO_AXIS_LINE_WIDTH);
   }
 
-  ggd->use_maya_center_style = use_maya_style;
-  ggd->use_maya_edit_pivot_style = use_edit_pivot_style;
-  ggd->maya_style_cache.mark_applied(use_maya_style, use_edit_pivot_style, ggd->twtype);
+  ggd->use_clarity_center_style = use_clarity_style;
+  ggd->use_clarity_edit_pivot_style = use_edit_pivot_style;
+  ggd->clarity_style_cache.mark_applied(use_clarity_style, use_edit_pivot_style, ggd->twtype);
 }
 
 static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
@@ -2189,8 +2189,8 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
     return;
   }
 
-  bool maya_edit_pivot;
-  const int twtype = gizmogroup_twtype_calc(C, ggd, v3d, &maya_edit_pivot);
+  bool clarity_edit_pivot;
+  const int twtype = gizmogroup_twtype_calc(C, ggd, v3d, &clarity_edit_pivot);
   if (ggd->use_twtype_refresh) {
     ggd->twtype = twtype;
     if (ggd->twtype != ggd->twtype_prev) {
@@ -2199,8 +2199,8 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
     }
   }
 
-  gizmogroup_apply_maya_center_style(
-      ggd, gizmogroup_maya_style_calc(gzgroup, v3d), maya_edit_pivot);
+  gizmogroup_apply_clarity_center_style(
+      ggd, gizmogroup_clarity_style_calc(gzgroup, v3d), clarity_edit_pivot);
 
   const int orient_index = BKE_scene_orientation_get_index_from_flag(scene, ggd->twtype_init);
 
@@ -2212,21 +2212,21 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
    * not: the manipulator belongs to the selection, not to the object. */
   ggd->all_hidden = calc_gizmo_stats(C, &calc_params, &tbounds, rv3d) == 0;
 
-  float maya_pivot_matrix[4][4];
-  const bool maya_pivot = !ggd->all_hidden &&
-                          ED_maya_pivot_custom_matrix_get(
-                              C, ed::maya::MayaPivotUsage::Display, maya_pivot_matrix);
-  GIZMO_TRACE("refresh: twtype=%d edit_pivot=%d maya_pivot=%d all_hidden=%d",
+  float clarity_pivot_matrix[4][4];
+  const bool clarity_pivot = !ggd->all_hidden &&
+                          ED_clarity_pivot_custom_matrix_get(
+                              C, ed::clarity::ClarityPivotUsage::Display, clarity_pivot_matrix);
+  GIZMO_TRACE("refresh: twtype=%d edit_pivot=%d clarity_pivot=%d all_hidden=%d",
               ggd->twtype,
-              int(maya_edit_pivot),
-              int(maya_pivot),
+              int(clarity_edit_pivot),
+              int(clarity_pivot),
               int(ggd->all_hidden));
   if (ggd->all_hidden) {
     return;
   }
 
-  if (maya_pivot) {
-    copy_m4_m4(rv3d->twmat, maya_pivot_matrix);
+  if (clarity_pivot) {
+    copy_m4_m4(rv3d->twmat, clarity_pivot_matrix);
   }
   else {
     gizmo_3d_calc_pos(
@@ -2267,10 +2267,10 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
   /* Re-calculate hidden unless modal. */
   const bool is_modal = WM_gizmo_group_is_modal(gzgroup);
 
-  const bool use_maya_palette = gizmogroup_maya_style_calc(gzgroup, v3d);
+  const bool use_clarity_palette = gizmogroup_clarity_style_calc(gzgroup, v3d);
   if ((rv3d->rflag & RV3D_NAVIGATING) == 0) {
-    bool maya_edit_pivot;
-    const int twtype = gizmogroup_twtype_calc(C, ggd, v3d, &maya_edit_pivot);
+    bool clarity_edit_pivot;
+    const int twtype = gizmogroup_twtype_calc(C, ggd, v3d, &clarity_edit_pivot);
     if (ggd->use_twtype_refresh && ggd->twtype != twtype) {
       ggd->twtype = twtype;
       ggd->twtype_prev = twtype;
@@ -2280,11 +2280,11 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
       /* The cache is invalidated when a mode/tool rebuilds the gizmo properties, preventing a
        * one-frame stale style without rewriting the same RNA values on every draw. A drag owns its
        * own styles, so it is left alone. */
-      gizmogroup_apply_maya_center_style(ggd, use_maya_palette, maya_edit_pivot);
+      gizmogroup_apply_clarity_center_style(ggd, use_clarity_palette, clarity_edit_pivot);
     }
   }
 
-  if (use_maya_palette) {
+  if (use_clarity_palette) {
     WM_gizmo_set_scale(ggd->gizmos[MAN_AXIS_SCALE_C], 0.065f);
   }
   float viewinv_m3[3][3];
@@ -2314,14 +2314,14 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
     }
     else {
       const short axis_type = gizmo_get_axis_type(axis_idx);
-      /* Plane handles are hidden by a rotate layout, but Maya keeps them under the rings that Edit
+      /* Plane handles are hidden by a rotate layout, but Clarity keeps them under the rings that Edit
        * Pivot adds, so they are tested against the translate layout. */
       const int visibility_twtype = ELEM(
                                         axis_idx,
                                         MAN_AXIS_TRANS_XY,
                                         MAN_AXIS_TRANS_YZ,
                                         MAN_AXIS_TRANS_ZX) ?
-                                        gizmo_3d_translate_layout_twtype_get(use_maya_palette,
+                                        gizmo_3d_translate_layout_twtype_get(use_clarity_palette,
                                                                              ggd->twtype) :
                                         ggd->twtype;
       if (gizmo_is_axis_visible(rv3d, visibility_twtype, idot, axis_type, axis_idx)) {
@@ -2341,7 +2341,7 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
           WM_gizmo_set_matrix_rotation_from_z_axis(axis, rv3d->viewinv[2]);
           break;
         case MAN_AXIS_SCALE_C:
-          if (use_maya_palette) {
+          if (use_clarity_palette) {
             copy_m4_m4(axis->matrix_basis, rv3d->twmat);
           }
           else {
@@ -2352,7 +2352,7 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
     }
 
     float color[4], color_hi[4];
-    gizmo_get_axis_color(axis_idx, idot, use_maya_palette, color, color_hi);
+    gizmo_get_axis_color(axis_idx, idot, use_clarity_palette, color, color_hi);
     WM_gizmo_set_color(axis, color);
     WM_gizmo_set_color_highlight(axis, color_hi);
   }
@@ -2365,13 +2365,13 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
       visible += (axis->flag & WM_GIZMO_HIDDEN) == 0;
     }
     MAN_ITER_AXES_END;
-    GIZMO_TRACE("draw_prepare: visible=%d twtype=%d modal=%d maya=%d pivot_style=%d at (%.3f %.3f "
+    GIZMO_TRACE("draw_prepare: visible=%d twtype=%d modal=%d clarity=%d pivot_style=%d at (%.3f %.3f "
                 "%.3f)",
                 visible,
                 ggd->twtype,
                 int(is_modal),
-                int(use_maya_palette),
-                int(ggd->use_maya_edit_pivot_style),
+                int(use_clarity_palette),
+                int(ggd->use_clarity_edit_pivot_style),
                 double(rv3d->twmat[3][0]),
                 double(rv3d->twmat[3][1]),
                 double(rv3d->twmat[3][2]));
@@ -2406,11 +2406,11 @@ static void gizmo_3d_draw_invoke(wmGizmoGroup *gzgroup,
 
   const short axis_active_type = gizmo_get_axis_type(axis_idx_active);
 
-  /* Maya keeps the whole manipulator on screen for the duration of the drag: it follows the
+  /* Clarity keeps the whole manipulator on screen for the duration of the drag: it follows the
    * transform and only the centre handle changes its glyph. Hiding everything but the dragged
    * handle made the pivot look like it disappeared, which is most visible while a snap key is
    * held and the centre handle itself is the one being dragged. */
-  const bool use_maya_style = ggd->use_maya_center_style;
+  const bool use_clarity_style = ggd->use_clarity_center_style;
 
   MAN_ITER_AXES_BEGIN (axis, axis_idx) {
     const bool visible_before_drag = (axis->flag & WM_GIZMO_HIDDEN) == 0;
@@ -2418,11 +2418,11 @@ static void gizmo_3d_draw_invoke(wmGizmoGroup *gzgroup,
         axis,
         WM_GIZMO_HIDDEN,
         !gizmo_3d_axis_visible_during_drag(
-            use_maya_style, axis_idx_active, axis_idx, visible_before_drag));
+            use_clarity_style, axis_idx_active, axis_idx, visible_before_drag));
   }
   MAN_ITER_AXES_END;
 
-  if (use_maya_style) {
+  if (use_clarity_style) {
     gizmogroup_refresh_from_matrix(gzgroup, rv3d->twmat, nullptr, true);
   }
   else {
@@ -2434,21 +2434,21 @@ static void gizmo_3d_draw_invoke(wmGizmoGroup *gzgroup,
   }
 
   gizmo_3d_setup_draw_modal(axis_active, axis_idx_active, ggd->twtype);
-  if (use_maya_style) {
+  if (use_clarity_style) {
     /* The modal glyphs below temporarily override the cached idle style. */
-    ggd->maya_style_cache.invalidate();
+    ggd->clarity_style_cache.invalidate();
     if (axis_idx_active == MAN_AXIS_SCALE_C) {
       RNA_enum_set(axis_active->ptr,
                    "draw_style",
-                   gizmo_3d_scale_center_style_get(use_maya_style, true));
+                   gizmo_3d_scale_center_style_get(use_clarity_style, true));
     }
     /* The translate centre square becomes a circle while the drag runs, and goes back to a square
-     * in #gizmogroup_apply_maya_center_style once it ended. In Edit Pivot the square inside a
+     * in #gizmogroup_apply_clarity_center_style once it ended. In Edit Pivot the square inside a
      * circle is the mode indicator, so there the drag changes nothing. */
     RNA_enum_set(
         ggd->gizmos[MAN_AXIS_TRANS_C]->ptr,
         "draw_style",
-        gizmo_3d_translate_center_style_get(use_maya_style, true, ggd->use_maya_edit_pivot_style));
+        gizmo_3d_translate_center_style_get(use_clarity_style, true, ggd->use_clarity_edit_pivot_style));
   }
 
   if (axis_active_type == MAN_AXES_TRANSLATE) {
@@ -2486,7 +2486,7 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
   GizmoGroup *ggd = static_cast<GizmoGroup *>(gzgroup->customdata);
   const int axis_idx = BLI_array_findindex(ggd->gizmos, ARRAY_SIZE(ggd->gizmos), &gz);
 
-  if (ED_maya_interaction_enabled(C) &&
+  if (ED_clarity_interaction_enabled(C) &&
       ELEM(axis_idx,
            MAN_AXIS_TRANS_X,
            MAN_AXIS_TRANS_Y,
@@ -2498,7 +2498,7 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
            MAN_AXIS_SCALE_Y,
            MAN_AXIS_SCALE_Z))
   {
-    ED_maya_pivot_active_axis_set(C, gizmo_orientation_axis(axis_idx, nullptr));
+    ED_clarity_pivot_active_axis_set(C, gizmo_orientation_axis(axis_idx, nullptr));
   }
 
   const float mval[2] = {float(event->mval[0]), float(event->mval[1])};
@@ -2510,15 +2510,15 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
     {
       RNA_property_boolean_set(&gzop->ptr, prop_cursor_transform, false);
     }
-    if (PropertyRNA *prop_maya_pivot_transform = RNA_struct_find_property(
-            &gzop->ptr, "maya_pivot_transform"))
+    if (PropertyRNA *prop_clarity_pivot_transform = RNA_struct_find_property(
+            &gzop->ptr, "clarity_pivot_transform"))
     {
       /* While Edit Pivot is active the drag edits the pivot, never the object, whichever transform
        * model the object uses. */
-      const bool transform_maya_pivot = ED_maya_pivot_edit_target_get(C) !=
-                                        ed::maya::MayaPivotEditTarget::None;
+      const bool transform_clarity_pivot = ED_clarity_pivot_edit_target_get(C) !=
+                                        ed::clarity::ClarityPivotEditTarget::None;
       RNA_property_boolean_set(
-          &gzop->ptr, prop_maya_pivot_transform, transform_maya_pivot);
+          &gzop->ptr, prop_clarity_pivot_transform, transform_clarity_pivot);
     }
   }
 
@@ -2560,10 +2560,10 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
   }
 
   if (axis != -1) {
-    /* Swap single axis for two-axis constraint. In the Maya model `Shift` on a handle means Shift
+    /* Swap single axis for two-axis constraint. In the Clarity model `Shift` on a handle means Shift
      * Extrude or Shift Duplicate: the drag has to keep the axis the user grabbed, or the new
      * geometry leaves along the two axes they did not point at. */
-    const bool flip = (event->modifier & KM_SHIFT) != 0 && !ED_maya_interaction_enabled(C);
+    const bool flip = (event->modifier & KM_SHIFT) != 0 && !ED_clarity_interaction_enabled(C);
     BLI_assert(axis_idx != -1);
     const short axis_type = gizmo_get_axis_type(axis_idx);
     if (axis_type != MAN_AXES_ROTATE) {
@@ -2584,7 +2584,7 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
       if (axis_type == MAN_AXES_SCALE) {
         PropertyRNA *prop_mouse_dir = RNA_struct_find_property(ptr, "mouse_dir_constraint");
         if (prop_mouse_dir) {
-          if (ggd->use_maya_center_style) {
+          if (ggd->use_clarity_center_style) {
             const RegionView3D *rv3d = CTX_wm_region_view3d(C);
             RNA_property_float_set_array(ptr, prop_mouse_dir, rv3d->twmat[axis]);
           }
@@ -2593,14 +2593,14 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
             RNA_property_float_set_array(ptr, prop_mouse_dir, direction);
           }
         }
-        RNA_boolean_set(ptr, "use_maya_scale_behavior", ggd->use_maya_center_style);
+        RNA_boolean_set(ptr, "use_clarity_scale_behavior", ggd->use_clarity_center_style);
       }
     }
   }
 
   if (axis_idx == MAN_AXIS_SCALE_C) {
     wmGizmoOpElem *gzop = WM_gizmo_operator_get(gz, 0);
-    RNA_boolean_set(&gzop->ptr, "use_maya_scale_behavior", ggd->use_maya_center_style);
+    RNA_boolean_set(&gzop->ptr, "use_clarity_scale_behavior", ggd->use_clarity_center_style);
   }
 }
 
@@ -2610,7 +2610,7 @@ static bool WIDGETGROUP_gizmo_poll_generic(View3D *v3d, const bool keep_while_tr
     return false;
   }
   /* A transform that was not started from the gizmo itself is never polled with the group owning a
-   * modal gizmo, so this is what switched the manipulator off for the whole duration of a Maya
+   * modal gizmo, so this is what switched the manipulator off for the whole duration of a Clarity
    * drag: the pivot vanished while the object moved and only came back on release. */
   if (!keep_while_transforming && (G.moving & (G_TRANSFORM_OBJ | G_TRANSFORM_EDIT))) {
     return false;
@@ -2622,26 +2622,26 @@ static bool WIDGETGROUP_gizmo_poll_context(const bContext *C, wmGizmoGroupType *
 {
   ScrArea *area = CTX_wm_area(C);
   View3D *v3d = static_cast<View3D *>(area->spacedata.first);
-  if (!WIDGETGROUP_gizmo_poll_generic(v3d, ED_maya_interaction_enabled(C))) {
+  if (!WIDGETGROUP_gizmo_poll_generic(v3d, ED_clarity_interaction_enabled(C))) {
     return false;
   }
   const bToolRef *tref = area->runtime.tool;
-  GIZMO_TRACE("poll_context: flag=%d show_object=%d moving=%d maya=%d edit_pivot=%d tool_gizmo=%d",
+  GIZMO_TRACE("poll_context: flag=%d show_object=%d moving=%d clarity=%d edit_pivot=%d tool_gizmo=%d",
               int(v3d->gizmo_flag),
               int(v3d->gizmo_show_object),
               int(G.moving),
-              int(ED_maya_interaction_enabled(C)),
-              int(ED_maya_pivot_edit_target_get(C) != ed::maya::MayaPivotEditTarget::None),
+              int(ED_clarity_interaction_enabled(C)),
+              int(ED_clarity_pivot_edit_target_get(C) != ed::clarity::ClarityPivotEditTarget::None),
               int(tref && tref->runtime && tref->runtime->gizmo_group[0] != '\0'));
   if (v3d->gizmo_flag & V3D_GIZMO_HIDE_CONTEXT) {
     return false;
   }
   /* Edit Pivot draws its own translate and rotate manipulator through this group, so it must not
-   * depend on the manipulator bits of the active tool: Maya shows the pivot manipulator even with
+   * depend on the manipulator bits of the active tool: Clarity shows the pivot manipulator even with
    * the Select tool active. */
-  const bool maya_edit_pivot = ED_maya_pivot_edit_target_get(C) !=
-                               ed::maya::MayaPivotEditTarget::None;
-  if (!maya_edit_pivot &&
+  const bool clarity_edit_pivot = ED_clarity_pivot_edit_target_get(C) !=
+                               ed::clarity::ClarityPivotEditTarget::None;
+  if (!clarity_edit_pivot &&
       (v3d->gizmo_show_object & (V3D_GIZMO_SHOW_OBJECT_TRANSLATE | V3D_GIZMO_SHOW_OBJECT_ROTATE |
                                  V3D_GIZMO_SHOW_OBJECT_SCALE)) == 0)
   {

@@ -21,9 +21,9 @@
 #include "BKE_layer.hh"
 #include "BKE_lib_id.hh"
 #include "BKE_library.hh"
-#include "BKE_maya_constraints.hh"
+#include "BKE_clarity_constraints.hh"
 #include "BKE_object.hh"
-#include "BKE_object_transform_maya.hh"
+#include "BKE_object_transform_clarity.hh"
 #include "BKE_pointcache.h"
 #include "BKE_report.hh"
 #include "BKE_rigidbody.h"
@@ -51,10 +51,10 @@ namespace blender::ed::transform {
 /** \name Object Mode Custom Data
  * \{ */
 
-struct MayaTransDataState {
+struct ClarityTransDataState {
   Object *object = nullptr;
 
-  MayaObjectTransform initial_transform;
+  ClarityObjectTransform initial_transform;
   double4x4 initial_channel_matrix;
   double4x4 initial_dag_local_matrix;
   double4x4 initial_world_matrix;
@@ -92,8 +92,8 @@ struct TransDataObject {
    */
   object::XFormObjectSkipChild_Container *xcs;
 
-  MayaTransDataState *maya_states;
-  int maya_states_num;
+  ClarityTransDataState *clarity_states;
+  int clarity_states_num;
 };
 
 static void freeTransObjectCustomData(TransInfo *t,
@@ -110,7 +110,7 @@ static void freeTransObjectCustomData(TransInfo *t,
   if (t->options & CTX_OBMODE_XFORM_SKIP_CHILDREN) {
     object::object_xform_skip_child_container_destroy(tdo->xcs);
   }
-  MEM_SAFE_DELETE(tdo->maya_states);
+  MEM_SAFE_DELETE(tdo->clarity_states);
   MEM_delete(tdo);
 }
 
@@ -174,37 +174,37 @@ static void trans_obchild_in_obmode_update_all(TransInfo *t)
 /**
  * Transcribe given object into TransData for Transforming.
  */
-static bool maya_transform_mode_supported(const TransInfo *t, const Object &object)
+static bool clarity_transform_mode_supported(const TransInfo *t, const Object &object)
 {
-  if (!BKE_object_uses_maya_transform(&object)) {
+  if (!BKE_object_uses_clarity_transform(&object)) {
     return true;
   }
   if (!ELEM(t->mode, TFM_DUMMY, TFM_TRANSLATION, TFM_ROTATION, TFM_TRACKBALL, TFM_RESIZE)) {
-    BKE_report(t->reports, RPT_WARNING, "This transform mode is not supported for Maya objects");
+    BKE_report(t->reports, RPT_WARNING, "This transform mode is not supported for Clarity objects");
     return false;
   }
   if (t->flag & T_PROP_EDIT) {
     BKE_report(
-        t->reports, RPT_WARNING, "Proportional object editing is not supported for Maya objects");
+        t->reports, RPT_WARNING, "Proportional object editing is not supported for Clarity objects");
     return false;
   }
   if (t->options & CTX_OBMODE_XFORM_OBDATA) {
-    BKE_report(t->reports, RPT_WARNING, "Affect Only Origins is not supported for Maya objects");
+    BKE_report(t->reports, RPT_WARNING, "Affect Only Origins is not supported for Clarity objects");
     return false;
   }
   if (t->scene->toolsettings->transform_flag & SCE_XFORM_AXIS_ALIGN) {
-    BKE_report(t->reports, RPT_WARNING, "Affect Only Locations is not supported for Maya objects");
+    BKE_report(t->reports, RPT_WARNING, "Affect Only Locations is not supported for Clarity objects");
     return false;
   }
   if (t->flag & T_V3D_ALIGN) {
     BKE_report(
-        t->reports, RPT_WARNING, "Align Rotation to Target is not supported for Maya objects");
+        t->reports, RPT_WARNING, "Align Rotation to Target is not supported for Clarity objects");
     return false;
   }
   if (object.constraints.first != nullptr) {
     BKE_report(t->reports,
                RPT_WARNING,
-               "Interactive transforms with constraints are not supported for Maya objects");
+               "Interactive transforms with constraints are not supported for Clarity objects");
     return false;
   }
   if (object.rigidbody_object != nullptr &&
@@ -212,13 +212,13 @@ static bool maya_transform_mode_supported(const TransInfo *t, const Object &obje
   {
     BKE_report(t->reports,
                RPT_WARNING,
-               "Active rigid body simulation is not supported for Maya object transforms");
+               "Active rigid body simulation is not supported for Clarity object transforms");
     return false;
   }
   return true;
 }
 
-static double4x4 maya_parent_effect_matrix_get(const Object &object)
+static double4x4 clarity_parent_effect_matrix_get(const Object &object)
 {
   if (object.parent == nullptr) {
     return double4x4::identity();
@@ -235,18 +235,18 @@ static void copy_v3_float_double(float destination[3], const double3 &source)
   }
 }
 
-static bool maya_trans_data_state_initialize(TransInfo *t,
+static bool clarity_trans_data_state_initialize(TransInfo *t,
                                              TransData *td,
                                              TransDataExtension *td_ext,
                                              Object &object,
-                                             MayaTransDataState &state)
+                                             ClarityTransDataState &state)
 {
   state.object = &object;
-  state.initial_transform = *object.maya_transform;
-  state.initial_channel_matrix = BKE_maya_transform_channel_matrix(state.initial_transform);
-  state.initial_dag_local_matrix = BKE_maya_transform_dag_local_matrix(state.initial_transform);
+  state.initial_transform = *object.clarity_transform;
+  state.initial_channel_matrix = BKE_clarity_transform_channel_matrix(state.initial_transform);
+  state.initial_dag_local_matrix = BKE_clarity_transform_dag_local_matrix(state.initial_transform);
   state.initial_world_matrix = double4x4(object.object_to_world());
-  state.parent_effect_matrix = maya_parent_effect_matrix_get(object);
+  state.parent_effect_matrix = clarity_parent_effect_matrix_get(object);
 
   for (int axis = 0; axis < 3; axis++) {
     state.location_proxy[axis] = float(state.initial_transform.translation[axis]);
@@ -266,20 +266,20 @@ static bool maya_trans_data_state_initialize(TransInfo *t,
   if (!invert_m3_m3(state.location_smtx, state.location_mtx)) {
     BKE_report(t->reports,
                RPT_WARNING,
-               "A singular Maya parent or offset matrix prevents interactive translation");
+               "A singular Clarity parent or offset matrix prevents interactive translation");
     return false;
   }
-  if (!BKE_object_maya_parent_axis_world_get(
+  if (!BKE_object_clarity_parent_axis_world_get(
           object, state.parent_effect_matrix, state.rotation_mtx) ||
       !invert_m3_m3(state.rotation_smtx, state.rotation_mtx))
   {
     BKE_report(t->reports,
                RPT_WARNING,
-               "A singular Maya orientation prefix prevents interactive rotation");
+               "A singular Clarity orientation prefix prevents interactive rotation");
     return false;
   }
 
-  td->flag |= TD_MAYA_TRANSFORM;
+  td->flag |= TD_CLARITY_TRANSFORM;
   td->loc = state.location_proxy;
   copy_v3_v3(td->iloc, state.initial_location_proxy);
   td_ext->rot = state.rotation_proxy;
@@ -288,7 +288,7 @@ static bool maya_trans_data_state_initialize(TransInfo *t,
   td_ext->rotAngle = nullptr;
   copy_v3_v3(td_ext->irot, state.initial_rotation_proxy);
   zero_v3(td_ext->drot);
-  td_ext->rotOrder = BKE_maya_rotation_order_to_blender(state.initial_transform.rotation_order);
+  td_ext->rotOrder = BKE_clarity_rotation_order_to_blender(state.initial_transform.rotation_order);
 
   td_ext->scale = state.scale_proxy;
   copy_v3_v3(td_ext->iscale, state.initial_scale_proxy);
@@ -302,21 +302,21 @@ static bool maya_trans_data_state_initialize(TransInfo *t,
 
   if (ELEM(t->mode, TFM_ROTATION, TFM_TRACKBALL)) {
     copy_v3_float_double(
-        td->center, BKE_object_maya_rotate_pivot_world_get(object, state.parent_effect_matrix));
+        td->center, BKE_object_clarity_rotate_pivot_world_get(object, state.parent_effect_matrix));
   }
   else if (t->mode == TFM_RESIZE) {
     copy_v3_float_double(
-        td->center, BKE_object_maya_scale_pivot_world_get(object, state.parent_effect_matrix));
+        td->center, BKE_object_clarity_scale_pivot_world_get(object, state.parent_effect_matrix));
   }
   else {
     copy_v3_v3(td->center, object.object_to_world().location());
   }
 
-  if (!BKE_object_maya_local_axis_world_get(object, state.parent_effect_matrix, td->axismtx)) {
+  if (!BKE_object_clarity_local_axis_world_get(object, state.parent_effect_matrix, td->axismtx)) {
     unit_m3(td->axismtx);
   }
   if (t->orient_type_mask & (1 << V3D_ORIENT_GIMBAL)) {
-    if (!BKE_object_maya_gimbal_axis_world_get(
+    if (!BKE_object_clarity_gimbal_axis_world_get(
             object, state.parent_effect_matrix, td_ext->axismtx_gimbal))
     {
       copy_m3_m3(td_ext->axismtx_gimbal, td->axismtx);
@@ -332,18 +332,18 @@ static bool float_v3_equal(const float a[3], const float b[3])
   return a[0] == b[0] && a[1] == b[1] && a[2] == b[2];
 }
 
-static bool maya_transform_proxy_flush(MayaTransDataState &state, const bool canceled)
+static bool clarity_transform_proxy_flush(ClarityTransDataState &state, const bool canceled)
 {
   if (!state.active) {
     return true;
   }
   if (canceled) {
-    *state.object->maya_transform = state.initial_transform;
-    BKE_object_maya_evaluated_channels_invalidate(*state.object);
+    *state.object->clarity_transform = state.initial_transform;
+    BKE_object_clarity_evaluated_channels_invalidate(*state.object);
     return true;
   }
 
-  MayaObjectTransform result = state.initial_transform;
+  ClarityObjectTransform result = state.initial_transform;
   for (int axis = 0; axis < 3; axis++) {
     const double delta = double(state.location_proxy[axis] - state.initial_location_proxy[axis]);
     result.translation[axis] = state.initial_transform.translation[axis] + delta;
@@ -356,17 +356,17 @@ static bool maya_transform_proxy_flush(MayaTransDataState &state, const bool can
     float proxy_delta[3][3];
     eulO_to_mat3(initial_rotation,
                  state.initial_rotation_proxy,
-                 BKE_maya_rotation_order_to_blender(state.initial_transform.rotation_order));
+                 BKE_clarity_rotation_order_to_blender(state.initial_transform.rotation_order));
     eulO_to_mat3(result_rotation,
                  state.rotation_proxy,
-                 BKE_maya_rotation_order_to_blender(state.initial_transform.rotation_order));
+                 BKE_clarity_rotation_order_to_blender(state.initial_transform.rotation_order));
     if (!invert_m3_m3(initial_rotation_inverse, initial_rotation)) {
       return false;
     }
     mul_m3_m3m3(proxy_delta, result_rotation, initial_rotation_inverse);
     const double3x3 exact_rotation = double3x3(float3x3(proxy_delta)) *
-                                     BKE_maya_transform_rotation_matrix(state.initial_transform);
-    if (!BKE_maya_transform_set_rotation_matrix(result, exact_rotation, true)) {
+                                     BKE_clarity_transform_rotation_matrix(state.initial_transform);
+    if (!BKE_clarity_transform_set_rotation_matrix(result, exact_rotation, true)) {
       return false;
     }
   }
@@ -385,8 +385,8 @@ static bool maya_transform_proxy_flush(MayaTransDataState &state, const bool can
     }
   }
 
-  *state.object->maya_transform = result;
-  BKE_object_maya_evaluated_channels_invalidate(*state.object);
+  *state.object->clarity_transform = result;
+  BKE_object_clarity_evaluated_channels_invalidate(*state.object);
   return true;
 }
 
@@ -394,13 +394,13 @@ static void ObjectToTransData(TransInfo *t,
                               TransData *td,
                               TransDataExtension *td_ext,
                               Object *ob,
-                              MayaTransDataState *maya_state)
+                              ClarityTransDataState *clarity_state)
 {
   Scene *scene = t->scene;
   bool constinv;
   bool skip_invert = false;
 
-  if (!BKE_object_uses_maya_transform(ob) && t->mode != TFM_DUMMY && ob->rigidbody_object) {
+  if (!BKE_object_uses_clarity_transform(ob) && t->mode != TFM_DUMMY && ob->rigidbody_object) {
     float rot[3][3], scale[3];
     float ctime = BKE_scene_ctime_get(scene);
 
@@ -479,8 +479,8 @@ static void ObjectToTransData(TransInfo *t,
   ob->transflag |= (object_eval->transflag & OB_NEG_SCALE);
 
   td->extra = ob;
-  if (maya_state != nullptr && BKE_object_uses_maya_transform(ob)) {
-    if (!maya_trans_data_state_initialize(t, td, td_ext, *ob, *maya_state)) {
+  if (clarity_state != nullptr && BKE_object_uses_clarity_transform(ob)) {
+    if (!clarity_trans_data_state_initialize(t, td, td_ext, *ob, *clarity_state)) {
       td->flag |= TD_SKIP;
     }
     return;
@@ -812,10 +812,10 @@ static void createTransObject(bContext *C, TransInfo *t)
   TransDataObject *tdo = MEM_new_zeroed<TransDataObject>(__func__);
   t->custom.type.data = tdo;
   t->custom.type.free_cb = freeTransObjectCustomData;
-  tdo->maya_states_num = tc->data_len;
-  /* Not trivially constructible (#MayaObjectTransform and #double4x4 members), so the array cannot
+  tdo->clarity_states_num = tc->data_len;
+  /* Not trivially constructible (#ClarityObjectTransform and #double4x4 members), so the array cannot
    * be zeroed memory. #MEM_new_array value-initializes each element instead. */
-  tdo->maya_states = MEM_new_array<MayaTransDataState>(tc->data_len, __func__);
+  tdo->clarity_states = MEM_new_array<ClarityTransDataState>(tc->data_len, __func__);
 
   if (t->options & CTX_OBMODE_XFORM_OBDATA) {
     tdo->xds = object::data_xform_container_create();
@@ -826,22 +826,22 @@ static void createTransObject(bContext *C, TransInfo *t)
 
     td->flag = TD_SELECTED;
     td->protectflag = ob->protectflag;
-    if (BKE_object_uses_maya_transform(ob)) {
+    if (BKE_object_uses_clarity_transform(ob)) {
       const Object *ob_eval = DEG_get_evaluated(t->depsgraph, ob);
       if (ob_eval != nullptr) {
         for (int axis = 0; axis < 3; axis++) {
-          if (BKE_object_maya_channel_is_driven(
-                  *ob_eval, MAYA_TRANSFORM_CHANNEL_TRANSLATION, axis))
+          if (BKE_object_clarity_channel_is_driven(
+                  *ob_eval, CLARITY_TRANSFORM_CHANNEL_TRANSLATION, axis))
           {
             td->protectflag |= OB_LOCK_LOCX << axis;
           }
-          if (BKE_object_maya_channel_is_driven(
-                  *ob_eval, MAYA_TRANSFORM_CHANNEL_ROTATION, axis))
+          if (BKE_object_clarity_channel_is_driven(
+                  *ob_eval, CLARITY_TRANSFORM_CHANNEL_ROTATION, axis))
           {
             td->protectflag |= OB_LOCK_ROTX << axis;
           }
-          if (BKE_object_maya_channel_is_driven(
-                  *ob_eval, MAYA_TRANSFORM_CHANNEL_SCALE, axis))
+          if (BKE_object_clarity_channel_is_driven(
+                  *ob_eval, CLARITY_TRANSFORM_CHANNEL_SCALE, axis))
           {
             td->protectflag |= OB_LOCK_SCALEX << axis;
           }
@@ -878,11 +878,11 @@ static void createTransObject(bContext *C, TransInfo *t)
       }
     }
 
-    MayaTransDataState *maya_state = &tdo->maya_states[td - tc->data];
-    if (!maya_transform_mode_supported(t, *ob)) {
+    ClarityTransDataState *clarity_state = &tdo->clarity_states[td - tc->data];
+    if (!clarity_transform_mode_supported(t, *ob)) {
       td->flag |= TD_SKIP;
     }
-    ObjectToTransData(t, td, tx, ob, maya_state);
+    ObjectToTransData(t, td, tx, ob, clarity_state);
     td->val = nullptr;
     td++;
     tx++;
@@ -907,11 +907,11 @@ static void createTransObject(bContext *C, TransInfo *t)
         td->protectflag = ob->protectflag;
         tx->rotOrder = ob->rotmode;
 
-        MayaTransDataState *maya_state = &tdo->maya_states[td - tc->data];
-        if (!maya_transform_mode_supported(t, *ob)) {
+        ClarityTransDataState *clarity_state = &tdo->clarity_states[td - tc->data];
+        if (!clarity_transform_mode_supported(t, *ob)) {
           td->flag |= TD_SKIP;
         }
-        ObjectToTransData(t, td, tx, ob, maya_state);
+        ObjectToTransData(t, td, tx, ob, clarity_state);
         td->val = nullptr;
         td++;
         tx++;
@@ -1172,8 +1172,8 @@ static void recalcData_objects(TransInfo *t)
       if (td->flag & TD_SKIP) {
         continue;
       }
-      if (i < tdo->maya_states_num) {
-        maya_transform_proxy_flush(tdo->maya_states[i], t->state == TRANS_CANCEL);
+      if (i < tdo->clarity_states_num) {
+        clarity_transform_proxy_flush(tdo->clarity_states[i], t->state == TRANS_CANCEL);
       }
 
       /* If animtimer is running, and the object already has animation data,
@@ -1234,8 +1234,8 @@ static void special_aftertrans_update__object(bContext *C, TransInfo *t)
       continue;
     }
     TransDataObject *tdo = static_cast<TransDataObject *>(t->custom.type.data);
-    if (i < tdo->maya_states_num) {
-      maya_transform_proxy_flush(tdo->maya_states[i], canceled);
+    if (i < tdo->clarity_states_num) {
+      clarity_transform_proxy_flush(tdo->clarity_states[i], canceled);
     }
 
     /* Flag object caches as outdated. */
@@ -1267,7 +1267,7 @@ static void special_aftertrans_update__object(bContext *C, TransInfo *t)
     motionpath_update |= motionpath_need_update_object(t->scene, ob);
 
     /* Restore rigid body transform. */
-    if (!BKE_object_uses_maya_transform(ob) && ob->rigidbody_object && canceled) {
+    if (!BKE_object_uses_clarity_transform(ob) && ob->rigidbody_object && canceled) {
       float ctime = BKE_scene_ctime_get(t->scene);
       if (BKE_rigidbody_check_sim_running(t->scene->rigidbody_world, ctime)) {
         BKE_rigidbody_aftertrans_update(

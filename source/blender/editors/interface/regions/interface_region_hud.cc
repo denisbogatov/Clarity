@@ -134,7 +134,7 @@ static std::optional<std::string> hud_position_file_path()
 
   char filepath[FILE_MAX];
   BLI_path_join(
-      filepath, sizeof(filepath), config_dir->c_str(), "maya-hud-positions.txt");
+      filepath, sizeof(filepath), config_dir->c_str(), "clarity-hud-positions.txt");
   return std::string(filepath);
 }
 

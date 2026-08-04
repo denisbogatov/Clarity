@@ -766,14 +766,14 @@ class VIEW3D_HT_header(Header):
 
         if show_snap:
             window_manager = context.window_manager
-            if window_manager.maya_interaction_enabled:
+            if window_manager.clarity_interaction_enabled:
                 row = layout.row(align=True)
-                persistent_mode = window_manager.maya_snap_mode
-                temporary_mode = window_manager.maya_snap_temporary_mode
+                persistent_mode = window_manager.clarity_snap_mode
+                temporary_mode = window_manager.clarity_snap_temporary_mode
                 effective_mode = (
                     temporary_mode if temporary_mode != 'NONE' else persistent_mode
                 )
-                maya_snap_buttons = (
+                clarity_snap_buttons = (
                     ('GRID', 'SNAP_GRID'),
                     ('CURVE', 'SNAP_EDGE'),
                     ('POINT', 'SNAP_VERTEX'),
@@ -782,11 +782,11 @@ class VIEW3D_HT_header(Header):
                     # Step snapping is a mode like the others: click to hold it on, J for a moment.
                     ('STEP', 'SNAP_INCREMENT'),
                 )
-                for mode, icon in maya_snap_buttons:
+                for mode, icon in clarity_snap_buttons:
                     sub = row.row(align=True)
                     sub.alert = temporary_mode == mode
                     props = sub.operator(
-                        "transform.maya_snap_toggle",
+                        "transform.clarity_snap_toggle",
                         text="",
                         icon=icon,
                         depress=persistent_mode == mode,
@@ -799,10 +799,10 @@ class VIEW3D_HT_header(Header):
                 sub.alert = temporary_mode == 'STEP'
                 sub_size = sub.row(align=True)
                 sub_size.ui_units_x = 3.0
-                sub_size.prop(window_manager, "maya_snap_step_size", text="")
+                sub_size.prop(window_manager, "clarity_snap_step_size", text="")
                 sub_angle = sub.row(align=True)
                 sub_angle.ui_units_x = 3.0
-                sub_angle.prop(window_manager, "maya_snap_step_angle", text="")
+                sub_angle.prop(window_manager, "clarity_snap_step_angle", text="")
                 row.popover(
                     panel="VIEW3D_PT_snapping",
                     icon='SNAP_ON' if effective_mode != 'NONE' else 'SNAP_OFF',
@@ -1157,7 +1157,7 @@ class VIEW3D_HT_header(Header):
         row = layout.row()
         row.active = shading.type == 'SOLID'
         row.operator(
-            "view3d.toggle_maya_ao",
+            "view3d.toggle_clarity_ao",
             text="",
             icon='MATSPHERE',
             depress=shading.show_cavity and shading.cavity_type in {'WORLD', 'BOTH'},
@@ -6517,83 +6517,130 @@ class VIEW3D_PT_view3d_lock(Panel):
         col.prop(view.region_3d, "lock_rotation", text="Rotation")
 
 
-def _maya_navigation_debug_log_path():
-    return os.path.join(bpy.app.tempdir, "maya_navigation_trace.log")
+def _clarity_navigation_debug_log_path():
+    return os.path.join(bpy.app.tempdir, "clarity_navigation_trace.log")
 
 
-def _maya_navigation_debug_update(window_manager, _context):
-    if not window_manager.maya_navigation_debug:
+def _clarity_navigation_debug_update(window_manager, _context):
+    if not window_manager.clarity_navigation_debug:
         return
     try:
-        os.remove(_maya_navigation_debug_log_path())
+        os.remove(_clarity_navigation_debug_log_path())
     except FileNotFoundError:
         pass
 
 
-def _maya_pivot_settings_update(window_manager, context):
+def _clarity_pivot_settings_update(window_manager, context):
     area = context.area
     if area is None or area.type != 'VIEW_3D':
         return
     try:
-        bpy.ops.maya.pivot_settings_set(
-            snap_position=window_manager.maya_pivot_snap_position,
-            snap_orientation=window_manager.maya_pivot_snap_orientation,
-            bake_orientation_automatically=window_manager.maya_pivot_bake_orientation,
-            preserve_children=window_manager.maya_pivot_preserve_children,
-            show_orientation_handle=window_manager.maya_pivot_show_orientation_handle,
-            reset_mode=window_manager.maya_pivot_reset_mode,
+        bpy.ops.clarity.pivot_settings_set(
+            snap_position=window_manager.clarity_pivot_snap_position,
+            snap_orientation=window_manager.clarity_pivot_snap_orientation,
+            bake_orientation_automatically=window_manager.clarity_pivot_bake_orientation,
+            preserve_children=window_manager.clarity_pivot_preserve_children,
+            show_orientation_handle=window_manager.clarity_pivot_show_orientation_handle,
+            reset_mode=window_manager.clarity_pivot_reset_mode,
         )
     except RuntimeError:
         pass
 
 
+def _clarity_legacy_bool_get(identifier):
+    return lambda window_manager: getattr(window_manager, identifier)
+
+
+def _clarity_legacy_bool_set(identifier):
+    return lambda window_manager, value: setattr(window_manager, identifier, value)
+
+
+def _maya_pivot_reset_mode_get(window_manager):
+    return 1 if window_manager.clarity_pivot_reset_mode == 'ZERO' else 0
+
+
+def _maya_pivot_reset_mode_set(window_manager, value):
+    window_manager.clarity_pivot_reset_mode = 'ZERO' if value == 1 else 'CENTER'
+
+
 def register_props():
     from bpy.props import BoolProperty, EnumProperty
 
-    bpy.types.WindowManager.maya_navigation_debug = BoolProperty(
+    bpy.types.WindowManager.clarity_navigation_debug = BoolProperty(
         name="Viewport Performance Debug Log",
         description="Record viewport performance stalls without writing to disk during interaction",
         default=False,
-        update=_maya_navigation_debug_update,
+        update=_clarity_navigation_debug_update,
     )
-    bpy.types.WindowManager.maya_pivot_snap_position = BoolProperty(
+    bpy.types.WindowManager.clarity_pivot_snap_position = BoolProperty(
         name="Snap Position",
-        description="Apply Maya pivot snap targets to position",
+        description="Apply Clarity pivot snap targets to position",
         default=True,
-        update=_maya_pivot_settings_update,
+        update=_clarity_pivot_settings_update,
     )
-    bpy.types.WindowManager.maya_pivot_snap_orientation = BoolProperty(
+    bpy.types.WindowManager.clarity_pivot_snap_orientation = BoolProperty(
         name="Snap Orientation",
-        description="Apply Maya pivot target orientation independently from position",
+        description="Apply Clarity pivot target orientation independently from position",
         default=True,
-        update=_maya_pivot_settings_update,
+        update=_clarity_pivot_settings_update,
     )
-    bpy.types.WindowManager.maya_pivot_bake_orientation = BoolProperty(
+    bpy.types.WindowManager.clarity_pivot_bake_orientation = BoolProperty(
         name="Bake Pivot Orientation",
         description="Bake custom orientation when an orientation edit is committed",
         default=False,
-        update=_maya_pivot_settings_update,
+        update=_clarity_pivot_settings_update,
     )
-    bpy.types.WindowManager.maya_pivot_preserve_children = BoolProperty(
+    bpy.types.WindowManager.clarity_pivot_preserve_children = BoolProperty(
         name="Preserve Child Position",
         description="Keep direct children fixed in world space while baking",
         default=True,
-        update=_maya_pivot_settings_update,
+        update=_clarity_pivot_settings_update,
     )
-    bpy.types.WindowManager.maya_pivot_show_orientation_handle = BoolProperty(
+    bpy.types.WindowManager.clarity_pivot_show_orientation_handle = BoolProperty(
         name="Show Orientation Handle",
         description="Show rotation handles while Edit Pivot is active",
         default=True,
-        update=_maya_pivot_settings_update,
+        update=_clarity_pivot_settings_update,
     )
-    bpy.types.WindowManager.maya_pivot_reset_mode = EnumProperty(
+    bpy.types.WindowManager.clarity_pivot_reset_mode = EnumProperty(
         name="Reset Mode",
         items=(
             ('CENTER', "Center", "Use the hierarchy or component bounding-box center"),
             ('ZERO', "Zero", "Use zero pivot channels or the component object's origin"),
         ),
         default='CENTER',
-        update=_maya_pivot_settings_update,
+        update=_clarity_pivot_settings_update,
+    )
+
+    # Deprecated aliases for external scripts using the former runtime property names.
+    for legacy_name, clarity_name, default in (
+        ("maya_navigation_debug", "clarity_navigation_debug", False),
+        ("maya_pivot_snap_position", "clarity_pivot_snap_position", True),
+        ("maya_pivot_snap_orientation", "clarity_pivot_snap_orientation", True),
+        ("maya_pivot_bake_orientation", "clarity_pivot_bake_orientation", False),
+        ("maya_pivot_preserve_children", "clarity_pivot_preserve_children", True),
+        ("maya_pivot_show_orientation_handle", "clarity_pivot_show_orientation_handle", True),
+    ):
+        setattr(
+            bpy.types.WindowManager,
+            legacy_name,
+            BoolProperty(
+                name="Clarity Legacy API",
+                default=default,
+                get=_clarity_legacy_bool_get(clarity_name),
+                set=_clarity_legacy_bool_set(clarity_name),
+                options={'HIDDEN', 'SKIP_SAVE'},
+            ),
+        )
+    bpy.types.WindowManager.maya_pivot_reset_mode = EnumProperty(
+        name="Clarity Legacy API",
+        items=(
+            ('CENTER', "Center", "Use the hierarchy or component bounding-box center"),
+            ('ZERO', "Zero", "Use zero pivot channels or the component object's origin"),
+        ),
+        get=_maya_pivot_reset_mode_get,
+        set=_maya_pivot_reset_mode_set,
+        options={'HIDDEN', 'SKIP_SAVE'},
     )
 
 
@@ -6605,16 +6652,23 @@ def unregister_props():
     del bpy.types.WindowManager.maya_pivot_snap_orientation
     del bpy.types.WindowManager.maya_pivot_snap_position
     del bpy.types.WindowManager.maya_navigation_debug
+    del bpy.types.WindowManager.clarity_pivot_reset_mode
+    del bpy.types.WindowManager.clarity_pivot_show_orientation_handle
+    del bpy.types.WindowManager.clarity_pivot_preserve_children
+    del bpy.types.WindowManager.clarity_pivot_bake_orientation
+    del bpy.types.WindowManager.clarity_pivot_snap_orientation
+    del bpy.types.WindowManager.clarity_pivot_snap_position
+    del bpy.types.WindowManager.clarity_navigation_debug
 
 
-def _maya_multi_cut_properties(context):
+def _clarity_multi_cut_properties(context):
     tool = context.workspace.tools.from_space_view3d_mode(context.mode, create=False)
     if tool is None or tool.idname != "builtin.knife":
         return None
     return tool.operator_properties("mesh.knife_tool")
 
 
-_MAYA_MULTI_CUT_SETTING_IDS = (
+_CLARITY_MULTI_CUT_SETTING_IDS = (
     "snap_step",
     "smoothing_angle",
     "use_edge_flow",
@@ -6639,17 +6693,17 @@ _MAYA_MULTI_CUT_SETTING_IDS = (
 )
 
 
-class MESH_OT_maya_multi_cut_reset(Operator):
-    bl_idname = "mesh.maya_multi_cut_reset"
+class MESH_OT_clarity_multi_cut_reset(Operator):
+    bl_idname = "mesh.clarity_multi_cut_reset"
     bl_label = "Reset Multi-Cut Tool"
-    bl_description = "Restore Maya Multi-Cut settings to their defaults"
+    bl_description = "Restore Clarity Multi-Cut settings to their defaults"
 
     def execute(self, context):
-        props = _maya_multi_cut_properties(context)
+        props = _clarity_multi_cut_properties(context)
         if props is None:
             return {'CANCELLED'}
 
-        for identifier in _MAYA_MULTI_CUT_SETTING_IDS:
+        for identifier in _CLARITY_MULTI_CUT_SETTING_IDS:
             props.property_unset(identifier)
 
         if context.area:
@@ -6657,10 +6711,10 @@ class MESH_OT_maya_multi_cut_reset(Operator):
         return {'FINISHED'}
 
 
-class MESH_OT_maya_multi_cut_activate(Operator):
-    bl_idname = "mesh.maya_multi_cut_activate"
+class MESH_OT_clarity_multi_cut_activate(Operator):
+    bl_idname = "mesh.clarity_multi_cut_activate"
     bl_label = "Activate Multi-Cut Tool"
-    bl_description = "Enter mesh edit mode and start the Maya Multi-Cut tool with hover preview"
+    bl_description = "Enter mesh edit mode and start the Clarity Multi-Cut tool with hover preview"
 
     @classmethod
     def poll(cls, context):
@@ -6672,12 +6726,12 @@ class MESH_OT_maya_multi_cut_activate(Operator):
             bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.wm.tool_set_by_id(name="builtin.knife")
 
-        props = _maya_multi_cut_properties(context)
+        props = _clarity_multi_cut_properties(context)
         if props is None:
             return {'CANCELLED'}
 
         operator_props = {}
-        for identifier in _MAYA_MULTI_CUT_SETTING_IDS:
+        for identifier in _CLARITY_MULTI_CUT_SETTING_IDS:
             value = getattr(props, identifier)
             operator_props[identifier] = tuple(value) if hasattr(value, "__len__") else value
 
@@ -6689,10 +6743,10 @@ class MESH_OT_maya_multi_cut_activate(Operator):
         return {'FINISHED'} if 'RUNNING_MODAL' in result else result
 
 
-class MESH_OT_maya_multi_cut_slice_plane(Operator):
-    bl_idname = "mesh.maya_multi_cut_slice_plane"
+class MESH_OT_clarity_multi_cut_slice_plane(Operator):
+    bl_idname = "mesh.clarity_multi_cut_slice_plane"
     bl_label = "Multi-Cut Slice Along Plane"
-    bl_description = "Slice the edited mesh through its center along a Maya Multi-Cut plane"
+    bl_description = "Slice the edited mesh through its center along a Clarity Multi-Cut plane"
     bl_options = {'REGISTER', 'UNDO'}
 
     axis: bpy.props.EnumProperty(
@@ -6713,7 +6767,7 @@ class MESH_OT_maya_multi_cut_slice_plane(Operator):
         import bmesh
         from mathutils import Vector
 
-        props = _maya_multi_cut_properties(context)
+        props = _clarity_multi_cut_properties(context)
         if props is None:
             return {'CANCELLED'}
 
@@ -6775,7 +6829,41 @@ class MESH_OT_maya_multi_cut_slice_plane(Operator):
         return {'FINISHED'}
 
 
-class VIEW3D_PT_maya_navigation_debug(Panel):
+def _clarity_multi_cut_legacy_operator_alias(base):
+    """Hidden forwarding class for external scripts using a former operator identifier."""
+    namespace = {
+        "__module__": __name__,
+        "bl_idname": base.bl_idname.replace(".clarity_", ".maya_"),
+        "bl_options": set(getattr(base, "bl_options", set())) | {'INTERNAL'},
+    }
+    for name, value in base.__dict__.items():
+        if name.startswith("__") or name in {"bl_idname", "bl_options", "bl_rna"}:
+            continue
+        namespace[name] = value
+    annotations = {}
+    for owner in reversed(base.__mro__):
+        annotations.update(getattr(owner, "__annotations__", {}))
+    if annotations:
+        namespace["__annotations__"] = annotations
+    for callback in ("poll", "description", "check", "draw", "invoke", "execute", "modal", "cancel"):
+        for owner in base.__mro__:
+            if callback in owner.__dict__:
+                namespace[callback] = owner.__dict__[callback]
+                break
+    return type(base.__name__.replace("_clarity_", "_maya_"), base.__bases__, namespace)
+
+
+_CLARITY_MULTI_CUT_LEGACY_OPERATOR_CLASSES = tuple(
+    _clarity_multi_cut_legacy_operator_alias(base)
+    for base in (
+        MESH_OT_clarity_multi_cut_activate,
+        MESH_OT_clarity_multi_cut_reset,
+        MESH_OT_clarity_multi_cut_slice_plane,
+    )
+)
+
+
+class VIEW3D_PT_clarity_navigation_debug(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "View"
@@ -6787,24 +6875,24 @@ class VIEW3D_PT_maya_navigation_debug(Panel):
         layout = self.layout
         window_manager = context.window_manager
 
-        layout.prop(window_manager, "maya_navigation_debug")
-        if window_manager.maya_navigation_debug:
+        layout.prop(window_manager, "clarity_navigation_debug")
+        if window_manager.clarity_navigation_debug:
             layout.label(text="Captures redraw, buffer resets, gizmos and GPU swap")
             row = layout.row(align=True)
-            row.label(text="maya_navigation_trace.log", icon='TEXT')
+            row.label(text="clarity_navigation_trace.log", icon='TEXT')
             row.operator("wm.path_open", text="", icon='FILE_FOLDER').filepath = bpy.app.tempdir
 
 
-class VIEW3D_PT_maya_interaction(Panel):
+class VIEW3D_PT_clarity_interaction(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "View"
-    bl_label = "Interaction Preset: Maya"
+    bl_label = "Interaction Preset: Clarity"
     bl_parent_id = "VIEW3D_PT_view3d_properties"
 
     @classmethod
     def poll(cls, context):
-        return context.preferences.inputs.interaction_preset == 'MAYA'
+        return context.preferences.inputs.interaction_preset == 'CLARITY'
 
     def draw_header(self, _context):
         self.layout.label(text="", icon='PREFERENCES')
@@ -6814,37 +6902,37 @@ class VIEW3D_PT_maya_interaction(Panel):
         pass
 
 
-class VIEW3D_PT_maya_pivot_settings(Panel):
+class VIEW3D_PT_clarity_pivot_settings(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "View"
     bl_label = "Pivot Tool Settings"
-    bl_parent_id = "VIEW3D_PT_maya_interaction"
+    bl_parent_id = "VIEW3D_PT_clarity_interaction"
 
     def draw(self, context):
         layout = self.layout
         window_manager = context.window_manager
 
-        layout.operator("maya.pivot_edit_toggle", text="Edit Pivot")
-        layout.operator("maya.pivot_pin_toggle", text="Pin Component Pivot")
+        layout.operator("clarity.pivot_edit_toggle", text="Edit Pivot")
+        layout.operator("clarity.pivot_pin_toggle", text="Pin Component Pivot")
 
         column = layout.column(align=True)
-        column.prop(window_manager, "maya_pivot_snap_position")
-        column.prop(window_manager, "maya_pivot_snap_orientation")
-        column.prop(window_manager, "maya_pivot_bake_orientation")
-        column.prop(window_manager, "maya_pivot_show_orientation_handle")
-        column.prop(window_manager, "maya_pivot_preserve_children")
-        column.prop(window_manager, "maya_pivot_reset_mode")
+        column.prop(window_manager, "clarity_pivot_snap_position")
+        column.prop(window_manager, "clarity_pivot_snap_orientation")
+        column.prop(window_manager, "clarity_pivot_bake_orientation")
+        column.prop(window_manager, "clarity_pivot_show_orientation_handle")
+        column.prop(window_manager, "clarity_pivot_preserve_children")
+        column.prop(window_manager, "clarity_pivot_reset_mode")
 
         row = layout.row(align=True)
-        row.operator("maya.pivot_reset", text="Reset Position").action = 'POSITION'
-        row.operator("maya.pivot_reset", text="Orientation").action = 'ORIENTATION'
-        row.operator("maya.pivot_reset", text="Both").action = 'BOTH'
+        row.operator("clarity.pivot_reset", text="Reset Position").action = 'POSITION'
+        row.operator("clarity.pivot_reset", text="Orientation").action = 'ORIENTATION'
+        row.operator("clarity.pivot_reset", text="Both").action = 'BOTH'
 
         row = layout.row(align=True)
-        row.operator("maya.pivot_bake", text="Bake Position").mode = 'POSITION'
-        row.operator("maya.pivot_bake", text="Orientation").mode = 'ORIENTATION'
-        row.operator("maya.pivot_bake", text="Both").mode = 'BOTH'
+        row.operator("clarity.pivot_bake", text="Bake Position").mode = 'POSITION'
+        row.operator("clarity.pivot_bake", text="Orientation").mode = 'ORIENTATION'
+        row.operator("clarity.pivot_bake", text="Both").mode = 'BOTH'
 
 
 class VIEW3D_PT_view3d_cursor(Panel):
@@ -8174,19 +8262,19 @@ class VIEW3D_PT_snapping(Panel):
         layout = self.layout
 
         window_manager = context.window_manager
-        if window_manager.maya_interaction_enabled:
+        if window_manager.clarity_interaction_enabled:
             col = layout.column()
             col.label(text="Step Snap")
-            col.prop(window_manager, "maya_snap_step_size", text="Move")
-            col.prop(window_manager, "maya_snap_step_angle", text="Rotate")
+            col.prop(window_manager, "clarity_snap_step_size", text="Move")
+            col.prop(window_manager, "clarity_snap_step_angle", text="Rotate")
 
             col.separator()
 
             col.label(text="Snap Tolerance")
-            col.prop(window_manager, "maya_snap_use_tolerance", text="Use Tolerance")
+            col.prop(window_manager, "clarity_snap_use_tolerance", text="Use Tolerance")
             sub = col.column()
-            sub.active = window_manager.maya_snap_use_tolerance
-            sub.prop(window_manager, "maya_snap_tolerance", text="Tolerance")
+            sub.active = window_manager.clarity_snap_use_tolerance
+            sub.prop(window_manager, "clarity_snap_tolerance", text="Tolerance")
 
             layout.separator()
 
@@ -9878,12 +9966,13 @@ classes = (
     VIEW3D_PT_active_tool_duplicate,
     VIEW3D_PT_view3d_properties,
     VIEW3D_PT_view3d_lock,
-    MESH_OT_maya_multi_cut_activate,
-    MESH_OT_maya_multi_cut_reset,
-    MESH_OT_maya_multi_cut_slice_plane,
-    VIEW3D_PT_maya_interaction,
-    VIEW3D_PT_maya_pivot_settings,
-    VIEW3D_PT_maya_navigation_debug,
+    MESH_OT_clarity_multi_cut_activate,
+    MESH_OT_clarity_multi_cut_reset,
+    MESH_OT_clarity_multi_cut_slice_plane,
+    *_CLARITY_MULTI_CUT_LEGACY_OPERATOR_CLASSES,
+    VIEW3D_PT_clarity_interaction,
+    VIEW3D_PT_clarity_pivot_settings,
+    VIEW3D_PT_clarity_navigation_debug,
     VIEW3D_PT_view3d_cursor,
     VIEW3D_PT_collections,
     VIEW3D_PT_object_type_visibility,

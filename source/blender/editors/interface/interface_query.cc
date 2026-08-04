@@ -209,7 +209,7 @@ void button_pie_dir(RadialDirection dir, float vec[2])
 /**
  * Whether the direction of the mark may decide for \a block at the given block-space point.
  *
- * In Maya the mark is the interaction: past the dead zone the item the stroke points at is the
+ * In Clarity the mark is the interaction: past the dead zone the item the stroke points at is the
  * selected one, at any distance, and the boxes are a legend for the directions rather than targets
  * that have to be hit. The one place that is not true is the linear part under the wheel, which is
  * an ordinary list and keeps the pointer that lands inside it.
@@ -237,10 +237,10 @@ bool button_is_marking_menu_item(const Button *but)
  * The item a marking-menu stroke points at: the one whose direction is closest to it.
  *
  * Blender gives each item the 45 degrees either side of its own direction and nothing beyond, which
- * is exact coverage only when the ring is full. A Maya marking menu is usually not full - the Move
+ * is exact coverage only when the ring is full. A Clarity marking menu is usually not full - the Move
  * orientation wheel, for instance, has items at four of the eight directions - and every direction
  * the gap is wider than 90 degrees leaves a wedge where the stroke lights nothing up, so a diagonal
- * flick out of the menu quietly does nothing. Maya has no such wedge: outside the dead zone the
+ * flick out of the menu quietly does nothing. Clarity has no such wedge: outside the dead zone the
  * whole plane belongs to some item, and the nearest one is it.
  */
 static RadialDirection pie_marking_nearest_dir(const Block *block)
@@ -407,7 +407,7 @@ Button *button_find_mouse_over_ex(const ARegion *region,
 
   for (Block &block : region->runtime->uiblocks) {
     /* A marking menu is aimed, not hit: the boxes are a legend for the directions and the stroke is
-     * expected to run well past them - in Maya it commonly ends on the far side of the model. The
+     * expected to run well past them - in Clarity it commonly ends on the far side of the model. The
      * region is only as large as the little cluster of boxes, so refusing every point outside it is
      * what makes the stroke stop selecting the moment it leaves them. Every other region keeps the
      * bounds check, which is what stops a menu from answering for pixels that are not its own. */
@@ -475,7 +475,7 @@ std::optional<ShelfDropTarget> shelf_drop_target_find(const ARegion *region, con
   for (Block &block : region->runtime->uiblocks) {
     for (Button &but : block.buttons()) {
       const std::optional<StringRefNull> item_id = button_context_string_get(&but,
-                                                                            "maya_shelf_item_id");
+                                                                            "clarity_shelf_item_id");
       if (!item_id || item_id->is_empty()) {
         continue;
       }

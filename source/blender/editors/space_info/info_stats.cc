@@ -78,7 +78,7 @@ struct SceneStats {
   uint64_t totpoints, totpointsel;
   uint64_t totcurves, totcurvesel;
 
-  /* Maya-style viewport polygon statistics: scene, selected objects, selected components. */
+  /* Clarity-style viewport polygon statistics: scene, selected objects, selected components. */
   uint64_t hud_vert[3], hud_edge[3], hud_face[3], hud_tri[3], hud_uv[3];
 };
 

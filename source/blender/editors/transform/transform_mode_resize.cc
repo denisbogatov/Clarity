@@ -268,7 +268,7 @@ static void initResize(TransInfo *t, wmOperator *op)
 {
   float mouse_dir_constraint[3];
   float mouse_sensitivity = 1.0f;
-  bool use_maya_scale_behavior = false;
+  bool use_clarity_scale_behavior = false;
   if (op) {
     PropertyRNA *prop = RNA_struct_find_property(op->ptr, "mouse_dir_constraint");
     if (prop) {
@@ -282,9 +282,9 @@ static void initResize(TransInfo *t, wmOperator *op)
     if (prop) {
       mouse_sensitivity = RNA_property_float_get(op->ptr, prop);
     }
-    prop = RNA_struct_find_property(op->ptr, "use_maya_scale_behavior");
+    prop = RNA_struct_find_property(op->ptr, "use_clarity_scale_behavior");
     if (prop) {
-      use_maya_scale_behavior = RNA_property_boolean_get(op->ptr, prop);
+      use_clarity_scale_behavior = RNA_property_boolean_get(op->ptr, prop);
     }
   }
   else {
@@ -331,7 +331,7 @@ static void initResize(TransInfo *t, wmOperator *op)
 
     initMouseInputMode(t, &t->mouse, only_location ? INPUT_ERROR_DASH : INPUT_CUSTOM_RATIO);
   }
-  t->mouse.clamp_to_positive = use_maya_scale_behavior && (t->flag & T_EDIT);
+  t->mouse.clamp_to_positive = use_clarity_scale_behavior && (t->flag & T_EDIT);
 
   t->num.val_flag[0] |= NUM_NULL_ONE;
   t->num.val_flag[1] |= NUM_NULL_ONE;

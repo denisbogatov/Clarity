@@ -31,8 +31,8 @@ namespace bke {
 
 struct GeometrySet;
 
-struct MayaObjectTransformRuntime {
-  MayaObjectTransform evaluated;
+struct ClarityObjectTransformRuntime {
+  ClarityObjectTransform evaluated;
   bool translation_driven[3] = {};
   bool rotation_driven[3] = {};
   bool scale_driven[3] = {};
@@ -44,7 +44,7 @@ struct ObjectRuntime {
   /** Final transformation matrices with constraints & animsys applied. */
   float4x4 object_to_world = float4x4::identity();
   float4x4 world_to_object = float4x4::identity();
-  MayaObjectTransformRuntime maya_transform;
+  ClarityObjectTransformRuntime clarity_transform;
 
   /**
    * The custom data layer mask that was last used

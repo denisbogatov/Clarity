@@ -45,7 +45,7 @@ void cavity_compute([[resource_table]] const workbench::Cavity &cavity,
   float2 jitter_co = (screenco * world_data.viewport_size.xy) * world_data.cavity_jitter_scale;
   float2 noise = texture(cavity.jitter_tx, jitter_co).rg;
 
-  /* Maya Viewport 2.0 defines the SSAO radius in screen-space pixels. */
+  /* Clarity Viewport 2.0 defines the SSAO radius in screen-space pixels. */
   float2 offset = world_data.viewport_size_inv * world_data.cavity_distance;
 
   /* NOTE: Putting noise usage here to put some ALU after texture fetch. */
@@ -73,7 +73,7 @@ void cavity_compute([[resource_table]] const workbench::Cavity &cavity,
 
     /* Sample depth. */
     float s_depth = texture(depth_tx, uvcoords).r;
-    /* Background pixels do not participate in Maya's normal-depth SSAO pass. */
+    /* Background pixels do not participate in Clarity's normal-depth SSAO pass. */
     if (s_depth == 1.0f || s_depth == 0.0f) {
       continue;
     }

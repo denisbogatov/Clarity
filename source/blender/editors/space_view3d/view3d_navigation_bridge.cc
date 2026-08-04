@@ -216,7 +216,7 @@ std::unique_ptr<NavigationSession> navigation_session_begin(
   }
 
   /* The first bridge version intentionally maps every pivot policy to Blender's current
-   * navigation preference. The policy remains part of the API for a later Maya-specific pivot. */
+   * navigation preference. The policy remains part of the API for a later Clarity-specific pivot. */
   UNUSED_VARS(params.orbit_around_selection, params.pivot_policy, params.explicit_pivot);
 
   return std::make_unique<BlenderNavigationSession>(vod, type, params.invert_direction);

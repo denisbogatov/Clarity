@@ -128,10 +128,10 @@ static SpaceLink *topbar_duplicate(SpaceLink *sl)
 }
 
 /**
- * Live state of a Maya-shelf icon drag, resolved from the buttons that are really laid out so the
+ * Live state of a Clarity-shelf icon drag, resolved from the buttons that are really laid out so the
  * insertion marker and the drop position always agree with the cursor.
  *
- * `TOPBAR_OT_maya_shelf_drag` drives this by calling `TOPBAR_OT_maya_shelf_drag_probe` from its
+ * `TOPBAR_OT_clarity_shelf_drag` drives this by calling `TOPBAR_OT_clarity_shelf_drag_probe` from its
  * modal handler. It cannot be driven from the shelf region event handlers instead: a modal
  * operator returning `RUNNING_MODAL | PASS_THROUGH` still yields `WM_HANDLER_BREAK`, and
  * `wm_event_do_handlers` skips every region handler once that flag is set.
@@ -193,7 +193,7 @@ static void topbar_shelf_drag_hover_notify(bContext *C,
                                            const ui::ShelfDropTarget *target,
                                            const bool found)
 {
-  wmOperatorType *ot = WM_operatortype_find("TOPBAR_OT_maya_shelf_drag_hover", true);
+  wmOperatorType *ot = WM_operatortype_find("TOPBAR_OT_clarity_shelf_drag_hover", true);
   if (ot == nullptr) {
     return;
   }
@@ -221,11 +221,11 @@ static int topbar_shelf_region_event_handler(bContext *C,
   ui::Button *button = region ? ui::but_find_mouse_over(region, event) : nullptr;
   std::optional<StringRefNull> item_id;
   if (button != nullptr) {
-    item_id = ui::button_context_string_get(button, "maya_shelf_item_id");
+    item_id = ui::button_context_string_get(button, "clarity_shelf_item_id");
   }
 
   if (event->type == RIGHTMOUSE) {
-    wmOperatorType *ot = WM_operatortype_find("TOPBAR_OT_maya_shelf_context_menu", false);
+    wmOperatorType *ot = WM_operatortype_find("TOPBAR_OT_clarity_shelf_context_menu", false);
     if (ot == nullptr) {
       return WM_UI_HANDLER_CONTINUE;
     }
@@ -252,7 +252,7 @@ static int topbar_shelf_region_event_handler(bContext *C,
     return WM_UI_HANDLER_CONTINUE;
   }
 
-  wmOperatorType *ot = WM_operatortype_find("TOPBAR_OT_maya_shelf_drag", false);
+  wmOperatorType *ot = WM_operatortype_find("TOPBAR_OT_clarity_shelf_drag", false);
   if (ot == nullptr) {
     return WM_UI_HANDLER_CONTINUE;
   }
@@ -370,10 +370,10 @@ static wmOperatorStatus shelf_drag_probe_exec(bContext *C, wmOperator * /*op*/)
   return OPERATOR_FINISHED;
 }
 
-static void TOPBAR_OT_maya_shelf_drag_probe(wmOperatorType *ot)
+static void TOPBAR_OT_clarity_shelf_drag_probe(wmOperatorType *ot)
 {
   ot->name = "Probe Shelf Drop Target";
-  ot->idname = "TOPBAR_OT_maya_shelf_drag_probe";
+  ot->idname = "TOPBAR_OT_clarity_shelf_drag_probe";
   ot->description = "Resolve the shelf entry under the cursor for the running drag";
   ot->exec = shelf_drag_probe_exec;
   ot->flag = OPTYPE_INTERNAL;
@@ -454,13 +454,25 @@ static wmOperatorStatus shelf_drag_end_exec(bContext *C, wmOperator * /*op*/)
   return OPERATOR_FINISHED;
 }
 
-static void TOPBAR_OT_maya_shelf_drag_end(wmOperatorType *ot)
+static void TOPBAR_OT_clarity_shelf_drag_end(wmOperatorType *ot)
 {
   ot->name = "End Shelf Icon Drag";
-  ot->idname = "TOPBAR_OT_maya_shelf_drag_end";
+  ot->idname = "TOPBAR_OT_clarity_shelf_drag_end";
   ot->description = "Stop tracking the shelf drag insertion marker";
   ot->exec = shelf_drag_end_exec;
   ot->flag = OPTYPE_INTERNAL;
+}
+
+static void TOPBAR_OT_maya_shelf_drag_probe_compatibility(wmOperatorType *ot)
+{
+  TOPBAR_OT_clarity_shelf_drag_probe(ot);
+  ot->idname = "TOPBAR_OT_maya_shelf_drag_probe";
+}
+
+static void TOPBAR_OT_maya_shelf_drag_end_compatibility(wmOperatorType *ot)
+{
+  TOPBAR_OT_clarity_shelf_drag_end(ot);
+  ot->idname = "TOPBAR_OT_maya_shelf_drag_end";
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
@@ -517,12 +529,12 @@ static void topbar_shelf_button_colors_apply(ui::Button *button, void * /*user_d
 {
   uchar color[4];
   if (topbar_shelf_color_parse(
-          ui::button_context_string_get(button, "maya_shelf_icon_color"), color))
+          ui::button_context_string_get(button, "clarity_shelf_icon_color"), color))
   {
     ui::button_color_set(button, color);
   }
   if (topbar_shelf_color_parse(
-          ui::button_context_string_get(button, "maya_shelf_background_color"), color))
+          ui::button_context_string_get(button, "clarity_shelf_background_color"), color))
   {
     ui::button_background_color_set(button, color);
   }
@@ -594,8 +606,10 @@ static void TOPBAR_OT_shelf_global_redraw(wmOperatorType *ot)
 static void topbar_operatortypes()
 {
   WM_operatortype_append(TOPBAR_OT_shelf_global_redraw);
-  WM_operatortype_append(TOPBAR_OT_maya_shelf_drag_probe);
-  WM_operatortype_append(TOPBAR_OT_maya_shelf_drag_end);
+  WM_operatortype_append(TOPBAR_OT_clarity_shelf_drag_probe);
+  WM_operatortype_append(TOPBAR_OT_clarity_shelf_drag_end);
+  WM_operatortype_append(TOPBAR_OT_maya_shelf_drag_probe_compatibility);
+  WM_operatortype_append(TOPBAR_OT_maya_shelf_drag_end_compatibility);
 }
 
 static void topbar_keymap(wmKeyConfig * /*keyconf*/) {}

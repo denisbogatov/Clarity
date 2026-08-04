@@ -47,7 +47,7 @@
 #include "GPU_matrix.hh"
 #include "GPU_state.hh"
 
-#include "ED_maya.hh"
+#include "ED_clarity.hh"
 #include "ED_mesh.hh"
 #include "ED_numinput.hh"
 #include "ED_screen.hh"
@@ -116,22 +116,22 @@ struct KnifeColors {
   uchar mesh[3];
 };
 
-struct KnifeMayaLoopPreviewPoint {
+struct KnifeClarityLoopPreviewPoint {
   BMEdge *edge;
   float3 cage;
 };
 
 struct KnifeEdge;
 
-enum class KnifeMayaRedoType : uint8_t {
+enum class KnifeClarityRedoType : uint8_t {
   Point,
   StartPoint,
   DeleteEdge,
   Slice,
 };
 
-struct KnifeMayaRedoAction {
-  KnifeMayaRedoType type;
+struct KnifeClarityRedoAction {
+  KnifeClarityRedoType type;
   float3 cage;
   float2 slice_start;
   float2 slice_end;
@@ -139,7 +139,7 @@ struct KnifeMayaRedoAction {
   bool grid_point;
 };
 
-struct KnifeMayaCutPoint {
+struct KnifeClarityCutPoint {
   float2 mval;
   float3 cage;
   bool grid_point;
@@ -173,7 +173,7 @@ struct KnifeEdge {
   int splits; /* Number of times this edge has been split. */
 };
 
-struct KnifeMayaPerpendicularPreview {
+struct KnifeClarityPerpendicularPreview {
   std::array<float3, 3> directions;
   KnifeEdge *edge;
   BMFace *edge_face;
@@ -236,8 +236,8 @@ struct KnifeUndoFrame {
   int splits;       /* Number of edges split. */
   KnifePosData pos; /* Store previous KnifePosData. */
   KnifeMeasureData mdata;
-  bool maya_prev_grid_point;
-  KnifeEdge *maya_deleted_edge;
+  bool clarity_prev_grid_point;
+  KnifeEdge *clarity_deleted_edge;
 };
 
 struct KnifeBVH {
@@ -379,8 +379,8 @@ struct KnifeTool_OpData {
 
   bool depth_test;
 
-  /* Maya Multi-Cut presentation and interaction settings. */
-  bool maya_style;
+  /* Clarity Multi-Cut presentation and interaction settings. */
+  bool clarity_style;
   float snap_step;
   float smoothing_angle;
   bool edge_flow;
@@ -399,49 +399,49 @@ struct KnifeTool_OpData {
 
   bool snap_to_grid;
   bool snap_to_points;
-  bool maya_curr_grid_point;
-  bool maya_prev_grid_point;
-  bool maya_quick_slice;
-  bool maya_slice_drag;
-  bool maya_slice_result;
-  bool maya_slice_move;
-  size_t maya_slice_undo_count;
-  bool maya_tweak_last;
-  bool maya_tweak_first;
-  bool maya_perpendicular;
-  bool maya_lmb_down;
-  bool maya_lmb_dragged;
-  bool maya_lmb_started_cut;
-  bool maya_lmb_added_cut;
-  bool maya_snap_step_drag;
-  bool maya_replaying_redo;
-  bool maya_loop_insert_down;
-  bool maya_loop_insert_centered;
-  bool maya_loop_preview_has_origin;
-  bool maya_cut_start_valid;
-  int maya_loop_preview_ob_index;
-  int maya_tweak_point_index;
-  int maya_slice_tweak_endpoint;
-  BMEdge *maya_loop_preview_edge;
-  float maya_loop_preview_factor;
-  float2 maya_loop_preview_origin_mval;
-  float3 maya_cut_start_cage;
-  KnifeMayaPerpendicularPreview maya_perpendicular_preview;
-  float2 maya_drag_start;
-  float2 maya_slice_start;
-  float2 maya_slice_end;
-  float2 maya_slice_control_start;
-  float2 maya_slice_control_end;
-  float2 maya_slice_tweak_original_start;
-  float2 maya_slice_tweak_original_end;
-  float2 maya_slice_move_start;
-  float2 maya_slice_move_end;
-  float2 maya_slice_move_control_start;
-  float2 maya_slice_move_control_end;
-  Vector<std::array<float3, 2>> maya_loop_preview_lines;
-  Vector<KnifeMayaLoopPreviewPoint> maya_loop_preview_points;
-  Vector<KnifeMayaRedoAction> maya_redo_actions;
-  Vector<KnifeMayaCutPoint> maya_cut_points;
+  bool clarity_curr_grid_point;
+  bool clarity_prev_grid_point;
+  bool clarity_quick_slice;
+  bool clarity_slice_drag;
+  bool clarity_slice_result;
+  bool clarity_slice_move;
+  size_t clarity_slice_undo_count;
+  bool clarity_tweak_last;
+  bool clarity_tweak_first;
+  bool clarity_perpendicular;
+  bool clarity_lmb_down;
+  bool clarity_lmb_dragged;
+  bool clarity_lmb_started_cut;
+  bool clarity_lmb_added_cut;
+  bool clarity_snap_step_drag;
+  bool clarity_replaying_redo;
+  bool clarity_loop_insert_down;
+  bool clarity_loop_insert_centered;
+  bool clarity_loop_preview_has_origin;
+  bool clarity_cut_start_valid;
+  int clarity_loop_preview_ob_index;
+  int clarity_tweak_point_index;
+  int clarity_slice_tweak_endpoint;
+  BMEdge *clarity_loop_preview_edge;
+  float clarity_loop_preview_factor;
+  float2 clarity_loop_preview_origin_mval;
+  float3 clarity_cut_start_cage;
+  KnifeClarityPerpendicularPreview clarity_perpendicular_preview;
+  float2 clarity_drag_start;
+  float2 clarity_slice_start;
+  float2 clarity_slice_end;
+  float2 clarity_slice_control_start;
+  float2 clarity_slice_control_end;
+  float2 clarity_slice_tweak_original_start;
+  float2 clarity_slice_tweak_original_end;
+  float2 clarity_slice_move_start;
+  float2 clarity_slice_move_end;
+  float2 clarity_slice_move_control_start;
+  float2 clarity_slice_move_control_end;
+  Vector<std::array<float3, 2>> clarity_loop_preview_lines;
+  Vector<KnifeClarityLoopPreviewPoint> clarity_loop_preview_points;
+  Vector<KnifeClarityRedoAction> clarity_redo_actions;
+  Vector<KnifeClarityCutPoint> clarity_cut_points;
 };
 
 enum {
@@ -847,7 +847,7 @@ static void knifetool_draw_visible_angles(const KnifeTool_OpData *kcd)
     float *end;
 
     /* If using relative angle snapping, always draw angle to reference edge. */
-    if (kcd->is_angle_snapping && !kcd->maya_perpendicular &&
+    if (kcd->is_angle_snapping && !kcd->clarity_perpendicular &&
         kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE)
     {
       kfe = kcd->snap_ref_edge;
@@ -968,12 +968,12 @@ static void knife_bm_tri_cagecos_get_worldspace(const KnifeTool_OpData *kcd,
                                                  int tri_index,
                                                  float cos[3][3]);
 static void knife_project_v2(const KnifeTool_OpData *kcd, const float co[3], float sco[2]);
-static bool knife_maya_first_edge_preview_get(const KnifeTool_OpData *kcd,
+static bool knife_clarity_first_edge_preview_get(const KnifeTool_OpData *kcd,
                                               float3 &r_start);
 
-static void knifetool_draw_maya_overlay(const KnifeTool_OpData *kcd)
+static void knifetool_draw_clarity_overlay(const KnifeTool_OpData *kcd)
 {
-  if (!kcd->maya_style || !kcd->use_live_surface ||
+  if (!kcd->clarity_style || !kcd->use_live_surface ||
       (!kcd->mesh_overlay && !kcd->wireframe_overlay))
   {
     return;
@@ -1057,20 +1057,20 @@ static void knifetool_draw_maya_overlay(const KnifeTool_OpData *kcd)
   GPU_depth_test(GPU_DEPTH_NONE);
 }
 
-static void knifetool_draw_maya_edge_percentage(const KnifeTool_OpData *kcd)
+static void knifetool_draw_clarity_edge_percentage(const KnifeTool_OpData *kcd)
 {
-  if (!kcd->maya_style || kcd->maya_slice_drag || kcd->maya_quick_slice) {
+  if (!kcd->clarity_style || kcd->clarity_slice_drag || kcd->clarity_quick_slice) {
     return;
   }
 
   float factor;
   float2 position;
-  if (kcd->maya_loop_preview_has_origin && !kcd->maya_loop_preview_lines.is_empty()) {
-    factor = kcd->maya_loop_preview_factor;
-    position = kcd->maya_loop_preview_origin_mval;
+  if (kcd->clarity_loop_preview_has_origin && !kcd->clarity_loop_preview_lines.is_empty()) {
+    factor = kcd->clarity_loop_preview_factor;
+    position = kcd->clarity_loop_preview_origin_mval;
   }
   else {
-    if (kcd->curr.edge == nullptr || kcd->curr.vert != nullptr || kcd->maya_curr_grid_point) {
+    if (kcd->curr.edge == nullptr || kcd->curr.vert != nullptr || kcd->clarity_curr_grid_point) {
       return;
     }
 
@@ -1109,9 +1109,9 @@ static void knifetool_draw_maya_edge_percentage(const KnifeTool_OpData *kcd)
   GPU_matrix_pop_projection();
 }
 
-static void knifetool_draw_maya_points_overlay(const KnifeTool_OpData *kcd)
+static void knifetool_draw_clarity_points_overlay(const KnifeTool_OpData *kcd)
 {
-  if (!kcd->maya_style) {
+  if (!kcd->clarity_style) {
     return;
   }
 
@@ -1146,7 +1146,7 @@ static void knifetool_draw_maya_points_overlay(const KnifeTool_OpData *kcd)
              screen[1] + half_size);
   };
 
-  const bool has_loop_preview = !kcd->maya_loop_preview_lines.is_empty();
+  const bool has_loop_preview = !kcd->clarity_loop_preview_lines.is_empty();
   if (!has_loop_preview) {
     if (kcd->curr.vert != nullptr) {
       draw_square(kcd->curr.cage, kcd->colors.point, 7.0f);
@@ -1159,9 +1159,9 @@ static void knifetool_draw_maya_points_overlay(const KnifeTool_OpData *kcd)
     }
   }
 
-  if (kcd->maya_tweak_point_index >= 0) {
-    for (const int point_index : kcd->maya_cut_points.index_range()) {
-      draw_square(kcd->maya_cut_points[point_index].cage,
+  if (kcd->clarity_tweak_point_index >= 0) {
+    for (const int point_index : kcd->clarity_cut_points.index_range()) {
+      draw_square(kcd->clarity_cut_points[point_index].cage,
                   point_index == 0 ? kcd->colors.point : committed_point_color,
                   point_index == 0 ? 7.0f : 6.0f);
     }
@@ -1188,7 +1188,7 @@ static void knifetool_draw_maya_points_overlay(const KnifeTool_OpData *kcd)
     }
   }
 
-  if (kcd->maya_snap_step_drag && kcd->curr.edge != nullptr) {
+  if (kcd->clarity_snap_step_drag && kcd->curr.edge != nullptr) {
     const float step = clamp_f(kcd->snap_step * 0.01f, 0.01f, 1.0f);
     const int point_count = max_ii(int(ceilf(1.0f / step)) - 1, 0);
     const uchar black[3] = {0, 0, 0};
@@ -1202,7 +1202,7 @@ static void knifetool_draw_maya_points_overlay(const KnifeTool_OpData *kcd)
   }
 
   if (has_loop_preview) {
-    for (const std::array<float3, 2> &line : kcd->maya_loop_preview_lines) {
+    for (const std::array<float3, 2> &line : kcd->clarity_loop_preview_lines) {
       draw_square(line[0], kcd->colors.curpoint, 6.0f);
       draw_square(line[1], kcd->colors.curpoint, 6.0f);
       for (int subdivision = 1; subdivision < kcd->subdivisions; subdivision++) {
@@ -1216,33 +1216,33 @@ static void knifetool_draw_maya_points_overlay(const KnifeTool_OpData *kcd)
   }
 
   float3 first_edge_start;
-  if (knife_maya_first_edge_preview_get(kcd, first_edge_start)) {
+  if (knife_clarity_first_edge_preview_get(kcd, first_edge_start)) {
     draw_square(first_edge_start, kcd->colors.point, 7.0f);
   }
-  if (kcd->mode == MODE_DRAGGING && kcd->maya_cut_start_valid) {
-    draw_square(kcd->maya_cut_start_cage, kcd->colors.point, 7.0f);
+  if (kcd->mode == MODE_DRAGGING && kcd->clarity_cut_start_valid) {
+    draw_square(kcd->clarity_cut_start_cage, kcd->colors.point, 7.0f);
   }
-  if (kcd->maya_slice_drag || kcd->maya_quick_slice) {
-    draw_screen_square(kcd->maya_drag_start, kcd->colors.point, 7.0f);
+  if (kcd->clarity_slice_drag || kcd->clarity_quick_slice) {
+    draw_screen_square(kcd->clarity_drag_start, kcd->colors.point, 7.0f);
     draw_screen_square(kcd->curr.mval, committed_point_color, 6.0f);
   }
-  else if (kcd->maya_slice_move || kcd->maya_slice_tweak_endpoint >= 0) {
-    const bool tweak_start = kcd->maya_slice_tweak_endpoint == 0;
-    const bool tweak_end = kcd->maya_slice_tweak_endpoint == 1;
-    draw_screen_square(kcd->maya_slice_control_start,
+  else if (kcd->clarity_slice_move || kcd->clarity_slice_tweak_endpoint >= 0) {
+    const bool tweak_start = kcd->clarity_slice_tweak_endpoint == 0;
+    const bool tweak_end = kcd->clarity_slice_tweak_endpoint == 1;
+    draw_screen_square(kcd->clarity_slice_control_start,
                        tweak_start ? kcd->colors.point : committed_point_color,
                        tweak_start ? 7.0f : 6.0f);
-    draw_screen_square(kcd->maya_slice_control_end,
+    draw_screen_square(kcd->clarity_slice_control_end,
                        tweak_end ? kcd->colors.point : committed_point_color,
                        tweak_end ? 7.0f : 6.0f);
   }
 
-  if (kcd->maya_slice_move || kcd->maya_slice_tweak_endpoint >= 0) {
+  if (kcd->clarity_slice_move || kcd->clarity_slice_tweak_endpoint >= 0) {
     immUniformColor3ubv(kcd->colors.line);
     GPU_line_width(2.0f);
     immBegin(GPU_PRIM_LINES, 2);
-    immVertex2fv(pos, kcd->maya_slice_start);
-    immVertex2fv(pos, kcd->maya_slice_end);
+    immVertex2fv(pos, kcd->clarity_slice_start);
+    immVertex2fv(pos, kcd->clarity_slice_end);
     immEnd();
   }
 
@@ -1251,10 +1251,10 @@ static void knifetool_draw_maya_points_overlay(const KnifeTool_OpData *kcd)
   GPU_matrix_pop_projection();
 }
 
-static void knifetool_draw_maya_perpendicular_preview(const KnifeTool_OpData *kcd)
+static void knifetool_draw_clarity_perpendicular_preview(const KnifeTool_OpData *kcd)
 {
-  if (!kcd->maya_style || !kcd->maya_perpendicular ||
-      !kcd->maya_perpendicular_preview.valid || kcd->mode != MODE_DRAGGING)
+  if (!kcd->clarity_style || !kcd->clarity_perpendicular ||
+      !kcd->clarity_perpendicular_preview.valid || kcd->mode != MODE_DRAGGING)
   {
     return;
   }
@@ -1273,7 +1273,7 @@ static void knifetool_draw_maya_perpendicular_preview(const KnifeTool_OpData *kc
   for (int index = 0; index < 3; index++) {
     float2 projected;
     knife_project_v2(
-        kcd, kcd->prev.cage + kcd->maya_perpendicular_preview.directions[index], projected);
+        kcd, kcd->prev.cage + kcd->clarity_perpendicular_preview.directions[index], projected);
     const float length = math::length(projected - origin);
     if (length <= FLT_EPSILON) {
       immUnbindProgram();
@@ -1312,7 +1312,7 @@ static void knifetool_draw_maya_perpendicular_preview(const KnifeTool_OpData *kc
   };
 
   for (int index = 0; index < 3; index++) {
-    const uchar *color = index == kcd->maya_perpendicular_preview.snap_index ?
+    const uchar *color = index == kcd->clarity_perpendicular_preview.snap_index ?
                              active_color :
                              protractor_color;
     draw_dashed_line(origin + screen_dirs[index] * guide_start,
@@ -1340,13 +1340,13 @@ static void knifetool_draw_maya_perpendicular_preview(const KnifeTool_OpData *kc
   }
   immEnd();
 
-  if (kcd->maya_perpendicular_preview.edge != nullptr && kcd->is_angle_snapping) {
+  if (kcd->clarity_perpendicular_preview.edge != nullptr && kcd->is_angle_snapping) {
     float2 edge_point;
     float2 edge_direction_point;
-    knife_project_v2(kcd, kcd->maya_perpendicular_preview.edge_point, edge_point);
+    knife_project_v2(kcd, kcd->clarity_perpendicular_preview.edge_point, edge_point);
     knife_project_v2(kcd,
-                     kcd->maya_perpendicular_preview.edge_point +
-                         kcd->maya_perpendicular_preview.edge_direction,
+                     kcd->clarity_perpendicular_preview.edge_point +
+                         kcd->clarity_perpendicular_preview.edge_direction,
                      edge_direction_point);
     float cut_length;
     float edge_length;
@@ -1362,7 +1362,7 @@ static void knifetool_draw_maya_perpendicular_preview(const KnifeTool_OpData *kc
                        2.0f);
 
       if (math::dot(edge_direction,
-                    kcd->maya_perpendicular_preview.edge_hover_mval - edge_point) < 0.0f)
+                    kcd->clarity_perpendicular_preview.edge_hover_mval - edge_point) < 0.0f)
       {
         edge_direction = -edge_direction;
       }
@@ -1379,8 +1379,8 @@ static void knifetool_draw_maya_perpendicular_preview(const KnifeTool_OpData *kc
       immEnd();
     }
   }
-  else if (kcd->maya_perpendicular_preview.snap_index >= 0 && kcd->is_angle_snapping) {
-    const float2 active_dir = screen_dirs[kcd->maya_perpendicular_preview.snap_index];
+  else if (kcd->clarity_perpendicular_preview.snap_index >= 0 && kcd->is_angle_snapping) {
+    const float2 active_dir = screen_dirs[kcd->clarity_perpendicular_preview.snap_index];
     const float active_length = max_ff(
         math::length(kcd->curr.mval - origin), guide_end);
     draw_dashed_line(origin,
@@ -1390,7 +1390,7 @@ static void knifetool_draw_maya_perpendicular_preview(const KnifeTool_OpData *kc
                      3.5f * UI_SCALE_FAC,
                      2.5f);
 
-    if (kcd->maya_perpendicular_preview.snap_index != 0) {
+    if (kcd->clarity_perpendicular_preview.snap_index != 0) {
       const float marker_size = 14.0f * UI_SCALE_FAC;
       const float2 marker_forward = origin + screen_dirs[0] * marker_size;
       const float2 marker_side = origin + active_dir * marker_size;
@@ -1419,7 +1419,7 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
   GPU_matrix_push_projection();
   GPU_polygon_offset(1.0f, 1.0f);
 
-  knifetool_draw_maya_overlay(kcd);
+  knifetool_draw_clarity_overlay(kcd);
 
   GPUVertFormat *format = immVertexFormat();
   uint pos = GPU_vertformat_attr_add(format, "pos", gpu::VertAttrType::SFLOAT_32_32_32);
@@ -1431,7 +1431,7 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
   /* Needed for AA points. */
   GPU_blend(GPU_BLEND_ALPHA);
 
-  if (!kcd->maya_style) {
+  if (!kcd->clarity_style) {
     if (kcd->prev.vert) {
       immUniformColor3ubv(kcd->colors.point);
       immUniform1f("size", 11 * UI_SCALE_FAC);
@@ -1469,11 +1469,11 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
     }
   }
 
-  if (kcd->depth_test && !kcd->maya_style) {
+  if (kcd->depth_test && !kcd->clarity_style) {
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }
 
-  if (kcd->totkvert > 0 && !kcd->maya_style) {
+  if (kcd->totkvert > 0 && !kcd->clarity_style) {
     BLI_mempool_iter iter;
     KnifeVert *kfv;
     immUniform1f("size", 5.0 * UI_SCALE_FAC);
@@ -1522,29 +1522,29 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
   /* Draw lines. */
   immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
-  if (!kcd->maya_loop_preview_lines.is_empty()) {
+  if (!kcd->clarity_loop_preview_lines.is_empty()) {
     immUniformColor3ubv(kcd->colors.line);
     GPU_line_width(2.0f);
-    immBegin(GPU_PRIM_LINES, int(kcd->maya_loop_preview_lines.size()) * 2);
-    for (const std::array<float3, 2> &line : kcd->maya_loop_preview_lines) {
+    immBegin(GPU_PRIM_LINES, int(kcd->clarity_loop_preview_lines.size()) * 2);
+    for (const std::array<float3, 2> &line : kcd->clarity_loop_preview_lines) {
       immVertex3fv(pos, line[0]);
       immVertex3fv(pos, line[1]);
     }
     immEnd();
   }
 
-  if (kcd->maya_tweak_point_index >= 0 && kcd->maya_cut_points.size() > 1) {
+  if (kcd->clarity_tweak_point_index >= 0 && kcd->clarity_cut_points.size() > 1) {
     immUniformColor3ubv(kcd->colors.line);
     GPU_line_width(2.0f);
-    immBegin(GPU_PRIM_LINE_STRIP, int(kcd->maya_cut_points.size()));
-    for (const KnifeMayaCutPoint &point : kcd->maya_cut_points) {
+    immBegin(GPU_PRIM_LINE_STRIP, int(kcd->clarity_cut_points.size()));
+    for (const KnifeClarityCutPoint &point : kcd->clarity_cut_points) {
       immVertex3fv(pos, point.cage);
     }
     immEnd();
   }
 
   float3 first_edge_start;
-  if (knife_maya_first_edge_preview_get(kcd, first_edge_start)) {
+  if (knife_clarity_first_edge_preview_get(kcd, first_edge_start)) {
     immUniformColor3ubv(kcd->colors.line);
     GPU_line_width(2.0f);
     immBegin(GPU_PRIM_LINES, 2);
@@ -1553,11 +1553,11 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
     immEnd();
   }
 
-  if (kcd->mode == MODE_DRAGGING && kcd->maya_tweak_point_index < 0) {
+  if (kcd->mode == MODE_DRAGGING && kcd->clarity_tweak_point_index < 0) {
     immUniformColor3ubv(kcd->colors.line);
     GPU_line_width(2.0);
 
-    if (kcd->maya_style && (kcd->maya_slice_drag || kcd->maya_quick_slice) &&
+    if (kcd->clarity_style && (kcd->clarity_slice_drag || kcd->clarity_quick_slice) &&
         !compare_v3v3(kcd->prev.cage, kcd->curr.cage, KNIFE_FLT_EPSBIG))
     {
       const float3 direction = math::normalize(kcd->curr.cage - kcd->prev.cage) *
@@ -1569,7 +1569,7 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
       immVertex3fv(pos, line_end);
       immEnd();
     }
-    else if (!(kcd->maya_style && kcd->maya_perpendicular && kcd->is_angle_snapping)) {
+    else if (!(kcd->clarity_style && kcd->clarity_perpendicular && kcd->is_angle_snapping)) {
       immBegin(GPU_PRIM_LINES, 2);
       immVertex3fv(pos, kcd->prev.cage);
       immVertex3fv(pos, kcd->curr.cage);
@@ -1590,7 +1590,7 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
     immEnd();
   }
 
-  if (kcd->totkedge > 0 && kcd->maya_tweak_point_index < 0) {
+  if (kcd->totkedge > 0 && kcd->clarity_tweak_point_index < 0) {
     BLI_mempool_iter iter;
     KnifeEdge *kfe;
 
@@ -1618,7 +1618,7 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
   }
 
   /* Draw relative angle snapping reference edge. */
-  if (kcd->is_angle_snapping && !kcd->maya_perpendicular &&
+  if (kcd->is_angle_snapping && !kcd->clarity_perpendicular &&
       kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE)
   {
     immUniformColor3ubv(kcd->colors.edge_extra);
@@ -1679,12 +1679,12 @@ static void knifetool_draw(const bContext * /*C*/, ARegion * /*region*/, void *a
 
   GPU_depth_test(GPU_DEPTH_NONE);
 
-  knifetool_draw_maya_perpendicular_preview(kcd);
-  knifetool_draw_maya_points_overlay(kcd);
-  knifetool_draw_maya_edge_percentage(kcd);
+  knifetool_draw_clarity_perpendicular_preview(kcd);
+  knifetool_draw_clarity_points_overlay(kcd);
+  knifetool_draw_clarity_edge_percentage(kcd);
 
   if (kcd->mode == MODE_DRAGGING) {
-    if (kcd->is_angle_snapping && !kcd->maya_perpendicular) {
+    if (kcd->is_angle_snapping && !kcd->clarity_perpendicular) {
       knifetool_draw_angle_snapping(kcd);
     }
     else if (kcd->axis_constrained) {
@@ -1715,8 +1715,8 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
   };
 
   WorkspaceStatus status(C);
-  if (kcd->maya_style) {
-    if (kcd->maya_slice_result) {
+  if (kcd->clarity_style) {
+    if (kcd->clarity_slice_result) {
       status.item(IFACE_("Move Slice End"), ICON_MOUSE_LMB_DRAG);
       status.item(IFACE_("Move Slice"), ICON_MOUSE_MMB_DRAG);
       status.item(IFACE_("Undo Slice"), ICON_EVENT_BACKSPACE);
@@ -2491,7 +2491,7 @@ static void knife_snap_curr(KnifeTool_OpData *kcd,
                             const float3 &ray_dir,
                             const float3 *curr_cage_constrain,
                             const float3 *fallback);
-static void knife_maya_snap_curr_to_grid(KnifeTool_OpData *kcd);
+static void knife_clarity_snap_curr_to_grid(KnifeTool_OpData *kcd);
 
 /* User has just clicked for first time or first time after a restart (E key).
  * Copy the current position data into prev. */
@@ -2503,9 +2503,9 @@ static void knife_start_cut(KnifeTool_OpData *kcd, const float2 &mval)
       kcd->vc.depsgraph, kcd->region, kcd->vc.v3d, mval, ray_orig, ray_dir, false);
 
   knife_snap_curr(kcd, mval, ray_orig, ray_dir, nullptr, nullptr);
-  knife_maya_snap_curr_to_grid(kcd);
+  knife_clarity_snap_curr_to_grid(kcd);
   kcd->prev = kcd->curr;
-  kcd->maya_prev_grid_point = kcd->maya_curr_grid_point;
+  kcd->clarity_prev_grid_point = kcd->clarity_curr_grid_point;
   kcd->mdata.is_stored = false;
 }
 
@@ -2803,13 +2803,13 @@ static void knife_make_face_cuts(KnifeTool_OpData *kcd,
     else {
       if (kfe->v1->v == nullptr) {
         kfe->v1->v = BM_vert_create(bm, kfe->v1->co, nullptr, eBMCreateFlag(0));
-        if (kcd->maya_style) {
+        if (kcd->clarity_style) {
           created_verts.add(kfe->v1->v);
         }
       }
       if (kfe->v2->v == nullptr) {
         kfe->v2->v = BM_vert_create(bm, kfe->v2->co, nullptr, eBMCreateFlag(0));
-        if (kcd->maya_style) {
+        if (kcd->clarity_style) {
           created_verts.add(kfe->v2->v);
         }
       }
@@ -2863,7 +2863,7 @@ static void knife_make_face_cuts(KnifeTool_OpData *kcd,
       BM_face_split_edgenet(bm, f, edge_array, edge_array_len, nullptr);
     }
 
-    /* Remove dangling edges. Maya Multi-Cut also removes the temporary interior vertices because
+    /* Remove dangling edges. Clarity Multi-Cut also removes the temporary interior vertices because
      * an incomplete segment must not leave isolated points after confirmation. */
     for (i = 0; i < edge_array_len_orig; i++) {
       if (kfe_array[i] == nullptr) {
@@ -2877,7 +2877,7 @@ static void knife_make_face_cuts(KnifeTool_OpData *kcd,
         dangling_kfe->e = nullptr;
         for (int vert_index = 0; vert_index < 2; vert_index++) {
           BMVert *vert = verts[vert_index];
-          if (kcd->maya_style && created_verts.contains(vert) && vert->e == nullptr) {
+          if (kcd->clarity_style && created_verts.contains(vert) && vert->e == nullptr) {
             knife_verts[vert_index]->v = nullptr;
             BM_vert_kill(bm, vert);
           }
@@ -3010,19 +3010,19 @@ static void knife_make_cuts(KnifeTool_OpData *kcd, int ob_index)
 static void knife_add_cut(KnifeTool_OpData *kcd)
 {
 
-  if (kcd->maya_style && !kcd->maya_replaying_redo) {
-    kcd->maya_redo_actions.clear();
+  if (kcd->clarity_style && !kcd->clarity_replaying_redo) {
+    kcd->clarity_redo_actions.clear();
   }
 
   /* Allocate new undo frame on stack, unless cut is being dragged. */
   if (!kcd->is_drag_undo) {
     kcd->undo = static_cast<KnifeUndoFrame *>(BLI_stack_push_r(kcd->undostack));
     kcd->undo->pos = kcd->prev;
-    kcd->undo->maya_prev_grid_point = kcd->maya_prev_grid_point;
+    kcd->undo->clarity_prev_grid_point = kcd->clarity_prev_grid_point;
     kcd->undo->cuts = 0;
     kcd->undo->splits = 0;
     kcd->undo->mdata = kcd->mdata;
-    kcd->undo->maya_deleted_edge = nullptr;
+    kcd->undo->clarity_deleted_edge = nullptr;
     kcd->is_drag_undo = true;
   }
 
@@ -3035,7 +3035,7 @@ static void knife_add_cut(KnifeTool_OpData *kcd)
   if (kcd->linehits.is_empty()) {
     if (kcd->is_drag_hold == false) {
       kcd->prev = kcd->curr;
-      kcd->maya_prev_grid_point = kcd->maya_curr_grid_point;
+      kcd->clarity_prev_grid_point = kcd->clarity_curr_grid_point;
     }
     return;
   }
@@ -3076,7 +3076,7 @@ static void knife_add_cut(KnifeTool_OpData *kcd)
 
   /* Set up for next cut. */
   kcd->prev = kcd->curr;
-  kcd->maya_prev_grid_point = kcd->maya_curr_grid_point;
+  kcd->clarity_prev_grid_point = kcd->clarity_curr_grid_point;
 
   if (kcd->prev.bmface) {
     /* Was "in face" but now we have a KnifeVert it is snapped to. */
@@ -3806,7 +3806,7 @@ static bool knife_find_closest_face(KnifeTool_OpData *kcd,
   BMFace *f;
   float dist = KMAXDIST;
 
-  kcd->bvh.cull_backfaces = kcd->maya_style && !kcd->snap_to_backfaces;
+  kcd->bvh.cull_backfaces = kcd->clarity_style && !kcd->snap_to_backfaces;
   f = knife_bvh_raycast(kcd, ray_orig, ray_dir, 0.0f, nullptr, cage, &ob_index);
   kcd->bvh.cull_backfaces = false;
 
@@ -4025,7 +4025,7 @@ static bool knife_find_closest_edge_of_face(KnifeTool_OpData *kcd,
 
     r_kpd->edge = kfe;
     if (kcd->snap_midpoints) {
-      if (kcd->maya_style && kcd->maya_snap_step_drag) {
+      if (kcd->clarity_style && kcd->clarity_snap_step_drag) {
         const float step = clamp_f(kcd->snap_step * 0.01f, 0.01f, 1.0f);
         const float edge_factor = clamp_f(
             line_point_factor_v3(test_cagep, kfe->v1->cageco, kfe->v2->cageco), 0.0f, 1.0f);
@@ -4174,9 +4174,9 @@ static bool knife_snap_angle_screen(const KnifeTool_OpData *kcd,
   return knife_snap_angle_impl(kcd, vec_x, vec_z, ray_orig, ray_dir, r_cage, r_angle);
 }
 
-static void knife_maya_perpendicular_preview_clear(KnifeTool_OpData *kcd)
+static void knife_clarity_perpendicular_preview_clear(KnifeTool_OpData *kcd)
 {
-  KnifeMayaPerpendicularPreview &preview = kcd->maya_perpendicular_preview;
+  KnifeClarityPerpendicularPreview &preview = kcd->clarity_perpendicular_preview;
   preview.edge = nullptr;
   preview.edge_face = nullptr;
   preview.edge_ob_index = -1;
@@ -4184,15 +4184,15 @@ static void knife_maya_perpendicular_preview_clear(KnifeTool_OpData *kcd)
   preview.valid = false;
 }
 
-/* Maya also offers the perpendicular foot on a hovered edge, independently of the three
+/* Clarity also offers the perpendicular foot on a hovered edge, independently of the three
  * protractor directions based on the previous cut segment. */
-static bool knife_maya_perpendicular_edge_snap_get(KnifeTool_OpData *kcd,
+static bool knife_clarity_perpendicular_edge_snap_get(KnifeTool_OpData *kcd,
                                                    const int ob_index,
                                                    BMFace *face,
                                                    const float2 &mval,
                                                    float3 &r_cage)
 {
-  KnifeMayaPerpendicularPreview &preview = kcd->maya_perpendicular_preview;
+  KnifeClarityPerpendicularPreview &preview = kcd->clarity_perpendicular_preview;
   float closest_distance_sq = square_f(kcd->ethresh);
   KnifeEdge *closest_edge = nullptr;
   float3 closest_point;
@@ -4253,14 +4253,14 @@ static bool knife_maya_perpendicular_edge_snap_get(KnifeTool_OpData *kcd,
   return true;
 }
 
-static bool knife_maya_snap_angle_perpendicular(KnifeTool_OpData *kcd,
+static bool knife_clarity_snap_angle_perpendicular(KnifeTool_OpData *kcd,
                                                 const float2 &mval,
                                                 const float3 &ray_orig,
                                                 const float3 &ray_dir,
                                                 float3 &r_cage,
                                                 float &r_angle)
 {
-  knife_maya_perpendicular_preview_clear(kcd);
+  knife_clarity_perpendicular_preview_clear(kcd);
   if (!kcd->mdata.is_stored || kcd->prev.is_space() ||
       compare_v3v3(kcd->mdata.cage, kcd->prev.cage, KNIFE_FLT_EPSBIG))
   {
@@ -4293,13 +4293,13 @@ static bool knife_maya_snap_angle_perpendicular(KnifeTool_OpData *kcd,
     return false;
   }
 
-  KnifeMayaPerpendicularPreview &preview = kcd->maya_perpendicular_preview;
+  KnifeClarityPerpendicularPreview &preview = kcd->clarity_perpendicular_preview;
   preview.directions[0] = forward;
   preview.directions[1] = perpendicular;
   preview.directions[2] = -perpendicular;
   preview.valid = true;
 
-  if (knife_maya_perpendicular_edge_snap_get(kcd, ob_index, face, mval, r_cage)) {
+  if (knife_clarity_perpendicular_edge_snap_get(kcd, ob_index, face, mval, r_cage)) {
     r_angle = float(M_PI_2);
     return true;
   }
@@ -4602,10 +4602,10 @@ static void knife_snap_curr(KnifeTool_OpData *kcd,
  * In this case the selection-buffer is used to select the face,
  * then the closest `vert` or `edge` is set, and those will enable `is_co_set`.
  */
-static void knife_maya_snap_curr_to_grid(KnifeTool_OpData *kcd)
+static void knife_clarity_snap_curr_to_grid(KnifeTool_OpData *kcd)
 {
-  kcd->maya_curr_grid_point = false;
-  if (!kcd->maya_style || !kcd->snap_to_grid) {
+  kcd->clarity_curr_grid_point = false;
+  if (!kcd->clarity_style || !kcd->snap_to_grid) {
     return;
   }
 
@@ -4622,7 +4622,7 @@ static void knife_maya_snap_curr_to_grid(KnifeTool_OpData *kcd)
   knife_pos_data_clear(&kcd->curr);
   kcd->curr.cage = snapped;
   knife_project_v2(kcd, kcd->curr.cage, kcd->curr.mval);
-  kcd->maya_curr_grid_point = true;
+  kcd->clarity_curr_grid_point = true;
 }
 
 static void knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float2 &mval)
@@ -4641,13 +4641,13 @@ static void knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float2 &mva
 
   bool is_constrained = false;
   kcd->is_angle_snapping = false;
-  if (!kcd->maya_perpendicular) {
-    knife_maya_perpendicular_preview_clear(kcd);
+  if (!kcd->clarity_perpendicular) {
+    knife_clarity_perpendicular_preview_clear(kcd);
   }
   if (kcd->mode == MODE_DRAGGING) {
     if (kcd->angle_snapping) {
-      if (kcd->maya_style && kcd->maya_perpendicular) {
-        kcd->is_angle_snapping = knife_maya_snap_angle_perpendicular(
+      if (kcd->clarity_style && kcd->clarity_perpendicular) {
+        kcd->is_angle_snapping = knife_clarity_snap_angle_perpendicular(
             kcd, mval, ray_orig, ray_dir, kcd->curr.cage, kcd->angle);
       }
       else if (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_SCREEN) {
@@ -4699,9 +4699,9 @@ static void knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float2 &mva
                   is_constrained ? &curr_cage_constrain : nullptr,
                   is_constrained ? &fallback : nullptr);
 
-  const KnifeMayaPerpendicularPreview &perpendicular_preview =
-      kcd->maya_perpendicular_preview;
-  if (kcd->maya_perpendicular && kcd->is_angle_snapping &&
+  const KnifeClarityPerpendicularPreview &perpendicular_preview =
+      kcd->clarity_perpendicular_preview;
+  if (kcd->clarity_perpendicular && kcd->is_angle_snapping &&
       perpendicular_preview.edge != nullptr)
   {
     knife_pos_data_clear(&kcd->curr);
@@ -4712,7 +4712,7 @@ static void knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float2 &mva
     knife_project_v2(kcd, kcd->curr.cage, kcd->curr.mval);
   }
 
-  knife_maya_snap_curr_to_grid(kcd);
+  knife_clarity_snap_curr_to_grid(kcd);
 }
 
 /**
@@ -4731,10 +4731,10 @@ static void knifetool_undo(KnifeTool_OpData *kcd)
 
   undo = static_cast<KnifeUndoFrame *>(BLI_stack_peek(kcd->undostack));
 
-  if (undo->maya_deleted_edge != nullptr) {
-    undo->maya_deleted_edge->is_invalid = false;
+  if (undo->clarity_deleted_edge != nullptr) {
+    undo->clarity_deleted_edge->is_invalid = false;
     kcd->prev = undo->pos;
-    kcd->maya_prev_grid_point = undo->maya_prev_grid_point;
+    kcd->clarity_prev_grid_point = undo->clarity_prev_grid_point;
     kcd->mdata = undo->mdata;
     BLI_stack_discard(kcd->undostack);
     return;
@@ -4797,7 +4797,7 @@ static void knifetool_undo(KnifeTool_OpData *kcd)
   if (ELEM(kcd->mode, MODE_DRAGGING, MODE_IDLE)) {
     /* Restore kcd->prev. */
     kcd->prev = undo->pos;
-    kcd->maya_prev_grid_point = undo->maya_prev_grid_point;
+    kcd->clarity_prev_grid_point = undo->clarity_prev_grid_point;
   }
 
   /* Restore data for distance and angle measurements. */
@@ -4878,7 +4878,7 @@ static void knife_init_colors(KnifeColors *colors)
   ui::theme::get_color_type_3ubv(TH_TRANSFORM, SPACE_VIEW3D, colors->axis_extra);
 }
 
-static void knife_maya_settings_from_properties(PointerRNA *properties, KnifeTool_OpData *kcd)
+static void knife_clarity_settings_from_properties(PointerRNA *properties, KnifeTool_OpData *kcd)
 {
   kcd->snap_step = RNA_float_get(properties, "snap_step");
   kcd->smoothing_angle = RNA_float_get(properties, "smoothing_angle");
@@ -4916,7 +4916,7 @@ static void knife_maya_settings_from_properties(PointerRNA *properties, KnifeToo
   rgb_float_to_uchar(kcd->colors.mesh, color);
 }
 
-static void knife_maya_settings_sync(const bContext *C,
+static void knife_clarity_settings_sync(const bContext *C,
                                      const wmOperator *op,
                                      KnifeTool_OpData *kcd)
 {
@@ -4925,10 +4925,10 @@ static void knife_maya_settings_sync(const bContext *C,
   if (tref != nullptr &&
       WM_toolsystem_ref_properties_get_from_operator(tref, op->type, &tool_properties))
   {
-    knife_maya_settings_from_properties(&tool_properties, kcd);
+    knife_clarity_settings_from_properties(&tool_properties, kcd);
     return;
   }
-  knife_maya_settings_from_properties(op->ptr, kcd);
+  knife_clarity_settings_from_properties(op->ptr, kcd);
 }
 
 /* called when modal loop selection gets set up... */
@@ -4980,16 +4980,16 @@ static void knifetool_init(ViewContext *vc,
   kcd->angle_snapping_mode = angle_snapping;
   kcd->angle_snapping = (kcd->angle_snapping_mode != KNF_CONSTRAIN_ANGLE_MODE_NONE);
   kcd->angle_snapping_increment = angle_snapping_increment;
-  kcd->maya_loop_preview_has_origin = false;
-  kcd->maya_loop_preview_ob_index = -1;
-  kcd->maya_loop_preview_edge = nullptr;
-  kcd->maya_perpendicular = false;
-  knife_maya_perpendicular_preview_clear(kcd);
-  kcd->maya_cut_start_valid = false;
-  kcd->maya_replaying_redo = false;
-  kcd->maya_tweak_point_index = -1;
-  kcd->maya_slice_move = false;
-  kcd->maya_slice_tweak_endpoint = -1;
+  kcd->clarity_loop_preview_has_origin = false;
+  kcd->clarity_loop_preview_ob_index = -1;
+  kcd->clarity_loop_preview_edge = nullptr;
+  kcd->clarity_perpendicular = false;
+  knife_clarity_perpendicular_preview_clear(kcd);
+  kcd->clarity_cut_start_valid = false;
+  kcd->clarity_replaying_redo = false;
+  kcd->clarity_tweak_point_index = -1;
+  kcd->clarity_slice_move = false;
+  kcd->clarity_slice_tweak_endpoint = -1;
 
   kcd->arena = BLI_memarena_new(MEM_SIZE_OPTIMAL(1 << 15), "knife");
 #ifdef USE_NET_ISLAND_CONNECT
@@ -5115,7 +5115,7 @@ static void knifetool_update_mval(KnifeTool_OpData *kcd, const float2 &mval)
   }
 }
 
-static bool knife_maya_slice_line_expand(const KnifeTool_OpData *kcd,
+static bool knife_clarity_slice_line_expand(const KnifeTool_OpData *kcd,
                                          const float2 &control_start,
                                          const float2 &control_end,
                                          float2 &r_slice_start,
@@ -5135,13 +5135,13 @@ static bool knife_maya_slice_line_expand(const KnifeTool_OpData *kcd,
   return true;
 }
 
-static bool knife_maya_commit_slice(KnifeTool_OpData *kcd,
+static bool knife_clarity_commit_slice(KnifeTool_OpData *kcd,
                                     const float2 &drag_start,
                                     const float2 &drag_end)
 {
   float2 slice_start;
   float2 slice_end;
-  if (!knife_maya_slice_line_expand(kcd, drag_start, drag_end, slice_start, slice_end)) {
+  if (!knife_clarity_slice_line_expand(kcd, drag_start, drag_end, slice_start, slice_end)) {
     return false;
   }
   const size_t undo_count = BLI_stack_count(kcd->undostack);
@@ -5169,16 +5169,16 @@ static bool knife_maya_commit_slice(KnifeTool_OpData *kcd,
     knife_pos_data_clear(&kcd->prev);
     knife_pos_data_clear(&kcd->curr);
     kcd->no_cuts = no_cuts;
-    kcd->maya_slice_result = false;
+    kcd->clarity_slice_result = false;
     return false;
   }
   kcd->no_cuts = false;
-  kcd->maya_slice_result = true;
-  kcd->maya_slice_undo_count = undo_count;
-  kcd->maya_slice_start = slice_start;
-  kcd->maya_slice_end = slice_end;
-  kcd->maya_slice_control_start = drag_start;
-  kcd->maya_slice_control_end = drag_end;
+  kcd->clarity_slice_result = true;
+  kcd->clarity_slice_undo_count = undo_count;
+  kcd->clarity_slice_start = slice_start;
+  kcd->clarity_slice_end = slice_end;
+  kcd->clarity_slice_control_start = drag_start;
+  kcd->clarity_slice_control_end = drag_end;
   return true;
 }
 
@@ -5188,12 +5188,12 @@ static bool knife_maya_commit_slice(KnifeTool_OpData *kcd,
 /** \name Finalization
  * \{ */
 
-static bool knife_maya_face_tag_test(const BMFace *face, void * /*user_data*/)
+static bool knife_clarity_face_tag_test(const BMFace *face, void * /*user_data*/)
 {
   return BM_elem_flag_test(face, BM_ELEM_TAG);
 }
 
-static void knife_maya_apply_cut_settings(KnifeTool_OpData *kcd, const int ob_index)
+static void knife_clarity_apply_cut_settings(KnifeTool_OpData *kcd, const int ob_index)
 {
   BMesh *bm = BKE_editmesh_from_object(kcd->objects[ob_index])->bm;
   bool has_cut_edges = false;
@@ -5237,15 +5237,15 @@ static void knife_maya_apply_cut_settings(KnifeTool_OpData *kcd, const int ob_in
   BM_mesh_elem_hflag_disable_all(bm, BM_EDGE, BM_ELEM_TAG, false);
 }
 
-static void knife_maya_apply_slice_result(KnifeTool_OpData *kcd, const int ob_index)
+static void knife_clarity_apply_slice_result(KnifeTool_OpData *kcd, const int ob_index)
 {
-  if (!kcd->maya_slice_result || (!kcd->delete_faces && !kcd->extract_faces)) {
+  if (!kcd->clarity_slice_result || (!kcd->delete_faces && !kcd->extract_faces)) {
     return;
   }
 
   Object *ob = kcd->objects[ob_index];
   BMesh *bm = BKE_editmesh_from_object(ob)->bm;
-  const float2 line = kcd->maya_slice_end - kcd->maya_slice_start;
+  const float2 line = kcd->clarity_slice_end - kcd->clarity_slice_start;
   if (math::length_squared(line) <= FLT_EPSILON) {
     return;
   }
@@ -5262,14 +5262,14 @@ static void knife_maya_apply_slice_result(KnifeTool_OpData *kcd, const int ob_in
     {
       continue;
     }
-    const float2 relative = float2(center_screen) - kcd->maya_slice_start;
+    const float2 relative = float2(center_screen) - kcd->clarity_slice_start;
     if (line.x * relative.y - line.y * relative.x < 0.0f) {
       BM_elem_flag_enable(face, BM_ELEM_TAG);
     }
   }
 
   if (kcd->extract_faces) {
-    BM_mesh_separate_faces(bm, knife_maya_face_tag_test, nullptr);
+    BM_mesh_separate_faces(bm, knife_clarity_face_tag_test, nullptr);
 
     BM_mesh_elem_hflag_disable_all(bm, BM_VERT, BM_ELEM_TAG, false);
     BM_ITER_MESH (face, &iter, bm, BM_FACES_OF_MESH) {
@@ -5305,9 +5305,9 @@ static void knife_maya_apply_slice_result(KnifeTool_OpData *kcd, const int ob_in
 static void knifetool_finish_single_pre(KnifeTool_OpData *kcd, int ob_index)
 {
   knife_make_cuts(kcd, ob_index);
-  if (kcd->maya_style) {
-    knife_maya_apply_cut_settings(kcd, ob_index);
-    knife_maya_apply_slice_result(kcd, ob_index);
+  if (kcd->clarity_style) {
+    knife_clarity_apply_cut_settings(kcd, ob_index);
+    knife_clarity_apply_slice_result(kcd, ob_index);
   }
 }
 
@@ -5360,15 +5360,15 @@ static void knifetool_cancel(bContext * /*C*/, wmOperator *op)
   knifetool_exit(op);
 }
 
-static wmOperatorStatus knife_maya_insert_edge_loop_and_restart(bContext *C,
+static wmOperatorStatus knife_clarity_insert_edge_loop_and_restart(bContext *C,
                                                                 wmOperator *op,
                                                                 const wmEvent *event,
                                                                 bool centered);
-static wmOperatorStatus knife_maya_restart_session(bContext *C,
+static wmOperatorStatus knife_clarity_restart_session(bContext *C,
                                                    wmOperator *op,
                                                    const wmEvent *event,
                                                    bool commit_current);
-static void knife_maya_cut_path_seed_from_face(KnifeTool_OpData *kcd,
+static void knife_clarity_cut_path_seed_from_face(KnifeTool_OpData *kcd,
                                                const float3 &start_cage);
 
 wmKeyMap *knifetool_modal_keymap(wmKeyConfig *keyconf)
@@ -5476,7 +5476,7 @@ static void knifetool_disable_orientation_locking(KnifeTool_OpData *kcd)
   kcd->axis_constrained = false;
 }
 
-static BMVert *knife_maya_face_closest_vertex(const KnifeTool_OpData *kcd,
+static BMVert *knife_clarity_face_closest_vertex(const KnifeTool_OpData *kcd,
                                               const KnifePosData &face_point,
                                               float3 &r_cage_world)
 {
@@ -5509,17 +5509,17 @@ static BMVert *knife_maya_face_closest_vertex(const KnifeTool_OpData *kcd,
   return closest_vert;
 }
 
-static bool knife_maya_first_edge_preview_get(const KnifeTool_OpData *kcd, float3 &r_start)
+static bool knife_clarity_first_edge_preview_get(const KnifeTool_OpData *kcd, float3 &r_start)
 {
-  if (!kcd->maya_style || kcd->mode != MODE_IDLE ||
-      !kcd->maya_loop_preview_lines.is_empty())
+  if (!kcd->clarity_style || kcd->mode != MODE_IDLE ||
+      !kcd->clarity_loop_preview_lines.is_empty())
   {
     return false;
   }
-  return knife_maya_face_closest_vertex(kcd, kcd->curr, r_start) != nullptr;
+  return knife_clarity_face_closest_vertex(kcd, kcd->curr, r_start) != nullptr;
 }
 
-static bool knife_maya_seed_cut_from_face(KnifeTool_OpData *kcd)
+static bool knife_clarity_seed_cut_from_face(KnifeTool_OpData *kcd)
 {
   const KnifePosData face_point = kcd->prev;
   if (face_point.bmface == nullptr || face_point.edge != nullptr || face_point.vert != nullptr ||
@@ -5531,7 +5531,7 @@ static bool knife_maya_seed_cut_from_face(KnifeTool_OpData *kcd)
   BM_mesh_elem_index_ensure(
       kcd->objects_info[face_point.ob_index].em->bm, BM_VERT);
   float3 closest_cage;
-  BMVert *closest_vert = knife_maya_face_closest_vertex(kcd, face_point, closest_cage);
+  BMVert *closest_vert = knife_clarity_face_closest_vertex(kcd, face_point, closest_cage);
   if (closest_vert == nullptr) {
     return false;
   }
@@ -5541,17 +5541,17 @@ static bool knife_maya_seed_cut_from_face(KnifeTool_OpData *kcd)
   kcd->prev.vert = knife_vert;
   kcd->prev.ob_index = face_point.ob_index;
   kcd->prev.cage = knife_vert->cageco;
-  kcd->maya_prev_grid_point = false;
-  kcd->maya_cut_start_valid = true;
-  kcd->maya_cut_start_cage = closest_cage;
+  kcd->clarity_prev_grid_point = false;
+  kcd->clarity_cut_start_valid = true;
+  kcd->clarity_cut_start_cage = closest_cage;
   knife_project_v2(kcd, kcd->prev.cage, kcd->prev.mval);
   knifetool_update_mval(kcd, face_point.mval);
   knife_add_cut(kcd);
-  knife_maya_cut_path_seed_from_face(kcd, closest_cage);
+  knife_clarity_cut_path_seed_from_face(kcd, closest_cage);
   return true;
 }
 
-static float3 knife_maya_vert_world(const KnifeTool_OpData *kcd,
+static float3 knife_clarity_vert_world(const KnifeTool_OpData *kcd,
                                     const int ob_index,
                                     const BMVert *vert)
 {
@@ -5562,7 +5562,7 @@ static float3 knife_maya_vert_world(const KnifeTool_OpData *kcd,
   return cage_world;
 }
 
-static BMEdge *knife_maya_face_edge_closest_to_mval(const KnifeTool_OpData *kcd,
+static BMEdge *knife_clarity_face_edge_closest_to_mval(const KnifeTool_OpData *kcd,
                                                     const int ob_index,
                                                     BMFace *face,
                                                     const float2 &mval)
@@ -5574,8 +5574,8 @@ static BMEdge *knife_maya_face_edge_closest_to_mval(const KnifeTool_OpData *kcd,
   BMEdge *edge;
   BM_ITER_ELEM (edge, &iter, face, BM_EDGES_OF_FACE) {
     const float3 edge_world[2] = {
-        knife_maya_vert_world(kcd, ob_index, edge->v1),
-        knife_maya_vert_world(kcd, ob_index, edge->v2),
+        knife_clarity_vert_world(kcd, ob_index, edge->v1),
+        knife_clarity_vert_world(kcd, ob_index, edge->v2),
     };
     float2 edge_screen[2];
     knife_project_v2(kcd, edge_world[0], edge_screen[0]);
@@ -5589,7 +5589,7 @@ static BMEdge *knife_maya_face_edge_closest_to_mval(const KnifeTool_OpData *kcd,
   return closest_edge;
 }
 
-static BMLoop *knife_maya_face_loop_for_edge(BMFace *face, const BMEdge *edge)
+static BMLoop *knife_clarity_face_loop_for_edge(BMFace *face, const BMEdge *edge)
 {
   BMLoop *loop = BM_FACE_FIRST_LOOP(face);
   BMLoop *loop_iter = loop;
@@ -5601,19 +5601,19 @@ static BMLoop *knife_maya_face_loop_for_edge(BMFace *face, const BMEdge *edge)
   return nullptr;
 }
 
-static void knife_maya_loop_preview_point_add(KnifeTool_OpData *kcd,
+static void knife_clarity_loop_preview_point_add(KnifeTool_OpData *kcd,
                                               BMEdge *edge,
                                               const float3 &cage)
 {
-  for (const KnifeMayaLoopPreviewPoint &point : kcd->maya_loop_preview_points) {
+  for (const KnifeClarityLoopPreviewPoint &point : kcd->clarity_loop_preview_points) {
     if (point.edge == edge) {
       return;
     }
   }
-  kcd->maya_loop_preview_points.append(KnifeMayaLoopPreviewPoint{edge, cage});
+  kcd->clarity_loop_preview_points.append(KnifeClarityLoopPreviewPoint{edge, cage});
 }
 
-static bool knife_maya_loop_face_exit_get(const KnifeTool_OpData *kcd,
+static bool knife_clarity_loop_face_exit_get(const KnifeTool_OpData *kcd,
                                           const int ob_index,
                                           BMFace *face,
                                           BMEdge *entry_edge,
@@ -5624,13 +5624,13 @@ static bool knife_maya_loop_face_exit_get(const KnifeTool_OpData *kcd,
   if (face == nullptr || face->len < 4) {
     return false;
   }
-  BMLoop *loop = knife_maya_face_loop_for_edge(face, entry_edge);
+  BMLoop *loop = knife_clarity_face_loop_for_edge(face, entry_edge);
   if (loop == nullptr) {
     return false;
   }
 
-  const float3 edge_start = knife_maya_vert_world(kcd, ob_index, loop->v);
-  const float3 edge_end = knife_maya_vert_world(kcd, ob_index, loop->next->v);
+  const float3 edge_start = knife_clarity_vert_world(kcd, ob_index, loop->v);
+  const float3 edge_end = knife_clarity_vert_world(kcd, ob_index, loop->next->v);
   const float factor = clamp_f(
       line_point_factor_v3(entry_point, edge_start, edge_end), 0.0f, 1.0f);
 
@@ -5659,8 +5659,8 @@ static bool knife_maya_loop_face_exit_get(const KnifeTool_OpData *kcd,
         continue;
       }
 
-      const float3 candidate_start = knife_maya_vert_world(kcd, ob_index, candidate_iter->v);
-      const float3 candidate_end = knife_maya_vert_world(
+      const float3 candidate_start = knife_clarity_vert_world(kcd, ob_index, candidate_iter->v);
+      const float3 candidate_end = knife_clarity_vert_world(
           kcd, ob_index, candidate_iter->next->v);
       float3 candidate_direction = candidate_end - candidate_start;
       if (normalize_v3(candidate_direction) <= FLT_EPSILON) {
@@ -5685,13 +5685,13 @@ static bool knife_maya_loop_face_exit_get(const KnifeTool_OpData *kcd,
     }
   }
 
-  const float3 opposite_start = knife_maya_vert_world(kcd, ob_index, r_opposite->next->v);
-  const float3 opposite_end = knife_maya_vert_world(kcd, ob_index, r_opposite->v);
+  const float3 opposite_start = knife_clarity_vert_world(kcd, ob_index, r_opposite->next->v);
+  const float3 opposite_end = knife_clarity_vert_world(kcd, ob_index, r_opposite->v);
   interp_v3_v3v3(r_exit_point, opposite_start, opposite_end, factor);
   return true;
 }
 
-static void knife_maya_loop_preview_walk(KnifeTool_OpData *kcd,
+static void knife_clarity_loop_preview_walk(KnifeTool_OpData *kcd,
                                          const int ob_index,
                                          BMEdge *start_edge,
                                          BMFace *start_face,
@@ -5706,14 +5706,14 @@ static void knife_maya_loop_preview_walk(KnifeTool_OpData *kcd,
     visited_faces.add(face);
     BMLoop *opposite = nullptr;
     float3 opposite_point;
-    if (!knife_maya_loop_face_exit_get(
+    if (!knife_clarity_loop_face_exit_get(
             kcd, ob_index, face, edge, point, opposite, opposite_point))
     {
       break;
     }
-    knife_maya_loop_preview_point_add(kcd, edge, point);
-    knife_maya_loop_preview_point_add(kcd, opposite->e, opposite_point);
-    kcd->maya_loop_preview_lines.append({point, opposite_point});
+    knife_clarity_loop_preview_point_add(kcd, edge, point);
+    knife_clarity_loop_preview_point_add(kcd, opposite->e, opposite_point);
+    kcd->clarity_loop_preview_lines.append({point, opposite_point});
 
     BMFace *next_face = nullptr;
     float best_continuation = -FLT_MAX;
@@ -5725,7 +5725,7 @@ static void knife_maya_loop_preview_walk(KnifeTool_OpData *kcd,
       if (candidate != face && !visited_faces.contains(candidate)) {
         BMLoop *candidate_opposite = nullptr;
         float3 candidate_exit;
-        if (knife_maya_loop_face_exit_get(kcd,
+        if (knife_clarity_loop_face_exit_get(kcd,
                                           ob_index,
                                           candidate,
                                           opposite->e,
@@ -5751,17 +5751,17 @@ static void knife_maya_loop_preview_walk(KnifeTool_OpData *kcd,
   }
 }
 
-static void knife_maya_loop_preview_update(KnifeTool_OpData *kcd,
+static void knife_clarity_loop_preview_update(KnifeTool_OpData *kcd,
                                            const float2 &mval,
                                            const wmEventModifierFlag modifier)
 {
-  kcd->maya_loop_preview_lines.clear();
-  kcd->maya_loop_preview_points.clear();
-  kcd->maya_loop_preview_has_origin = false;
-  kcd->maya_loop_preview_ob_index = -1;
-  kcd->maya_loop_preview_edge = nullptr;
-  if (kcd->mode == MODE_DRAGGING || kcd->maya_slice_result ||
-      ((modifier & KM_CTRL) == 0 && !kcd->maya_loop_insert_down) || kcd->curr.ob_index < 0)
+  kcd->clarity_loop_preview_lines.clear();
+  kcd->clarity_loop_preview_points.clear();
+  kcd->clarity_loop_preview_has_origin = false;
+  kcd->clarity_loop_preview_ob_index = -1;
+  kcd->clarity_loop_preview_edge = nullptr;
+  if (kcd->mode == MODE_DRAGGING || kcd->clarity_slice_result ||
+      ((modifier & KM_CTRL) == 0 && !kcd->clarity_loop_insert_down) || kcd->curr.ob_index < 0)
   {
     return;
   }
@@ -5769,22 +5769,22 @@ static void knife_maya_loop_preview_update(KnifeTool_OpData *kcd,
   const int ob_index = kcd->curr.ob_index;
   BMEdge *edge = kcd->curr.edge != nullptr ? kcd->curr.edge->e : nullptr;
   if (edge == nullptr && kcd->curr.bmface != nullptr) {
-    edge = knife_maya_face_edge_closest_to_mval(kcd, ob_index, kcd->curr.bmface, mval);
+    edge = knife_clarity_face_edge_closest_to_mval(kcd, ob_index, kcd->curr.bmface, mval);
   }
   if (edge == nullptr || edge->l == nullptr) {
     return;
   }
 
   BM_mesh_elem_index_ensure(kcd->objects_info[ob_index].em->bm, BM_VERT);
-  const float3 edge_start = knife_maya_vert_world(kcd, ob_index, edge->v1);
-  const float3 edge_end = knife_maya_vert_world(kcd, ob_index, edge->v2);
+  const float3 edge_start = knife_clarity_vert_world(kcd, ob_index, edge->v1);
+  const float3 edge_end = knife_clarity_vert_world(kcd, ob_index, edge->v2);
   float2 edge_screen[2];
   knife_project_v2(kcd, edge_start, edge_screen[0]);
   knife_project_v2(kcd, edge_end, edge_screen[1]);
-  float factor = kcd->maya_loop_insert_centered ?
+  float factor = kcd->clarity_loop_insert_centered ?
                      0.5f :
                      clamp_f(line_point_factor_v2(mval, edge_screen[0], edge_screen[1]), 0.0f, 1.0f);
-  if (!kcd->maya_loop_insert_centered && (modifier & KM_SHIFT) != 0) {
+  if (!kcd->clarity_loop_insert_centered && (modifier & KM_SHIFT) != 0) {
     const float step = clamp_f(kcd->snap_step * 0.01f, 0.01f, 1.0f);
     factor = clamp_f(roundf(factor / step) * step, 0.0f, 1.0f);
   }
@@ -5795,53 +5795,53 @@ static void knife_maya_loop_preview_update(KnifeTool_OpData *kcd,
   BMLoop *radial = edge->l;
   BMLoop *radial_iter = radial;
   do {
-    knife_maya_loop_preview_walk(
+    knife_clarity_loop_preview_walk(
         kcd, ob_index, edge, radial_iter->f, start_point, visited_faces);
   } while ((radial_iter = radial_iter->radial_next) != radial);
 
-  if (!kcd->maya_loop_preview_lines.is_empty()) {
-    kcd->maya_loop_preview_has_origin = true;
-    kcd->maya_loop_preview_ob_index = ob_index;
-    kcd->maya_loop_preview_edge = edge;
-    kcd->maya_loop_preview_factor = factor;
-    knife_project_v2(kcd, start_point, kcd->maya_loop_preview_origin_mval);
+  if (!kcd->clarity_loop_preview_lines.is_empty()) {
+    kcd->clarity_loop_preview_has_origin = true;
+    kcd->clarity_loop_preview_ob_index = ob_index;
+    kcd->clarity_loop_preview_edge = edge;
+    kcd->clarity_loop_preview_factor = factor;
+    knife_project_v2(kcd, start_point, kcd->clarity_loop_preview_origin_mval);
   }
 }
 
-static KnifeMayaCutPoint knife_maya_cut_point_from_pos(const KnifePosData &pos,
+static KnifeClarityCutPoint knife_clarity_cut_point_from_pos(const KnifePosData &pos,
                                                        const bool grid_point)
 {
-  KnifeMayaCutPoint point{};
+  KnifeClarityCutPoint point{};
   point.mval = pos.mval;
   point.cage = pos.cage;
   point.grid_point = grid_point;
   return point;
 }
 
-static void knife_maya_cut_path_append_current(KnifeTool_OpData *kcd)
+static void knife_clarity_cut_path_append_current(KnifeTool_OpData *kcd)
 {
-  kcd->maya_cut_points.append(
-      knife_maya_cut_point_from_pos(kcd->prev, kcd->maya_prev_grid_point));
+  kcd->clarity_cut_points.append(
+      knife_clarity_cut_point_from_pos(kcd->prev, kcd->clarity_prev_grid_point));
 }
 
-static void knife_maya_cut_path_seed_from_face(KnifeTool_OpData *kcd,
+static void knife_clarity_cut_path_seed_from_face(KnifeTool_OpData *kcd,
                                                const float3 &start_cage)
 {
-  kcd->maya_cut_points.clear();
-  KnifeMayaCutPoint start{};
+  kcd->clarity_cut_points.clear();
+  KnifeClarityCutPoint start{};
   start.cage = start_cage;
   knife_project_v2(kcd, start.cage, start.mval);
-  kcd->maya_cut_points.append(start);
-  knife_maya_cut_path_append_current(kcd);
+  kcd->clarity_cut_points.append(start);
+  knife_clarity_cut_path_append_current(kcd);
 }
 
-static int knife_maya_cut_path_point_find(const KnifeTool_OpData *kcd, const float2 &mval)
+static int knife_clarity_cut_path_point_find(const KnifeTool_OpData *kcd, const float2 &mval)
 {
   int closest_index = -1;
   float closest_distance = square_f(12.0f * UI_SCALE_FAC);
-  for (const int point_index : kcd->maya_cut_points.index_range()) {
+  for (const int point_index : kcd->clarity_cut_points.index_range()) {
     float2 screen;
-    knife_project_v2(kcd, kcd->maya_cut_points[point_index].cage, screen);
+    knife_project_v2(kcd, kcd->clarity_cut_points[point_index].cage, screen);
     const float distance = math::distance_squared(screen, mval);
     if (distance <= closest_distance) {
       closest_distance = distance;
@@ -5851,10 +5851,10 @@ static int knife_maya_cut_path_point_find(const KnifeTool_OpData *kcd, const flo
   return closest_index;
 }
 
-static void knife_maya_cut_path_rebuild_from(KnifeTool_OpData *kcd, const int point_index)
+static void knife_clarity_cut_path_rebuild_from(KnifeTool_OpData *kcd, const int point_index)
 {
-  BLI_assert(point_index >= 0 && point_index < int(kcd->maya_cut_points.size()));
-  kcd->maya_replaying_redo = true;
+  BLI_assert(point_index >= 0 && point_index < int(kcd->clarity_cut_points.size()));
+  kcd->clarity_replaying_redo = true;
   const size_t kept_segment_count = point_index > 0 ? size_t(point_index - 1) : 0;
   while (BLI_stack_count(kcd->undostack) > kept_segment_count) {
     knifetool_undo(kcd);
@@ -5867,9 +5867,9 @@ static void knife_maya_cut_path_rebuild_from(KnifeTool_OpData *kcd, const int po
     knife_pos_data_clear(&kcd->curr);
     kcd->mdata.is_stored = false;
     kcd->mode = MODE_IDLE;
-    kcd->maya_cut_start_valid = false;
+    kcd->clarity_cut_start_valid = false;
 
-    const KnifeMayaCutPoint &first = kcd->maya_cut_points.first();
+    const KnifeClarityCutPoint &first = kcd->clarity_cut_points.first();
     float2 first_mval;
     knife_project_v2(kcd, first.cage, first_mval);
     if (first.grid_point) {
@@ -5877,30 +5877,30 @@ static void knife_maya_cut_path_rebuild_from(KnifeTool_OpData *kcd, const int po
       kcd->curr.cage = first.cage;
       kcd->curr.mval = first_mval;
       kcd->prev = kcd->curr;
-      kcd->maya_curr_grid_point = true;
-      kcd->maya_prev_grid_point = true;
+      kcd->clarity_curr_grid_point = true;
+      kcd->clarity_prev_grid_point = true;
     }
     else {
       knife_start_cut(kcd, first_mval);
     }
     kcd->mode = MODE_DRAGGING;
     kcd->init = kcd->prev;
-    kcd->maya_cut_start_valid = true;
-    kcd->maya_cut_start_cage = kcd->prev.cage;
+    kcd->clarity_cut_start_valid = true;
+    kcd->clarity_cut_start_cage = kcd->prev.cage;
     replay_point_index = 1;
   }
 
   for (const int replay_index :
-       kcd->maya_cut_points.index_range().drop_front(replay_point_index))
+       kcd->clarity_cut_points.index_range().drop_front(replay_point_index))
   {
-    const KnifeMayaCutPoint &point = kcd->maya_cut_points[replay_index];
+    const KnifeClarityCutPoint &point = kcd->clarity_cut_points[replay_index];
     float2 point_mval;
     knife_project_v2(kcd, point.cage, point_mval);
     if (point.grid_point) {
       knife_pos_data_clear(&kcd->curr);
       kcd->curr.cage = point.cage;
       kcd->curr.mval = point_mval;
-      kcd->maya_curr_grid_point = true;
+      kcd->clarity_curr_grid_point = true;
       knife_find_line_hits(kcd);
     }
     else {
@@ -5911,37 +5911,37 @@ static void knife_maya_cut_path_rebuild_from(KnifeTool_OpData *kcd, const int po
   }
 
   kcd->curr = kcd->prev;
-  kcd->no_cuts = kcd->maya_cut_points.size() < 2;
-  kcd->maya_replaying_redo = false;
+  kcd->no_cuts = kcd->clarity_cut_points.size() < 2;
+  kcd->clarity_replaying_redo = false;
 }
 
-static void knife_maya_cut_path_tweak_commit(KnifeTool_OpData *kcd)
+static void knife_clarity_cut_path_tweak_commit(KnifeTool_OpData *kcd)
 {
-  const int point_index = kcd->maya_tweak_point_index;
-  if (point_index < 0 || point_index >= int(kcd->maya_cut_points.size())) {
+  const int point_index = kcd->clarity_tweak_point_index;
+  if (point_index < 0 || point_index >= int(kcd->clarity_cut_points.size())) {
     return;
   }
 
-  if (kcd->maya_tweak_last && point_index == int(kcd->maya_cut_points.size()) - 1) {
+  if (kcd->clarity_tweak_last && point_index == int(kcd->clarity_cut_points.size()) - 1) {
     /* The last segment was already undone when tweaking began. Re-apply only that segment so
      * earlier cuts keep their exact KnifeVert/KnifeEdge topology instead of being replayed. */
     knife_add_cut(kcd);
     kcd->is_drag_undo = false;
-    kcd->maya_cut_points[point_index] =
-        knife_maya_cut_point_from_pos(kcd->prev, kcd->maya_prev_grid_point);
+    kcd->clarity_cut_points[point_index] =
+        knife_clarity_cut_point_from_pos(kcd->prev, kcd->clarity_prev_grid_point);
   }
   else {
-    kcd->maya_cut_points[point_index] =
-        knife_maya_cut_point_from_pos(kcd->curr, kcd->maya_curr_grid_point);
-    knife_maya_cut_path_rebuild_from(kcd, point_index);
+    kcd->clarity_cut_points[point_index] =
+        knife_clarity_cut_point_from_pos(kcd->curr, kcd->clarity_curr_grid_point);
+    knife_clarity_cut_path_rebuild_from(kcd, point_index);
   }
 
-  kcd->maya_tweak_point_index = -1;
-  kcd->maya_tweak_last = false;
-  kcd->maya_tweak_first = false;
+  kcd->clarity_tweak_point_index = -1;
+  kcd->clarity_tweak_last = false;
+  kcd->clarity_tweak_first = false;
 }
 
-static bool knife_maya_delete_highlighted_edge(KnifeTool_OpData *kcd)
+static bool knife_clarity_delete_highlighted_edge(KnifeTool_OpData *kcd)
 {
   KnifeEdge *edge = kcd->curr.edge;
   if (edge == nullptr || !edge->is_cut || edge->is_invalid) {
@@ -5953,84 +5953,84 @@ static bool knife_maya_delete_highlighted_edge(KnifeTool_OpData *kcd)
   undo->splits = 0;
   undo->pos = kcd->prev;
   undo->mdata = kcd->mdata;
-  undo->maya_prev_grid_point = kcd->maya_prev_grid_point;
-  undo->maya_deleted_edge = edge;
+  undo->clarity_prev_grid_point = kcd->clarity_prev_grid_point;
+  undo->clarity_deleted_edge = edge;
   edge->is_invalid = true;
-  kcd->maya_redo_actions.clear();
+  kcd->clarity_redo_actions.clear();
   return true;
 }
 
-static bool knife_maya_undo_action(KnifeTool_OpData *kcd)
+static bool knife_clarity_undo_action(KnifeTool_OpData *kcd)
 {
   if (BLI_stack_is_empty(kcd->undostack)) {
     if (kcd->mode != MODE_DRAGGING) {
       return false;
     }
 
-    KnifeMayaRedoAction action{};
-    action.type = KnifeMayaRedoType::StartPoint;
+    KnifeClarityRedoAction action{};
+    action.type = KnifeClarityRedoType::StartPoint;
     action.cage = kcd->prev.cage;
-    action.grid_point = kcd->maya_prev_grid_point;
-    kcd->maya_redo_actions.append(action);
-    kcd->maya_cut_points.clear();
+    action.grid_point = kcd->clarity_prev_grid_point;
+    kcd->clarity_redo_actions.append(action);
+    kcd->clarity_cut_points.clear();
     knife_pos_data_clear(&kcd->prev);
     knife_pos_data_clear(&kcd->curr);
     kcd->mode = MODE_IDLE;
     kcd->no_cuts = true;
-    kcd->maya_lmb_down = false;
-    kcd->maya_slice_drag = false;
-    kcd->maya_quick_slice = false;
-    kcd->maya_slice_move = false;
-    kcd->maya_slice_tweak_endpoint = -1;
-    kcd->maya_cut_start_valid = false;
+    kcd->clarity_lmb_down = false;
+    kcd->clarity_slice_drag = false;
+    kcd->clarity_quick_slice = false;
+    kcd->clarity_slice_move = false;
+    kcd->clarity_slice_tweak_endpoint = -1;
+    kcd->clarity_cut_start_valid = false;
     return true;
   }
 
   const KnifeUndoFrame *undo = static_cast<const KnifeUndoFrame *>(
       BLI_stack_peek(kcd->undostack));
-  KnifeMayaRedoAction action{};
-  if (undo->maya_deleted_edge != nullptr) {
-    action.type = KnifeMayaRedoType::DeleteEdge;
-    action.edge = undo->maya_deleted_edge;
+  KnifeClarityRedoAction action{};
+  if (undo->clarity_deleted_edge != nullptr) {
+    action.type = KnifeClarityRedoType::DeleteEdge;
+    action.edge = undo->clarity_deleted_edge;
   }
-  else if (kcd->maya_slice_result) {
-    action.type = KnifeMayaRedoType::Slice;
-    action.slice_start = kcd->maya_slice_control_start;
-    action.slice_end = kcd->maya_slice_control_end;
+  else if (kcd->clarity_slice_result) {
+    action.type = KnifeClarityRedoType::Slice;
+    action.slice_start = kcd->clarity_slice_control_start;
+    action.slice_end = kcd->clarity_slice_control_end;
   }
   else {
-    action.type = KnifeMayaRedoType::Point;
+    action.type = KnifeClarityRedoType::Point;
     action.cage = kcd->prev.cage;
-    action.grid_point = kcd->maya_prev_grid_point;
+    action.grid_point = kcd->clarity_prev_grid_point;
   }
-  kcd->maya_redo_actions.append(action);
+  kcd->clarity_redo_actions.append(action);
 
   knifetool_undo(kcd);
-  if (action.type == KnifeMayaRedoType::Slice) {
-    kcd->maya_slice_result = false;
-    kcd->maya_slice_move = false;
-    kcd->maya_slice_tweak_endpoint = -1;
+  if (action.type == KnifeClarityRedoType::Slice) {
+    kcd->clarity_slice_result = false;
+    kcd->clarity_slice_move = false;
+    kcd->clarity_slice_tweak_endpoint = -1;
   }
-  else if (action.type == KnifeMayaRedoType::Point && !kcd->maya_cut_points.is_empty()) {
-    kcd->maya_cut_points.remove_last();
+  else if (action.type == KnifeClarityRedoType::Point && !kcd->clarity_cut_points.is_empty()) {
+    kcd->clarity_cut_points.remove_last();
   }
   return true;
 }
 
-static bool knife_maya_redo_action(KnifeTool_OpData *kcd)
+static bool knife_clarity_redo_action(KnifeTool_OpData *kcd)
 {
-  if (kcd->maya_redo_actions.is_empty()) {
+  if (kcd->clarity_redo_actions.is_empty()) {
     return false;
   }
 
-  const KnifeMayaRedoAction action = kcd->maya_redo_actions.last();
+  const KnifeClarityRedoAction action = kcd->clarity_redo_actions.last();
   bool redone = false;
-  /* Shift invokes redo in Maya, but it must not also midpoint-snap the replayed point. */
+  /* Shift invokes redo in Clarity, but it must not also midpoint-snap the replayed point. */
   const bool snap_midpoints = kcd->snap_midpoints;
   kcd->snap_midpoints = false;
-  kcd->maya_replaying_redo = true;
+  kcd->clarity_replaying_redo = true;
   switch (action.type) {
-    case KnifeMayaRedoType::StartPoint:
+    case KnifeClarityRedoType::StartPoint:
       if (kcd->mode == MODE_IDLE) {
         float2 action_mval;
         knife_project_v2(kcd, action.cage, action_mval);
@@ -6039,22 +6039,22 @@ static bool knife_maya_redo_action(KnifeTool_OpData *kcd)
           kcd->curr.cage = action.cage;
           kcd->curr.mval = action_mval;
           kcd->prev = kcd->curr;
-          kcd->maya_curr_grid_point = true;
-          kcd->maya_prev_grid_point = true;
+          kcd->clarity_curr_grid_point = true;
+          kcd->clarity_prev_grid_point = true;
         }
         else {
           knife_start_cut(kcd, action_mval);
         }
         kcd->mode = MODE_DRAGGING;
         kcd->init = kcd->curr;
-        kcd->maya_cut_start_valid = true;
-        kcd->maya_cut_start_cage = kcd->prev.cage;
-        kcd->maya_cut_points.append(
-            knife_maya_cut_point_from_pos(kcd->prev, kcd->maya_prev_grid_point));
+        kcd->clarity_cut_start_valid = true;
+        kcd->clarity_cut_start_cage = kcd->prev.cage;
+        kcd->clarity_cut_points.append(
+            knife_clarity_cut_point_from_pos(kcd->prev, kcd->clarity_prev_grid_point));
         redone = true;
       }
       break;
-    case KnifeMayaRedoType::Point:
+    case KnifeClarityRedoType::Point:
       if (kcd->mode == MODE_DRAGGING) {
         float2 action_mval;
         knife_project_v2(kcd, action.cage, action_mval);
@@ -6062,7 +6062,7 @@ static bool knife_maya_redo_action(KnifeTool_OpData *kcd)
           knife_pos_data_clear(&kcd->curr);
           kcd->curr.cage = action.cage;
           kcd->curr.mval = action_mval;
-          kcd->maya_curr_grid_point = true;
+          kcd->clarity_curr_grid_point = true;
           knife_find_line_hits(kcd);
         }
         else {
@@ -6070,11 +6070,11 @@ static bool knife_maya_redo_action(KnifeTool_OpData *kcd)
         }
         knife_add_cut(kcd);
         kcd->is_drag_undo = false;
-        knife_maya_cut_path_append_current(kcd);
+        knife_clarity_cut_path_append_current(kcd);
         redone = true;
       }
       break;
-    case KnifeMayaRedoType::DeleteEdge:
+    case KnifeClarityRedoType::DeleteEdge:
       if (action.edge != nullptr && !action.edge->is_invalid) {
         KnifeUndoFrame *undo = static_cast<KnifeUndoFrame *>(
             BLI_stack_push_r(kcd->undostack));
@@ -6082,33 +6082,33 @@ static bool knife_maya_redo_action(KnifeTool_OpData *kcd)
         undo->splits = 0;
         undo->pos = kcd->prev;
         undo->mdata = kcd->mdata;
-        undo->maya_prev_grid_point = kcd->maya_prev_grid_point;
-        undo->maya_deleted_edge = action.edge;
+        undo->clarity_prev_grid_point = kcd->clarity_prev_grid_point;
+        undo->clarity_deleted_edge = action.edge;
         action.edge->is_invalid = true;
         redone = true;
       }
       break;
-    case KnifeMayaRedoType::Slice:
-      kcd->maya_cut_points.clear();
-      redone = knife_maya_commit_slice(kcd, action.slice_start, action.slice_end);
+    case KnifeClarityRedoType::Slice:
+      kcd->clarity_cut_points.clear();
+      redone = knife_clarity_commit_slice(kcd, action.slice_start, action.slice_end);
       break;
   }
-  kcd->maya_replaying_redo = false;
+  kcd->clarity_replaying_redo = false;
   kcd->snap_midpoints = snap_midpoints;
 
   if (redone) {
-    kcd->maya_redo_actions.remove_last();
+    kcd->clarity_redo_actions.remove_last();
   }
   return redone;
 }
 
-static void knife_maya_marking_menu_invoke(bContext *C, const wmEvent *event)
+static void knife_clarity_marking_menu_invoke(bContext *C, const wmEvent *event)
 {
   ui::MarkingMenuStyle style;
   style.threshold = 10.0f;
   style.radius = 76.0f;
   style.popup_delay = 0.0f;
-  ui::marking_menu_invoke(C, "VIEW3D_MT_maya_multi_cut_marking_menu", event, style);
+  ui::marking_menu_invoke(C, "VIEW3D_MT_clarity_multi_cut_marking_menu", event, style);
 }
 
 static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
@@ -6131,8 +6131,8 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
   const ARegion *mouse_region = ED_area_find_region_xy_visual(
       CTX_wm_area(C), RGN_TYPE_ANY, event->xy);
   const bool mouse_over_editor_ui = mouse_region != nullptr && mouse_region != kcd->vc.region;
-  if (kcd->maya_style && ISMOUSE(event_type) && !kcd->maya_lmb_down &&
-      !kcd->maya_loop_insert_down && !kcd->maya_quick_slice &&
+  if (kcd->clarity_style && ISMOUSE(event_type) && !kcd->clarity_lmb_down &&
+      !kcd->clarity_loop_insert_down && !kcd->clarity_quick_slice &&
       (mouse_over_popup || mouse_over_editor_ui ||
        !BLI_rcti_isect_pt(&kcd->vc.region->winrct, event->xy[0], event->xy[1])))
   {
@@ -6140,13 +6140,13 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
   }
 
   kcd->region = kcd->vc.region;
-  if (kcd->maya_style) {
-    knife_maya_settings_sync(C, op, kcd);
+  if (kcd->clarity_style) {
+    knife_clarity_settings_sync(C, op, kcd);
   }
 
   ED_view3d_init_mats_rv3d(ob, kcd->vc.rv3d); /* Needed to initialize clipping. */
 
-  if (kcd->maya_style && kcd->mode == MODE_PANNING) {
+  if (kcd->clarity_style && kcd->mode == MODE_PANNING) {
     const bool navigation_ended =
         (ELEM(event->type, EVT_LEFTALTKEY, EVT_RIGHTALTKEY) && event->val == KM_RELEASE) ||
         ((event->modifier & KM_ALT) == 0 && event->type == MOUSEMOVE);
@@ -6159,7 +6159,7 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
     return OPERATOR_PASS_THROUGH;
   }
 
-  if (kcd->maya_style && event->val == KM_PRESS &&
+  if (kcd->clarity_style && event->val == KM_PRESS &&
       ELEM(event->type, EVT_QKEY, EVT_WKEY, EVT_EKEY, EVT_RKEY) &&
       (event->modifier & (KM_SHIFT | KM_CTRL | KM_ALT | KM_OSKEY)) == 0)
   {
@@ -6172,10 +6172,10 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
     return (changed ? OPERATOR_FINISHED : OPERATOR_CANCELLED) | OPERATOR_PASS_THROUGH;
   }
 
-  if (kcd->maya_style && event_type == RIGHTMOUSE && event->val == KM_PRESS &&
+  if (kcd->clarity_style && event_type == RIGHTMOUSE && event->val == KM_PRESS &&
       (event->modifier & (KM_CTRL | KM_SHIFT | KM_ALT)) == (KM_CTRL | KM_SHIFT))
   {
-    knife_maya_marking_menu_invoke(C, event);
+    knife_clarity_marking_menu_invoke(C, event);
     return OPERATOR_RUNNING_MODAL;
   }
 
@@ -6183,10 +6183,10 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
   float snapping_increment_temp;
   const float2 mval = {float(event->mval[0]), float(event->mval[1])};
 
-  if (kcd->maya_style) {
-    const ed::maya::MayaSnapMode snap_mode = ED_maya_snap_override_get(C);
-    const bool snap_to_grid = snap_mode == ed::maya::MayaSnapMode::Grid;
-    const bool snap_to_points = snap_mode == ed::maya::MayaSnapMode::Point;
+  if (kcd->clarity_style) {
+    const ed::clarity::ClaritySnapMode snap_mode = ED_clarity_snap_override_get(C);
+    const bool snap_to_grid = snap_mode == ed::clarity::ClaritySnapMode::Grid;
+    const bool snap_to_points = snap_mode == ed::clarity::ClaritySnapMode::Point;
     if (snap_to_grid != kcd->snap_to_grid || snap_to_points != kcd->snap_to_points) {
       kcd->snap_to_grid = snap_to_grid;
       kcd->snap_to_points = snap_to_points;
@@ -6207,8 +6207,8 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
     const bool perpendicular = kcd->mode == MODE_DRAGGING &&
                                (event->modifier & (KM_CTRL | KM_SHIFT)) ==
                                    (KM_CTRL | KM_SHIFT);
-    if (perpendicular != kcd->maya_perpendicular) {
-      kcd->maya_perpendicular = perpendicular;
+    if (perpendicular != kcd->clarity_perpendicular) {
+      kcd->clarity_perpendicular = perpendicular;
       if (perpendicular) {
         kcd->angle_snapping_mode = KNF_CONSTRAIN_ANGLE_MODE_RELATIVE;
         kcd->angle_snapping = true;
@@ -6216,7 +6216,7 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
         knifetool_disable_orientation_locking(kcd);
       }
       else {
-        knife_maya_perpendicular_preview_clear(kcd);
+        knife_clarity_perpendicular_preview_clear(kcd);
         kcd->angle_snapping_mode = RNA_enum_get(op->ptr, "angle_snapping");
         kcd->angle_snapping = kcd->angle_snapping_mode != KNF_CONSTRAIN_ANGLE_MODE_NONE;
         kcd->angle_snapping_increment = RAD2DEGF(
@@ -6255,8 +6255,8 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
   if (event->type == EVT_MODAL_MAP) {
     switch (event->val) {
       case KNF_MODAL_CANCEL:
-        if (kcd->maya_style) {
-          return knife_maya_restart_session(C, op, event, false);
+        if (kcd->clarity_style) {
+          return knife_clarity_restart_session(C, op, event, false);
         }
         /* finish */
         ED_region_tag_redraw(kcd->region);
@@ -6266,8 +6266,8 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
 
         return OPERATOR_CANCELLED;
       case KNF_MODAL_CONFIRM: {
-        if (kcd->maya_style) {
-          return knife_maya_restart_session(C, op, event, true);
+        if (kcd->clarity_style) {
+          return knife_clarity_restart_session(C, op, event, true);
         }
         const bool changed = (kcd->totkvert != 0);
         /* finish */
@@ -6284,7 +6284,7 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
         return OPERATOR_FINISHED;
       }
       case KNF_MODAL_UNDO:
-        if (kcd->maya_style) {
+        if (kcd->clarity_style) {
           if (BLI_stack_is_empty(kcd->undostack) && kcd->mode == MODE_IDLE &&
               ED_undo_is_valid(C, nullptr))
           {
@@ -6292,9 +6292,9 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
              * rebuild the same modal session around the restored mesh. */
             knifetool_exit(op);
             ED_undo_pop(C);
-            return knife_maya_restart_session(C, op, event, false);
+            return knife_clarity_restart_session(C, op, event, false);
           }
-          knife_maya_undo_action(kcd);
+          knife_clarity_undo_action(kcd);
           knife_update_active(kcd, mval);
           do_refresh = true;
           handled = true;
@@ -6307,34 +6307,34 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
           return OPERATOR_CANCELLED;
         }
         knifetool_undo(kcd);
-        if (kcd->maya_style && kcd->maya_slice_result &&
-            BLI_stack_count(kcd->undostack) <= kcd->maya_slice_undo_count)
+        if (kcd->clarity_style && kcd->clarity_slice_result &&
+            BLI_stack_count(kcd->undostack) <= kcd->clarity_slice_undo_count)
         {
-          kcd->maya_slice_result = false;
+          kcd->clarity_slice_result = false;
         }
         knife_update_active(kcd, mval);
         ED_region_tag_redraw(kcd->region);
         handled = true;
         break;
       case KNF_MODAL_REDO:
-        if (kcd->maya_style) {
-          if (kcd->maya_redo_actions.is_empty() && kcd->mode == MODE_IDLE &&
+        if (kcd->clarity_style) {
+          if (kcd->clarity_redo_actions.is_empty() && kcd->mode == MODE_IDLE &&
               ED_undo_has_redo_step(C))
           {
             knifetool_exit(op);
             ED_undo_redo(C);
-            return knife_maya_restart_session(C, op, event, false);
+            return knife_clarity_restart_session(C, op, event, false);
           }
-          knife_maya_redo_action(kcd);
+          knife_clarity_redo_action(kcd);
           knife_update_active(kcd, mval);
           do_refresh = true;
           handled = true;
         }
         break;
       case KNF_MODAL_DELETE_HIGHLIGHTED:
-        if (kcd->maya_style) {
-          if (!knife_maya_delete_highlighted_edge(kcd)) {
-            knife_maya_undo_action(kcd);
+        if (kcd->clarity_style) {
+          if (!knife_clarity_delete_highlighted_edge(kcd)) {
+            knife_clarity_undo_action(kcd);
           }
           knife_update_active(kcd, mval);
           do_refresh = true;
@@ -6342,25 +6342,25 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
         }
         break;
       case KNF_MODAL_MIDPOINT_ON:
-        kcd->snap_midpoints = !kcd->maya_style || (event->modifier & KM_CTRL) == 0;
-        kcd->maya_snap_step_drag = false;
+        kcd->snap_midpoints = !kcd->clarity_style || (event->modifier & KM_CTRL) == 0;
+        kcd->clarity_snap_step_drag = false;
 
         knife_recalc_ortho(kcd);
         knife_update_active(kcd, mval);
-        if (kcd->maya_style) {
-          knife_maya_loop_preview_update(kcd, mval, event->modifier);
+        if (kcd->clarity_style) {
+          knife_clarity_loop_preview_update(kcd, mval, event->modifier);
         }
         do_refresh = true;
         handled = true;
         break;
       case KNF_MODAL_MIDPOINT_OFF:
         kcd->snap_midpoints = false;
-        kcd->maya_snap_step_drag = false;
+        kcd->clarity_snap_step_drag = false;
 
         knife_recalc_ortho(kcd);
         knife_update_active(kcd, mval);
-        if (kcd->maya_style) {
-          knife_maya_loop_preview_update(kcd, mval, event->modifier);
+        if (kcd->clarity_style) {
+          knife_clarity_loop_preview_update(kcd, mval, event->modifier);
         }
         do_refresh = true;
         handled = true;
@@ -6427,9 +6427,9 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
         handled = true;
         break;
       case KNF_MODAL_OBJECT_XRAY_TOGGLE:
-        if (kcd->maya_style) {
+        if (kcd->clarity_style) {
           WM_operator_name_call(C,
-                                "VIEW3D_OT_maya_object_xray",
+                                "VIEW3D_OT_clarity_object_xray",
                                 wm::OpCallContext::ExecDefault,
                                 nullptr,
                                 event);
@@ -6438,7 +6438,7 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
         }
         break;
       case KNF_MODAL_VIEW_XRAY_TOGGLE:
-        if (kcd->maya_style) {
+        if (kcd->clarity_style) {
           WM_operator_name_call(C,
                                 "VIEW3D_OT_toggle_xray",
                                 wm::OpCallContext::ExecDefault,
@@ -6451,23 +6451,23 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
       case KNF_MODAL_SUBDIVISION_PREVIEW_OFF:
       case KNF_MODAL_SUBDIVISION_PREVIEW_ON:
       case KNF_MODAL_SUBDIVISION_PREVIEW_SURFACE:
-        if (kcd->maya_style) {
+        if (kcd->clarity_style) {
           const char *idname = event->val == KNF_MODAL_SUBDIVISION_PREVIEW_OFF ?
-                                   "VIEW3D_OT_maya_subdivision_preview_off" :
+                                   "VIEW3D_OT_clarity_subdivision_preview_off" :
                                event->val == KNF_MODAL_SUBDIVISION_PREVIEW_ON ?
-                                   "VIEW3D_OT_maya_subdivision_preview_on" :
-                                   "VIEW3D_OT_maya_subdivision_preview_surface";
+                                   "VIEW3D_OT_clarity_subdivision_preview_on" :
+                                   "VIEW3D_OT_clarity_subdivision_preview_surface";
           if (kcd->totkvert != 0) {
             knifetool_finish(op);
             ED_undo_push(C, "Multi-Cut Cut");
           }
           knifetool_exit(op);
           WM_operator_name_call(C, idname, wm::OpCallContext::ExecDefault, nullptr, event);
-          return knife_maya_restart_session(C, op, event, false);
+          return knife_clarity_restart_session(C, op, event, false);
         }
         break;
       case KNF_MODAL_NEW_CUT:
-        if (kcd->maya_style) {
+        if (kcd->clarity_style) {
           const bool changed = (kcd->totkvert != 0);
           ED_region_tag_redraw(kcd->region);
           knifetool_finish(op);
@@ -6491,90 +6491,90 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
         handled = true;
         break;
       case KNF_MODAL_ADD_CUT:
-        if (kcd->maya_style) {
-          if (kcd->maya_loop_insert_down) {
+        if (kcd->clarity_style) {
+          if (kcd->clarity_loop_insert_down) {
             if (event->prev_val == KM_RELEASE) {
-              return knife_maya_insert_edge_loop_and_restart(
-                  C, op, event, kcd->maya_loop_insert_centered);
+              return knife_clarity_insert_edge_loop_and_restart(
+                  C, op, event, kcd->clarity_loop_insert_centered);
             }
             handled = true;
             break;
           }
 
           if (event->prev_val != KM_RELEASE) {
-            kcd->maya_redo_actions.clear();
-            if (kcd->maya_slice_result) {
+            kcd->clarity_redo_actions.clear();
+            if (kcd->clarity_slice_result) {
               const float start_distance = math::distance_squared(
-                  mval, kcd->maya_slice_control_start);
+                  mval, kcd->clarity_slice_control_start);
               const float end_distance = math::distance_squared(
-                  mval, kcd->maya_slice_control_end);
+                  mval, kcd->clarity_slice_control_end);
               const float point_radius = square_f(12.0f * UI_SCALE_FAC);
               if (min_ff(start_distance, end_distance) <= point_radius) {
-                kcd->maya_slice_tweak_endpoint = start_distance <= end_distance ? 0 : 1;
-                kcd->maya_slice_tweak_original_start = kcd->maya_slice_control_start;
-                kcd->maya_slice_tweak_original_end = kcd->maya_slice_control_end;
-                kcd->maya_lmb_down = true;
-                kcd->maya_drag_start = mval;
+                kcd->clarity_slice_tweak_endpoint = start_distance <= end_distance ? 0 : 1;
+                kcd->clarity_slice_tweak_original_start = kcd->clarity_slice_control_start;
+                kcd->clarity_slice_tweak_original_end = kcd->clarity_slice_control_end;
+                kcd->clarity_lmb_down = true;
+                kcd->clarity_drag_start = mval;
                 handled = true;
                 do_refresh = true;
                 break;
               }
             }
-            if (kcd->mode != MODE_DRAGGING && !kcd->maya_slice_result &&
+            if (kcd->mode != MODE_DRAGGING && !kcd->clarity_slice_result &&
                 (event->modifier & KM_CTRL) != 0)
             {
               knifetool_update_mval(kcd, mval);
-              kcd->maya_loop_insert_down = true;
-              kcd->maya_loop_insert_centered = false;
-              knife_maya_loop_preview_update(kcd, mval, event->modifier);
+              kcd->clarity_loop_insert_down = true;
+              kcd->clarity_loop_insert_centered = false;
+              knife_clarity_loop_preview_update(kcd, mval, event->modifier);
               do_refresh = true;
               handled = true;
               break;
             }
 
-            kcd->maya_loop_preview_lines.clear();
-            kcd->maya_loop_preview_points.clear();
-            kcd->maya_loop_preview_has_origin = false;
-            kcd->maya_loop_preview_ob_index = -1;
-            kcd->maya_loop_preview_edge = nullptr;
-            kcd->maya_slice_result = false;
+            kcd->clarity_loop_preview_lines.clear();
+            kcd->clarity_loop_preview_points.clear();
+            kcd->clarity_loop_preview_has_origin = false;
+            kcd->clarity_loop_preview_ob_index = -1;
+            kcd->clarity_loop_preview_edge = nullptr;
+            kcd->clarity_slice_result = false;
             kcd->no_cuts = false;
             knife_recalc_ortho(kcd);
-            kcd->maya_lmb_down = true;
-            kcd->maya_lmb_dragged = false;
-            kcd->maya_lmb_started_cut = false;
-            kcd->maya_lmb_added_cut = false;
+            kcd->clarity_lmb_down = true;
+            kcd->clarity_lmb_dragged = false;
+            kcd->clarity_lmb_started_cut = false;
+            kcd->clarity_lmb_added_cut = false;
             const int tweak_point_index =
-                kcd->mode == MODE_DRAGGING && !kcd->maya_slice_result ?
-                    knife_maya_cut_path_point_find(kcd, mval) :
+                kcd->mode == MODE_DRAGGING && !kcd->clarity_slice_result ?
+                    knife_clarity_cut_path_point_find(kcd, mval) :
                     -1;
             if (tweak_point_index >= 0) {
-              kcd->maya_tweak_point_index = tweak_point_index;
-              if (tweak_point_index == int(kcd->maya_cut_points.size()) - 1 &&
+              kcd->clarity_tweak_point_index = tweak_point_index;
+              if (tweak_point_index == int(kcd->clarity_cut_points.size()) - 1 &&
                   !BLI_stack_is_empty(kcd->undostack))
               {
                 knifetool_undo(kcd);
-                kcd->maya_tweak_last = true;
+                kcd->clarity_tweak_last = true;
               }
-              else if (kcd->maya_cut_points.size() == 1) {
-                kcd->maya_tweak_first = true;
+              else if (kcd->clarity_cut_points.size() == 1) {
+                kcd->clarity_tweak_first = true;
               }
               kcd->mode = MODE_DRAGGING;
               knifetool_update_mval(kcd, mval);
             }
             else if (kcd->mode == MODE_DRAGGING) {
-              if (kcd->prev.is_space() && !kcd->maya_prev_grid_point) {
-                if (!knife_maya_commit_slice(kcd, kcd->prev.mval, mval)) {
+              if (kcd->prev.is_space() && !kcd->clarity_prev_grid_point) {
+                if (!knife_clarity_commit_slice(kcd, kcd->prev.mval, mval)) {
                   knife_pos_data_clear(&kcd->prev);
                   knife_pos_data_clear(&kcd->curr);
                   kcd->mode = MODE_IDLE;
                 }
-                kcd->maya_slice_drag = false;
+                kcd->clarity_slice_drag = false;
               }
               else {
                 knife_add_cut(kcd);
-                knife_maya_cut_path_append_current(kcd);
-                kcd->maya_lmb_added_cut = true;
+                knife_clarity_cut_path_append_current(kcd);
+                kcd->clarity_lmb_added_cut = true;
               }
             }
             else if (kcd->mode != MODE_PANNING) {
@@ -6585,70 +6585,70 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
                                            kcd->prev.edge == nullptr && kcd->prev.vert == nullptr;
               bool seeded_from_face = false;
               if (!slice_from_face) {
-                seeded_from_face = knife_maya_seed_cut_from_face(kcd);
-                kcd->maya_lmb_added_cut = seeded_from_face;
+                seeded_from_face = knife_clarity_seed_cut_from_face(kcd);
+                kcd->clarity_lmb_added_cut = seeded_from_face;
               }
               kcd->init = kcd->curr;
-              kcd->maya_drag_start = mval;
-              kcd->maya_lmb_started_cut = true;
-              kcd->maya_slice_drag = (kcd->prev.is_space() && !kcd->maya_prev_grid_point) ||
+              kcd->clarity_drag_start = mval;
+              kcd->clarity_lmb_started_cut = true;
+              kcd->clarity_slice_drag = (kcd->prev.is_space() && !kcd->clarity_prev_grid_point) ||
                                      slice_from_face;
-              if (kcd->maya_slice_drag) {
-                kcd->maya_cut_points.clear();
-                kcd->maya_cut_start_valid = false;
+              if (kcd->clarity_slice_drag) {
+                kcd->clarity_cut_points.clear();
+                kcd->clarity_cut_start_valid = false;
               }
               else if (!seeded_from_face) {
-                kcd->maya_cut_points.clear();
-                knife_maya_cut_path_append_current(kcd);
-                kcd->maya_cut_start_valid = true;
-                kcd->maya_cut_start_cage = kcd->prev.cage;
+                kcd->clarity_cut_points.clear();
+                knife_clarity_cut_path_append_current(kcd);
+                kcd->clarity_cut_start_valid = true;
+                kcd->clarity_cut_start_cage = kcd->prev.cage;
               }
             }
             kcd->is_drag_hold = false;
           }
           else {
-            if (kcd->maya_slice_tweak_endpoint >= 0) {
-              const float2 control_start = kcd->maya_slice_control_start;
-              const float2 control_end = kcd->maya_slice_control_end;
-              while (BLI_stack_count(kcd->undostack) > kcd->maya_slice_undo_count) {
+            if (kcd->clarity_slice_tweak_endpoint >= 0) {
+              const float2 control_start = kcd->clarity_slice_control_start;
+              const float2 control_end = kcd->clarity_slice_control_end;
+              while (BLI_stack_count(kcd->undostack) > kcd->clarity_slice_undo_count) {
                 knifetool_undo(kcd);
               }
-              kcd->maya_slice_result = false;
+              kcd->clarity_slice_result = false;
               knife_pos_data_clear(&kcd->prev);
               knife_pos_data_clear(&kcd->curr);
               kcd->mode = MODE_IDLE;
-              if (!knife_maya_commit_slice(kcd, control_start, control_end)) {
-                knife_maya_commit_slice(kcd,
-                                        kcd->maya_slice_tweak_original_start,
-                                        kcd->maya_slice_tweak_original_end);
+              if (!knife_clarity_commit_slice(kcd, control_start, control_end)) {
+                knife_clarity_commit_slice(kcd,
+                                        kcd->clarity_slice_tweak_original_start,
+                                        kcd->clarity_slice_tweak_original_end);
               }
-              kcd->maya_slice_tweak_endpoint = -1;
+              kcd->clarity_slice_tweak_endpoint = -1;
             }
-            else if (kcd->maya_tweak_point_index >= 0) {
-              knife_maya_cut_path_tweak_commit(kcd);
+            else if (kcd->clarity_tweak_point_index >= 0) {
+              knife_clarity_cut_path_tweak_commit(kcd);
             }
-            else if (kcd->maya_slice_drag) {
-              if (!knife_maya_commit_slice(kcd, kcd->maya_drag_start, mval)) {
+            else if (kcd->clarity_slice_drag) {
+              if (!knife_clarity_commit_slice(kcd, kcd->clarity_drag_start, mval)) {
                 knife_pos_data_clear(&kcd->prev);
                 knife_pos_data_clear(&kcd->curr);
                 kcd->mode = MODE_IDLE;
-                kcd->maya_cut_start_valid = false;
+                kcd->clarity_cut_start_valid = false;
               }
             }
-            else if (kcd->maya_lmb_started_cut && kcd->maya_lmb_dragged) {
+            else if (kcd->clarity_lmb_started_cut && kcd->clarity_lmb_dragged) {
               kcd->prev = kcd->curr;
-              kcd->maya_prev_grid_point = kcd->maya_curr_grid_point;
-              if (!kcd->maya_cut_points.is_empty()) {
-                kcd->maya_cut_points.last() =
-                    knife_maya_cut_point_from_pos(kcd->prev, kcd->maya_prev_grid_point);
+              kcd->clarity_prev_grid_point = kcd->clarity_curr_grid_point;
+              if (!kcd->clarity_cut_points.is_empty()) {
+                kcd->clarity_cut_points.last() =
+                    knife_clarity_cut_point_from_pos(kcd->prev, kcd->clarity_prev_grid_point);
               }
             }
-            kcd->maya_slice_drag = false;
-            kcd->maya_lmb_down = false;
-            kcd->maya_lmb_dragged = false;
-            kcd->maya_lmb_started_cut = false;
-            kcd->maya_lmb_added_cut = false;
-            kcd->maya_snap_step_drag = false;
+            kcd->clarity_slice_drag = false;
+            kcd->clarity_lmb_down = false;
+            kcd->clarity_lmb_dragged = false;
+            kcd->clarity_lmb_started_cut = false;
+            kcd->clarity_lmb_added_cut = false;
+            kcd->clarity_snap_step_drag = false;
             kcd->is_drag_undo = false;
             knifetool_update_mval(kcd, mval);
           }
@@ -6710,97 +6710,97 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
       case KNF_MODAL_INSERT_EDGE_LOOP:
       case KNF_MODAL_INSERT_CENTERED_EDGE_LOOP:
         if (event->prev_val != KM_RELEASE) {
-          if (kcd->mode == MODE_DRAGGING || kcd->maya_slice_result) {
+          if (kcd->mode == MODE_DRAGGING || kcd->clarity_slice_result) {
             handled = true;
             break;
           }
-          kcd->maya_loop_insert_down = true;
-          kcd->maya_loop_insert_centered = event->val == KNF_MODAL_INSERT_CENTERED_EDGE_LOOP;
+          kcd->clarity_loop_insert_down = true;
+          kcd->clarity_loop_insert_centered = event->val == KNF_MODAL_INSERT_CENTERED_EDGE_LOOP;
           knifetool_update_mval(kcd, mval);
-          knife_maya_loop_preview_update(kcd, mval, event->modifier);
+          knife_clarity_loop_preview_update(kcd, mval, event->modifier);
           do_refresh = true;
         }
-        else if (kcd->maya_loop_insert_down) {
-          return knife_maya_insert_edge_loop_and_restart(
-              C, op, event, kcd->maya_loop_insert_centered);
+        else if (kcd->clarity_loop_insert_down) {
+          return knife_clarity_insert_edge_loop_and_restart(
+              C, op, event, kcd->clarity_loop_insert_centered);
         }
         handled = true;
         break;
       case KNF_MODAL_QUICK_SLICE:
-        if (kcd->maya_loop_insert_down) {
+        if (kcd->clarity_loop_insert_down) {
           if (event->prev_val == KM_RELEASE) {
-            return knife_maya_insert_edge_loop_and_restart(
-                C, op, event, kcd->maya_loop_insert_centered);
+            return knife_clarity_insert_edge_loop_and_restart(
+                C, op, event, kcd->clarity_loop_insert_centered);
           }
           handled = true;
           break;
         }
         if (event->prev_val != KM_RELEASE) {
-          kcd->maya_redo_actions.clear();
-          if (kcd->maya_slice_result &&
+          kcd->clarity_redo_actions.clear();
+          if (kcd->clarity_slice_result &&
               dist_squared_to_line_segment_v2(
-                  mval, kcd->maya_slice_start, kcd->maya_slice_end) <=
+                  mval, kcd->clarity_slice_start, kcd->clarity_slice_end) <=
                   square_f(12.0f * UI_SCALE_FAC))
           {
-            kcd->maya_slice_move = true;
-            kcd->maya_slice_move_start = kcd->maya_slice_start;
-            kcd->maya_slice_move_end = kcd->maya_slice_end;
-            kcd->maya_slice_move_control_start = kcd->maya_slice_control_start;
-            kcd->maya_slice_move_control_end = kcd->maya_slice_control_end;
+            kcd->clarity_slice_move = true;
+            kcd->clarity_slice_move_start = kcd->clarity_slice_start;
+            kcd->clarity_slice_move_end = kcd->clarity_slice_end;
+            kcd->clarity_slice_move_control_start = kcd->clarity_slice_control_start;
+            kcd->clarity_slice_move_control_end = kcd->clarity_slice_control_end;
           }
-          kcd->maya_drag_start = mval;
-          if (kcd->maya_slice_move) {
+          kcd->clarity_drag_start = mval;
+          if (kcd->clarity_slice_move) {
             /* Keep the original cut visible until release; mouse motion draws the translated
              * plane preview without changing its angle. */
           }
           else if (kcd->mode == MODE_DRAGGING) {
-            kcd->maya_tweak_point_index = kcd->maya_cut_points.is_empty() ?
+            kcd->clarity_tweak_point_index = kcd->clarity_cut_points.is_empty() ?
                                               -1 :
-                                              int(kcd->maya_cut_points.size()) - 1;
+                                              int(kcd->clarity_cut_points.size()) - 1;
             if (!BLI_stack_is_empty(kcd->undostack)) {
               knifetool_undo(kcd);
-              kcd->maya_tweak_last = true;
+              kcd->clarity_tweak_last = true;
             }
             else {
-              kcd->maya_tweak_first = true;
+              kcd->clarity_tweak_first = true;
             }
             kcd->mode = MODE_DRAGGING;
             knifetool_update_mval(kcd, mval);
           }
           else {
-            kcd->maya_quick_slice = true;
-            kcd->maya_cut_points.clear();
+            kcd->clarity_quick_slice = true;
+            kcd->clarity_cut_points.clear();
             knife_start_cut(kcd, mval);
             kcd->mode = MODE_DRAGGING;
             kcd->init = kcd->curr;
           }
         }
-        else if (kcd->maya_slice_move) {
-          const float2 translated_start = kcd->maya_slice_control_start;
-          const float2 translated_end = kcd->maya_slice_control_end;
-          while (BLI_stack_count(kcd->undostack) > kcd->maya_slice_undo_count) {
+        else if (kcd->clarity_slice_move) {
+          const float2 translated_start = kcd->clarity_slice_control_start;
+          const float2 translated_end = kcd->clarity_slice_control_end;
+          while (BLI_stack_count(kcd->undostack) > kcd->clarity_slice_undo_count) {
             knifetool_undo(kcd);
           }
-          kcd->maya_slice_result = false;
+          kcd->clarity_slice_result = false;
           knife_pos_data_clear(&kcd->prev);
           knife_pos_data_clear(&kcd->curr);
           kcd->mode = MODE_IDLE;
-          knife_maya_commit_slice(kcd, translated_start, translated_end);
-          kcd->maya_slice_move = false;
+          knife_clarity_commit_slice(kcd, translated_start, translated_end);
+          kcd->clarity_slice_move = false;
         }
-        else if (kcd->maya_tweak_point_index >= 0) {
-          knife_maya_cut_path_tweak_commit(kcd);
+        else if (kcd->clarity_tweak_point_index >= 0) {
+          knife_clarity_cut_path_tweak_commit(kcd);
         }
-        else if (kcd->maya_tweak_first) {
+        else if (kcd->clarity_tweak_first) {
           kcd->prev = kcd->curr;
-          kcd->maya_prev_grid_point = kcd->maya_curr_grid_point;
-          kcd->maya_tweak_first = false;
+          kcd->clarity_prev_grid_point = kcd->clarity_curr_grid_point;
+          kcd->clarity_tweak_first = false;
         }
-        else if (kcd->maya_quick_slice) {
-          const bool committed = knife_maya_commit_slice(kcd, kcd->maya_drag_start, mval);
-          kcd->maya_quick_slice = false;
+        else if (kcd->clarity_quick_slice) {
+          const bool committed = knife_clarity_commit_slice(kcd, kcd->clarity_drag_start, mval);
+          kcd->clarity_quick_slice = false;
           if (committed) {
-            return knife_maya_restart_session(C, op, event, true);
+            return knife_clarity_restart_session(C, op, event, true);
           }
           else {
             knife_pos_data_clear(&kcd->prev);
@@ -6861,52 +6861,52 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
         return OPERATOR_PASS_THROUGH;
       case MOUSEMOVE: /* Mouse moved somewhere to select another loop. */
         if (kcd->mode != MODE_PANNING) {
-          if (kcd->maya_style && kcd->maya_slice_tweak_endpoint >= 0) {
-            if (kcd->maya_slice_tweak_endpoint == 0) {
-              kcd->maya_slice_control_start = mval;
+          if (kcd->clarity_style && kcd->clarity_slice_tweak_endpoint >= 0) {
+            if (kcd->clarity_slice_tweak_endpoint == 0) {
+              kcd->clarity_slice_control_start = mval;
             }
             else {
-              kcd->maya_slice_control_end = mval;
+              kcd->clarity_slice_control_end = mval;
             }
-            knife_maya_slice_line_expand(kcd,
-                                         kcd->maya_slice_control_start,
-                                         kcd->maya_slice_control_end,
-                                         kcd->maya_slice_start,
-                                         kcd->maya_slice_end);
+            knife_clarity_slice_line_expand(kcd,
+                                         kcd->clarity_slice_control_start,
+                                         kcd->clarity_slice_control_end,
+                                         kcd->clarity_slice_start,
+                                         kcd->clarity_slice_end);
           }
-          else if (kcd->maya_style && kcd->maya_slice_move) {
-            const float2 offset = mval - kcd->maya_drag_start;
-            kcd->maya_slice_start = kcd->maya_slice_move_start + offset;
-            kcd->maya_slice_end = kcd->maya_slice_move_end + offset;
-            kcd->maya_slice_control_start = kcd->maya_slice_move_control_start + offset;
-            kcd->maya_slice_control_end = kcd->maya_slice_move_control_end + offset;
+          else if (kcd->clarity_style && kcd->clarity_slice_move) {
+            const float2 offset = mval - kcd->clarity_drag_start;
+            kcd->clarity_slice_start = kcd->clarity_slice_move_start + offset;
+            kcd->clarity_slice_end = kcd->clarity_slice_move_end + offset;
+            kcd->clarity_slice_control_start = kcd->clarity_slice_move_control_start + offset;
+            kcd->clarity_slice_control_end = kcd->clarity_slice_move_control_end + offset;
           }
-          if (kcd->maya_style && kcd->maya_lmb_down && !kcd->maya_lmb_dragged &&
-              math::distance_squared(kcd->maya_drag_start, mval) >
+          if (kcd->clarity_style && kcd->clarity_lmb_down && !kcd->clarity_lmb_dragged &&
+              math::distance_squared(kcd->clarity_drag_start, mval) >
                   square_f(3.0f * UI_SCALE_FAC))
           {
-            kcd->maya_lmb_dragged = true;
-            kcd->maya_snap_step_drag = (event->modifier & KM_SHIFT) != 0 &&
-                                       !kcd->maya_slice_drag;
-            if (kcd->maya_lmb_added_cut && !kcd->maya_slice_drag &&
+            kcd->clarity_lmb_dragged = true;
+            kcd->clarity_snap_step_drag = (event->modifier & KM_SHIFT) != 0 &&
+                                       !kcd->clarity_slice_drag;
+            if (kcd->clarity_lmb_added_cut && !kcd->clarity_slice_drag &&
                 !BLI_stack_is_empty(kcd->undostack))
             {
               knifetool_undo(kcd);
               kcd->is_drag_undo = false;
-              kcd->maya_tweak_last = true;
-              kcd->maya_tweak_point_index = int(kcd->maya_cut_points.size()) - 1;
-              kcd->maya_lmb_added_cut = false;
+              kcd->clarity_tweak_last = true;
+              kcd->clarity_tweak_point_index = int(kcd->clarity_cut_points.size()) - 1;
+              kcd->clarity_lmb_added_cut = false;
             }
           }
           knifetool_update_mval(kcd, mval);
-          if (kcd->maya_style) {
-            if (kcd->maya_tweak_point_index >= 0 &&
-                (kcd->maya_lmb_down || kcd->maya_tweak_last || kcd->maya_tweak_first))
+          if (kcd->clarity_style) {
+            if (kcd->clarity_tweak_point_index >= 0 &&
+                (kcd->clarity_lmb_down || kcd->clarity_tweak_last || kcd->clarity_tweak_first))
             {
-              kcd->maya_cut_points[kcd->maya_tweak_point_index] =
-                  knife_maya_cut_point_from_pos(kcd->curr, kcd->maya_curr_grid_point);
+              kcd->clarity_cut_points[kcd->clarity_tweak_point_index] =
+                  knife_clarity_cut_point_from_pos(kcd->curr, kcd->clarity_curr_grid_point);
             }
-            knife_maya_loop_preview_update(kcd, mval, event->modifier);
+            knife_clarity_loop_preview_update(kcd, mval, event->modifier);
           }
           do_refresh = true;
 
@@ -6919,10 +6919,10 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
 
         break;
       default: {
-        if (kcd->maya_style &&
+        if (kcd->clarity_style &&
             ELEM(event->type, EVT_LEFTCTRLKEY, EVT_RIGHTCTRLKEY, EVT_LEFTSHIFTKEY, EVT_RIGHTSHIFTKEY))
         {
-          knife_maya_loop_preview_update(kcd, mval, event->modifier);
+          knife_clarity_loop_preview_update(kcd, mval, event->modifier);
           do_refresh = true;
         }
         break;
@@ -6955,7 +6955,7 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
   }
 
   /* Constrain axes with X,Y,Z keys. */
-  if (event->type == EVT_MODAL_MAP && !kcd->maya_style) {
+  if (event->type == EVT_MODAL_MAP && !kcd->clarity_style) {
     if (ELEM(event->val, KNF_MODAL_X_AXIS, KNF_MODAL_Y_AXIS, KNF_MODAL_Z_AXIS)) {
       if (event->val == KNF_MODAL_X_AXIS && kcd->constrain_axis != KNF_CONSTRAIN_AXIS_X) {
         kcd->constrain_axis = KNF_CONSTRAIN_AXIS_X;
@@ -7009,16 +7009,16 @@ static wmOperatorStatus knifetool_modal(bContext *C, wmOperator *op, const wmEve
   return OPERATOR_RUNNING_MODAL;
 }
 
-static wmOperatorStatus knife_maya_insert_edge_loop(bContext *C,
+static wmOperatorStatus knife_clarity_insert_edge_loop(bContext *C,
                                                     wmOperator *knife_op,
                                                     const wmEvent * /*event*/,
                                                     const bool /*centered*/,
                                                     const KnifeTool_OpData *kcd)
 {
-  if (kcd == nullptr || !kcd->maya_loop_preview_has_origin ||
-      kcd->maya_loop_preview_edge == nullptr || kcd->maya_loop_preview_ob_index < 0 ||
-      kcd->maya_loop_preview_ob_index >= int(kcd->objects.size()) ||
-      kcd->maya_loop_preview_points.is_empty())
+  if (kcd == nullptr || !kcd->clarity_loop_preview_has_origin ||
+      kcd->clarity_loop_preview_edge == nullptr || kcd->clarity_loop_preview_ob_index < 0 ||
+      kcd->clarity_loop_preview_ob_index >= int(kcd->objects.size()) ||
+      kcd->clarity_loop_preview_points.is_empty())
   {
     BKE_report(knife_op->reports, RPT_WARNING, "No edge-loop preview to insert");
     return OPERATOR_CANCELLED;
@@ -7029,7 +7029,7 @@ static wmOperatorStatus knife_maya_insert_edge_loop(bContext *C,
       *vc.bmain, vc.scene, vc.view_layer, vc.v3d);
 
   bool base_found = false;
-  Object *ob = kcd->objects[kcd->maya_loop_preview_ob_index];
+  Object *ob = kcd->objects[kcd->clarity_loop_preview_ob_index];
   for (Base *base : bases) {
     if (base->object == ob) {
       base_found = true;
@@ -7051,15 +7051,15 @@ static wmOperatorStatus knife_maya_insert_edge_loop(bContext *C,
     float3 target;
   };
   Vector<LoopPreviewPlacement> placements;
-  placements.reserve(kcd->maya_loop_preview_points.size());
+  placements.reserve(kcd->clarity_loop_preview_points.size());
 
-  for (const KnifeMayaLoopPreviewPoint &preview_point : kcd->maya_loop_preview_points) {
+  for (const KnifeClarityLoopPreviewPoint &preview_point : kcd->clarity_loop_preview_points) {
     const BMEdge *preview_edge = preview_point.edge;
     const float3 cage_world[2] = {
-        knife_maya_vert_world(
-            kcd, kcd->maya_loop_preview_ob_index, preview_edge->v1),
-        knife_maya_vert_world(
-            kcd, kcd->maya_loop_preview_ob_index, preview_edge->v2),
+        knife_clarity_vert_world(
+            kcd, kcd->clarity_loop_preview_ob_index, preview_edge->v1),
+        knife_clarity_vert_world(
+            kcd, kcd->clarity_loop_preview_ob_index, preview_edge->v2),
     };
     const float factor = clamp_f(
         line_point_factor_v3(preview_point.cage, cage_world[0], cage_world[1]), 0.0f, 1.0f);
@@ -7079,7 +7079,7 @@ static wmOperatorStatus knife_maya_insert_edge_loop(bContext *C,
     BMEditMesh *em = BKE_editmesh_from_object(base->object);
     EDBM_flag_disable_all(em, BM_ELEM_SELECT);
   }
-  for (const KnifeMayaLoopPreviewPoint &preview_point : kcd->maya_loop_preview_points) {
+  for (const KnifeClarityLoopPreviewPoint &preview_point : kcd->clarity_loop_preview_points) {
     BM_edge_select_set(vc.em->bm, preview_point.edge, true);
   }
 
@@ -7176,22 +7176,22 @@ static wmOperatorStatus knife_maya_insert_edge_loop(bContext *C,
   return OPERATOR_FINISHED;
 }
 
-static wmOperatorStatus knife_maya_insert_edge_loop_and_restart(bContext *C,
+static wmOperatorStatus knife_clarity_insert_edge_loop_and_restart(bContext *C,
                                                                 wmOperator *op,
                                                                 const wmEvent *event,
                                                                 const bool centered)
 {
   KnifeTool_OpData *kcd = static_cast<KnifeTool_OpData *>(op->customdata);
-  if (knife_maya_insert_edge_loop(C, op, event, centered, kcd) & OPERATOR_FINISHED) {
+  if (knife_clarity_insert_edge_loop(C, op, event, centered, kcd) & OPERATOR_FINISHED) {
     /* The tool stays modal, so materialized topology needs an explicit edit-mesh undo step. */
     ED_undo_push(C, "Multi-Cut Edge Loop");
   }
   knifetool_exit(op);
 
-  return knife_maya_restart_session(C, op, event, false);
+  return knife_clarity_restart_session(C, op, event, false);
 }
 
-static wmOperatorStatus knife_maya_restart_session(bContext *C,
+static wmOperatorStatus knife_clarity_restart_session(bContext *C,
                                                    wmOperator *op,
                                                    const wmEvent *event,
                                                    const bool commit_current)
@@ -7228,10 +7228,10 @@ static wmOperatorStatus knife_maya_restart_session(bContext *C,
                  angle_snapping,
                  angle_snapping_increment,
                  true);
-  kcd->maya_style = true;
-  knife_maya_settings_sync(C, op, kcd);
-  kcd->snap_to_grid = ED_maya_snap_override_get(C) == ed::maya::MayaSnapMode::Grid;
-  kcd->snap_to_points = ED_maya_snap_override_get(C) == ed::maya::MayaSnapMode::Point;
+  kcd->clarity_style = true;
+  knife_clarity_settings_sync(C, op, kcd);
+  kcd->snap_to_grid = ED_clarity_snap_override_get(C) == ed::clarity::ClaritySnapMode::Grid;
+  kcd->snap_to_points = ED_clarity_snap_override_get(C) == ed::clarity::ClaritySnapMode::Point;
 
   op->flag |= OP_IS_MODAL_CURSOR_REGION;
   WM_cursor_modal_set(CTX_wm_window(C), WM_CURSOR_KNIFE);
@@ -7244,7 +7244,7 @@ static wmOperatorStatus knife_maya_restart_session(bContext *C,
 
 static wmOperatorStatus knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  const bool maya_style = ED_maya_interaction_preset_enabled(C);
+  const bool clarity_style = ED_clarity_interaction_preset_enabled(C);
   const bool only_select = RNA_boolean_get(op->ptr, "only_selected");
   const bool cut_through = !RNA_boolean_get(op->ptr, "use_occlude_geometry");
   const bool xray = !RNA_boolean_get(op->ptr, "xray");
@@ -7270,13 +7270,13 @@ static wmOperatorStatus knifetool_invoke(bContext *C, wmOperator *op, const wmEv
                  angle_snapping,
                  angle_snapping_increment,
                  true);
-  kcd->maya_style = maya_style;
-  if (maya_style) {
-    knife_maya_settings_sync(C, op, kcd);
+  kcd->clarity_style = clarity_style;
+  if (clarity_style) {
+    knife_clarity_settings_sync(C, op, kcd);
     kcd->snap_to_grid = event->keymodifier == EVT_XKEY ||
-                        ED_maya_snap_override_get(C) == ed::maya::MayaSnapMode::Grid;
+                        ED_clarity_snap_override_get(C) == ed::clarity::ClaritySnapMode::Grid;
     kcd->snap_to_points = event->keymodifier == EVT_VKEY ||
-                          ED_maya_snap_override_get(C) == ed::maya::MayaSnapMode::Point;
+                          ED_clarity_snap_override_get(C) == ed::clarity::ClaritySnapMode::Point;
     kcd->snap_midpoints = (event->modifier & KM_SHIFT) != 0 &&
                           (event->modifier & KM_CTRL) == 0;
   }
@@ -7308,12 +7308,12 @@ static wmOperatorStatus knifetool_invoke(bContext *C, wmOperator *op, const wmEv
     wmEvent event_modal{};
     event_modal.prev_val = KM_NOTHING;
     event_modal.type = EVT_MODAL_MAP;
-    if (maya_style && (event->modifier & KM_CTRL) != 0) {
+    if (clarity_style && (event->modifier & KM_CTRL) != 0) {
       event_modal.val = event->type == MIDDLEMOUSE ? KNF_MODAL_INSERT_CENTERED_EDGE_LOOP :
                                                     KNF_MODAL_INSERT_EDGE_LOOP;
     }
     else {
-      event_modal.val = (maya_style && event->type == MIDDLEMOUSE) ? KNF_MODAL_QUICK_SLICE :
+      event_modal.val = (clarity_style && event->type == MIDDLEMOUSE) ? KNF_MODAL_QUICK_SLICE :
                                                                     KNF_MODAL_ADD_CUT;
     }
     event_modal.modifier = event->modifier;
@@ -7337,7 +7337,7 @@ void MESH_OT_knife_tool(wmOperatorType *ot)
   /* Description. */
   ot->name = "Multi-Cut Topology Tool";
   ot->idname = "MESH_OT_knife_tool";
-  ot->description = "Cut, slice, and insert edge loops with Maya Multi-Cut interactions";
+  ot->description = "Cut, slice, and insert edge loops with Clarity Multi-Cut interactions";
 
   /* Callbacks. */
   ot->invoke = knifetool_invoke;
@@ -7551,7 +7551,7 @@ void MESH_OT_knife_tool(wmOperatorType *ot)
                   "use_live_surface",
                   false,
                   "Live Surface",
-                  "Enable Maya-style live-surface display and constraint options");
+                  "Enable Clarity-style live-surface display and constraint options");
   RNA_def_boolean(ot->srna,
                   "wireframe_overlay",
                   true,

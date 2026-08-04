@@ -78,7 +78,7 @@
 
 #include "ED_anim_api.hh"
 #include "ED_fileselect.hh"
-#include "ED_maya.hh"
+#include "ED_clarity.hh"
 #include "ED_render.hh"
 #include "ED_scene.hh"
 #include "ED_screen.hh"
@@ -274,7 +274,7 @@ static void wm_ghostwindow_destroy(wmWindowManager *wm, wmWindow *win)
 
 void wm_window_free(bContext *C, wmWindowManager *wm, wmWindow *win)
 {
-  ED_maya_runtime_free(C, win);
+  ED_clarity_runtime_free(C, win);
 
   /* Update context. */
   if (C) {
@@ -693,7 +693,7 @@ static std::string wm_window_title_text(
     }
   }
 
-  win_title.append(" - Maya 2.0");
+  win_title.append(" - Clarity");
 
   return win_title;
 }

@@ -22,7 +22,7 @@
 #include "BKE_main.hh"
 #include "BKE_screen.hh"
 
-#include "ED_maya.hh"
+#include "ED_clarity.hh"
 #include "ED_screen.hh"
 #include "ED_select_utils.hh"
 #include "ED_view3d.hh"
@@ -435,7 +435,7 @@ static void gizmomap_prepare_drawing(wmGizmoMap *gzmap,
 
     /* Check after ensure which can run refresh and update this value. */
     if (gzgroup.hide.any != 0) {
-      if (ED_maya_gizmo_trace_enabled()) {
+      if (ED_clarity_gizmo_trace_enabled()) {
         fprintf(stderr,
                 "GZTRACE %.3f group_skipped: %s hide_any=%d\n",
                 BLI_time_now_seconds(),
@@ -536,20 +536,20 @@ void WM_gizmomap_draw(wmGizmoMap *gzmap,
     return;
   }
 
-  const bool maya_debug = ED_maya_navigation_debug_active(C);
-  const double draw_start = maya_debug ? BLI_time_now_seconds() : 0.0;
+  const bool clarity_debug = ED_clarity_navigation_debug_active(C);
+  const double draw_start = clarity_debug ? BLI_time_now_seconds() : 0.0;
   ListBaseT<wmGizmo> draw_gizmos = {nullptr};
 
   gizmomap_prepare_drawing(gzmap, C, &draw_gizmos, drawstep);
   gizmos_draw_list(gzmap, C, &draw_gizmos);
   BLI_assert(draw_gizmos.is_empty());
 
-  if (maya_debug && ELEM(drawstep, WM_GIZMOMAP_DRAWSTEP_3D, WM_GIZMOMAP_DRAWSTEP_2D)) {
-    ED_maya_navigation_debug_stage_sample(
+  if (clarity_debug && ELEM(drawstep, WM_GIZMOMAP_DRAWSTEP_3D, WM_GIZMOMAP_DRAWSTEP_2D)) {
+    ED_clarity_navigation_debug_stage_sample(
         C,
         drawstep == WM_GIZMOMAP_DRAWSTEP_3D ?
-            ed::maya::MayaNavigationDebugStage::Gizmo3D :
-            ed::maya::MayaNavigationDebugStage::Gizmo2D,
+            ed::clarity::ClarityNavigationDebugStage::Gizmo3D :
+            ed::clarity::ClarityNavigationDebugStage::Gizmo2D,
         (BLI_time_now_seconds() - draw_start) * 1000.0,
         0.0,
         0.0,

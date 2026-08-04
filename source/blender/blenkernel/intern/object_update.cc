@@ -29,7 +29,7 @@
 #include "BKE_lattice.hh"
 #include "BKE_layer.hh"
 #include "BKE_mball.hh"
-#include "BKE_maya_constraints.hh"
+#include "BKE_clarity_constraints.hh"
 #include "BKE_mesh.hh"
 #include "BKE_modifier.hh"
 #include "BKE_object.hh"
@@ -56,9 +56,9 @@ void BKE_object_eval_local_transform(Depsgraph *depsgraph, Object *ob)
 {
   DEG_debug_print_eval(depsgraph, __func__, ob->id.name, ob);
 
-  if (BKE_object_uses_maya_transform(ob)) {
-    BKE_object_eval_maya_channels_init(depsgraph, ob);
-    BKE_object_eval_maya_local_transform(depsgraph, ob);
+  if (BKE_object_uses_clarity_transform(ob)) {
+    BKE_object_eval_clarity_channels_init(depsgraph, ob);
+    BKE_object_eval_clarity_local_transform(depsgraph, ob);
     return;
   }
   BKE_object_local_matrix_get(ob, ob->runtime->object_to_world.ptr());
@@ -80,14 +80,14 @@ void BKE_object_eval_parent(Depsgraph *depsgraph, Object *ob)
   /* XXX: redundant? */
   copy_m4_m4(locmat, ob->object_to_world().ptr());
 
-  if (BKE_object_uses_maya_transform(ob) && !ob->maya_transform->inherits_transform) {
+  if (BKE_object_uses_clarity_transform(ob) && !ob->clarity_transform->inherits_transform) {
     return;
   }
 
   /* get parent effect matrix */
   BKE_object_get_parent_matrix(ob, par, totmat);
 
-  if (BKE_object_uses_maya_transform(ob)) {
+  if (BKE_object_uses_clarity_transform(ob)) {
     mul_m4_m4m4(ob->runtime->object_to_world.ptr(), totmat, locmat);
   }
   else {
@@ -112,8 +112,8 @@ void BKE_object_eval_constraints(Depsgraph *depsgraph, Scene *scene, Object *ob)
 
   DEG_debug_print_eval(depsgraph, __func__, ob->id.name, ob);
 
-  if (BKE_object_uses_maya_transform(ob) && !ob->maya_constraints.is_empty()) {
-    BKE_object_eval_maya_constraints(depsgraph, scene, ob);
+  if (BKE_object_uses_clarity_transform(ob) && !ob->clarity_constraints.is_empty()) {
+    BKE_object_eval_clarity_constraints(depsgraph, scene, ob);
   }
 
   /* evaluate constraints stack */
@@ -415,7 +415,7 @@ void BKE_object_eval_transform_all(Depsgraph *depsgraph, Scene *scene, Object *o
   if (object->parent != nullptr) {
     BKE_object_eval_parent(depsgraph, object);
   }
-  if (!object->constraints.is_empty() || !object->maya_constraints.is_empty()) {
+  if (!object->constraints.is_empty() || !object->clarity_constraints.is_empty()) {
     BKE_object_eval_constraints(depsgraph, scene, object);
   }
   BKE_object_eval_uber_transform(depsgraph, object);

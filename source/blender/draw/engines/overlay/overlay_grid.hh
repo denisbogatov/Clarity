@@ -289,7 +289,7 @@ class Grid : Overlay {
       return false;
     }
 
-    /* Match Maya's default finite floor: 40 one-unit cells, centered at the world origin.
+    /* Match Clarity's default finite floor: 40 one-unit cells, centered at the world origin.
      * Keep all step entries valid because the same shader data layout is shared with SpaceImage. */
     constexpr float grid_step = 1.0f;
     constexpr uint grid_cell_count = 40u;

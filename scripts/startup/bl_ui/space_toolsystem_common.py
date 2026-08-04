@@ -834,7 +834,7 @@ class ToolSelectPanelHelper:
         idname_fallback = tool.idname_fallback
         hide_fallback = (
             item.idname == "builtin.knife" and
-            context.preferences.inputs.interaction_preset == 'MAYA'
+            context.preferences.inputs.interaction_preset == 'CLARITY'
         )
         if idname_fallback and idname_fallback != item.idname and not hide_fallback:
             tool_settings = context.tool_settings

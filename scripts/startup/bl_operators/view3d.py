@@ -265,10 +265,10 @@ class VIEW3D_OT_transform_gizmo_set(Operator):
         return self.execute(context)
 
 
-class VIEW3D_OT_maya_object_xray(Operator):
+class VIEW3D_OT_clarity_object_xray(Operator):
     """Toggle transparent X-Ray drawing for selected objects"""
     bl_label = "Object X-Ray"
-    bl_idname = "view3d.maya_object_xray"
+    bl_idname = "view3d.clarity_object_xray"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -284,10 +284,10 @@ class VIEW3D_OT_maya_object_xray(Operator):
         return {'FINISHED'}
 
 
-class VIEW3D_OT_maya_bridge_or_fill(Operator):
+class VIEW3D_OT_clarity_bridge_or_fill(Operator):
     """Bridge two selected edge loops, or fill a single selected boundary"""
     bl_label = "Bridge or Fill"
-    bl_idname = "view3d.maya_bridge_or_fill"
+    bl_idname = "view3d.clarity_bridge_or_fill"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -343,10 +343,10 @@ class VIEW3D_OT_maya_bridge_or_fill(Operator):
         return bpy.ops.mesh.edge_face_add()
 
 
-class VIEW3D_OT_maya_connect(Operator):
+class VIEW3D_OT_clarity_connect(Operator):
     """Interactively insert and slide an edge loop"""
     bl_label = "Loop Cut and Slide"
-    bl_idname = "view3d.maya_connect"
+    bl_idname = "view3d.clarity_connect"
 
     @classmethod
     def poll(cls, context):
@@ -359,7 +359,7 @@ class VIEW3D_OT_maya_connect(Operator):
         return self.execute(context)
 
 
-def _maya_subdivision_preview_set(context, mode):
+def _clarity_subdivision_preview_set(context, mode):
     objects = [obj for obj in context.selected_objects if obj.type == 'MESH']
     active_object = context.active_object
     if active_object and active_object.type == 'MESH' and active_object not in objects:
@@ -371,7 +371,7 @@ def _maya_subdivision_preview_set(context, mode):
     for obj in objects:
         modifiers = [modifier for modifier in obj.modifiers if modifier.type == 'SUBSURF']
         if enabled and not modifiers:
-            modifier = obj.modifiers.new(name="Maya Smooth Preview", type='SUBSURF')
+            modifier = obj.modifiers.new(name="Clarity Smooth Preview", type='SUBSURF')
             modifier.levels = 2
             modifier.render_levels = 2
             modifiers.append(modifier)
@@ -385,34 +385,71 @@ def _maya_subdivision_preview_set(context, mode):
     return {'FINISHED'}
 
 
-class VIEW3D_OT_maya_subdivision_preview_off(Operator):
+class VIEW3D_OT_clarity_subdivision_preview_off(Operator):
     """Show the original control mesh without subdivision preview"""
     bl_label = "Subdivision Preview Off"
-    bl_idname = "view3d.maya_subdivision_preview_off"
+    bl_idname = "view3d.clarity_subdivision_preview_off"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        return _maya_subdivision_preview_set(context, 0)
+        return _clarity_subdivision_preview_set(context, 0)
 
 
-class VIEW3D_OT_maya_subdivision_preview_on(Operator):
+class VIEW3D_OT_clarity_subdivision_preview_on(Operator):
     """Show subdivision preview together with the original control cage"""
     bl_label = "Subdivision Preview with Cage"
-    bl_idname = "view3d.maya_subdivision_preview_on"
+    bl_idname = "view3d.clarity_subdivision_preview_on"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        return _maya_subdivision_preview_set(context, 1)
+        return _clarity_subdivision_preview_set(context, 1)
 
 
-class VIEW3D_OT_maya_subdivision_preview_surface(Operator):
+class VIEW3D_OT_clarity_subdivision_preview_surface(Operator):
     """Show subdivision preview with the cage fitted to the smooth surface"""
     bl_label = "Subdivision Preview Surface"
-    bl_idname = "view3d.maya_subdivision_preview_surface"
+    bl_idname = "view3d.clarity_subdivision_preview_surface"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        return _maya_subdivision_preview_set(context, 2)
+        return _clarity_subdivision_preview_set(context, 2)
+
+
+def _clarity_legacy_operator_alias(base):
+    """Hidden forwarding class for external scripts using a former operator identifier."""
+    namespace = {
+        "__module__": __name__,
+        "bl_idname": base.bl_idname.replace(".clarity_", ".maya_"),
+        "bl_options": set(getattr(base, "bl_options", set())) | {'INTERNAL'},
+    }
+    for name, value in base.__dict__.items():
+        if name.startswith("__") or name in {"bl_idname", "bl_options", "bl_rna"}:
+            continue
+        namespace[name] = value
+    annotations = {}
+    for owner in reversed(base.__mro__):
+        annotations.update(getattr(owner, "__annotations__", {}))
+    if annotations:
+        namespace["__annotations__"] = annotations
+    for callback in ("poll", "description", "check", "draw", "invoke", "execute", "modal", "cancel"):
+        for owner in base.__mro__:
+            if callback in owner.__dict__:
+                namespace[callback] = owner.__dict__[callback]
+                break
+    return type(base.__name__.replace("_clarity_", "_maya_"), base.__bases__, namespace)
+
+
+_CLARITY_LEGACY_OPERATOR_CLASSES = tuple(
+    _clarity_legacy_operator_alias(base)
+    for base in (
+        VIEW3D_OT_clarity_object_xray,
+        VIEW3D_OT_clarity_bridge_or_fill,
+        VIEW3D_OT_clarity_connect,
+        VIEW3D_OT_clarity_subdivision_preview_off,
+        VIEW3D_OT_clarity_subdivision_preview_on,
+        VIEW3D_OT_clarity_subdivision_preview_surface,
+    )
+)
 
 
 class VIEW3D_FH_empty_image(FileHandler):
@@ -460,12 +497,13 @@ classes = (
     VIEW3D_OT_edit_mesh_extrude_shrink_fatten,
     VIEW3D_OT_edit_mesh_extrude_manifold_normal,
     VIEW3D_OT_transform_gizmo_set,
-    VIEW3D_OT_maya_object_xray,
-    VIEW3D_OT_maya_bridge_or_fill,
-    VIEW3D_OT_maya_connect,
-    VIEW3D_OT_maya_subdivision_preview_off,
-    VIEW3D_OT_maya_subdivision_preview_on,
-    VIEW3D_OT_maya_subdivision_preview_surface,
+    VIEW3D_OT_clarity_object_xray,
+    VIEW3D_OT_clarity_bridge_or_fill,
+    VIEW3D_OT_clarity_connect,
+    VIEW3D_OT_clarity_subdivision_preview_off,
+    VIEW3D_OT_clarity_subdivision_preview_on,
+    VIEW3D_OT_clarity_subdivision_preview_surface,
+    *_CLARITY_LEGACY_OPERATOR_CLASSES,
     VIEW3D_FH_camera_background_image,
     VIEW3D_FH_empty_image,
     VIEW3D_FH_vdb_volume,

@@ -30,7 +30,7 @@
 #include "WM_api.hh"
 
 #include "ED_image.hh"
-#include "ED_maya.hh"
+#include "ED_clarity.hh"
 #include "ED_node.hh"
 #include "ED_transform_snap_object_context.hh"
 #include "ED_uvedit.hh"
@@ -46,7 +46,7 @@
 #include "transform_convert.hh"
 #include "transform_mode.hh"
 #include "transform_snap.hh"
-#include "transform_snap_maya.hh"
+#include "transform_snap_clarity.hh"
 
 namespace blender::ed::transform {
 
@@ -622,24 +622,24 @@ void transform_snap_mixed_apply(TransInfo *t, float *vec)
   }
 }
 
-MayaSnapPlan transform_snap_maya_plan_get(const MayaSnapPlanInput &input)
+ClaritySnapPlan transform_snap_clarity_plan_get(const ClaritySnapPlanInput &input)
 {
-  MayaSnapPlan plan;
-  if (input.mode == ed::maya::MayaSnapMode::None) {
+  ClaritySnapPlan plan;
+  if (input.mode == ed::clarity::ClaritySnapMode::None) {
     /* A transform constraint is what holds a component on the geometry while nothing is snapping
      * it anywhere. A held snap key is a deliberate one-off and outranks it, which is why this only
      * answers when there is no snap mode. */
     if (input.is_translation && input.is_component_edit) {
       switch (input.transform_constraint) {
-        case ed::maya::MayaTransformConstraint::Edge:
+        case ed::clarity::ClarityTransformConstraint::Edge:
           plan.use_snap = true;
           plan.snap_to = SCE_SNAP_TO_EDGE;
           break;
-        case ed::maya::MayaTransformConstraint::Surface:
+        case ed::clarity::ClarityTransformConstraint::Surface:
           plan.use_snap = true;
           plan.snap_to = SCE_SNAP_TO_FACE;
           break;
-        case ed::maya::MayaTransformConstraint::Off:
+        case ed::clarity::ClarityTransformConstraint::Off:
           break;
       }
       /* The component itself is what has to end up on the edge or the surface, so the pivot is left
@@ -648,46 +648,46 @@ MayaSnapPlan transform_snap_maya_plan_get(const MayaSnapPlanInput &input)
     }
     return plan;
   }
-  if (!input.is_translation && input.mode != ed::maya::MayaSnapMode::Step) {
-    /* Maya only steps a rotation or a scale; its point, curve and grid snapping are about where
+  if (!input.is_translation && input.mode != ed::clarity::ClaritySnapMode::Step) {
+    /* Clarity only steps a rotation or a scale; its point, curve and grid snapping are about where
      * something goes, so they have nothing to say here. */
     return plan;
   }
 
   switch (input.mode) {
-    case ed::maya::MayaSnapMode::Grid:
+    case ed::clarity::ClaritySnapMode::Grid:
       plan.use_snap = true;
       plan.snap_to = SCE_SNAP_TO_GRID;
       plan.source_is_center = true;
       break;
-    case ed::maya::MayaSnapMode::Curve:
+    case ed::clarity::ClaritySnapMode::Curve:
       plan.use_snap = true;
       plan.snap_to = SCE_SNAP_TO_EDGE;
       plan.curve_targets_only = true;
       plan.source_is_center = true;
       break;
-    case ed::maya::MayaSnapMode::Point:
+    case ed::clarity::ClaritySnapMode::Point:
       plan.use_snap = true;
       plan.snap_to = SCE_SNAP_TO_VERTEX;
       plan.include_object_pivots = true;
       plan.source_is_center = true;
       break;
-    case ed::maya::MayaSnapMode::ViewPlane:
+    case ed::clarity::ClaritySnapMode::ViewPlane:
       /* A constraint, not a target: nothing is snapped onto anything. */
       plan.view_plane = true;
       break;
-    case ed::maya::MayaSnapMode::MeshCenter:
+    case ed::clarity::ClaritySnapMode::MeshCenter:
       plan.use_snap = true;
       plan.snap_to = SCE_SNAP_TO_VOLUME;
       plan.mesh_center = true;
       plan.source_is_center = true;
       break;
-    case ed::maya::MayaSnapMode::Step:
+    case ed::clarity::ClaritySnapMode::Step:
       plan.use_snap = true;
       plan.snap_to = SCE_SNAP_TO_INCREMENT;
       /* Absolute steps are measured from the world origin, so they only mean anything while the
        * translation itself runs in global space. */
-      plan.absolute_grid = input.step.mode == ed::maya::MAYA_STEP_SNAP_ABSOLUTE &&
+      plan.absolute_grid = input.step.mode == ed::clarity::CLARITY_STEP_SNAP_ABSOLUTE &&
                            (!input.is_translation || input.orientation_is_global);
       /* Outside the 3D View the increment carries the aspect of that editor, so it is left alone. */
       if (input.space_is_view3d) {
@@ -699,7 +699,7 @@ MayaSnapPlan transform_snap_maya_plan_get(const MayaSnapPlanInput &input)
         }
       }
       break;
-    case ed::maya::MayaSnapMode::None:
+    case ed::clarity::ClaritySnapMode::None:
       BLI_assert_unreachable();
       break;
   }
@@ -709,9 +709,9 @@ MayaSnapPlan transform_snap_maya_plan_get(const MayaSnapPlanInput &input)
   return plan;
 }
 
-MayaPivotSnapDecision maya_pivot_snap_decision_get(const MayaPivotSnapInput &input)
+ClarityPivotSnapDecision clarity_pivot_snap_decision_get(const ClarityPivotSnapInput &input)
 {
-  MayaPivotSnapDecision decision;
+  ClarityPivotSnapDecision decision;
   if (!input.has_target) {
     /* Nothing is near the pointer, so the pivot follows it. Holding it at the last target instead
      * is what made the pivot look magnetized to a vertex it had already left. */
@@ -722,7 +722,7 @@ MayaPivotSnapDecision maya_pivot_snap_decision_get(const MayaPivotSnapInput &inp
     /* The magnet: exactly on the target. Deriving it from the drag would offset it by the distance
      * between the pivot and the transform center.
      *
-     * A dragged axis or plane handle still owns the direction: Maya slides the pivot along it up to
+     * A dragged axis or plane handle still owns the direction: Clarity slides the pivot along it up to
      * the target instead of pulling the pivot off it, which is what taking the target verbatim did.
      */
     decision.position = input.has_constraint ? input.constrained_target_position :
@@ -744,12 +744,12 @@ void resetSnapping(TransInfo *t)
   t->tsnap.source_type = SCE_SNAP_TO_NONE;
   t->tsnap.target_type = SCE_SNAP_TO_NONE;
   t->tsnap.mode = SCE_SNAP_TO_NONE;
-  t->tsnap.maya_mode_active = false;
-  t->tsnap.maya_curve_targets_only = false;
-  t->tsnap.maya_include_object_pivots = false;
-  t->tsnap.maya_view_plane = false;
-  t->tsnap.maya_mesh_center = false;
-  t->tsnap.maya_snap_dist_px = 0.0f;
+  t->tsnap.clarity_mode_active = false;
+  t->tsnap.clarity_curve_targets_only = false;
+  t->tsnap.clarity_include_object_pivots = false;
+  t->tsnap.clarity_view_plane = false;
+  t->tsnap.clarity_mesh_center = false;
+  t->tsnap.clarity_snap_dist_px = 0.0f;
   t->tsnap.target_operation = SCE_SNAP_TARGET_ALL;
   t->tsnap.source_operation = SCE_SNAP_SOURCE_CLOSEST;
   t->tsnap.last = 0;
@@ -933,7 +933,7 @@ static eSnapTargetOP snap_target_select_from_spacetype_and_tool_settings(TransIn
       /* Particles edit mode. */
     }
     else if (t->options &
-             (CTX_GPENCIL_STROKES | CTX_CURSOR | CTX_MAYA_PIVOT | CTX_OBMODE_XFORM_OBDATA))
+             (CTX_GPENCIL_STROKES | CTX_CURSOR | CTX_CLARITY_PIVOT | CTX_OBMODE_XFORM_OBDATA))
     {
       /* In "Edit Strokes" mode,
        * snap tool can perform snap to selected or active objects (see #49632)
@@ -1184,19 +1184,19 @@ void initSnapping(TransInfo *t, wmOperator *op)
   transform_snap_grid_init(t, t->snap_spatial, &t->snap_spatial_precision);
   setSnappingCallback(t);
 
-  /* Capture the visible pivot before anything moved: Maya snaps that pivot onto the target, and
+  /* Capture the visible pivot before anything moved: Clarity snaps that pivot onto the target, and
    * during the drag the pivot itself follows the data. Editing the pivot is excluded, there the
    * pivot is already the transform center. */
-  t->tsnap.maya_pivot_source_valid = false;
+  t->tsnap.clarity_pivot_source_valid = false;
   if (t->spacetype == SPACE_VIEW3D && t->context != nullptr &&
-      (t->options & CTX_MAYA_PIVOT) == 0)
+      (t->options & CTX_CLARITY_PIVOT) == 0)
   {
     float pivot_matrix[4][4];
-    if (ED_maya_pivot_custom_matrix_get(
-            t->context, ed::maya::MayaPivotUsage::Display, pivot_matrix))
+    if (ED_clarity_pivot_custom_matrix_get(
+            t->context, ed::clarity::ClarityPivotUsage::Display, pivot_matrix))
     {
-      copy_v3_v3(t->tsnap.maya_pivot_source, pivot_matrix[3]);
-      t->tsnap.maya_pivot_source_valid = true;
+      copy_v3_v3(t->tsnap.clarity_pivot_source, pivot_matrix[3]);
+      t->tsnap.clarity_pivot_source_valid = true;
     }
   }
 
@@ -1498,9 +1498,9 @@ static void snap_target_view3d_fn(TransInfo *t, float * /*vec*/)
   float no[3];
   bool found = false;
   eSnapMode snap_elem = SCE_SNAP_TO_NONE;
-  /* Maya restricts the search to its own snap tolerance around the pointer, so a target only wins
+  /* Clarity restricts the search to its own snap tolerance around the pointer, so a target only wins
    * while the pointer is actually near it. */
-  float dist_px = t->tsnap.maya_snap_dist_px > 0.0f ? t->tsnap.maya_snap_dist_px :
+  float dist_px = t->tsnap.clarity_snap_dist_px > 0.0f ? t->tsnap.clarity_snap_dist_px :
                                                       SNAP_MIN_DISTANCE;
 
   if (t->tsnap.mode & (SCE_SNAP_TO_GEOM | SCE_SNAP_TO_GRID)) {
@@ -1509,10 +1509,10 @@ static void snap_target_view3d_fn(TransInfo *t, float * /*vec*/)
     found = (snap_elem != SCE_SNAP_TO_NONE);
   }
   if ((found == false) && (t->tsnap.mode & SCE_SNAP_TO_VOLUME)) {
-    const bool use_peel = t->tsnap.maya_mesh_center ||
+    const bool use_peel = t->tsnap.clarity_mesh_center ||
                           (t->settings->snap_flag & SCE_SNAP_PEEL_OBJECT) != 0;
     found = peelObjectsTransform(
-        t, t->mval, use_peel, t->tsnap.maya_mesh_center, loc, no, nullptr);
+        t, t->mval, use_peel, t->tsnap.clarity_mesh_center, loc, no, nullptr);
 
     if (found) {
       snap_elem = SCE_SNAP_TO_VOLUME;
@@ -1635,9 +1635,9 @@ void transform_snap_source_center_calc(const TransSnap &tsnap,
                                        const float center_global[3],
                                        float r_source[3])
 {
-  if (tsnap.maya_mode_active && tsnap.maya_pivot_source_valid) {
-    /* Maya moves the visible pivot onto the target, not the center of the selection. */
-    copy_v3_v3(r_source, tsnap.maya_pivot_source);
+  if (tsnap.clarity_mode_active && tsnap.clarity_pivot_source_valid) {
+    /* Clarity moves the visible pivot onto the target, not the center of the selection. */
+    copy_v3_v3(r_source, tsnap.clarity_pivot_source);
     return;
   }
   copy_v3_v3(r_source, center_global);
@@ -1646,7 +1646,7 @@ void transform_snap_source_center_calc(const TransSnap &tsnap,
 const float *transform_snap_excluded_pivot_get(const TransSnap &tsnap,
                                                const float center_global[3])
 {
-  return tsnap.maya_pivot_source_valid ? tsnap.maya_pivot_source : center_global;
+  return tsnap.clarity_pivot_source_valid ? tsnap.clarity_pivot_source : center_global;
 }
 
 static void snap_source_center_fn(TransInfo *t)
@@ -1813,9 +1813,9 @@ static eSnapMode snapObjectsTransform(
   snap_object_params.edit_mode_type = (t->flag & T_EDIT) != 0 ? SNAP_GEOM_EDIT : SNAP_GEOM_FINAL;
   snap_object_params.occlusion_test = SNAP_OCCLUSION_AS_SEEM;
   snap_object_params.use_backface_culling = (t->tsnap.flag & SCE_SNAP_BACKFACE_CULLING) != 0;
-  snap_object_params.curve_targets_only = t->tsnap.maya_curve_targets_only;
-  snap_object_params.include_object_pivots = t->tsnap.maya_include_object_pivots;
-  /* Maya never snaps the moved data onto the pivot it is being moved by, so the pivot that acts as
+  snap_object_params.curve_targets_only = t->tsnap.clarity_curve_targets_only;
+  snap_object_params.include_object_pivots = t->tsnap.clarity_include_object_pivots;
+  /* Clarity never snaps the moved data onto the pivot it is being moved by, so the pivot that acts as
    * the snap source is excluded from the pivot targets in every mode, not only while the pivot
    * itself is edited. */
   snap_object_params.excluded_object_pivot_location = transform_snap_excluded_pivot_get(

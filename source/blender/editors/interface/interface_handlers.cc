@@ -12408,7 +12408,7 @@ static int pie_handler(bContext *C, const wmEvent *event, PopupBlockHandle *menu
   Block *block = static_cast<Block *>(region->runtime->uiblocks.first);
 
   const bool is_click_style = (block->pie_data->flags & PIE_CLICK_STYLE);
-  /* Maya never commits on distance alone: the item is decided when the button is let go. */
+  /* Clarity never commits on distance alone: the item is decided when the button is let go. */
   const bool is_marking_style = (block->pie_data->flags & PIE_MARKING_STYLE);
 
   /* if there's an active modal button, don't check events or outside, except for search menu */

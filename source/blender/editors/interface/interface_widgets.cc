@@ -34,7 +34,7 @@
 
 #include "BLF_api.hh"
 
-#include "ED_maya.hh"
+#include "ED_clarity.hh"
 #include "ED_node.hh"
 
 #include "UI_interface_icons.hh"
@@ -3301,10 +3301,10 @@ static void widget_state_pulldown(WidgetType *wt,
 
 /* special case, pie menu items */
 /**
- * The item a marking-menu stroke points at, painted the way Maya paints it.
+ * The item a marking-menu stroke points at, painted the way Clarity paints it.
  *
  * The ordinary highlight is #widget_active_color brightening `wcol.inner`, which on the grey button
- * plate reads as white and is easy to miss on a menu that is only up for a moment. Maya fills the
+ * plate reads as white and is easy to miss on a menu that is only up for a moment. Clarity fills the
  * item with its interface blue instead, so the choice is unmistakable. The fill has to be written
  * after the general state function, which is what applies that brightening.
  */
@@ -5635,14 +5635,14 @@ void draw_button(const bContext *C, ARegion *region, uiStyle *style, Button *but
   else if (but->emboss == EmbossType::PieMenu) {
     wt = widget_type(WidgetStyle::MenuItemPie);
     if (button_is_marking_menu_item(but)) {
-      /* Maya's marking menu items are the same grey buttons as the rows stacked under the wheel,
+      /* Clarity's marking menu items are the same grey buttons as the rows stacked under the wheel,
        * not the near-black plates a Blender pie menu uses. Taking the colors from the regular
        * button set is also what keeps the two halves of the menu looking like one menu. */
       wt->wcol_theme = &tui->wcol_tool;
       /* The pie state function highlights by filling the item with `wcol.item`, which in the pie
        * theme is a grey meant for exactly that. In the button theme the same field is the color of
        * the check mark - pure white - so it has to give way to a highlight that suits a button;
-       * Maya's is its interface blue. */
+       * Clarity's is its interface blue. */
       wt->state = widget_state_marking_menu_item;
     }
   }
@@ -5898,7 +5898,7 @@ void draw_button(const bContext *C, ARegion *region, uiStyle *style, Button *but
   state.but_flag = but->flag;
   state.but_drawflag = but->drawflag;
   state.emboss = but->emboss;
-  if (button_context_string_get(but, "maya_shelf_separator")) {
+  if (button_context_string_get(but, "clarity_shelf_separator")) {
     state.but_flag &= ~UI_HOVER;
   }
   state.draw_as_link = button_draw_as_link(but);
@@ -5942,15 +5942,15 @@ void draw_button(const bContext *C, ARegion *region, uiStyle *style, Button *but
 
   const float zoom = 1.0f / but->block->aspect;
   uchar context_color[4];
-  if (shelf_button_context_color_get(but, "maya_shelf_icon_color", context_color)) {
+  if (shelf_button_context_color_get(but, "clarity_shelf_icon_color", context_color)) {
     copy_v4_v4_uchar(but->col, context_color);
   }
-  if (shelf_button_context_color_get(but, "maya_shelf_background_color", context_color)) {
+  if (shelf_button_context_color_get(but, "clarity_shelf_background_color", context_color)) {
     copy_v4_v4_uchar(but->background_col, context_color);
   }
   wt->state(wt, &state, but->emboss);
   const std::optional<StringRefNull> drag_source = button_context_string_get(
-      but, "maya_shelf_drag_source");
+      but, "clarity_shelf_drag_source");
   if (drag_source && *drag_source == "1") {
     const uchar drag_outline[4] = {42, 132, 255, 255};
     copy_v4_v4_uchar(wt->wcol.outline, drag_outline);
@@ -6050,14 +6050,14 @@ void draw_menu_back(uiStyle * /*style*/, Block *block, const rcti *rect)
   WidgetType *wt = widget_type(WidgetStyle::MenuBack);
 
   wt->state(wt, &STATE_INFO_NULL, EmbossType::Undefined);
-  if (block && ED_maya_gizmo_trace_enabled()) {
+  if (block && ED_clarity_gizmo_trace_enabled()) {
     fprintf(stderr,
             "MENUBACK theme_style=%d flag=%d\n",
             int(block->theme_style),
             int(block->flag));
     fflush(stderr);
   }
-  if (block && block->theme_style == BLOCK_THEME_STYLE_MAYA_MENU) {
+  if (block && block->theme_style == BLOCK_THEME_STYLE_CLARITY_MENU) {
     /* Backed in the same grey as the rows that opened it, so the sub-menu reads as a second panel
      * of one menu instead of a black window dropped on top of it. */
     const bTheme *btheme = theme::theme_get();
@@ -6228,7 +6228,7 @@ static void draw_disk_shaded(float start,
 /**
  * The origin of a marking menu and the mark drawn from it.
  *
- * Maya shows where the menu was opened and the stroke the pointer has made since, not a ring with a
+ * Clarity shows where the menu was opened and the stroke the pointer has made since, not a ring with a
  * lit wedge: the wedge is what suggests that the direction is the only thing that selects, which is
  * exactly the impression this menu must not give.
  */

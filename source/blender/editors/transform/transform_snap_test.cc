@@ -8,39 +8,39 @@
 
 #include "transform.hh"
 #include "transform_snap.hh"
-#include "transform_snap_maya.hh"
+#include "transform_snap_clarity.hh"
 
 namespace blender::ed::transform::tests {
 
-static TransSnap maya_snap_state(const bool maya_mode_active,
+static TransSnap clarity_snap_state(const bool clarity_mode_active,
                                  const bool pivot_valid,
                                  const float pivot[3])
 {
   TransSnap tsnap = {};
-  tsnap.maya_mode_active = maya_mode_active;
-  tsnap.maya_pivot_source_valid = pivot_valid;
-  copy_v3_v3(tsnap.maya_pivot_source, pivot);
+  tsnap.clarity_mode_active = clarity_mode_active;
+  tsnap.clarity_pivot_source_valid = pivot_valid;
+  copy_v3_v3(tsnap.clarity_pivot_source, pivot);
   return tsnap;
 }
 
 /** Plain Blender snapping keeps moving the center of the selection onto the target. */
-TEST(transform_snap, SourceCenterIgnoresPivotWithoutMayaSnapping)
+TEST(transform_snap, SourceCenterIgnoresPivotWithoutClaritySnapping)
 {
   const float pivot[3] = {5.0f, 6.0f, 7.0f};
   const float center[3] = {1.0f, 2.0f, 3.0f};
-  const TransSnap tsnap = maya_snap_state(false, true, pivot);
+  const TransSnap tsnap = clarity_snap_state(false, true, pivot);
 
   float source[3];
   transform_snap_source_center_calc(tsnap, center, source);
   EXPECT_EQ_ARRAY(center, source, 3);
 }
 
-/** Maya puts the pivot the user sees onto the target, whatever the selection center is. */
-TEST(transform_snap, SourceCenterUsesCapturedPivotWithMayaSnapping)
+/** Clarity puts the pivot the user sees onto the target, whatever the selection center is. */
+TEST(transform_snap, SourceCenterUsesCapturedPivotWithClaritySnapping)
 {
   const float pivot[3] = {5.0f, 6.0f, 7.0f};
   const float center[3] = {1.0f, 2.0f, 3.0f};
-  const TransSnap tsnap = maya_snap_state(true, true, pivot);
+  const TransSnap tsnap = clarity_snap_state(true, true, pivot);
 
   float source[3];
   transform_snap_source_center_calc(tsnap, center, source);
@@ -52,7 +52,7 @@ TEST(transform_snap, SourceCenterFallsBackToCenterWithoutCapturedPivot)
 {
   const float pivot[3] = {5.0f, 6.0f, 7.0f};
   const float center[3] = {1.0f, 2.0f, 3.0f};
-  const TransSnap tsnap = maya_snap_state(true, false, pivot);
+  const TransSnap tsnap = clarity_snap_state(true, false, pivot);
 
   float source[3];
   transform_snap_source_center_calc(tsnap, center, source);
@@ -68,28 +68,28 @@ TEST(transform_snap, ExcludedPivotFollowsTheSnapSource)
   const float pivot[3] = {5.0f, 6.0f, 7.0f};
   const float center[3] = {1.0f, 2.0f, 3.0f};
 
-  const TransSnap captured = maya_snap_state(true, true, pivot);
+  const TransSnap captured = clarity_snap_state(true, true, pivot);
   const float *excluded = transform_snap_excluded_pivot_get(captured, center);
   ASSERT_NE(excluded, nullptr);
   EXPECT_EQ_ARRAY(pivot, excluded, 3);
 
   /* Editing the pivot captures nothing, there the transform center already is the pivot. */
-  const TransSnap pivot_edit = maya_snap_state(true, false, pivot);
+  const TransSnap pivot_edit = clarity_snap_state(true, false, pivot);
   excluded = transform_snap_excluded_pivot_get(pivot_edit, center);
   ASSERT_NE(excluded, nullptr);
   EXPECT_EQ_ARRAY(center, excluded, 3);
 }
 
 /* -------------------------------------------------------------------- */
-/** \name Maya Snap Plan
+/** \name Clarity Snap Plan
  *
- * The decision the Maya snapping state hands to a transform. Everything the viewport does with
+ * The decision the Clarity snapping state hands to a transform. Everything the viewport does with
  * snapping follows from these, so they are pinned here instead of being re-derived by hand.
  * \{ */
 
-static MayaSnapPlanInput maya_translate_input(const maya::MayaSnapMode mode)
+static ClaritySnapPlanInput clarity_translate_input(const clarity::ClaritySnapMode mode)
 {
-  MayaSnapPlanInput input;
+  ClaritySnapPlanInput input;
   input.mode = mode;
   input.is_translation = true;
   input.orientation_is_global = true;
@@ -98,14 +98,14 @@ static MayaSnapPlanInput maya_translate_input(const maya::MayaSnapMode mode)
 }
 
 /**
- * The regression this whole plan exists for: with no Maya mode engaged nothing snaps at all.
+ * The regression this whole plan exists for: with no Clarity mode engaged nothing snaps at all.
  * Leaving Blender's own magnet in charge is what kept quantizing every transform to the increment
  * grid while no key was held.
  */
-TEST(transform_snap_maya_plan, NothingSnapsWithoutAMayaMode)
+TEST(transform_snap_clarity_plan, NothingSnapsWithoutAClarityMode)
 {
-  const MayaSnapPlan plan = transform_snap_maya_plan_get(
-      maya_translate_input(maya::MayaSnapMode::None));
+  const ClaritySnapPlan plan = transform_snap_clarity_plan_get(
+      clarity_translate_input(clarity::ClaritySnapMode::None));
 
   EXPECT_FALSE(plan.use_snap);
   EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_NONE);
@@ -116,13 +116,13 @@ TEST(transform_snap_maya_plan, NothingSnapsWithoutAMayaMode)
 }
 
 /** The Move Tool marking menu holds components on the edges they were moved along. */
-TEST(transform_snap_maya_plan, EdgeConstraintKeepsComponentsOnEdges)
+TEST(transform_snap_clarity_plan, EdgeConstraintKeepsComponentsOnEdges)
 {
-  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::None);
-  input.transform_constraint = maya::MayaTransformConstraint::Edge;
+  ClaritySnapPlanInput input = clarity_translate_input(clarity::ClaritySnapMode::None);
+  input.transform_constraint = clarity::ClarityTransformConstraint::Edge;
   input.is_component_edit = true;
 
-  const MayaSnapPlan plan = transform_snap_maya_plan_get(input);
+  const ClaritySnapPlan plan = transform_snap_clarity_plan_get(input);
 
   EXPECT_TRUE(plan.use_snap);
   EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_EDGE);
@@ -131,62 +131,62 @@ TEST(transform_snap_maya_plan, EdgeConstraintKeepsComponentsOnEdges)
   EXPECT_FALSE(plan.curve_targets_only);
 }
 
-TEST(transform_snap_maya_plan, SurfaceConstraintKeepsComponentsOnFaces)
+TEST(transform_snap_clarity_plan, SurfaceConstraintKeepsComponentsOnFaces)
 {
-  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::None);
-  input.transform_constraint = maya::MayaTransformConstraint::Surface;
+  ClaritySnapPlanInput input = clarity_translate_input(clarity::ClaritySnapMode::None);
+  input.transform_constraint = clarity::ClarityTransformConstraint::Surface;
   input.is_component_edit = true;
 
-  const MayaSnapPlan plan = transform_snap_maya_plan_get(input);
+  const ClaritySnapPlan plan = transform_snap_clarity_plan_get(input);
 
   EXPECT_TRUE(plan.use_snap);
   EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_FACE);
 }
 
-/** Maya constrains components, never whole objects. */
-TEST(transform_snap_maya_plan, TransformConstraintsLeaveObjectModeAlone)
+/** Clarity constrains components, never whole objects. */
+TEST(transform_snap_clarity_plan, TransformConstraintsLeaveObjectModeAlone)
 {
-  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::None);
-  input.transform_constraint = maya::MayaTransformConstraint::Edge;
+  ClaritySnapPlanInput input = clarity_translate_input(clarity::ClaritySnapMode::None);
+  input.transform_constraint = clarity::ClarityTransformConstraint::Edge;
   input.is_component_edit = false;
 
-  const MayaSnapPlan plan = transform_snap_maya_plan_get(input);
+  const ClaritySnapPlan plan = transform_snap_clarity_plan_get(input);
 
   EXPECT_FALSE(plan.use_snap);
   EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_NONE);
 }
 
 /** A held snap key is a deliberate one-off, so it outranks a constraint that is always on. */
-TEST(transform_snap_maya_plan, AHeldSnapKeyOutranksTheTransformConstraint)
+TEST(transform_snap_clarity_plan, AHeldSnapKeyOutranksTheTransformConstraint)
 {
-  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::Point);
-  input.transform_constraint = maya::MayaTransformConstraint::Edge;
+  ClaritySnapPlanInput input = clarity_translate_input(clarity::ClaritySnapMode::Point);
+  input.transform_constraint = clarity::ClarityTransformConstraint::Edge;
   input.is_component_edit = true;
 
-  const MayaSnapPlan plan = transform_snap_maya_plan_get(input);
+  const ClaritySnapPlan plan = transform_snap_clarity_plan_get(input);
 
   EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_VERTEX);
 }
 
 /** A constraint holds a component while it travels; it has nothing to say about a rotation. */
-TEST(transform_snap_maya_plan, TransformConstraintsOnlyReachTranslation)
+TEST(transform_snap_clarity_plan, TransformConstraintsOnlyReachTranslation)
 {
-  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::None);
+  ClaritySnapPlanInput input = clarity_translate_input(clarity::ClaritySnapMode::None);
   input.is_translation = false;
   input.is_rotation = true;
-  input.transform_constraint = maya::MayaTransformConstraint::Edge;
+  input.transform_constraint = clarity::ClarityTransformConstraint::Edge;
   input.is_component_edit = true;
 
-  const MayaSnapPlan plan = transform_snap_maya_plan_get(input);
+  const ClaritySnapPlan plan = transform_snap_clarity_plan_get(input);
 
   EXPECT_FALSE(plan.use_snap);
 }
 
-/** Maya moves the pivot onto the point under the pointer, and object pivots are points too. */
-TEST(transform_snap_maya_plan, PointSnapTargetsVerticesAndPivotsFromTheCenter)
+/** Clarity moves the pivot onto the point under the pointer, and object pivots are points too. */
+TEST(transform_snap_clarity_plan, PointSnapTargetsVerticesAndPivotsFromTheCenter)
 {
-  const MayaSnapPlan plan = transform_snap_maya_plan_get(
-      maya_translate_input(maya::MayaSnapMode::Point));
+  const ClaritySnapPlan plan = transform_snap_clarity_plan_get(
+      clarity_translate_input(clarity::ClaritySnapMode::Point));
 
   EXPECT_TRUE(plan.use_snap);
   EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_VERTEX);
@@ -196,33 +196,33 @@ TEST(transform_snap_maya_plan, PointSnapTargetsVerticesAndPivotsFromTheCenter)
   EXPECT_EQ(plan.increment, 0.0f);
 }
 
-TEST(transform_snap_maya_plan, CurveGridAndMeshCenterPickTheirOwnTargets)
+TEST(transform_snap_clarity_plan, CurveGridAndMeshCenterPickTheirOwnTargets)
 {
-  const MayaSnapPlan curve = transform_snap_maya_plan_get(
-      maya_translate_input(maya::MayaSnapMode::Curve));
+  const ClaritySnapPlan curve = transform_snap_clarity_plan_get(
+      clarity_translate_input(clarity::ClaritySnapMode::Curve));
   EXPECT_TRUE(curve.use_snap);
   EXPECT_EQ(curve.snap_to, SCE_SNAP_TO_EDGE);
   EXPECT_TRUE(curve.curve_targets_only);
   EXPECT_TRUE(curve.source_is_center);
 
-  const MayaSnapPlan grid = transform_snap_maya_plan_get(
-      maya_translate_input(maya::MayaSnapMode::Grid));
+  const ClaritySnapPlan grid = transform_snap_clarity_plan_get(
+      clarity_translate_input(clarity::ClaritySnapMode::Grid));
   EXPECT_TRUE(grid.use_snap);
   EXPECT_EQ(grid.snap_to, SCE_SNAP_TO_GRID);
   EXPECT_FALSE(grid.absolute_grid);
 
-  const MayaSnapPlan mesh_center = transform_snap_maya_plan_get(
-      maya_translate_input(maya::MayaSnapMode::MeshCenter));
+  const ClaritySnapPlan mesh_center = transform_snap_clarity_plan_get(
+      clarity_translate_input(clarity::ClaritySnapMode::MeshCenter));
   EXPECT_TRUE(mesh_center.use_snap);
   EXPECT_EQ(mesh_center.snap_to, SCE_SNAP_TO_VOLUME);
   EXPECT_TRUE(mesh_center.mesh_center);
 }
 
 /** The view plane constrains the movement; it has no target to snap onto. */
-TEST(transform_snap_maya_plan, ViewPlaneConstrainsWithoutSnapping)
+TEST(transform_snap_clarity_plan, ViewPlaneConstrainsWithoutSnapping)
 {
-  const MayaSnapPlan plan = transform_snap_maya_plan_get(
-      maya_translate_input(maya::MayaSnapMode::ViewPlane));
+  const ClaritySnapPlan plan = transform_snap_clarity_plan_get(
+      clarity_translate_input(clarity::ClaritySnapMode::ViewPlane));
 
   EXPECT_TRUE(plan.view_plane);
   EXPECT_FALSE(plan.use_snap);
@@ -230,13 +230,13 @@ TEST(transform_snap_maya_plan, ViewPlaneConstrainsWithoutSnapping)
 }
 
 /** Step snapping uses the size from the Step Snap widget, not the grid of the scene. */
-TEST(transform_snap_maya_plan, StepSnapUsesTheConfiguredSize)
+TEST(transform_snap_clarity_plan, StepSnapUsesTheConfiguredSize)
 {
-  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::Step);
-  input.step.mode = maya::MAYA_STEP_SNAP_RELATIVE;
+  ClaritySnapPlanInput input = clarity_translate_input(clarity::ClaritySnapMode::Step);
+  input.step.mode = clarity::CLARITY_STEP_SNAP_RELATIVE;
   input.step.size = 0.25f;
 
-  const MayaSnapPlan plan = transform_snap_maya_plan_get(input);
+  const ClaritySnapPlan plan = transform_snap_clarity_plan_get(input);
   EXPECT_TRUE(plan.use_snap);
   EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_INCREMENT);
   EXPECT_FALSE(plan.absolute_grid);
@@ -249,30 +249,30 @@ TEST(transform_snap_maya_plan, StepSnapUsesTheConfiguredSize)
  * Absolute steps are counted from the world origin, so they can only be honored while the
  * translation runs in global space.
  */
-TEST(transform_snap_maya_plan, AbsoluteStepsNeedGlobalSpace)
+TEST(transform_snap_clarity_plan, AbsoluteStepsNeedGlobalSpace)
 {
-  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::Step);
-  input.step.mode = maya::MAYA_STEP_SNAP_ABSOLUTE;
+  ClaritySnapPlanInput input = clarity_translate_input(clarity::ClaritySnapMode::Step);
+  input.step.mode = clarity::CLARITY_STEP_SNAP_ABSOLUTE;
 
-  EXPECT_TRUE(transform_snap_maya_plan_get(input).absolute_grid);
+  EXPECT_TRUE(transform_snap_clarity_plan_get(input).absolute_grid);
 
   input.orientation_is_global = false;
-  EXPECT_FALSE(transform_snap_maya_plan_get(input).absolute_grid);
+  EXPECT_FALSE(transform_snap_clarity_plan_get(input).absolute_grid);
 }
 
-/** Maya steps a rotation or a scale, but never snaps one onto a point, a curve or the grid. */
-TEST(transform_snap_maya_plan, OnlyStepsReachRotationAndScale)
+/** Clarity steps a rotation or a scale, but never snaps one onto a point, a curve or the grid. */
+TEST(transform_snap_clarity_plan, OnlyStepsReachRotationAndScale)
 {
-  MayaSnapPlanInput point = maya_translate_input(maya::MayaSnapMode::Point);
+  ClaritySnapPlanInput point = clarity_translate_input(clarity::ClaritySnapMode::Point);
   point.is_translation = false;
-  const MayaSnapPlan point_plan = transform_snap_maya_plan_get(point);
+  const ClaritySnapPlan point_plan = transform_snap_clarity_plan_get(point);
   EXPECT_FALSE(point_plan.use_snap);
   EXPECT_EQ(point_plan.snap_to, SCE_SNAP_TO_NONE);
 
-  MayaSnapPlanInput step = maya_translate_input(maya::MayaSnapMode::Step);
+  ClaritySnapPlanInput step = clarity_translate_input(clarity::ClaritySnapMode::Step);
   step.is_translation = false;
   step.step.size = 15.0f;
-  const MayaSnapPlan step_plan = transform_snap_maya_plan_get(step);
+  const ClaritySnapPlan step_plan = transform_snap_clarity_plan_get(step);
   EXPECT_TRUE(step_plan.use_snap);
   EXPECT_EQ(step_plan.snap_to, SCE_SNAP_TO_INCREMENT);
   /* A scale counts neither in units nor in radians, so it keeps the increment of its own mode. */
@@ -283,31 +283,31 @@ TEST(transform_snap_maya_plan, OnlyStepsReachRotationAndScale)
  * Each transform counts its steps in its own unit: the distance drives a translation, the angle
  * drives a rotation. Handing a rotation the distance is what made a 1 unit step mean 57 degrees.
  */
-TEST(transform_snap_maya_plan, RotationStepsUseTheAngleAndTranslationTheDistance)
+TEST(transform_snap_clarity_plan, RotationStepsUseTheAngleAndTranslationTheDistance)
 {
-  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::Step);
+  ClaritySnapPlanInput input = clarity_translate_input(clarity::ClaritySnapMode::Step);
   input.step.size = 2.0f;
   input.step.angle = 0.5f;
 
-  EXPECT_EQ(transform_snap_maya_plan_get(input).increment, 2.0f);
+  EXPECT_EQ(transform_snap_clarity_plan_get(input).increment, 2.0f);
 
   input.is_translation = false;
   input.is_rotation = true;
-  EXPECT_EQ(transform_snap_maya_plan_get(input).increment, 0.5f);
+  EXPECT_EQ(transform_snap_clarity_plan_get(input).increment, 0.5f);
 
   /* Outside the 3D View the increment belongs to that editor either way. */
   input.space_is_view3d = false;
-  EXPECT_EQ(transform_snap_maya_plan_get(input).increment, 0.0f);
+  EXPECT_EQ(transform_snap_clarity_plan_get(input).increment, 0.0f);
 }
 
 /** Outside the 3D View the increment carries the aspect of that editor, so it is left alone. */
-TEST(transform_snap_maya_plan, StepSizeOnlyReplacesTheIncrementInTheViewport)
+TEST(transform_snap_clarity_plan, StepSizeOnlyReplacesTheIncrementInTheViewport)
 {
-  MayaSnapPlanInput input = maya_translate_input(maya::MayaSnapMode::Step);
+  ClaritySnapPlanInput input = clarity_translate_input(clarity::ClaritySnapMode::Step);
   input.space_is_view3d = false;
   input.step.size = 2.0f;
 
-  EXPECT_EQ(transform_snap_maya_plan_get(input).increment, 0.0f);
+  EXPECT_EQ(transform_snap_clarity_plan_get(input).increment, 0.0f);
 }
 
 /** \} */
@@ -315,13 +315,13 @@ TEST(transform_snap_maya_plan, StepSizeOnlyReplacesTheIncrementInTheViewport)
 /* -------------------------------------------------------------------- */
 /** \name Pivot Snapping
  *
- * Where a drag of the Edit Pivot manipulator leaves the pivot. These are the rules the Maya capture
+ * Where a drag of the Edit Pivot manipulator leaves the pivot. These are the rules the Clarity capture
  * shows, pinned here so the behavior stops being re-derived from a video.
  * \{ */
 
-static MayaPivotSnapInput maya_pivot_input()
+static ClarityPivotSnapInput clarity_pivot_input()
 {
-  MayaPivotSnapInput input;
+  ClarityPivotSnapInput input;
   input.applied_position = double3(1.0, 1.0, 1.0);
   input.pointer_position = double3(2.0, 2.0, 2.0);
   input.target_position = double3(5.0, 6.0, 7.0);
@@ -329,28 +329,28 @@ static MayaPivotSnapInput maya_pivot_input()
 }
 
 /**
- * Outside the snap tolerance there is no target, and Maya keeps the pivot on the pointer. Holding it
+ * Outside the snap tolerance there is no target, and Clarity keeps the pivot on the pointer. Holding it
  * on the last target instead is what looked like a pivot magnetized to a vertex it had left.
  */
-TEST(transform_snap_maya_pivot, PivotFollowsThePointerWithoutATarget)
+TEST(transform_snap_clarity_pivot, PivotFollowsThePointerWithoutATarget)
 {
-  MayaPivotSnapInput input = maya_pivot_input();
+  ClarityPivotSnapInput input = clarity_pivot_input();
   input.has_target = false;
   input.target_has_normal = true;
 
-  const MayaPivotSnapDecision decision = maya_pivot_snap_decision_get(input);
+  const ClarityPivotSnapDecision decision = clarity_pivot_snap_decision_get(input);
   EXPECT_EQ(decision.position, input.applied_position);
   EXPECT_FALSE(decision.from_target);
   EXPECT_FALSE(decision.aim_at_normal);
 }
 
 /** The magnet: the pivot lands on the target itself, never offset by the drag that took it there. */
-TEST(transform_snap_maya_pivot, PivotLandsExactlyOnTheTarget)
+TEST(transform_snap_clarity_pivot, PivotLandsExactlyOnTheTarget)
 {
-  MayaPivotSnapInput input = maya_pivot_input();
+  ClarityPivotSnapInput input = clarity_pivot_input();
   input.has_target = true;
 
-  const MayaPivotSnapDecision decision = maya_pivot_snap_decision_get(input);
+  const ClarityPivotSnapDecision decision = clarity_pivot_snap_decision_get(input);
   EXPECT_EQ(decision.position, input.target_position);
   EXPECT_TRUE(decision.from_target);
 }
@@ -361,51 +361,51 @@ TEST(transform_snap_maya_pivot, PivotLandsExactlyOnTheTarget)
  * a vertex beside the axis, which the manipulator trace showed as `applied=(0 0 1)` while the
  * decision returned `(1 1 1)`.
  */
-TEST(transform_snap_maya_pivot, AConstrainedDragKeepsThePivotOnItsConstraint)
+TEST(transform_snap_clarity_pivot, AConstrainedDragKeepsThePivotOnItsConstraint)
 {
-  MayaPivotSnapInput input = maya_pivot_input();
+  ClarityPivotSnapInput input = clarity_pivot_input();
   input.has_target = true;
   input.has_constraint = true;
   /* The Z arrow: only the target's Z reaches the pivot. */
   input.constrained_target_position = double3(0.0, 0.0, 7.0);
 
-  const MayaPivotSnapDecision decision = maya_pivot_snap_decision_get(input);
+  const ClarityPivotSnapDecision decision = clarity_pivot_snap_decision_get(input);
   EXPECT_EQ(decision.position, input.constrained_target_position);
   EXPECT_TRUE(decision.from_target);
 
   /* Without a constraint the whole target still wins. */
   input.has_constraint = false;
-  EXPECT_EQ(maya_pivot_snap_decision_get(input).position, input.target_position);
+  EXPECT_EQ(clarity_pivot_snap_decision_get(input).position, input.target_position);
 }
 
 /** Position snapping off keeps the pointer in charge, and the target may still aim the pivot. */
-TEST(transform_snap_maya_pivot, PositionSnapOffLeavesThePointerInChargeOfTheMove)
+TEST(transform_snap_clarity_pivot, PositionSnapOffLeavesThePointerInChargeOfTheMove)
 {
-  MayaPivotSnapInput input = maya_pivot_input();
+  ClarityPivotSnapInput input = clarity_pivot_input();
   input.has_target = true;
   input.target_has_normal = true;
   input.snap_position = false;
 
-  const MayaPivotSnapDecision decision = maya_pivot_snap_decision_get(input);
+  const ClarityPivotSnapDecision decision = clarity_pivot_snap_decision_get(input);
   EXPECT_EQ(decision.position, input.pointer_position);
   EXPECT_FALSE(decision.from_target);
   EXPECT_TRUE(decision.aim_at_normal);
 }
 
 /** A vertex has no surface normal, so a snap onto one places the pivot without turning it. */
-TEST(transform_snap_maya_pivot, AimingNeedsANormalAndItsOwnSetting)
+TEST(transform_snap_clarity_pivot, AimingNeedsANormalAndItsOwnSetting)
 {
-  MayaPivotSnapInput input = maya_pivot_input();
+  ClarityPivotSnapInput input = clarity_pivot_input();
   input.has_target = true;
 
   input.target_has_normal = false;
-  EXPECT_FALSE(maya_pivot_snap_decision_get(input).aim_at_normal);
+  EXPECT_FALSE(clarity_pivot_snap_decision_get(input).aim_at_normal);
 
   input.target_has_normal = true;
-  EXPECT_TRUE(maya_pivot_snap_decision_get(input).aim_at_normal);
+  EXPECT_TRUE(clarity_pivot_snap_decision_get(input).aim_at_normal);
 
   input.snap_orientation = false;
-  const MayaPivotSnapDecision decision = maya_pivot_snap_decision_get(input);
+  const ClarityPivotSnapDecision decision = clarity_pivot_snap_decision_get(input);
   EXPECT_FALSE(decision.aim_at_normal);
   /* Turning the aim off must not stop the pivot from being placed. */
   EXPECT_EQ(decision.position, input.target_position);

@@ -1274,10 +1274,10 @@ void VIEW3D_OT_toggle_xray(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Toggle Maya-style Ambient Occlusion
+/** \name Toggle Clarity-style Ambient Occlusion
  * \{ */
 
-static wmOperatorStatus toggle_maya_ao_exec(bContext *C, wmOperator * /*op*/)
+static wmOperatorStatus toggle_clarity_ao_exec(bContext *C, wmOperator * /*op*/)
 {
   View3D *v3d = CTX_wm_view3d(C);
   ScrArea *area = CTX_wm_area(C);
@@ -1305,7 +1305,7 @@ static wmOperatorStatus toggle_maya_ao_exec(bContext *C, wmOperator * /*op*/)
       v3d->shading.cavity_valley_factor = 1.0f;
     }
 
-    /* Convert the legacy world-space default to Maya's 16 pixel SSAO radius. */
+    /* Convert the legacy world-space default to Clarity's 16 pixel SSAO radius. */
     if (scene->display.matcap_ssao_distance < 1.0f) {
       scene->display.matcap_ssao_distance = 16.0f;
     }
@@ -1317,14 +1317,21 @@ static wmOperatorStatus toggle_maya_ao_exec(bContext *C, wmOperator * /*op*/)
   return OPERATOR_FINISHED;
 }
 
-void VIEW3D_OT_toggle_maya_ao(wmOperatorType *ot)
+void VIEW3D_OT_toggle_clarity_ao(wmOperatorType *ot)
 {
   ot->name = "Toggle Ambient Occlusion";
-  ot->idname = "VIEW3D_OT_toggle_maya_ao";
-  ot->description = "Toggle Maya-style screen-space ambient occlusion";
+  ot->idname = "VIEW3D_OT_toggle_clarity_ao";
+  ot->description = "Toggle Clarity-style screen-space ambient occlusion";
 
-  ot->exec = toggle_maya_ao_exec;
+  ot->exec = toggle_clarity_ao_exec;
   ot->poll = ED_operator_view3d_active;
+}
+
+void VIEW3D_OT_toggle_maya_ao_compatibility(wmOperatorType *ot)
+{
+  VIEW3D_OT_toggle_clarity_ao(ot);
+  ot->idname = "VIEW3D_OT_toggle_maya_ao";
+  ot->flag |= OPTYPE_INTERNAL;
 }
 
 /** \} */

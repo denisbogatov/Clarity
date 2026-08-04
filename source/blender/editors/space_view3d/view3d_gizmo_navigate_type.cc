@@ -7,7 +7,7 @@
  *
  * \name Custom Orientation/Navigation Gizmo for the 3D View
  *
- * \brief Maya-style view cube for axis selection and view rotation.
+ * \brief Clarity-style view cube for axis selection and view rotation.
  *
  * - scale_basis: used for the size.
  * - matrix_basis: used for the location.
@@ -46,7 +46,7 @@ namespace blender {
 /* Radius of the entire background. */
 #define WIDGET_RADIUS ((U.gizmo_size_navigate_v3d / 2.0f) * UI_SCALE_FAC)
 
-/* Maya-style view-cube dimensions in normalized gizmo space. */
+/* Clarity-style view-cube dimensions in normalized gizmo space. */
 #define VIEWCUBE_HALF_SIZE 0.68f
 #define VIEWCUBE_BEVEL_SIZE 0.10f
 #define VIEWCUBE_BOUND_RADIUS (VIEWCUBE_HALF_SIZE * 1.74f)

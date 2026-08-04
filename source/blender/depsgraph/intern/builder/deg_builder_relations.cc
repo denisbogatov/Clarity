@@ -802,8 +802,8 @@ void DepsgraphRelationBuilder::build_object(Object *object)
     data.builder = this;
     BKE_constraints_id_loop(&object->constraints, constraint_walk, IDWALK_NOP, &data);
   }
-  for (MayaConstraint &constraint : object->maya_constraints) {
-    for (MayaConstraintTarget &target : constraint.targets) {
+  for (ClarityConstraint &constraint : object->clarity_constraints) {
+    for (ClarityConstraintTarget &target : constraint.targets) {
       if (target.object != nullptr && target.object != object) {
         build_object(target.object);
       }
@@ -818,28 +818,28 @@ void DepsgraphRelationBuilder::build_object(Object *object)
   /* Object constraints. */
   OperationKey object_transform_simulation_init_key(
       &object->id, NodeType::TRANSFORM, OperationCode::TRANSFORM_SIMULATION_INIT);
-  if (object->constraints.first != nullptr || object->maya_constraints.first != nullptr) {
+  if (object->constraints.first != nullptr || object->clarity_constraints.first != nullptr) {
     OperationKey constraint_key(
         &object->id, NodeType::TRANSFORM, OperationCode::TRANSFORM_CONSTRAINTS);
     /* Constraint relations. */
     if (object->constraints.first != nullptr) {
       build_constraints(&object->id, NodeType::TRANSFORM, "", &object->constraints, nullptr);
     }
-    for (MayaConstraint &constraint : object->maya_constraints) {
-      for (MayaConstraintTarget &target : constraint.targets) {
+    for (ClarityConstraint &constraint : object->clarity_constraints) {
+      for (ClarityConstraintTarget &target : constraint.targets) {
         if (target.object == nullptr || target.object == object) {
           continue;
         }
         add_relation(ComponentKey(&target.object->id, NodeType::TRANSFORM),
                      constraint_key,
-                     "Maya Constraint Target");
+                     "Clarity Constraint Target");
       }
       if (constraint.aim.world_up_object != nullptr &&
           constraint.aim.world_up_object != object)
       {
         add_relation(ComponentKey(&constraint.aim.world_up_object->id, NodeType::TRANSFORM),
                      constraint_key,
-                     "Maya Constraint World Up");
+                     "Clarity Constraint World Up");
       }
     }
     /* operation order */

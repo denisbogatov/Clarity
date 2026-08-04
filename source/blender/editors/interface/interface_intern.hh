@@ -180,7 +180,7 @@ enum {
   /** Pie gesture selection has been done, now wait for mouse motion to end. */
   PIE_GESTURE_END_WAIT = (1 << 6),
   /**
-   * Maya marking menu: the items appear at their final place at once, the box under the pointer is
+   * Clarity marking menu: the items appear at their final place at once, the box under the pointer is
    * what gets highlighted, and only a mark that leaves the ring lets the direction decide. Nothing
    * fires before the button that opened the menu is released.
    */
@@ -1411,7 +1411,7 @@ float block_calc_pie_segment(Block *block, const float event_xy[2]);
 float block_pie_threshold_px(const Block *block);
 float block_pie_radius_px(const Block *block);
 /**
- * Whether \a but belongs to a Maya marking menu. Those draw their buttons with the regular emboss
+ * Whether \a but belongs to a Clarity marking menu. Those draw their buttons with the regular emboss
  * instead of the pull-down one, so anything that keys off #EmbossType::Pulldown to decide that a
  * button is part of a menu has to ask this as well.
  */

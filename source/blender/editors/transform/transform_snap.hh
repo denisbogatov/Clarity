@@ -44,7 +44,7 @@ bool validSnap(const TransInfo *t);
 /**
  * Point that #SCE_SNAP_SOURCE_CENTER moves onto the snap target.
  *
- * Maya moves the visible pivot, so while Maya snapping is active the pivot captured by
+ * Clarity moves the visible pivot, so while Clarity snapping is active the pivot captured by
  * #initSnapping wins over the center of the selection.
  */
 void transform_snap_source_center_calc(const TransSnap &tsnap,

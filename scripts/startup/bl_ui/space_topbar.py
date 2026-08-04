@@ -79,12 +79,12 @@ class TOPBAR_HT_upper_bar(Header):
         )
 
 
-_MAYA_SHELF_TABS = (
+_CLARITY_SHELF_TABS = (
     "Modeling",
     "Custom",
 )
 
-_MAYA_SHELF_LEGACY_TABS = {
+_CLARITY_SHELF_LEGACY_TABS = {
     "Poly Modeling",
     "Modeling",
     "Curves",
@@ -100,7 +100,7 @@ _MAYA_SHELF_LEGACY_TABS = {
     "Custom",
 }
 
-_MAYA_SHELF_ITEMS = {
+_CLARITY_SHELF_ITEMS = {
     "Modeling": (
         ("select_box", "Box Select", 'RESTRICT_SELECT_OFF'),
         ("move", "Move", 'ORIENTATION_GLOBAL'),
@@ -196,12 +196,12 @@ _MAYA_SHELF_ITEMS = {
     ),
 }
 
-_MAYA_SHELF_ITEMS["Surfaces"] = _MAYA_SHELF_ITEMS["Curves"]
-_MAYA_SHELF_ITEMS["Motion Graphics"] = _MAYA_SHELF_ITEMS["Animation"]
-_MAYA_SHELF_ITEMS["XGen"] = _MAYA_SHELF_ITEMS["FX"]
-_MAYA_SHELF_ITEMS["Arnold"] = _MAYA_SHELF_ITEMS["Rendering"]
+_CLARITY_SHELF_ITEMS["Surfaces"] = _CLARITY_SHELF_ITEMS["Curves"]
+_CLARITY_SHELF_ITEMS["Motion Graphics"] = _CLARITY_SHELF_ITEMS["Animation"]
+_CLARITY_SHELF_ITEMS["XGen"] = _CLARITY_SHELF_ITEMS["FX"]
+_CLARITY_SHELF_ITEMS["Arnold"] = _CLARITY_SHELF_ITEMS["Rendering"]
 
-_MAYA_SHELF_EXTRA_ACTIONS = (
+_CLARITY_SHELF_EXTRA_ACTIONS = (
     ("select_all", "Selection: Select All", 'RESTRICT_SELECT_OFF'),
     ("select_none", "Selection: Deselect All", 'SELECT_SUBTRACT'),
     ("select_inverse", "Selection: Invert", 'ARROW_LEFTRIGHT'),
@@ -371,7 +371,7 @@ _MAYA_SHELF_EXTRA_ACTIONS = (
     ("purge_orphans", "File: Purge Orphan Data", 'TRASH'),
 )
 
-_MAYA_SHELF_DISCOVERED_OPERATOR_MODULES = (
+_CLARITY_SHELF_DISCOVERED_OPERATOR_MODULES = (
     "mesh",
     "uv",
     "object",
@@ -386,7 +386,7 @@ _MAYA_SHELF_DISCOVERED_OPERATOR_MODULES = (
 )
 
 
-def _maya_shelf_operator_icon(module_name, operator_name):
+def _clarity_shelf_operator_icon(module_name, operator_name):
     name = operator_name.lower()
     icon_rules = (
         (("delete", "remove", "dissolve"), 'TRASH'),
@@ -428,9 +428,9 @@ def _maya_shelf_operator_icon(module_name, operator_name):
     }.get(module_name, 'NONE')
 
 
-def _maya_shelf_discovered_action_items():
+def _clarity_shelf_discovered_action_items():
     items = []
-    for module_name in _MAYA_SHELF_DISCOVERED_OPERATOR_MODULES:
+    for module_name in _CLARITY_SHELF_DISCOVERED_OPERATOR_MODULES:
         module = getattr(bpy.ops, module_name)
         for operator_name in dir(module):
             if operator_name.startswith("_"):
@@ -443,7 +443,7 @@ def _maya_shelf_discovered_action_items():
             action = f"operator__{module_name}__{operator_name}"
             category = module_name.replace("_", " ").title()
             label = f"{category} (All): {rna_type.name}"
-            icon = _maya_shelf_operator_icon(module_name, operator_name)
+            icon = _clarity_shelf_operator_icon(module_name, operator_name)
             items.append((action, label, icon))
     return tuple(items)
 
@@ -451,10 +451,10 @@ def _maya_shelf_discovered_action_items():
 # Walking every `bpy.ops` module and the whole icon enum costs far more than the
 # shelf needs at startup: the catalogs are only read when an Add/Edit dialog is
 # open. Build them on first use and keep the result here instead.
-_maya_shelf_catalog_cache = {}
+_clarity_shelf_catalog_cache = {}
 
 
-def _maya_shelf_refresh_action_catalog():
+def _clarity_shelf_refresh_action_catalog():
     """Invalidate discovered actions after add-ons register or remove operators."""
     signature = tuple(
         (
@@ -464,27 +464,27 @@ def _maya_shelf_refresh_action_catalog():
                 if not name.startswith("_")
             ),
         )
-        for module_name in _MAYA_SHELF_DISCOVERED_OPERATOR_MODULES
+        for module_name in _CLARITY_SHELF_DISCOVERED_OPERATOR_MODULES
     )
-    if _maya_shelf_catalog_cache.get("operator_signature") == signature:
+    if _clarity_shelf_catalog_cache.get("operator_signature") == signature:
         return
-    for key in tuple(_maya_shelf_catalog_cache):
+    for key in tuple(_clarity_shelf_catalog_cache):
         if key in {"actions", "action_labels", "action_icons", "action_rows"}:
-            del _maya_shelf_catalog_cache[key]
+            del _clarity_shelf_catalog_cache[key]
         elif isinstance(key, tuple) and key[:1] == ("action_order",):
-            del _maya_shelf_catalog_cache[key]
-    _maya_shelf_catalog_cache["operator_signature"] = signature
+            del _clarity_shelf_catalog_cache[key]
+    _clarity_shelf_catalog_cache["operator_signature"] = signature
 
 
-def _maya_shelf_builtin_actions():
-    actions = _maya_shelf_catalog_cache.get("actions")
+def _clarity_shelf_builtin_actions():
+    actions = _clarity_shelf_catalog_cache.get("actions")
     if actions is not None:
         return actions
     items = []
     seen = set()
-    action_groups = list(_MAYA_SHELF_ITEMS.values()) + [
-        _MAYA_SHELF_EXTRA_ACTIONS,
-        _maya_shelf_discovered_action_items(),
+    action_groups = list(_CLARITY_SHELF_ITEMS.values()) + [
+        _CLARITY_SHELF_EXTRA_ACTIONS,
+        _clarity_shelf_discovered_action_items(),
     ]
     for shelf_items in action_groups:
         for shelf_item in shelf_items:
@@ -496,34 +496,34 @@ def _maya_shelf_builtin_actions():
             seen.add(action)
             items.append((action, label, f"Run {label}", icon, len(items)))
     actions = tuple(items)
-    _maya_shelf_catalog_cache["actions"] = actions
+    _clarity_shelf_catalog_cache["actions"] = actions
     return actions
 
 
-def _maya_shelf_builtin_action_labels():
-    labels = _maya_shelf_catalog_cache.get("action_labels")
+def _clarity_shelf_builtin_action_labels():
+    labels = _clarity_shelf_catalog_cache.get("action_labels")
     if labels is None:
         labels = {
             action: label
-            for action, label, _description, _icon, _index in _maya_shelf_builtin_actions()
+            for action, label, _description, _icon, _index in _clarity_shelf_builtin_actions()
         }
-        _maya_shelf_catalog_cache["action_labels"] = labels
+        _clarity_shelf_catalog_cache["action_labels"] = labels
     return labels
 
 
-def _maya_shelf_builtin_action_icons():
-    icons = _maya_shelf_catalog_cache.get("action_icons")
+def _clarity_shelf_builtin_action_icons():
+    icons = _clarity_shelf_catalog_cache.get("action_icons")
     if icons is None:
         icons = {
             action: icon
-            for action, _label, _description, icon, _index in _maya_shelf_builtin_actions()
+            for action, _label, _description, icon, _index in _clarity_shelf_builtin_actions()
         }
-        _maya_shelf_catalog_cache["action_icons"] = icons
+        _clarity_shelf_catalog_cache["action_icons"] = icons
     return icons
 
 
-def _maya_shelf_blender_icons():
-    icons = _maya_shelf_catalog_cache.get("icons")
+def _clarity_shelf_blender_icons():
+    icons = _clarity_shelf_catalog_cache.get("icons")
     if icons is not None:
         return icons
     enum_items = bpy.types.UILayout.bl_rna.functions["operator"].parameters["icon"].enum_items
@@ -537,34 +537,34 @@ def _maya_shelf_blender_icons():
         )
         for index, enum_item in enumerate(enum_items)
     )
-    _maya_shelf_catalog_cache["icons"] = icons
+    _clarity_shelf_catalog_cache["icons"] = icons
     return icons
 
 
-def _maya_shelf_blender_icon_values():
-    values = _maya_shelf_catalog_cache.get("icon_values")
+def _clarity_shelf_blender_icon_values():
+    values = _clarity_shelf_catalog_cache.get("icon_values")
     if values is None:
         values = {
             identifier: icon_value
-            for identifier, _name, _description, icon_value, _index in _maya_shelf_blender_icons()
+            for identifier, _name, _description, icon_value, _index in _clarity_shelf_blender_icons()
         }
-        _maya_shelf_catalog_cache["icon_values"] = values
+        _clarity_shelf_catalog_cache["icon_values"] = values
     return values
 
 
-_MAYA_SHELF_COMMAND_TYPES = (
+_CLARITY_SHELF_COMMAND_TYPES = (
     ('BUILTIN', "Built-in Action", "Choose a ready-to-use shelf action"),
     ('OPERATOR', "Blender Operator", "Run a Blender operator"),
     ('PYTHON', "Python Script", "Run custom Python code"),
 )
 
-_MAYA_SHELF_SCRIPT_SOURCES = (
+_CLARITY_SHELF_SCRIPT_SOURCES = (
     ('INLINE', "Inline Code", "Run code stored in this shelf button"),
     ('TEXT', "Text Block", "Run a Blender Text Editor text block"),
     ('FILE', "Python File", "Run an external Python file"),
 )
 
-_MAYA_SHELF_ACTION_CATEGORIES = (
+_CLARITY_SHELF_ACTION_CATEGORIES = (
     ('ALL', "All Categories", "Show actions from every category"),
     ('MESH', "Mesh", "Mesh modeling actions"),
     ('UV', "UV", "UV editing actions"),
@@ -585,21 +585,21 @@ _MAYA_SHELF_ACTION_CATEGORIES = (
     ('OTHER', "Other", "Uncategorized actions"),
 )
 
-_MAYA_SHELF_ACTION_SORT_MODES = (
+_CLARITY_SHELF_ACTION_SORT_MODES = (
     ('CATEGORY', "Category", "Group actions by category, then sort by name"),
     ('NAME', "Name", "Sort all visible actions by name"),
     ('ORIGINAL', "Original", "Keep the catalog order"),
 )
 
-_MAYA_SHELF_ACTION_CATEGORY_ORDER = {
+_CLARITY_SHELF_ACTION_CATEGORY_ORDER = {
     identifier: index
     for index, (identifier, _name, _description) in enumerate(
-        _MAYA_SHELF_ACTION_CATEGORIES
+        _CLARITY_SHELF_ACTION_CATEGORIES
     )
 }
 
 
-_MAYA_SHELF_CATEGORY_BY_PREFIX = {
+_CLARITY_SHELF_CATEGORY_BY_PREFIX = {
     "mesh": 'MESH',
     "uv": 'UV',
     "object": 'OBJECT',
@@ -621,7 +621,7 @@ _MAYA_SHELF_CATEGORY_BY_PREFIX = {
     "render": 'RENDER',
     "fx": 'FX',
 }
-_MAYA_SHELF_CATEGORY_BY_ACTION = {
+_CLARITY_SHELF_CATEGORY_BY_ACTION = {
     "select_box": 'SELECTION',
     "select_all": 'SELECTION',
     "select_none": 'SELECTION',
@@ -645,7 +645,7 @@ _MAYA_SHELF_CATEGORY_BY_ACTION = {
     "open_render_result": 'RENDER',
 }
 
-_MAYA_SHELF_CATEGORY_BY_TAB = {
+_CLARITY_SHELF_CATEGORY_BY_TAB = {
     "Modeling": 'MESH',
     "Curves": 'CURVE',
     "Surfaces": 'CURVE',
@@ -661,64 +661,64 @@ _MAYA_SHELF_CATEGORY_BY_TAB = {
 }
 
 
-def _maya_shelf_category_by_tab_action():
+def _clarity_shelf_category_by_tab_action():
     """Category of every action that appears in a built-in tab, first tab wins."""
-    categories = _maya_shelf_catalog_cache.get("tab_categories")
+    categories = _clarity_shelf_catalog_cache.get("tab_categories")
     if categories is None:
         categories = {}
-        for tab_name, shelf_items in _MAYA_SHELF_ITEMS.items():
-            category = _MAYA_SHELF_CATEGORY_BY_TAB.get(tab_name, 'OTHER')
+        for tab_name, shelf_items in _CLARITY_SHELF_ITEMS.items():
+            category = _CLARITY_SHELF_CATEGORY_BY_TAB.get(tab_name, 'OTHER')
             for shelf_item in shelf_items:
                 if shelf_item is not None:
                     categories.setdefault(shelf_item[0], category)
-        _maya_shelf_catalog_cache["tab_categories"] = categories
+        _clarity_shelf_catalog_cache["tab_categories"] = categories
     return categories
 
 
-def _maya_shelf_action_category(action, label):
-    category = _MAYA_SHELF_CATEGORY_BY_ACTION.get(action)
+def _clarity_shelf_action_category(action, label):
+    category = _CLARITY_SHELF_CATEGORY_BY_ACTION.get(action)
     if category is not None:
         return category
     if action.startswith("operator__"):
         _prefix, module_name, _operator_name = action.split("__", 2)
-        return _MAYA_SHELF_CATEGORY_BY_PREFIX.get(module_name, 'OTHER')
+        return _CLARITY_SHELF_CATEGORY_BY_PREFIX.get(module_name, 'OTHER')
     if ":" in label:
         prefix = label.split(":", 1)[0].replace(" (All)", "").lower()
-        category = _MAYA_SHELF_CATEGORY_BY_PREFIX.get(prefix)
+        category = _CLARITY_SHELF_CATEGORY_BY_PREFIX.get(prefix)
         if category is not None:
             return category
-    return _maya_shelf_category_by_tab_action().get(action, 'OTHER')
+    return _clarity_shelf_category_by_tab_action().get(action, 'OTHER')
 
 
-def _maya_shelf_action_rows():
+def _clarity_shelf_action_rows():
     """Picker rows: (identifier, label, icon, category, sort_key).
 
     Precomputed because the action picker is refilled from scratch every time a dialog
-    opens, and `sort_key` keeps the per-redraw sort in `TOPBAR_UL_maya_shelf_actions`
+    opens, and `sort_key` keeps the per-redraw sort in `TOPBAR_UL_clarity_shelf_actions`
     down to one string compare per entry instead of a category lookup plus a casefold.
     """
-    rows = _maya_shelf_catalog_cache.get("action_rows")
+    rows = _clarity_shelf_catalog_cache.get("action_rows")
     if rows is not None:
         return rows
-    unknown_order = len(_MAYA_SHELF_ACTION_CATEGORY_ORDER)
+    unknown_order = len(_CLARITY_SHELF_ACTION_CATEGORY_ORDER)
     rows = []
-    for action, label, _description, icon, _index in _maya_shelf_builtin_actions():
-        category = _maya_shelf_action_category(action, label)
-        order = _MAYA_SHELF_ACTION_CATEGORY_ORDER.get(category, unknown_order)
+    for action, label, _description, icon, _index in _clarity_shelf_builtin_actions():
+        category = _clarity_shelf_action_category(action, label)
+        order = _CLARITY_SHELF_ACTION_CATEGORY_ORDER.get(category, unknown_order)
         rows.append((action, label, icon, category, "{:02d}{:s}".format(order, label.casefold())))
     rows = tuple(rows)
-    _maya_shelf_catalog_cache["action_rows"] = rows
+    _clarity_shelf_catalog_cache["action_rows"] = rows
     return rows
 
 
-def _maya_shelf_action_order(sort_mode, reverse=False):
+def _clarity_shelf_action_order(sort_mode, reverse=False):
     """Cached UIList mapping from catalog index to displayed index."""
     cache_key = ("action_order", sort_mode, reverse)
-    order = _maya_shelf_catalog_cache.get(cache_key)
+    order = _clarity_shelf_catalog_cache.get(cache_key)
     if order is not None:
         return list(order)
 
-    rows = _maya_shelf_action_rows()
+    rows = _clarity_shelf_action_rows()
     if sort_mode == 'CATEGORY':
         sorted_indices = sorted(
             range(len(rows)),
@@ -740,93 +740,93 @@ def _maya_shelf_action_order(sort_mode, reverse=False):
     for displayed_index, catalog_index in enumerate(sorted_indices):
         order[catalog_index] = displayed_index
     order = tuple(order)
-    _maya_shelf_catalog_cache[cache_key] = order
+    _clarity_shelf_catalog_cache[cache_key] = order
     return list(order)
 
 
-_MAYA_SHELF_INVALID_STORAGE_BASELINE = object()
+_CLARITY_SHELF_INVALID_STORAGE_BASELINE = object()
 
-_maya_shelf_config_cache = None
-_maya_shelf_active_scope = "TOPBAR"
-_maya_shelf_drag_state = None
+_clarity_shelf_config_cache = None
+_clarity_shelf_active_scope = "TOPBAR"
+_clarity_shelf_drag_state = None
 # Entry under the cursor, pushed in by the C++ shelf region handler while a drag runs.
-_maya_shelf_drag_hover = None
-_maya_shelf_previews = None
-_maya_shelf_row_cache = {}
-_maya_shelf_custom_icon_cache = {}
-_maya_shelf_future_scope_storage = {}
-_maya_shelf_future_storage = None
-_maya_shelf_scope_baselines = {}
-_maya_shelf_storage_baseline_content = None
-_maya_shelf_pending_scopes = set()
+_clarity_shelf_drag_hover = None
+_clarity_shelf_previews = None
+_clarity_shelf_row_cache = {}
+_clarity_shelf_custom_icon_cache = {}
+_clarity_shelf_future_scope_storage = {}
+_clarity_shelf_future_storage = None
+_clarity_shelf_scope_baselines = {}
+_clarity_shelf_storage_baseline_content = None
+_clarity_shelf_pending_scopes = set()
 
-_MAYA_SHELF_ROW_COUNT = 2
+_CLARITY_SHELF_ROW_COUNT = 2
 
-# Schema version of a single shelf config, see `_maya_shelf_migrate_config`.
-_MAYA_SHELF_VERSION = 3
-_MAYA_SHELF_STORAGE_VERSION = 1
-_MAYA_SHELF_DEFAULT_BACKGROUND_COLOR = (0.18, 0.18, 0.18, 1.0)
-_MAYA_SHELF_DEFAULT_ICON_COLOR = (1.0, 1.0, 1.0, 1.0)
-_MAYA_SHELF_DRAG_SOURCE_COLOR = (0.08, 0.32, 0.68, 1.0)
-_MAYA_SHELF_CUSTOM_ICON_RECHECK_SECONDS = 1.0
-_MAYA_SHELF_SAVE_LOCK_TIMEOUT = 0.75
-_MAYA_SHELF_STALE_LOCK_SECONDS = 30.0
+# Schema version of a single shelf config, see `_clarity_shelf_migrate_config`.
+_CLARITY_SHELF_VERSION = 3
+_CLARITY_SHELF_STORAGE_VERSION = 1
+_CLARITY_SHELF_DEFAULT_BACKGROUND_COLOR = (0.18, 0.18, 0.18, 1.0)
+_CLARITY_SHELF_DEFAULT_ICON_COLOR = (1.0, 1.0, 1.0, 1.0)
+_CLARITY_SHELF_DRAG_SOURCE_COLOR = (0.08, 0.32, 0.68, 1.0)
+_CLARITY_SHELF_CUSTOM_ICON_RECHECK_SECONDS = 1.0
+_CLARITY_SHELF_SAVE_LOCK_TIMEOUT = 0.75
+_CLARITY_SHELF_STALE_LOCK_SECONDS = 30.0
 
 
 def unregister_runtime():
-    global _maya_shelf_previews
-    global _maya_shelf_drag_state
-    global _maya_shelf_drag_hover
-    global _maya_shelf_config_cache
-    global _maya_shelf_future_storage
-    global _maya_shelf_storage_baseline_content
-    if _maya_shelf_previews is not None:
-        bpy.utils.previews.remove(_maya_shelf_previews)
-        _maya_shelf_previews = None
-    _maya_shelf_drag_state = None
-    _maya_shelf_drag_hover = None
+    global _clarity_shelf_previews
+    global _clarity_shelf_drag_state
+    global _clarity_shelf_drag_hover
+    global _clarity_shelf_config_cache
+    global _clarity_shelf_future_storage
+    global _clarity_shelf_storage_baseline_content
+    if _clarity_shelf_previews is not None:
+        bpy.utils.previews.remove(_clarity_shelf_previews)
+        _clarity_shelf_previews = None
+    _clarity_shelf_drag_state = None
+    _clarity_shelf_drag_hover = None
     # The config is written out on every change, so dropping it here only forces
     # a reload. Icon ids belong to the previews collection freed above.
-    _maya_shelf_config_cache = None
-    _maya_shelf_future_storage = None
-    _maya_shelf_storage_baseline_content = None
-    _maya_shelf_custom_icon_cache.clear()
-    _maya_shelf_catalog_cache.clear()
-    _maya_shelf_row_cache.clear()
-    _maya_shelf_future_scope_storage.clear()
-    _maya_shelf_scope_baselines.clear()
-    _maya_shelf_pending_scopes.clear()
+    _clarity_shelf_config_cache = None
+    _clarity_shelf_future_storage = None
+    _clarity_shelf_storage_baseline_content = None
+    _clarity_shelf_custom_icon_cache.clear()
+    _clarity_shelf_catalog_cache.clear()
+    _clarity_shelf_row_cache.clear()
+    _clarity_shelf_future_scope_storage.clear()
+    _clarity_shelf_scope_baselines.clear()
+    _clarity_shelf_pending_scopes.clear()
 
 
-def _maya_shelf_preview_icon(name, filename, *, force_reload=False):
-    global _maya_shelf_previews
-    if _maya_shelf_previews is None:
+def _clarity_shelf_preview_icon(name, filename, *, force_reload=False):
+    global _clarity_shelf_previews
+    if _clarity_shelf_previews is None:
         import bpy.utils.previews
 
-        _maya_shelf_previews = bpy.utils.previews.new()
-    if force_reload and name in _maya_shelf_previews:
-        del _maya_shelf_previews[name]
-    if name not in _maya_shelf_previews:
+        _clarity_shelf_previews = bpy.utils.previews.new()
+    if force_reload and name in _clarity_shelf_previews:
+        del _clarity_shelf_previews[name]
+    if name not in _clarity_shelf_previews:
         filepath = os.path.join(
             os.path.dirname(__file__),
             "assets",
             filename,
         )
         try:
-            preview = _maya_shelf_previews.load(name, filepath, 'IMAGE')
+            preview = _clarity_shelf_previews.load(name, filepath, 'IMAGE')
             # Force the image to load before the first frame using it is drawn.
             icon_size = preview.icon_size
             if not icon_size[0] or not icon_size[1]:
-                del _maya_shelf_previews[name]
+                del _clarity_shelf_previews[name]
                 return 0
         except Exception:
-            if name in _maya_shelf_previews:
-                del _maya_shelf_previews[name]
+            if name in _clarity_shelf_previews:
+                del _clarity_shelf_previews[name]
             return 0
-    return _maya_shelf_previews[name].icon_id
+    return _clarity_shelf_previews[name].icon_id
 
 
-def _maya_shelf_custom_icon(filepath, *, force_reload=False):
+def _clarity_shelf_custom_icon(filepath, *, force_reload=False):
     """Preview id for a user image, refreshed after the file changes.
 
     Draw calls only stat each distinct path once per second. This keeps missing paths
@@ -838,7 +838,7 @@ def _maya_shelf_custom_icon(filepath, *, force_reload=False):
     absolute_path = os.path.abspath(bpy.path.abspath(filepath))
     cache_key = os.path.normcase(absolute_path)
     now = time.monotonic()
-    cached = _maya_shelf_custom_icon_cache.get(cache_key)
+    cached = _clarity_shelf_custom_icon_cache.get(cache_key)
     if not force_reload and cached is not None and now < cached["recheck_at"]:
         return cached["icon_id"]
 
@@ -846,43 +846,43 @@ def _maya_shelf_custom_icon(filepath, *, force_reload=False):
         stat = os.stat(absolute_path)
         fingerprint = (stat.st_mtime_ns, stat.st_size)
     except OSError:
-        if cached is not None and cached["preview_name"] and _maya_shelf_previews is not None:
-            if cached["preview_name"] in _maya_shelf_previews:
-                del _maya_shelf_previews[cached["preview_name"]]
-        _maya_shelf_custom_icon_cache[cache_key] = {
+        if cached is not None and cached["preview_name"] and _clarity_shelf_previews is not None:
+            if cached["preview_name"] in _clarity_shelf_previews:
+                del _clarity_shelf_previews[cached["preview_name"]]
+        _clarity_shelf_custom_icon_cache[cache_key] = {
             "fingerprint": None,
             "icon_id": 0,
             "preview_name": "",
-            "recheck_at": now + _MAYA_SHELF_CUSTOM_ICON_RECHECK_SECONDS,
+            "recheck_at": now + _CLARITY_SHELF_CUSTOM_ICON_RECHECK_SECONDS,
         }
         return 0
 
     if not force_reload and cached is not None and cached["fingerprint"] == fingerprint:
-        cached["recheck_at"] = now + _MAYA_SHELF_CUSTOM_ICON_RECHECK_SECONDS
+        cached["recheck_at"] = now + _CLARITY_SHELF_CUSTOM_ICON_RECHECK_SECONDS
         return cached["icon_id"]
-    if cached is not None and cached["preview_name"] and _maya_shelf_previews is not None:
-        if cached["preview_name"] in _maya_shelf_previews:
-            del _maya_shelf_previews[cached["preview_name"]]
+    if cached is not None and cached["preview_name"] and _clarity_shelf_previews is not None:
+        if cached["preview_name"] in _clarity_shelf_previews:
+            del _clarity_shelf_previews[cached["preview_name"]]
 
-    preview_name = "maya_shelf_custom_" + uuid.uuid5(
+    preview_name = "clarity_shelf_custom_" + uuid.uuid5(
         uuid.NAMESPACE_URL,
         "{:s}:{:d}:{:d}".format(cache_key, fingerprint[0], fingerprint[1]),
     ).hex
-    icon_id = _maya_shelf_preview_icon(
+    icon_id = _clarity_shelf_preview_icon(
         preview_name,
         absolute_path,
         force_reload=force_reload,
     )
-    _maya_shelf_custom_icon_cache[cache_key] = {
+    _clarity_shelf_custom_icon_cache[cache_key] = {
         "fingerprint": fingerprint,
         "icon_id": icon_id,
         "preview_name": preview_name if icon_id else "",
-        "recheck_at": now + _MAYA_SHELF_CUSTOM_ICON_RECHECK_SECONDS,
+        "recheck_at": now + _CLARITY_SHELF_CUSTOM_ICON_RECHECK_SECONDS,
     }
     return icon_id
 
 
-def _maya_shelf_script_settings(operator):
+def _clarity_shelf_script_settings(operator):
     source = operator.script_source
     settings = {
         "script_source": source,
@@ -908,11 +908,11 @@ def _maya_shelf_script_settings(operator):
     return settings, ""
 
 
-class TOPBAR_PG_maya_shelf_icon(PropertyGroup):
+class TOPBAR_PG_clarity_shelf_icon(PropertyGroup):
     identifier: StringProperty()
 
 
-class TOPBAR_PG_maya_shelf_action(PropertyGroup):
+class TOPBAR_PG_clarity_shelf_action(PropertyGroup):
     identifier: StringProperty()
     label: StringProperty()
     icon: StringProperty()
@@ -921,7 +921,7 @@ class TOPBAR_PG_maya_shelf_action(PropertyGroup):
     sort_key: StringProperty()
 
 
-class TOPBAR_UL_maya_shelf_icons(UIList):
+class TOPBAR_UL_clarity_shelf_icons(UIList):
     def draw_item(
             self,
             _context,
@@ -936,7 +936,7 @@ class TOPBAR_UL_maya_shelf_icons(UIList):
         layout.label(text=item.identifier, icon=item.identifier)
 
 
-class TOPBAR_UL_maya_shelf_actions(UIList):
+class TOPBAR_UL_clarity_shelf_actions(UIList):
     def filter_items(self, _context, data, property_name):
         actions = getattr(data, property_name)
         flags = []
@@ -959,8 +959,8 @@ class TOPBAR_UL_maya_shelf_actions(UIList):
         sort_mode = getattr(data, "action_sort", 'CATEGORY')
         if self.use_filter_sort_alpha:
             sort_mode = 'NAME'
-        if len(actions) == len(_maya_shelf_action_rows()):
-            indices = _maya_shelf_action_order(
+        if len(actions) == len(_clarity_shelf_action_rows()):
+            indices = _clarity_shelf_action_order(
                 sort_mode,
                 reverse=self.use_filter_sort_reverse,
             )
@@ -996,14 +996,14 @@ class TOPBAR_UL_maya_shelf_actions(UIList):
         layout.label(text=item.label, icon=item.icon)
 
 
-def _maya_shelf_color_string(color):
+def _clarity_shelf_color_string(color):
     return ",".join(f"{component:.6f}" for component in color)
 
 
-def _maya_shelf_icon_list_fill(operator, selected_icon):
+def _clarity_shelf_icon_list_fill(operator, selected_icon):
     operator.icons.clear()
     selected_index = 0
-    for index, enum_item in enumerate(_maya_shelf_blender_icons()):
+    for index, enum_item in enumerate(_clarity_shelf_blender_icons()):
         icon = operator.icons.add()
         icon.identifier = enum_item[0]
         # The built-in UIList name filter reads the inherited PropertyGroup name.
@@ -1013,12 +1013,12 @@ def _maya_shelf_icon_list_fill(operator, selected_icon):
     operator.icon_index = selected_index
 
 
-def _maya_shelf_action_list_fill(operator, selected_action):
-    _maya_shelf_refresh_action_catalog()
+def _clarity_shelf_action_list_fill(operator, selected_action):
+    _clarity_shelf_refresh_action_catalog()
     operator.actions.clear()
     selected_index = 0
     selected_found = False
-    for index, row in enumerate(_maya_shelf_action_rows()):
+    for index, row in enumerate(_clarity_shelf_action_rows()):
         identifier, label, icon, category, sort_key = row
         action = operator.actions.add()
         action.identifier = identifier
@@ -1036,25 +1036,25 @@ def _maya_shelf_action_list_fill(operator, selected_action):
         action.icon = 'ERROR'
         action.category = 'OTHER'
         action.sort_key = "{:02d}{:s}".format(
-            _MAYA_SHELF_ACTION_CATEGORY_ORDER['OTHER'],
+            _CLARITY_SHELF_ACTION_CATEGORY_ORDER['OTHER'],
             action.label.casefold(),
         )
         selected_index = len(operator.actions) - 1
     operator.action_index = selected_index
 
 
-def _maya_shelf_selected_action(operator):
+def _clarity_shelf_selected_action(operator):
     if operator.actions and 0 <= operator.action_index < len(operator.actions):
         return operator.actions[operator.action_index].identifier
     return operator.builtin_action
 
 
-def _maya_shelf_action_index_update(operator, _context):
-    action = _maya_shelf_selected_action(operator)
-    label = _maya_shelf_builtin_action_labels().get(action, "")
+def _clarity_shelf_action_index_update(operator, _context):
+    action = _clarity_shelf_selected_action(operator)
+    label = _clarity_shelf_builtin_action_labels().get(action, "")
     if label:
         operator.label = label.split(":", 1)[-1].strip()
-    icon_identifier = _maya_shelf_builtin_action_icons().get(action)
+    icon_identifier = _clarity_shelf_builtin_action_icons().get(action)
     if not icon_identifier:
         return
     for index, icon in enumerate(operator.icons):
@@ -1064,13 +1064,13 @@ def _maya_shelf_action_index_update(operator, _context):
             break
 
 
-def _maya_shelf_draw_icon_preview(layout, operator):
-    custom_icon_value = _maya_shelf_custom_icon(operator.custom_icon)
+def _clarity_shelf_draw_icon_preview(layout, operator):
+    custom_icon_value = _clarity_shelf_custom_icon(operator.custom_icon)
     icon_value = custom_icon_value
     icon_identifier = ""
     if not icon_value and operator.icons and 0 <= operator.icon_index < len(operator.icons):
         icon_identifier = operator.icons[operator.icon_index].identifier
-        icon_value = _maya_shelf_blender_icon_values().get(icon_identifier, 0)
+        icon_value = _clarity_shelf_blender_icon_values().get(icon_identifier, 0)
 
     preview = layout.box()
     preview.label(text="Icon Preview")
@@ -1080,12 +1080,12 @@ def _maya_shelf_draw_icon_preview(layout, operator):
     preview_button.scale_x = 3.0
     preview_button.scale_y = 3.0
     preview_button.context_string_set(
-        "maya_shelf_background_color",
-        _maya_shelf_color_string(operator.background_color),
+        "clarity_shelf_background_color",
+        _clarity_shelf_color_string(operator.background_color),
     )
     preview_button.context_string_set(
-        "maya_shelf_icon_color",
-        _maya_shelf_color_string(
+        "clarity_shelf_icon_color",
+        _clarity_shelf_color_string(
             (1.0, 1.0, 1.0, operator.icon_color[3])
             if custom_icon_value
             else operator.icon_color
@@ -1094,33 +1094,38 @@ def _maya_shelf_draw_icon_preview(layout, operator):
     operator_args = {"text": "", "emboss": True}
     if icon_value:
         operator_args["icon_value"] = icon_value
-    preview_button.operator("topbar.maya_shelf_preview", **operator_args)
+    preview_button.operator("topbar.clarity_shelf_preview", **operator_args)
     if operator.custom_icon:
         preview.label(text=os.path.basename(operator.custom_icon))
     elif icon_identifier:
         preview.label(text=icon_identifier)
 
 
-def _maya_shelf_config_path():
+def _clarity_shelf_config_path():
     config_dir = bpy.utils.user_resource('CONFIG', create=True)
+    return os.path.join(config_dir, "clarity_shelf.json")
+
+
+def _clarity_shelf_legacy_config_path():
+    config_dir = bpy.utils.user_resource('CONFIG')
     return os.path.join(config_dir, "maya_shelf.json")
 
 
-def _maya_shelf_reject_json_constant(value):
+def _clarity_shelf_reject_json_constant(value):
     raise ValueError("Invalid JSON number: {:s}".format(value))
 
 
-def _maya_shelf_json_float(value):
+def _clarity_shelf_json_float(value):
     number = float(value)
     if not math.isfinite(number):
         raise ValueError("JSON number is outside the supported range")
     return number
 
 
-def _maya_shelf_default_config():
+def _clarity_shelf_default_config():
     tabs = []
-    for tab_name in _MAYA_SHELF_TABS:
-        source_items = [item for item in _MAYA_SHELF_ITEMS.get(tab_name, ()) if item is not None]
+    for tab_name in _CLARITY_SHELF_TABS:
+        source_items = [item for item in _CLARITY_SHELF_ITEMS.get(tab_name, ()) if item is not None]
         split = (len(source_items) + 1) // 2
         items = []
         for index, (action, label, icon) in enumerate(source_items):
@@ -1133,10 +1138,10 @@ def _maya_shelf_default_config():
                 "row": 0 if index < split else 1,
             })
         tabs.append({"name": tab_name, "items": items, "separators": []})
-    return {"version": _MAYA_SHELF_VERSION, "active": "Modeling", "tabs": tabs}
+    return {"version": _CLARITY_SHELF_VERSION, "active": "Modeling", "tabs": tabs}
 
 
-def _maya_shelf_config_clone(source):
+def _clarity_shelf_config_clone(source):
     config = copy.deepcopy(source)
     for tab in config["tabs"]:
         for item in tab["items"]:
@@ -1146,7 +1151,7 @@ def _maya_shelf_config_clone(source):
     return config
 
 
-def _maya_shelf_clamped_int(value, minimum, maximum):
+def _clarity_shelf_clamped_int(value, minimum, maximum):
     try:
         number = int(value)
     except (OverflowError, TypeError, ValueError):
@@ -1154,14 +1159,14 @@ def _maya_shelf_clamped_int(value, minimum, maximum):
     return min(max(number, minimum), maximum)
 
 
-def _maya_shelf_version(value):
+def _clarity_shelf_version(value):
     try:
         return max(int(value), 1)
     except (OverflowError, TypeError, ValueError):
         return 1
 
 
-def _maya_shelf_assign(mapping, key, value):
+def _clarity_shelf_assign(mapping, key, value):
     """Assign a normalized value and report whether the JSON graph changed."""
     sentinel = object()
     if mapping.get(key, sentinel) == value:
@@ -1170,7 +1175,7 @@ def _maya_shelf_assign(mapping, key, value):
     return True
 
 
-def _maya_shelf_ui_string(value, default="", *, strip=False, max_length=None):
+def _clarity_shelf_ui_string(value, default="", *, strip=False, max_length=None):
     if value is None:
         value = default
     elif not isinstance(value, str):
@@ -1182,7 +1187,7 @@ def _maya_shelf_ui_string(value, default="", *, strip=False, max_length=None):
     return value
 
 
-def _maya_shelf_color(value, default):
+def _clarity_shelf_color(value, default):
     if not isinstance(value, (list, tuple)) or len(value) != 4:
         return list(default)
     try:
@@ -1194,7 +1199,7 @@ def _maya_shelf_color(value, default):
     return [min(max(component, 0.0), 1.0) for component in color]
 
 
-def _maya_shelf_unique_id(value, used_ids):
+def _clarity_shelf_unique_id(value, used_ids):
     identifier = value.strip() if isinstance(value, str) else ""
     if not identifier or identifier in used_ids:
         identifier = uuid.uuid4().hex
@@ -1202,7 +1207,7 @@ def _maya_shelf_unique_id(value, used_ids):
     return identifier
 
 
-def _maya_shelf_normalize_tab(tab):
+def _clarity_shelf_normalize_tab(tab):
     """Fill in every key the draw and edit code indexes with `[]`.
 
     The config is a plain JSON file users can hand-edit, so nothing about its shape
@@ -1214,9 +1219,9 @@ def _maya_shelf_normalize_tab(tab):
         raise ValueError("Shelf tab is invalid")
     changed = False
     discarded = False
-    name = _maya_shelf_ui_string(tab.get("name"), "Shelf", strip=True) or "Shelf"
+    name = _clarity_shelf_ui_string(tab.get("name"), "Shelf", strip=True) or "Shelf"
     discarded |= "name" in tab and tab.get("name") != name
-    changed |= _maya_shelf_assign(tab, "name", name)
+    changed |= _clarity_shelf_assign(tab, "name", name)
 
     items = tab.get("items")
     if isinstance(items, list):
@@ -1226,7 +1231,7 @@ def _maya_shelf_normalize_tab(tab):
         normalized_items = []
         changed = True
         discarded |= items not in (None, [])
-    changed |= _maya_shelf_assign(tab, "items", normalized_items)
+    changed |= _clarity_shelf_assign(tab, "items", normalized_items)
 
     separators = tab.get("separators")
     if isinstance(separators, list):
@@ -1238,28 +1243,28 @@ def _maya_shelf_normalize_tab(tab):
         normalized_separators = []
         changed = True
         discarded |= separators not in (None, [])
-    changed |= _maya_shelf_assign(tab, "separators", normalized_separators)
+    changed |= _clarity_shelf_assign(tab, "separators", normalized_separators)
 
-    last_row = _MAYA_SHELF_ROW_COUNT - 1
+    last_row = _CLARITY_SHELF_ROW_COUNT - 1
     used_ids = set()
     for item in tab["items"]:
-        identifier = _maya_shelf_unique_id(item.get("id"), used_ids)
+        identifier = _clarity_shelf_unique_id(item.get("id"), used_ids)
         discarded |= bool(item.get("id")) and item.get("id") != identifier
-        changed |= _maya_shelf_assign(
+        changed |= _clarity_shelf_assign(
             item,
             "id",
             identifier,
         )
-        changed |= _maya_shelf_assign(
+        changed |= _clarity_shelf_assign(
             item,
             "label",
-            _maya_shelf_ui_string(item.get("label"), "Shelf Command"),
+            _clarity_shelf_ui_string(item.get("label"), "Shelf Command"),
         )
-        icon = _maya_shelf_ui_string(item.get("icon"), 'NONE') or 'NONE'
-        changed |= _maya_shelf_assign(item, "icon", icon)
-        row = _maya_shelf_clamped_int(item.get("row", 0), 0, last_row)
+        icon = _clarity_shelf_ui_string(item.get("icon"), 'NONE') or 'NONE'
+        changed |= _clarity_shelf_assign(item, "icon", icon)
+        row = _clarity_shelf_clamped_int(item.get("row", 0), 0, last_row)
         discarded |= "row" in item and item.get("row") != row
-        changed |= _maya_shelf_assign(item, "row", row)
+        changed |= _clarity_shelf_assign(item, "row", row)
 
         for key in (
                 "action",
@@ -1270,16 +1275,16 @@ def _maya_shelf_normalize_tab(tab):
                 "script_file",
         ):
             if key in item:
-                value = _maya_shelf_ui_string(item.get(key))
+                value = _clarity_shelf_ui_string(item.get(key))
                 discarded |= item.get(key) != value
-                changed |= _maya_shelf_assign(item, key, value)
+                changed |= _clarity_shelf_assign(item, key, value)
         if "short_text" in item:
-            short_text = _maya_shelf_ui_string(
+            short_text = _clarity_shelf_ui_string(
                 item.get("short_text"),
                 max_length=5,
             )
             discarded |= item.get("short_text") != short_text
-            changed |= _maya_shelf_assign(item, "short_text", short_text)
+            changed |= _clarity_shelf_assign(item, "short_text", short_text)
         if "command_type" in item:
             command_type = item.get("command_type")
             if command_type not in {'BUILTIN', 'OPERATOR', 'PYTHON'}:
@@ -1291,42 +1296,42 @@ def _maya_shelf_normalize_tab(tab):
                     else 'BUILTIN'
                 )
             discarded |= item.get("command_type") != command_type
-            changed |= _maya_shelf_assign(item, "command_type", command_type)
+            changed |= _clarity_shelf_assign(item, "command_type", command_type)
         if "script_source" in item:
             script_source = item.get("script_source")
             if script_source not in {'INLINE', 'TEXT', 'FILE'}:
                 script_source = 'INLINE'
             discarded |= item.get("script_source") != script_source
-            changed |= _maya_shelf_assign(item, "script_source", script_source)
+            changed |= _clarity_shelf_assign(item, "script_source", script_source)
         for key, default in (
-                ("background_color", _MAYA_SHELF_DEFAULT_BACKGROUND_COLOR),
-                ("icon_color", _MAYA_SHELF_DEFAULT_ICON_COLOR),
+                ("background_color", _CLARITY_SHELF_DEFAULT_BACKGROUND_COLOR),
+                ("icon_color", _CLARITY_SHELF_DEFAULT_ICON_COLOR),
         ):
             if key in item:
-                color = _maya_shelf_color(item.get(key), default)
+                color = _clarity_shelf_color(item.get(key), default)
                 discarded |= item.get(key) != color
-                changed |= _maya_shelf_assign(item, key, color)
+                changed |= _clarity_shelf_assign(item, key, color)
 
     row_lengths = {
-        row_index: len(_maya_shelf_row_items(tab, row_index))
-        for row_index in range(_MAYA_SHELF_ROW_COUNT)
+        row_index: len(_clarity_shelf_row_items(tab, row_index))
+        for row_index in range(_CLARITY_SHELF_ROW_COUNT)
     }
     for separator in tab["separators"]:
-        identifier = _maya_shelf_unique_id(separator.get("id"), used_ids)
+        identifier = _clarity_shelf_unique_id(separator.get("id"), used_ids)
         discarded |= bool(separator.get("id")) and separator.get("id") != identifier
-        changed |= _maya_shelf_assign(
+        changed |= _clarity_shelf_assign(
             separator,
             "id",
             identifier,
         )
-        row = _maya_shelf_clamped_int(separator.get("row", 0), 0, last_row)
+        row = _clarity_shelf_clamped_int(separator.get("row", 0), 0, last_row)
         discarded |= "row" in separator and separator.get("row") != row
-        changed |= _maya_shelf_assign(separator, "row", row)
-        column = _maya_shelf_clamped_int(
+        changed |= _clarity_shelf_assign(separator, "row", row)
+        column = _clarity_shelf_clamped_int(
             separator.get("column", 0), 0, row_lengths[row],
         )
         discarded |= "column" in separator and separator.get("column") != column
-        changed |= _maya_shelf_assign(
+        changed |= _clarity_shelf_assign(
             separator,
             "column",
             column,
@@ -1335,11 +1340,11 @@ def _maya_shelf_normalize_tab(tab):
         tab["separators"],
         key=lambda separator: (separator["row"], separator["column"]),
     )
-    changed |= _maya_shelf_assign(tab, "separators", sorted_separators)
+    changed |= _clarity_shelf_assign(tab, "separators", sorted_separators)
     return changed, discarded
 
 
-def _maya_shelf_normalize_config(config):
+def _clarity_shelf_normalize_config(config):
     if not isinstance(config, dict):
         raise ValueError("Shelf config is invalid")
     tabs = config.get("tabs")
@@ -1355,8 +1360,8 @@ def _maya_shelf_normalize_config(config):
     active_tab_name = None
     used_names = set()
     for tab in normalized_tabs:
-        original_name = _maya_shelf_ui_string(tab.get("name"), "Shelf", strip=True) or "Shelf"
-        tab_changed, tab_discarded = _maya_shelf_normalize_tab(tab)
+        original_name = _clarity_shelf_ui_string(tab.get("name"), "Shelf", strip=True) or "Shelf"
+        tab_changed, tab_discarded = _clarity_shelf_normalize_tab(tab)
         changed |= tab_changed
         discarded |= tab_discarded
 
@@ -1368,18 +1373,18 @@ def _maya_shelf_normalize_config(config):
             suffix += 1
         used_names.add(unique_name)
         discarded |= unique_name != base_name
-        changed |= _maya_shelf_assign(tab, "name", unique_name)
+        changed |= _clarity_shelf_assign(tab, "name", unique_name)
         if active_tab_name is None and active_name == original_name:
             active_tab_name = unique_name
 
-    changed |= _maya_shelf_assign(config, "tabs", normalized_tabs)
+    changed |= _clarity_shelf_assign(config, "tabs", normalized_tabs)
     if active_tab_name is None:
         active_tab_name = normalized_tabs[0]["name"]
-    changed |= _maya_shelf_assign(config, "active", active_tab_name)
+    changed |= _clarity_shelf_assign(config, "active", active_tab_name)
     return changed, discarded
 
 
-def _maya_shelf_layout_scope_key(context, area=None):
+def _clarity_shelf_layout_scope_key(context, area=None):
     if area is None:
         area = getattr(context, "area", None)
     screen = getattr(context, "screen", None)
@@ -1401,7 +1406,7 @@ def _maya_shelf_layout_scope_key(context, area=None):
     )
 
 
-def _maya_shelf_uuid_scope_key(context):
+def _clarity_shelf_uuid_scope_key(context):
     area = getattr(context, "area", None)
     if area is None or area.type != 'SHELF':
         return None
@@ -1409,14 +1414,14 @@ def _maya_shelf_uuid_scope_key(context):
     return "SHELF:" + shelf_id if shelf_id else None
 
 
-def _maya_shelf_scope_key(context):
+def _clarity_shelf_scope_key(context):
     area = getattr(context, "area", None) if context is not None else None
     if area is None or area.type != 'SHELF':
         return "TOPBAR"
-    return _maya_shelf_layout_scope_key(context, area)
+    return _clarity_shelf_layout_scope_key(context, area)
 
 
-def _maya_shelf_tab_is_unmodified_builtin(tab):
+def _clarity_shelf_tab_is_unmodified_builtin(tab):
     """Whether a legacy tab still matches the generated v1 contents.
 
     UUIDs are intentionally ignored. Any visual customization, separator, command
@@ -1426,7 +1431,7 @@ def _maya_shelf_tab_is_unmodified_builtin(tab):
     tab_name = tab["name"]
     source_name = "Modeling" if tab_name == "Poly Modeling" else tab_name
     source_items = [
-        item for item in _MAYA_SHELF_ITEMS.get(source_name, ()) if item is not None
+        item for item in _CLARITY_SHELF_ITEMS.get(source_name, ()) if item is not None
     ]
     if tab["separators"] or len(tab["items"]) != len(source_items):
         return False
@@ -1457,11 +1462,11 @@ def _maya_shelf_tab_is_unmodified_builtin(tab):
     return True
 
 
-def _maya_shelf_migrate_config(config):
+def _clarity_shelf_migrate_config(config):
     """Bring one shelf config up to the current version. Returns True when changed."""
     migrated = False
-    version = _maya_shelf_version(config.get("version", 1))
-    if version > _MAYA_SHELF_VERSION:
+    version = _clarity_shelf_version(config.get("version", 1))
+    if version > _CLARITY_SHELF_VERSION:
         # Never downgrade data written by a newer Blender. Known fields were
         # normalized for safe drawing, but the schema marker and unknown fields stay.
         return False
@@ -1478,7 +1483,7 @@ def _maya_shelf_migrate_config(config):
             None,
         )
         if modeling is None:
-            modeling = _maya_shelf_default_config()["tabs"][0]
+            modeling = _clarity_shelf_default_config()["tabs"][0]
         modeling["name"] = "Modeling"
         if custom is None:
             custom = {"name": "Custom", "items": [], "separators": []}
@@ -1488,8 +1493,8 @@ def _maya_shelf_migrate_config(config):
                 tab is not modeling and
                 tab is not custom and
                 (
-                    tab["name"] not in _MAYA_SHELF_LEGACY_TABS or
-                    not _maya_shelf_tab_is_unmodified_builtin(tab)
+                    tab["name"] not in _CLARITY_SHELF_LEGACY_TABS or
+                    not _clarity_shelf_tab_is_unmodified_builtin(tab)
                 )
             )
         ]
@@ -1511,32 +1516,32 @@ def _maya_shelf_migrate_config(config):
                         item[key] = [color[0], color[1], color[2], 1.0]
         config["version"] = 3
         migrated = True
-    if config.get("version") != _MAYA_SHELF_VERSION:
-        config["version"] = _MAYA_SHELF_VERSION
+    if config.get("version") != _CLARITY_SHELF_VERSION:
+        config["version"] = _CLARITY_SHELF_VERSION
         migrated = True
     return migrated
 
 
-def _maya_shelf_backup_broken_config(error, expected_content):
+def _clarity_shelf_backup_broken_config(error, expected_content):
     """Keep an unreadable config around, the next save would overwrite it."""
-    path = _maya_shelf_config_path()
+    path = _clarity_shelf_config_path()
     if expected_content is None:
-        print("Maya shelf: unable to verify the unreadable config before backing it up")
+        print("Clarity shelf: unable to verify the unreadable config before backing it up")
         return False
     backup_path = path + ".bak"
     lock_path = ""
     try:
-        lock_path = _maya_shelf_save_lock_acquire(path)
+        lock_path = _clarity_shelf_save_lock_acquire(path)
         with open(path, "rb") as handle:
             if handle.read() != expected_content:
                 print(
-                    "Maya shelf: config changed in another Blender process; "
+                    "Clarity shelf: config changed in another Blender process; "
                     "left the newer file untouched"
                 )
                 return False
         os.replace(path, backup_path)
     except OSError as ex:
-        print("Maya shelf: unable to back up {:s}: {:s}".format(path, str(ex)))
+        print("Clarity shelf: unable to back up {:s}: {:s}".format(path, str(ex)))
         return False
     finally:
         if lock_path:
@@ -1545,15 +1550,15 @@ def _maya_shelf_backup_broken_config(error, expected_content):
             except OSError:
                 pass
     print(
-        "Maya shelf: {:s} could not be read ({:s}), "
+        "Clarity shelf: {:s} could not be read ({:s}), "
         "kept as {:s} and reset to defaults".format(path, str(error), backup_path)
     )
     return True
 
 
-def _maya_shelf_backup_repaired_config(reason, original_content):
+def _clarity_shelf_backup_repaired_config(reason, original_content):
     """Copy a partly recoverable config before destructive local repairs."""
-    path = _maya_shelf_config_path()
+    path = _clarity_shelf_config_path()
     if original_content is None:
         return
     backup_path = path + ".bak"
@@ -1570,7 +1575,7 @@ def _maya_shelf_backup_repaired_config(reason, original_content):
             handle.write(original_content)
         os.replace(temp_path, backup_path)
     except OSError as ex:
-        print("Maya shelf: unable to back up {:s}: {:s}".format(path, str(ex)))
+        print("Clarity shelf: unable to back up {:s}: {:s}".format(path, str(ex)))
         return
     finally:
         if temp_path and os.path.exists(temp_path):
@@ -1579,78 +1584,82 @@ def _maya_shelf_backup_repaired_config(reason, original_content):
             except OSError:
                 pass
     print(
-        "Maya shelf: repaired unreadable data ({:s}); original kept as {:s}".format(
+        "Clarity shelf: repaired unreadable data ({:s}); original kept as {:s}".format(
             reason,
             backup_path,
         )
     )
 
 
-def _maya_shelf_load():
-    """Read the shelf storage into `_maya_shelf_config_cache`, defaults on failure."""
-    global _maya_shelf_config_cache
-    global _maya_shelf_future_storage
-    global _maya_shelf_storage_baseline_content
-    migrated = False
+def _clarity_shelf_load():
+    """Read the shelf storage into `_clarity_shelf_config_cache`, defaults on failure."""
+    global _clarity_shelf_config_cache
+    global _clarity_shelf_future_storage
+    global _clarity_shelf_storage_baseline_content
+    config_path = _clarity_shelf_config_path()
+    legacy_config_path = _clarity_shelf_legacy_config_path()
+    migrate_legacy_config = not os.path.exists(config_path) and os.path.isfile(legacy_config_path)
+    read_path = legacy_config_path if migrate_legacy_config else config_path
+    migrated = migrate_legacy_config
     destructive_repair = False
     repair_reasons = []
     raw_storage_content = None
-    _maya_shelf_future_scope_storage.clear()
-    _maya_shelf_scope_baselines.clear()
-    _maya_shelf_pending_scopes.clear()
-    _maya_shelf_future_storage = None
-    _maya_shelf_storage_baseline_content = None
+    _clarity_shelf_future_scope_storage.clear()
+    _clarity_shelf_scope_baselines.clear()
+    _clarity_shelf_pending_scopes.clear()
+    _clarity_shelf_future_storage = None
+    _clarity_shelf_storage_baseline_content = None
     try:
-        with open(_maya_shelf_config_path(), "rb") as handle:
+        with open(read_path, "rb") as handle:
             raw_storage_content = handle.read()
         stored_config = json.loads(
             raw_storage_content.decode("utf-8"),
-            parse_constant=_maya_shelf_reject_json_constant,
-            parse_float=_maya_shelf_json_float,
+            parse_constant=_clarity_shelf_reject_json_constant,
+            parse_float=_clarity_shelf_json_float,
         )
         if not isinstance(stored_config, dict):
             raise ValueError("Shelf storage is invalid")
-        _maya_shelf_storage_baseline_content = raw_storage_content
-        declared_storage_version = _maya_shelf_version(
+        _clarity_shelf_storage_baseline_content = raw_storage_content
+        declared_storage_version = _clarity_shelf_version(
             stored_config.get("storage_version", 1),
         )
         raw_shelves = stored_config.get("shelves")
         if isinstance(raw_shelves, dict):
-            _maya_shelf_scope_baselines.update(copy.deepcopy(raw_shelves))
-        elif "shelves" not in stored_config and declared_storage_version <= _MAYA_SHELF_STORAGE_VERSION:
+            _clarity_shelf_scope_baselines.update(copy.deepcopy(raw_shelves))
+        elif "shelves" not in stored_config and declared_storage_version <= _CLARITY_SHELF_STORAGE_VERSION:
             # Storage version 0 held the Top Bar shelf directly at the top level.
-            _maya_shelf_scope_baselines["TOPBAR"] = copy.deepcopy(stored_config)
-        if declared_storage_version > _MAYA_SHELF_STORAGE_VERSION:
-            _maya_shelf_future_storage = copy.deepcopy(stored_config)
+            _clarity_shelf_scope_baselines["TOPBAR"] = copy.deepcopy(stored_config)
+        if declared_storage_version > _CLARITY_SHELF_STORAGE_VERSION:
+            _clarity_shelf_future_storage = copy.deepcopy(stored_config)
         if (
-            _maya_shelf_future_storage is not None and
+            _clarity_shelf_future_storage is not None and
             not isinstance(stored_config.get("shelves"), dict)
         ):
             # A future storage schema may rename `shelves`; never reinterpret its
             # top-level graph as the legacy single-shelf format.
             storage = {
                 "storage_version": declared_storage_version,
-                "shelves": {"TOPBAR": _maya_shelf_default_config()},
+                "shelves": {"TOPBAR": _clarity_shelf_default_config()},
             }
         elif "shelves" in stored_config:
             shelves = stored_config["shelves"]
             if not isinstance(shelves, dict):
                 raise ValueError("Shelf storage is invalid")
             storage = stored_config
-            if declared_storage_version <= _MAYA_SHELF_STORAGE_VERSION:
-                if storage.get("storage_version") != _MAYA_SHELF_STORAGE_VERSION:
-                    storage["storage_version"] = _MAYA_SHELF_STORAGE_VERSION
+            if declared_storage_version <= _CLARITY_SHELF_STORAGE_VERSION:
+                if storage.get("storage_version") != _CLARITY_SHELF_STORAGE_VERSION:
+                    storage["storage_version"] = _CLARITY_SHELF_STORAGE_VERSION
                     migrated = True
         else:
             # Storage version 0 held a single Top Bar shelf at the top level.
             storage = {
-                "storage_version": _MAYA_SHELF_STORAGE_VERSION,
+                "storage_version": _CLARITY_SHELF_STORAGE_VERSION,
                 "shelves": {"TOPBAR": stored_config},
             }
             migrated = True
         if "TOPBAR" not in storage["shelves"]:
             # Every other scope is cloned from the Top Bar shelf, so it has to exist.
-            storage["shelves"]["TOPBAR"] = _maya_shelf_default_config()
+            storage["shelves"]["TOPBAR"] = _clarity_shelf_default_config()
             migrated = True
         # Repair one scope at a time: a single unreadable shelf must not cost the user
         # every other shelf they set up.
@@ -1659,106 +1668,110 @@ def _maya_shelf_load():
                 config = storage["shelves"][scope]
                 future_schema = (
                     isinstance(config, dict) and
-                    _maya_shelf_version(config.get("version", 1)) > _MAYA_SHELF_VERSION
+                    _clarity_shelf_version(config.get("version", 1)) > _CLARITY_SHELF_VERSION
                 )
                 if future_schema:
                     # Keep the exact future-schema graph for unrelated saves. A safe
                     # normalized copy is still used at runtime so drawing cannot fail.
-                    _maya_shelf_future_scope_storage[scope] = copy.deepcopy(config)
-                normalized, discarded = _maya_shelf_normalize_config(config)
+                    _clarity_shelf_future_scope_storage[scope] = copy.deepcopy(config)
+                normalized, discarded = _clarity_shelf_normalize_config(config)
                 if not future_schema:
                     migrated |= normalized
                 if discarded and not future_schema:
                     destructive_repair = True
                     repair_reasons.append("discarded invalid entries in {:s}".format(scope))
-                migrated |= _maya_shelf_migrate_config(config)
+                migrated |= _clarity_shelf_migrate_config(config)
             except (AttributeError, OverflowError, ValueError, TypeError) as ex:
-                print("Maya shelf: resetting unreadable shelf {:s}: {:s}".format(
+                print("Clarity shelf: resetting unreadable shelf {:s}: {:s}".format(
                     scope, str(ex)))
-                if scope in _maya_shelf_future_scope_storage:
+                if scope in _clarity_shelf_future_scope_storage:
                     # The raw graph remains the source of truth until the user edits
                     # this scope explicitly.
                     future_schema = True
-                storage["shelves"][scope] = _maya_shelf_default_config()
+                storage["shelves"][scope] = _clarity_shelf_default_config()
                 if not future_schema:
                     migrated = True
                     destructive_repair = True
                     repair_reasons.append("reset {:s}".format(scope))
-        _maya_shelf_config_cache = storage
+        _clarity_shelf_config_cache = storage
     except (OSError, AttributeError, UnicodeError, ValueError, TypeError, json.JSONDecodeError) as ex:
-        if not isinstance(ex, FileNotFoundError):
-            _maya_shelf_backup_broken_config(ex, raw_storage_content)
-        _maya_shelf_storage_baseline_content = None
-        _maya_shelf_scope_baselines.clear()
-        _maya_shelf_config_cache = {
-            "storage_version": _MAYA_SHELF_STORAGE_VERSION,
-            "shelves": {"TOPBAR": _maya_shelf_default_config()},
+        if not isinstance(ex, FileNotFoundError) and not migrate_legacy_config:
+            _clarity_shelf_backup_broken_config(ex, raw_storage_content)
+        _clarity_shelf_storage_baseline_content = None
+        _clarity_shelf_scope_baselines.clear()
+        _clarity_shelf_config_cache = {
+            "storage_version": _CLARITY_SHELF_STORAGE_VERSION,
+            "shelves": {"TOPBAR": _clarity_shelf_default_config()},
         }
         migrated = True
-    _maya_shelf_invalidate_layout()
-    if migrated and _maya_shelf_future_storage is None:
+    _clarity_shelf_invalidate_layout()
+    if migrated and _clarity_shelf_future_storage is None:
+        if migrate_legacy_config:
+            # The legacy file remains a read-only fallback. The migrated graph is written only to
+            # `clarity_shelf.json`, so future edits never make the old path authoritative again.
+            _clarity_shelf_storage_baseline_content = None
         if destructive_repair:
-            _maya_shelf_backup_repaired_config(
+            _clarity_shelf_backup_repaired_config(
                 "; ".join(repair_reasons),
                 raw_storage_content,
             )
-        _maya_shelf_save()
+        _clarity_shelf_save()
 
 
-def _maya_shelf_scope_config(scope, uuid_scope=None):
+def _clarity_shelf_scope_config(scope, uuid_scope=None):
     """Config for `scope`, created from the Top Bar shelf when it does not exist yet.
 
     Returns the config and whether the storage had to be changed to produce it.
     """
-    if _maya_shelf_config_cache is None:
-        _maya_shelf_load()
-    shelves = _maya_shelf_config_cache["shelves"]
+    if _clarity_shelf_config_cache is None:
+        _clarity_shelf_load()
+    shelves = _clarity_shelf_config_cache["shelves"]
     if scope in shelves:
         return shelves[scope], False
     if uuid_scope is not None and uuid_scope in shelves:
         # Shelf areas used to be keyed by their `shelf_id`; adopt that config.
         shelves[scope] = shelves.pop(uuid_scope)
-        if uuid_scope in _maya_shelf_future_scope_storage:
-            _maya_shelf_future_scope_storage[scope] = (
-                _maya_shelf_future_scope_storage.pop(uuid_scope)
+        if uuid_scope in _clarity_shelf_future_scope_storage:
+            _clarity_shelf_future_scope_storage[scope] = (
+                _clarity_shelf_future_scope_storage.pop(uuid_scope)
             )
     else:
         source = shelves.get("TOPBAR")
         shelves[scope] = (
-            _maya_shelf_config_clone(source)
+            _clarity_shelf_config_clone(source)
             if source is not None
-            else _maya_shelf_default_config()
+            else _clarity_shelf_default_config()
         )
-    _maya_shelf_invalidate_layout()
+    _clarity_shelf_invalidate_layout()
     return shelves[scope], True
 
 
-def _maya_shelf_config(context=None):
+def _clarity_shelf_config(context=None):
     """Config of the shelf `context` belongs to, or of the last one that was used.
 
     Passing a context re-points the module-wide active scope, so any code that
     later calls this without one keeps operating on the same shelf.
     """
-    global _maya_shelf_active_scope
+    global _clarity_shelf_active_scope
     if context is not None:
-        _maya_shelf_active_scope = _maya_shelf_scope_key(context)
-        uuid_scope = _maya_shelf_uuid_scope_key(context)
+        _clarity_shelf_active_scope = _clarity_shelf_scope_key(context)
+        uuid_scope = _clarity_shelf_uuid_scope_key(context)
     else:
         uuid_scope = None
-    config, created = _maya_shelf_scope_config(_maya_shelf_active_scope, uuid_scope)
+    config, created = _clarity_shelf_scope_config(_clarity_shelf_active_scope, uuid_scope)
     if created:
-        changed_scopes = {_maya_shelf_active_scope}
+        changed_scopes = {_clarity_shelf_active_scope}
         if uuid_scope is not None:
             changed_scopes.add(uuid_scope)
-        if _maya_shelf_save(changed_scopes):
-            _maya_shelf_pending_scopes.update(changed_scopes)
+        if _clarity_shelf_save(changed_scopes):
+            _clarity_shelf_pending_scopes.update(changed_scopes)
     return config
 
 
-def _maya_shelf_save_lock_acquire(path):
+def _clarity_shelf_save_lock_acquire(path):
     """Acquire the small cross-process lock guarding read/merge/replace."""
     lock_path = path + ".lock"
-    deadline = time.monotonic() + _MAYA_SHELF_SAVE_LOCK_TIMEOUT
+    deadline = time.monotonic() + _CLARITY_SHELF_SAVE_LOCK_TIMEOUT
     while True:
         try:
             descriptor = os.open(
@@ -1768,7 +1781,7 @@ def _maya_shelf_save_lock_acquire(path):
         except FileExistsError:
             try:
                 lock_age = time.time() - os.path.getmtime(lock_path)
-                if lock_age > _MAYA_SHELF_STALE_LOCK_SECONDS:
+                if lock_age > _CLARITY_SHELF_STALE_LOCK_SECONDS:
                     os.remove(lock_path)
                     continue
             except FileNotFoundError:
@@ -1791,18 +1804,18 @@ def _maya_shelf_save_lock_acquire(path):
         return lock_path
 
 
-def _maya_shelf_merge_disk_storage(storage, changed_scopes, path):
+def _clarity_shelf_merge_disk_storage(storage, changed_scopes, path):
     """Preserve external scopes and return whether the whole-file baseline stayed valid."""
     try:
         with open(path, "rb") as handle:
             disk_content = handle.read()
         disk_storage = json.loads(
             disk_content.decode("utf-8"),
-            parse_constant=_maya_shelf_reject_json_constant,
-            parse_float=_maya_shelf_json_float,
+            parse_constant=_clarity_shelf_reject_json_constant,
+            parse_float=_clarity_shelf_json_float,
         )
     except FileNotFoundError:
-        if _maya_shelf_storage_baseline_content is None:
+        if _clarity_shelf_storage_baseline_content is None:
             return storage, True
         raise OSError(
             "shelf storage was removed by another process; restart Blender before editing it"
@@ -1813,25 +1826,25 @@ def _maya_shelf_merge_disk_storage(storage, changed_scopes, path):
         )
 
     if not changed_scopes:
-        if disk_content != _maya_shelf_storage_baseline_content:
+        if disk_content != _clarity_shelf_storage_baseline_content:
             raise OSError(
                 "shelf storage changed in another Blender process during migration; "
                 "restart Blender before editing it"
             )
         return storage, True
     if isinstance(disk_storage, dict):
-        disk_storage_version = _maya_shelf_version(
+        disk_storage_version = _clarity_shelf_version(
             disk_storage.get("storage_version", 1),
         )
-        if _maya_shelf_future_storage is None:
-            if disk_storage_version > _MAYA_SHELF_STORAGE_VERSION:
+        if _clarity_shelf_future_storage is None:
+            if disk_storage_version > _CLARITY_SHELF_STORAGE_VERSION:
                 raise OSError(
                     "shelf storage was upgraded by another Blender process; "
                     "restart Blender before editing it"
                 )
         else:
-            loaded_storage_version = _maya_shelf_version(
-                _maya_shelf_future_storage.get("storage_version", 1),
+            loaded_storage_version = _clarity_shelf_version(
+                _clarity_shelf_future_storage.get("storage_version", 1),
             )
             if disk_storage_version != loaded_storage_version:
                 raise OSError(
@@ -1842,7 +1855,7 @@ def _maya_shelf_merge_disk_storage(storage, changed_scopes, path):
         not isinstance(disk_storage, dict) or
         not isinstance(disk_storage.get("shelves"), dict)
     ):
-        if disk_content == _maya_shelf_storage_baseline_content:
+        if disk_content == _clarity_shelf_storage_baseline_content:
             return storage, True
         raise OSError(
             "shelf storage uses a schema written by another Blender process; "
@@ -1852,10 +1865,10 @@ def _maya_shelf_merge_disk_storage(storage, changed_scopes, path):
     merged = disk_storage
     merged_shelves = merged["shelves"]
     source_shelves = storage["shelves"]
-    disk_unchanged = disk_content == _maya_shelf_storage_baseline_content
+    disk_unchanged = disk_content == _clarity_shelf_storage_baseline_content
     missing = object()
     for scope in changed_scopes:
-        baseline_scope = _maya_shelf_scope_baselines.get(scope, missing)
+        baseline_scope = _clarity_shelf_scope_baselines.get(scope, missing)
         disk_scope = merged_shelves.get(scope, missing)
         source_scope = source_shelves.get(scope, missing)
         if (
@@ -1874,30 +1887,30 @@ def _maya_shelf_merge_disk_storage(storage, changed_scopes, path):
     return merged, disk_unchanged
 
 
-def _maya_shelf_save(changed_scopes=None):
+def _clarity_shelf_save(changed_scopes=None):
     """Atomically write the whole shelf storage. Returns an empty string on success."""
-    global _maya_shelf_future_storage
-    global _maya_shelf_storage_baseline_content
-    if _maya_shelf_config_cache is None:
+    global _clarity_shelf_future_storage
+    global _clarity_shelf_storage_baseline_content
+    if _clarity_shelf_config_cache is None:
         return ""
     if changed_scopes is not None:
         changed_scopes = set(changed_scopes)
-        changed_scopes.update(_maya_shelf_pending_scopes)
-    if _maya_shelf_future_storage is not None and not changed_scopes:
+        changed_scopes.update(_clarity_shelf_pending_scopes)
+    if _clarity_shelf_future_storage is not None and not changed_scopes:
         # Automatic normalization and migration must never rewrite a storage schema
         # this Blender does not understand.
         return ""
-    path = _maya_shelf_config_path()
+    path = _clarity_shelf_config_path()
     temp_path = ""
     lock_path = ""
     try:
-        lock_path = _maya_shelf_save_lock_acquire(path)
-        source_storage = _maya_shelf_config_cache
-        if _maya_shelf_future_scope_storage:
+        lock_path = _clarity_shelf_save_lock_acquire(path)
+        source_storage = _clarity_shelf_config_cache
+        if _clarity_shelf_future_scope_storage:
             source_storage = copy.deepcopy(source_storage)
-            source_storage["shelves"].update(_maya_shelf_future_scope_storage)
-        if _maya_shelf_future_storage is not None:
-            storage = copy.deepcopy(_maya_shelf_future_storage)
+            source_storage["shelves"].update(_clarity_shelf_future_scope_storage)
+        if _clarity_shelf_future_storage is not None:
+            storage = copy.deepcopy(_clarity_shelf_future_storage)
             storage_shelves = storage.setdefault("shelves", {})
             for scope in changed_scopes:
                 if scope in source_storage["shelves"]:
@@ -1906,7 +1919,7 @@ def _maya_shelf_save(changed_scopes=None):
                     storage_shelves.pop(scope, None)
         else:
             storage = source_storage
-        storage, refresh_whole_baseline = _maya_shelf_merge_disk_storage(
+        storage, refresh_whole_baseline = _clarity_shelf_merge_disk_storage(
             storage,
             changed_scopes,
             path,
@@ -1934,30 +1947,30 @@ def _maya_shelf_save(changed_scopes=None):
         if changed_scopes:
             for scope in changed_scopes:
                 if scope in storage_shelves:
-                    _maya_shelf_scope_baselines[scope] = copy.deepcopy(
+                    _clarity_shelf_scope_baselines[scope] = copy.deepcopy(
                         storage_shelves[scope],
                     )
                 else:
-                    _maya_shelf_scope_baselines.pop(scope, None)
-            _maya_shelf_pending_scopes.difference_update(changed_scopes)
+                    _clarity_shelf_scope_baselines.pop(scope, None)
+            _clarity_shelf_pending_scopes.difference_update(changed_scopes)
         else:
-            _maya_shelf_scope_baselines.clear()
+            _clarity_shelf_scope_baselines.clear()
             if isinstance(storage_shelves, dict):
-                _maya_shelf_scope_baselines.update(copy.deepcopy(storage_shelves))
-            _maya_shelf_pending_scopes.clear()
+                _clarity_shelf_scope_baselines.update(copy.deepcopy(storage_shelves))
+            _clarity_shelf_pending_scopes.clear()
         if refresh_whole_baseline:
-            _maya_shelf_storage_baseline_content = written_content
+            _clarity_shelf_storage_baseline_content = written_content
         else:
             # Runtime scopes not touched by this save may still be older than the
             # merged disk graph. Never use a historical whole-file snapshot as a
             # fast-path marker after that happens.
-            _maya_shelf_storage_baseline_content = _MAYA_SHELF_INVALID_STORAGE_BASELINE
-        if _maya_shelf_future_storage is not None:
-            _maya_shelf_future_storage = copy.deepcopy(storage)
+            _clarity_shelf_storage_baseline_content = _CLARITY_SHELF_INVALID_STORAGE_BASELINE
+        if _clarity_shelf_future_storage is not None:
+            _clarity_shelf_future_storage = copy.deepcopy(storage)
         return ""
     except (OSError, TypeError, ValueError) as ex:
         error = "Unable to save shelf config: {:s}".format(str(ex))
-        print("Maya shelf: {:s} ({:s})".format(error, path))
+        print("Clarity shelf: {:s} ({:s})".format(error, path))
         return error
     finally:
         if temp_path and os.path.exists(temp_path):
@@ -1972,11 +1985,11 @@ def _maya_shelf_save(changed_scopes=None):
                 pass
 
 
-def _maya_shelf_active_tab(context=None):
-    return _maya_shelf_tab_for_config(_maya_shelf_config(context))
+def _clarity_shelf_active_tab(context=None):
+    return _clarity_shelf_tab_for_config(_clarity_shelf_config(context))
 
 
-def _maya_shelf_tab_for_config(config):
+def _clarity_shelf_tab_for_config(config):
     active = config.get("active")
     tab = next((tab for tab in config["tabs"] if tab["name"] == active), None)
     if tab is None:
@@ -1985,26 +1998,26 @@ def _maya_shelf_tab_for_config(config):
     return tab
 
 
-def _maya_shelf_config_for_scope(scope):
-    config, created = _maya_shelf_scope_config(scope)
+def _clarity_shelf_config_for_scope(scope):
+    config, created = _clarity_shelf_scope_config(scope)
     if created:
         changed_scopes = {scope}
-        if _maya_shelf_save(changed_scopes):
-            _maya_shelf_pending_scopes.update(changed_scopes)
+        if _clarity_shelf_save(changed_scopes):
+            _clarity_shelf_pending_scopes.update(changed_scopes)
     return config
 
 
-def _maya_shelf_active_tab_for_scope(scope):
-    return _maya_shelf_tab_for_config(_maya_shelf_config_for_scope(scope))
+def _clarity_shelf_active_tab_for_scope(scope):
+    return _clarity_shelf_tab_for_config(_clarity_shelf_config_for_scope(scope))
 
 
-def _maya_shelf_find_item(tab, item_id):
+def _clarity_shelf_find_item(tab, item_id):
     if not item_id:
         return None
     return next((item for item in tab["items"] if item["id"] == item_id), None)
 
 
-def _maya_shelf_find_separator(tab, item_id):
+def _clarity_shelf_find_separator(tab, item_id):
     if not item_id:
         return None
     return next(
@@ -2013,20 +2026,20 @@ def _maya_shelf_find_separator(tab, item_id):
     )
 
 
-def _maya_shelf_row_items(tab, row_index):
+def _clarity_shelf_row_items(tab, row_index):
     return [item for item in tab["items"] if item.get("row", 0) == row_index]
 
 
-def _maya_shelf_row_entries(tab, row_index, scope=None):
+def _clarity_shelf_row_entries(tab, row_index, scope=None):
     """Visual entries of one Top Bar row, including every separator."""
     if scope is None:
-        scope = _maya_shelf_active_scope
+        scope = _clarity_shelf_active_scope
     cache_key = (scope, tab["name"], row_index)
-    cached = _maya_shelf_row_cache.get(cache_key)
+    cached = _clarity_shelf_row_cache.get(cache_key)
     if cached is not None:
         return cached
 
-    items = _maya_shelf_row_items(tab, row_index)
+    items = _clarity_shelf_row_items(tab, row_index)
     separators_by_column = {}
     for separator in tab["separators"]:
         if separator.get("row", 0) != row_index:
@@ -2043,24 +2056,24 @@ def _maya_shelf_row_entries(tab, row_index, scope=None):
         if column < len(items):
             entries.append(("ITEM", items[column]))
     cached = tuple(entries)
-    _maya_shelf_row_cache[cache_key] = cached
+    _clarity_shelf_row_cache[cache_key] = cached
     return cached
 
 
-def _maya_shelf_sort_separators(tab):
+def _clarity_shelf_sort_separators(tab):
     tab["separators"].sort(
         key=lambda separator: (separator.get("row", 0), separator.get("column", 0)),
     )
 
 
-def _maya_shelf_invalidate_layout():
+def _clarity_shelf_invalidate_layout():
     """Drop cached row grouping after the config object graph changes."""
-    _maya_shelf_row_cache.clear()
+    _clarity_shelf_row_cache.clear()
 
 
-def _maya_shelf_redraw(context, *, layout_changed=False):
+def _clarity_shelf_redraw(context, *, layout_changed=False):
     if layout_changed:
-        _maya_shelf_invalidate_layout()
+        _clarity_shelf_invalidate_layout()
 
     context_area = getattr(context, "area", None)
     if context_area is not None and context_area.type in {'TOPBAR', 'SHELF'}:
@@ -2076,7 +2089,7 @@ def _maya_shelf_redraw(context, *, layout_changed=False):
         bpy.ops.topbar.shelf_global_redraw()
 
 
-def _maya_shelf_commit(
+def _clarity_shelf_commit(
         context,
         operator=None,
         *,
@@ -2086,34 +2099,34 @@ def _maya_shelf_commit(
 ):
     """Persist a shelf mutation, report failures and refresh every visible shelf."""
     if changed_scopes is None:
-        changed_scopes = {_maya_shelf_active_scope}
+        changed_scopes = {_clarity_shelf_active_scope}
     else:
         changed_scopes = set(changed_scopes)
     future_scopes = {}
     for scope in changed_scopes:
-        future_scope = _maya_shelf_future_scope_storage.pop(scope, None)
+        future_scope = _clarity_shelf_future_scope_storage.pop(scope, None)
         if future_scope is not None:
             future_scopes[scope] = future_scope
-    error = _maya_shelf_save(changed_scopes)
+    error = _clarity_shelf_save(changed_scopes)
     if error:
         if retry_on_error:
-            _maya_shelf_pending_scopes.update(changed_scopes)
+            _clarity_shelf_pending_scopes.update(changed_scopes)
         else:
-            _maya_shelf_future_scope_storage.update(future_scopes)
-    _maya_shelf_redraw(context, layout_changed=layout_changed)
+            _clarity_shelf_future_scope_storage.update(future_scopes)
+    _clarity_shelf_redraw(context, layout_changed=layout_changed)
     if error and operator is not None:
         operator.report({'ERROR'}, error)
     return not error
 
 
-def _maya_shelf_apply_row_entries(tab, row_index, entries):
+def _clarity_shelf_apply_row_entries(tab, row_index, entries):
     """Write a flat visual row back to the item/column JSON representation."""
     rows = {
         candidate_row: (
             [] if candidate_row == row_index
-            else _maya_shelf_row_items(tab, candidate_row)
+            else _clarity_shelf_row_items(tab, candidate_row)
         )
-        for candidate_row in range(_MAYA_SHELF_ROW_COUNT)
+        for candidate_row in range(_CLARITY_SHELF_ROW_COUNT)
     }
     separators = [
         separator for separator in tab["separators"]
@@ -2127,25 +2140,25 @@ def _maya_shelf_apply_row_entries(tab, row_index, entries):
             entry["column"] = len(rows[row_index])
             separators.append(entry)
     tab["items"] = [
-        item for candidate_row in range(_MAYA_SHELF_ROW_COUNT)
+        item for candidate_row in range(_CLARITY_SHELF_ROW_COUNT)
         for item in rows[candidate_row]
     ]
     tab["separators"] = separators
-    _maya_shelf_sort_separators(tab)
+    _clarity_shelf_sort_separators(tab)
 
 
-def _maya_shelf_reorder(item_id, target_row, target_index):
+def _clarity_shelf_reorder(item_id, target_row, target_index):
     """Move an icon or separator by visual insertion index."""
-    tab = _maya_shelf_active_tab()
-    entry = _maya_shelf_find_item(tab, item_id)
+    tab = _clarity_shelf_active_tab()
+    entry = _clarity_shelf_find_item(tab, item_id)
     if entry is None:
-        entry = _maya_shelf_find_separator(tab, item_id)
+        entry = _clarity_shelf_find_separator(tab, item_id)
     if entry is None:
         return False
 
-    target_row = min(max(target_row, 0), _MAYA_SHELF_ROW_COUNT - 1)
+    target_row = min(max(target_row, 0), _CLARITY_SHELF_ROW_COUNT - 1)
     source_row = entry.get("row", 0)
-    source_entries = list(_maya_shelf_row_entries(tab, source_row))
+    source_entries = list(_clarity_shelf_row_entries(tab, source_row))
     source_index = next(
         (
             index for index, (_entry_type, candidate) in enumerate(source_entries)
@@ -2164,18 +2177,18 @@ def _maya_shelf_reorder(item_id, target_row, target_index):
         if insert_index == source_index:
             return False
         source_entries.insert(insert_index, moved_entry)
-        _maya_shelf_apply_row_entries(tab, source_row, source_entries)
+        _clarity_shelf_apply_row_entries(tab, source_row, source_entries)
         return True
 
-    target_entries = list(_maya_shelf_row_entries(tab, target_row))
+    target_entries = list(_clarity_shelf_row_entries(tab, target_row))
     insert_index = min(max(target_index, 0), len(target_entries))
     target_entries.insert(insert_index, moved_entry)
-    _maya_shelf_apply_row_entries(tab, source_row, source_entries)
-    _maya_shelf_apply_row_entries(tab, target_row, target_entries)
+    _clarity_shelf_apply_row_entries(tab, source_row, source_entries)
+    _clarity_shelf_apply_row_entries(tab, target_row, target_entries)
     return True
 
 
-def _maya_shelf_apply_adaptive_entries(tab, entries):
+def _clarity_shelf_apply_adaptive_entries(tab, entries):
     """Rewrite a tab from a flat entry list, the shape the shelf editor works in."""
     tab["items"] = []
     tab["separators"] = []
@@ -2190,9 +2203,9 @@ def _maya_shelf_apply_adaptive_entries(tab, entries):
             tab["separators"].append(entry)
 
 
-def _maya_shelf_reorder_adaptive(item_id, target_index):
-    tab = _maya_shelf_active_tab()
-    entries = _maya_shelf_adaptive_entries(tab)
+def _clarity_shelf_reorder_adaptive(item_id, target_index):
+    tab = _clarity_shelf_active_tab()
+    entries = _clarity_shelf_adaptive_entries(tab)
     source_index = next(
         (
             index
@@ -2211,118 +2224,118 @@ def _maya_shelf_reorder_adaptive(item_id, target_index):
     if target_index == source_index:
         return False
     entries.insert(target_index, entry)
-    _maya_shelf_apply_adaptive_entries(tab, entries)
+    _clarity_shelf_apply_adaptive_entries(tab, entries)
     return True
 
 
-def _maya_shelf_entry_remove(tab, item_id):
-    item = _maya_shelf_find_item(tab, item_id)
+def _clarity_shelf_entry_remove(tab, item_id):
+    item = _clarity_shelf_find_item(tab, item_id)
     if item is not None:
         row = item.get("row", 0)
-        index = _maya_shelf_row_items(tab, row).index(item)
+        index = _clarity_shelf_row_items(tab, row).index(item)
         tab["items"].remove(item)
         for separator in tab["separators"]:
             if separator.get("row", 0) == row and separator.get("column", 0) > index:
                 separator["column"] -= 1
         return "ITEM", item
 
-    separator = _maya_shelf_find_separator(tab, item_id)
+    separator = _clarity_shelf_find_separator(tab, item_id)
     if separator is not None:
         tab["separators"].remove(separator)
         return "SEPARATOR", separator
     return None, None
 
 
-def _maya_shelf_entry_insert_row(tab, entry_type, entry, row, index, scope=None):
-    row = min(max(row, 0), _MAYA_SHELF_ROW_COUNT - 1)
-    entries = list(_maya_shelf_row_entries(tab, row, scope))
+def _clarity_shelf_entry_insert_row(tab, entry_type, entry, row, index, scope=None):
+    row = min(max(row, 0), _CLARITY_SHELF_ROW_COUNT - 1)
+    entries = list(_clarity_shelf_row_entries(tab, row, scope))
     entries.insert(min(max(index, 0), len(entries)), (entry_type, entry))
-    _maya_shelf_apply_row_entries(tab, row, entries)
+    _clarity_shelf_apply_row_entries(tab, row, entries)
 
 
-def _maya_shelf_entry_insert_adaptive(tab, entry_type, entry, index, scope=None):
-    entries = _maya_shelf_adaptive_entries(tab, scope)
+def _clarity_shelf_entry_insert_adaptive(tab, entry_type, entry, index, scope=None):
+    entries = _clarity_shelf_adaptive_entries(tab, scope)
     entries.insert(min(max(index, 0), len(entries)), (entry_type, entry))
-    _maya_shelf_apply_adaptive_entries(tab, entries)
+    _clarity_shelf_apply_adaptive_entries(tab, entries)
 
 
-class TOPBAR_OT_maya_shelf_tab(Operator):
-    bl_idname = "topbar.maya_shelf_tab"
-    bl_label = "Maya Shelf Tab"
+class TOPBAR_OT_clarity_shelf_tab(Operator):
+    bl_idname = "topbar.clarity_shelf_tab"
+    bl_label = "Clarity Shelf Tab"
     bl_options = {'INTERNAL'}
 
     tab: StringProperty()
 
     def execute(self, context):
-        config = _maya_shelf_config(context)
+        config = _clarity_shelf_config(context)
         if any(tab["name"] == self.tab for tab in config["tabs"]):
             config["active"] = self.tab
-            if not _maya_shelf_commit(context, self, layout_changed=False):
+            if not _clarity_shelf_commit(context, self, layout_changed=False):
                 return {'CANCELLED'}
         else:
-            _maya_shelf_redraw(context)
+            _clarity_shelf_redraw(context)
         return {'FINISHED'}
 
 
-class TOPBAR_OT_maya_shelf_tab_add(Operator):
-    bl_idname = "topbar.maya_shelf_tab_add"
+class TOPBAR_OT_clarity_shelf_tab_add(Operator):
+    bl_idname = "topbar.clarity_shelf_tab_add"
     bl_label = "Add Shelf Tab"
 
     name: StringProperty(name="Name", default="New Shelf")
 
     def invoke(self, context, _event):
-        _maya_shelf_config(context)
+        _clarity_shelf_config(context)
         return context.window_manager.invoke_props_dialog(self, width=320)
 
     def execute(self, context):
         name = self.name.strip()
-        config = _maya_shelf_config(context)
+        config = _clarity_shelf_config(context)
         if not name or any(tab["name"] == name for tab in config["tabs"]):
             self.report({'WARNING'}, "Enter a unique shelf name")
             return {'CANCELLED'}
         config["tabs"].append({"name": name, "items": [], "separators": []})
         config["active"] = name
-        return {'FINISHED'} if _maya_shelf_commit(context, self) else {'CANCELLED'}
+        return {'FINISHED'} if _clarity_shelf_commit(context, self) else {'CANCELLED'}
 
 
-class TOPBAR_OT_maya_shelf_tab_rename(Operator):
-    bl_idname = "topbar.maya_shelf_tab_rename"
+class TOPBAR_OT_clarity_shelf_tab_rename(Operator):
+    bl_idname = "topbar.clarity_shelf_tab_rename"
     bl_label = "Rename Shelf Tab"
 
     name: StringProperty(name="Name")
 
     def invoke(self, context, _event):
-        self.name = _maya_shelf_active_tab(context)["name"]
+        self.name = _clarity_shelf_active_tab(context)["name"]
         return context.window_manager.invoke_props_dialog(self, width=320)
 
     def execute(self, context):
         name = self.name.strip()
-        config = _maya_shelf_config(context)
-        tab = _maya_shelf_tab_for_config(config)
+        config = _clarity_shelf_config(context)
+        tab = _clarity_shelf_tab_for_config(config)
         if not name or any(item is not tab and item["name"] == name for item in config["tabs"]):
             self.report({'WARNING'}, "Enter a unique shelf name")
             return {'CANCELLED'}
         tab["name"] = name
         config["active"] = name
-        return {'FINISHED'} if _maya_shelf_commit(context, self) else {'CANCELLED'}
+        return {'FINISHED'} if _clarity_shelf_commit(context, self) else {'CANCELLED'}
 
 
-class TOPBAR_OT_maya_shelf_tab_remove(Operator):
-    bl_idname = "topbar.maya_shelf_tab_remove"
+class TOPBAR_OT_clarity_shelf_tab_remove(Operator):
+    bl_idname = "topbar.clarity_shelf_tab_remove"
     bl_label = "Remove Shelf Tab"
 
     def execute(self, context):
-        config = _maya_shelf_config(context)
+        config = _clarity_shelf_config(context)
         if len(config["tabs"]) == 1:
             self.report({'WARNING'}, "At least one shelf tab is required")
             return {'CANCELLED'}
-        tab = _maya_shelf_tab_for_config(config)
+        tab = _clarity_shelf_tab_for_config(config)
         config["tabs"].remove(tab)
         config["active"] = config["tabs"][0]["name"]
-        return {'FINISHED'} if _maya_shelf_commit(context, self) else {'CANCELLED'}
+        return {'FINISHED'} if _clarity_shelf_commit(context, self) else {'CANCELLED'}
 
 
-class _MayaShelfItemDialog:
+class _ClarityShelfItemDialog:
     """Shared properties, layout and validation of the Add/Edit shelf icon dialogs.
 
     Blender collects property annotations from non-RNA base classes, so keeping them
@@ -2332,39 +2345,39 @@ class _MayaShelfItemDialog:
     label: StringProperty(name="Tooltip")
     command_type: EnumProperty(
         name="Action",
-        items=_MAYA_SHELF_COMMAND_TYPES,
+        items=_CLARITY_SHELF_COMMAND_TYPES,
         default='BUILTIN',
     )
     # Fallback for the selected action when `actions` was never filled, which happens
     # when the operator runs without its dialog. The catalog is too large to expose as
     # an enum: building it would cost every startup, dialog or not.
     builtin_action: StringProperty(default="cube", options={'HIDDEN', 'SKIP_SAVE'})
-    actions: CollectionProperty(type=TOPBAR_PG_maya_shelf_action)
+    actions: CollectionProperty(type=TOPBAR_PG_clarity_shelf_action)
     action_index: IntProperty(
         name="Built-in Action",
         default=0,
-        update=_maya_shelf_action_index_update,
+        update=_clarity_shelf_action_index_update,
     )
     action_category: EnumProperty(
         name="Category",
-        items=_MAYA_SHELF_ACTION_CATEGORIES,
+        items=_CLARITY_SHELF_ACTION_CATEGORIES,
         default='ALL',
     )
     action_sort: EnumProperty(
         name="Sort",
-        items=_MAYA_SHELF_ACTION_SORT_MODES,
+        items=_CLARITY_SHELF_ACTION_SORT_MODES,
         default='CATEGORY',
     )
     operator_id: StringProperty(name="Operator", default="mesh.primitive_cube_add")
     script_source: EnumProperty(
         name="Script Source",
-        items=_MAYA_SHELF_SCRIPT_SOURCES,
+        items=_CLARITY_SHELF_SCRIPT_SOURCES,
         default='INLINE',
     )
     script_code: StringProperty(name="Python Code")
     script_text: StringProperty(name="Text Block")
     script_file: StringProperty(name="Python File", subtype='FILE_PATH')
-    icons: CollectionProperty(type=TOPBAR_PG_maya_shelf_icon)
+    icons: CollectionProperty(type=TOPBAR_PG_clarity_shelf_icon)
     icon_index: IntProperty(name="Blender Icon", default=0)
     custom_icon: StringProperty(name="Custom Icon", subtype='FILE_PATH')
     background_color: FloatVectorProperty(
@@ -2374,7 +2387,7 @@ class _MayaShelfItemDialog:
         size=4,
         min=0.0,
         max=1.0,
-        default=_MAYA_SHELF_DEFAULT_BACKGROUND_COLOR,
+        default=_CLARITY_SHELF_DEFAULT_BACKGROUND_COLOR,
     )
     icon_color: FloatVectorProperty(
         name="Icon Color",
@@ -2383,7 +2396,7 @@ class _MayaShelfItemDialog:
         size=4,
         min=0.0,
         max=1.0,
-        default=_MAYA_SHELF_DEFAULT_ICON_COLOR,
+        default=_CLARITY_SHELF_DEFAULT_ICON_COLOR,
     )
     short_text: StringProperty(
         name="Short Text",
@@ -2404,7 +2417,7 @@ class _MayaShelfItemDialog:
             filters.prop(self, "action_category", text="")
             filters.prop(self, "action_sort", text="")
             layout.template_list(
-                "TOPBAR_UL_maya_shelf_actions",
+                "TOPBAR_UL_clarity_shelf_actions",
                 "",
                 self,
                 "actions",
@@ -2431,7 +2444,7 @@ class _MayaShelfItemDialog:
                 layout.prop(self, "script_file")
         layout.label(text="Blender Icon")
         layout.template_list(
-            "TOPBAR_UL_maya_shelf_icons",
+            "TOPBAR_UL_clarity_shelf_icons",
             "",
             self,
             "icons",
@@ -2441,7 +2454,7 @@ class _MayaShelfItemDialog:
             maxrows=8,
         )
         layout.prop(self, "custom_icon")
-        _maya_shelf_draw_icon_preview(layout, self)
+        _clarity_shelf_draw_icon_preview(layout, self)
         layout.prop(self, "background_color")
         layout.prop(self, "icon_color")
         layout.prop(self, "short_text")
@@ -2462,17 +2475,17 @@ class _MayaShelfItemDialog:
         }
         if self.command_type == 'OPERATOR':
             try:
-                _maya_shelf_operator(operator_id)
+                _clarity_shelf_operator(operator_id)
             except RuntimeError:
                 return None, "Unknown Blender operator"
             command["operator"] = operator_id
         elif self.command_type == 'PYTHON':
-            script_settings, error = _maya_shelf_script_settings(self)
+            script_settings, error = _clarity_shelf_script_settings(self)
             if error:
                 return None, error
             command.update(script_settings)
         else:
-            command["action"] = _maya_shelf_selected_action(self)
+            command["action"] = _clarity_shelf_selected_action(self)
         return command, ""
 
     def _validated_appearance(self, command):
@@ -2482,7 +2495,7 @@ class _MayaShelfItemDialog:
         else:
             # Run without its dialog, so the icon list was never filled. A built-in
             # action still knows which icon it wants.
-            icon = _maya_shelf_builtin_action_icons().get(command["action"], "")
+            icon = _clarity_shelf_builtin_action_icons().get(command["action"], "")
         if not icon:
             return None, "Select a Blender icon"
 
@@ -2491,7 +2504,7 @@ class _MayaShelfItemDialog:
             custom_icon = os.path.abspath(bpy.path.abspath(custom_icon))
             if not os.path.isfile(custom_icon):
                 return None, "Custom icon file does not exist"
-            if not _maya_shelf_custom_icon(custom_icon, force_reload=True):
+            if not _clarity_shelf_custom_icon(custom_icon, force_reload=True):
                 return None, "Unsupported custom icon image"
         return {
             "icon": icon,
@@ -2503,7 +2516,7 @@ class _MayaShelfItemDialog:
 
     def _default_label(self, command):
         if command["command_type"] == 'BUILTIN':
-            return _maya_shelf_builtin_action_labels().get(
+            return _clarity_shelf_builtin_action_labels().get(
                 command["action"], "Shelf Command",
             )
         if command["command_type"] == 'OPERATOR':
@@ -2511,25 +2524,25 @@ class _MayaShelfItemDialog:
         return "Python Script"
 
 
-class TOPBAR_OT_maya_shelf_item_add(_MayaShelfItemDialog, Operator):
-    bl_idname = "topbar.maya_shelf_item_add"
+class TOPBAR_OT_clarity_shelf_item_add(_ClarityShelfItemDialog, Operator):
+    bl_idname = "topbar.clarity_shelf_item_add"
     bl_label = "Add Shelf Icon"
 
-    row: IntProperty(name="Row", default=0, min=0, max=_MAYA_SHELF_ROW_COUNT - 1)
+    row: IntProperty(name="Row", default=0, min=0, max=_CLARITY_SHELF_ROW_COUNT - 1)
 
     draw_row_property = True
 
     def invoke(self, context, _event):
-        _maya_shelf_config(context)
+        _clarity_shelf_config(context)
         # Operator properties are remembered between runs, so the sentinel the
         # auto-label in `execute` looks for has to be restored explicitly.
         self.label = "New Command"
-        _maya_shelf_action_list_fill(self, "cube")
-        _maya_shelf_icon_list_fill(self, "MESH_CUBE")
+        _clarity_shelf_action_list_fill(self, "cube")
+        _clarity_shelf_icon_list_fill(self, "MESH_CUBE")
         return context.window_manager.invoke_props_dialog(self, width=600)
 
     def execute(self, context):
-        tab = _maya_shelf_active_tab(context)
+        tab = _clarity_shelf_active_tab(context)
         command, error = self._validated_command()
         if error:
             self.report({'WARNING'}, error)
@@ -2550,17 +2563,17 @@ class TOPBAR_OT_maya_shelf_item_add(_MayaShelfItemDialog, Operator):
             **command,
             **appearance,
         })
-        return {'FINISHED'} if _maya_shelf_commit(context, self) else {'CANCELLED'}
+        return {'FINISHED'} if _clarity_shelf_commit(context, self) else {'CANCELLED'}
 
 
-class TOPBAR_OT_maya_shelf_item_edit(_MayaShelfItemDialog, Operator):
-    bl_idname = "topbar.maya_shelf_item_edit"
+class TOPBAR_OT_clarity_shelf_item_edit(_ClarityShelfItemDialog, Operator):
+    bl_idname = "topbar.clarity_shelf_item_edit"
     bl_label = "Edit Shelf Icon"
 
     item_id: StringProperty(options={'SKIP_SAVE'})
 
     def invoke(self, context, _event):
-        item = _maya_shelf_find_item(_maya_shelf_active_tab(context), self.item_id)
+        item = _clarity_shelf_find_item(_clarity_shelf_active_tab(context), self.item_id)
         if item is None:
             return {'CANCELLED'}
         self.operator_id = item.get("operator", "")
@@ -2570,23 +2583,23 @@ class TOPBAR_OT_maya_shelf_item_edit(_MayaShelfItemDialog, Operator):
         )
         action = item.get("action", "")
         self.builtin_action = action or "select_box"
-        _maya_shelf_action_list_fill(self, self.builtin_action)
+        _clarity_shelf_action_list_fill(self, self.builtin_action)
         self.label = item.get("label", "")
         self.script_source = item.get("script_source", "INLINE") or 'INLINE'
         self.script_code = item.get("script_code", "")
         self.script_text = item.get("script_text", "")
         self.script_file = item.get("script_file", "")
-        _maya_shelf_icon_list_fill(self, item.get("icon", 'NONE'))
+        _clarity_shelf_icon_list_fill(self, item.get("icon", 'NONE'))
         self.custom_icon = item.get("custom_icon", "")
         self.background_color = item.get(
-            "background_color", _MAYA_SHELF_DEFAULT_BACKGROUND_COLOR,
+            "background_color", _CLARITY_SHELF_DEFAULT_BACKGROUND_COLOR,
         )
-        self.icon_color = item.get("icon_color", _MAYA_SHELF_DEFAULT_ICON_COLOR)
+        self.icon_color = item.get("icon_color", _CLARITY_SHELF_DEFAULT_ICON_COLOR)
         self.short_text = item.get("short_text", "")
         return context.window_manager.invoke_props_dialog(self, width=600)
 
     def execute(self, context):
-        item = _maya_shelf_find_item(_maya_shelf_active_tab(context), self.item_id)
+        item = _clarity_shelf_find_item(_clarity_shelf_active_tab(context), self.item_id)
         if item is None:
             return {'CANCELLED'}
 
@@ -2604,13 +2617,13 @@ class TOPBAR_OT_maya_shelf_item_edit(_MayaShelfItemDialog, Operator):
         item.update(appearance)
         return (
             {'FINISHED'}
-            if _maya_shelf_commit(context, self, layout_changed=False)
+            if _clarity_shelf_commit(context, self, layout_changed=False)
             else {'CANCELLED'}
         )
 
 
-class TOPBAR_OT_maya_shelf_item_remove_id(Operator):
-    bl_idname = "topbar.maya_shelf_item_remove_id"
+class TOPBAR_OT_clarity_shelf_item_remove_id(Operator):
+    bl_idname = "topbar.clarity_shelf_item_remove_id"
     bl_label = "Remove from Shelf"
     # No 'UNDO': the shelf lives in its own config file, not in the undo stack.
     bl_options = {'INTERNAL'}
@@ -2618,68 +2631,68 @@ class TOPBAR_OT_maya_shelf_item_remove_id(Operator):
     item_id: StringProperty()
 
     def execute(self, context):
-        tab = _maya_shelf_active_tab(context)
-        entry_type, _entry = _maya_shelf_entry_remove(tab, self.item_id)
+        tab = _clarity_shelf_active_tab(context)
+        entry_type, _entry = _clarity_shelf_entry_remove(tab, self.item_id)
         if entry_type is None:
             return {'CANCELLED'}
-        return {'FINISHED'} if _maya_shelf_commit(context, self) else {'CANCELLED'}
+        return {'FINISHED'} if _clarity_shelf_commit(context, self) else {'CANCELLED'}
 
 
-class TOPBAR_OT_maya_shelf_separator_add(Operator):
-    bl_idname = "topbar.maya_shelf_separator_add"
+class TOPBAR_OT_clarity_shelf_separator_add(Operator):
+    bl_idname = "topbar.clarity_shelf_separator_add"
     bl_label = "Add Shelf Separator"
     bl_options = {'INTERNAL'}
 
     column: IntProperty(default=-1, min=-1, options={'SKIP_SAVE'})
     row: IntProperty(
-        default=0, min=0, max=_MAYA_SHELF_ROW_COUNT - 1, options={'SKIP_SAVE'},
+        default=0, min=0, max=_CLARITY_SHELF_ROW_COUNT - 1, options={'SKIP_SAVE'},
     )
 
     def execute(self, context):
-        tab = _maya_shelf_active_tab(context)
+        tab = _clarity_shelf_active_tab(context)
         column = self.column
         if column < 0:
-            column = len(_maya_shelf_row_items(tab, self.row))
+            column = len(_clarity_shelf_row_items(tab, self.row))
         tab["separators"].append({
             "id": uuid.uuid4().hex,
             "column": column,
             "row": self.row,
         })
-        _maya_shelf_sort_separators(tab)
-        return {'FINISHED'} if _maya_shelf_commit(context, self) else {'CANCELLED'}
+        _clarity_shelf_sort_separators(tab)
+        return {'FINISHED'} if _clarity_shelf_commit(context, self) else {'CANCELLED'}
 
 
-def _maya_shelf_separator_insert_column(tab, item, separator, fallback_row):
+def _clarity_shelf_separator_insert_column(tab, item, separator, fallback_row):
     """Column a new separator should take when added next to an existing entry."""
     if item is not None:
-        return _maya_shelf_row_items(tab, item.get("row", 0)).index(item) + 1
+        return _clarity_shelf_row_items(tab, item.get("row", 0)).index(item) + 1
     if separator is not None:
         return separator.get("column", 0)
-    return len(_maya_shelf_row_items(tab, fallback_row))
+    return len(_clarity_shelf_row_items(tab, fallback_row))
 
 
-class TOPBAR_OT_maya_shelf_context_menu(Operator):
-    bl_idname = "topbar.maya_shelf_context_menu"
+class TOPBAR_OT_clarity_shelf_context_menu(Operator):
+    bl_idname = "topbar.clarity_shelf_context_menu"
     bl_label = "Shelf Context Menu"
     bl_options = {'INTERNAL'}
 
     item_id: StringProperty(options={'SKIP_SAVE'})
     row: IntProperty(
-        default=0, min=0, max=_MAYA_SHELF_ROW_COUNT - 1, options={'SKIP_SAVE'},
+        default=0, min=0, max=_CLARITY_SHELF_ROW_COUNT - 1, options={'SKIP_SAVE'},
     )
 
     def invoke(self, context, _event):
-        _maya_shelf_config(context)
+        _clarity_shelf_config(context)
         context.window_manager.popup_menu(self.draw_menu, title="Shelf")
         return {'FINISHED'}
 
     def draw_menu(self, menu, context):
-        config = _maya_shelf_config(context)
+        config = _clarity_shelf_config(context)
         layout = menu.layout
         layout.operator_context = 'INVOKE_DEFAULT'
-        tab = _maya_shelf_tab_for_config(config)
-        item = _maya_shelf_find_item(tab, self.item_id)
-        separator = _maya_shelf_find_separator(tab, self.item_id)
+        tab = _clarity_shelf_tab_for_config(config)
+        item = _clarity_shelf_find_item(tab, self.item_id)
+        separator = _clarity_shelf_find_separator(tab, self.item_id)
         entry_row = (
             item.get("row", self.row) if item is not None
             else separator.get("row", self.row) if separator is not None
@@ -2689,42 +2702,42 @@ class TOPBAR_OT_maya_shelf_context_menu(Operator):
             layout.label(text="Shelf Tabs")
             for shelf_tab in config["tabs"]:
                 props = layout.operator(
-                    "topbar.maya_shelf_tab",
+                    "topbar.clarity_shelf_tab",
                     text=shelf_tab["name"],
                     icon='CHECKMARK' if shelf_tab is tab else 'BLANK1',
                 )
                 props.tab = shelf_tab["name"]
             layout.separator()
             layout.operator(
-                "topbar.maya_shelf_tab_add",
+                "topbar.clarity_shelf_tab_add",
                 text="Add Shelf Tab",
                 icon='ADD',
             )
             layout.operator(
-                "topbar.maya_shelf_tab_rename",
+                "topbar.clarity_shelf_tab_rename",
                 text="Rename Active Tab",
                 icon='GREASEPENCIL',
             )
             layout.operator(
-                "topbar.maya_shelf_tab_remove",
+                "topbar.clarity_shelf_tab_remove",
                 text="Remove Active Tab",
                 icon='X',
             )
             layout.separator()
 
         props = layout.operator(
-            "topbar.maya_shelf_item_add",
+            "topbar.clarity_shelf_item_add",
             text="Add Shelf Icon",
             icon='ADD',
         )
         props.row = entry_row
 
         props = layout.operator(
-            "topbar.maya_shelf_separator_add",
+            "topbar.clarity_shelf_separator_add",
             text="Add Separator",
             icon='SPLIT_VERTICAL',
         )
-        props.column = _maya_shelf_separator_insert_column(
+        props.column = _clarity_shelf_separator_insert_column(
             tab, item, separator, entry_row,
         )
         props.row = entry_row
@@ -2733,21 +2746,21 @@ class TOPBAR_OT_maya_shelf_context_menu(Operator):
             layout.separator()
             if item is not None:
                 props = layout.operator(
-                    "topbar.maya_shelf_item_edit",
+                    "topbar.clarity_shelf_item_edit",
                     text="Edit Shelf Icon",
                     icon='GREASEPENCIL',
                 )
                 props.item_id = item["id"]
             props = layout.operator(
-                "topbar.maya_shelf_item_remove_id",
+                "topbar.clarity_shelf_item_remove_id",
                 text="Remove Separator" if separator is not None else "Remove from Shelf",
                 icon='TRASH',
             )
             props.item_id = self.item_id
 
 
-class TOPBAR_OT_maya_shelf_drag(Operator):
-    bl_idname = "topbar.maya_shelf_drag"
+class TOPBAR_OT_clarity_shelf_drag(Operator):
+    bl_idname = "topbar.clarity_shelf_drag"
     bl_label = "Move Shelf Icon"
     bl_options = {'INTERNAL'}
 
@@ -2764,14 +2777,14 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
 
     @staticmethod
     def _probe():
-        """Refresh `_maya_shelf_drag_hover` from the real button layout.
+        """Refresh `_clarity_shelf_drag_hover` from the real button layout.
 
         The hit test has to live in C++, because only it can see the rectangles the layout
         engine produced, and it has to be pulled from here rather than pushed from a shelf
         region handler: a modal operator returning `PASS_THROUGH` still yields
         `WM_HANDLER_BREAK`, and `wm_event_do_handlers` then skips every region handler.
         """
-        bpy.ops.topbar.maya_shelf_drag_probe()
+        bpy.ops.topbar.clarity_shelf_drag_probe()
 
     def _drop_target(self, context, _event):
         """Where the dragged entry would land: (scope, adaptive, row, index).
@@ -2779,18 +2792,18 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
         Scope is None when the cursor is over no shelf. Everything is derived from the
         last probe, so the drop cannot disagree with the marker the user sees.
         """
-        hover = _maya_shelf_drag_hover
+        hover = _clarity_shelf_drag_hover
         if hover is None:
             return None, None, None, None
 
         scope = hover["scope"]
         adaptive = hover["adaptive"]
         row = hover["row"]
-        tab = _maya_shelf_active_tab_for_scope(scope)
+        tab = _clarity_shelf_active_tab_for_scope(scope)
         if adaptive:
-            entries = _maya_shelf_adaptive_entries(tab, scope)
+            entries = _clarity_shelf_adaptive_entries(tab, scope)
         else:
-            entries = _maya_shelf_row_entries(tab, row, scope)
+            entries = _clarity_shelf_row_entries(tab, row, scope)
 
         index = next(
             (
@@ -2813,11 +2826,11 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
         return scope, adaptive, row, index + (1 if hover["after"] else 0)
 
     def _preview_begin(self, context):
-        global _maya_shelf_drag_state
-        global _maya_shelf_drag_hover
+        global _clarity_shelf_drag_state
+        global _clarity_shelf_drag_hover
         self._preview_active = True
-        _maya_shelf_drag_hover = None
-        _maya_shelf_drag_state = {
+        _clarity_shelf_drag_hover = None
+        _clarity_shelf_drag_state = {
             "kind": "separator" if self._drag_separator else "icon",
             "item_id": self.item_id,
             "source_scope": self._source_scope,
@@ -2826,43 +2839,43 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
         }
 
     def _preview_end(self, context):
-        global _maya_shelf_drag_state
-        global _maya_shelf_drag_hover
+        global _clarity_shelf_drag_state
+        global _clarity_shelf_drag_hover
         if not getattr(self, "_preview_active", False):
             return
         self._preview_active = False
-        _maya_shelf_drag_state = None
-        _maya_shelf_drag_hover = None
+        _clarity_shelf_drag_state = None
+        _clarity_shelf_drag_hover = None
         # Stops the C++ side from hit testing and drawing the insertion marker.
-        if hasattr(bpy.ops.topbar, "maya_shelf_drag_end"):
-            bpy.ops.topbar.maya_shelf_drag_end()
+        if hasattr(bpy.ops.topbar, "clarity_shelf_drag_end"):
+            bpy.ops.topbar.clarity_shelf_drag_end()
 
     def invoke(self, context, _event):
-        if not hasattr(bpy.ops.topbar, "maya_shelf_drag_probe"):
+        if not hasattr(bpy.ops.topbar, "clarity_shelf_drag_probe"):
             # Without the hit test there is no way to tell where the icon would land, and a
             # silent no-op would look like a broken shelf.
             self.report(
                 {'ERROR'},
-                "Shelf drag needs a rebuilt Blender: topbar.maya_shelf_drag_probe is missing",
+                "Shelf drag needs a rebuilt Blender: topbar.clarity_shelf_drag_probe is missing",
             )
             return {'CANCELLED'}
 
-        tab = _maya_shelf_active_tab(context)
-        self._source_scope = _maya_shelf_active_scope
+        tab = _clarity_shelf_active_tab(context)
+        self._source_scope = _clarity_shelf_active_scope
         self._adaptive = context.area.type == 'SHELF'
-        source_separator = _maya_shelf_find_separator(tab, self.item_id)
+        source_separator = _clarity_shelf_find_separator(tab, self.item_id)
         self._drag_separator = source_separator is not None
         source_entry = source_separator
         if source_entry is None:
-            source_entry = _maya_shelf_find_item(tab, self.item_id)
+            source_entry = _clarity_shelf_find_item(tab, self.item_id)
         if source_entry is None:
             return {'CANCELLED'}
         row = source_entry.get("row", 0)
 
         if self._adaptive:
-            entries = _maya_shelf_adaptive_entries(tab, self._source_scope)
+            entries = _clarity_shelf_adaptive_entries(tab, self._source_scope)
         else:
-            entries = _maya_shelf_row_entries(tab, row, self._source_scope)
+            entries = _clarity_shelf_row_entries(tab, row, self._source_scope)
         index = next(
             (
                 entry_index
@@ -2881,11 +2894,11 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
         self._source_index = index
         self._preview_begin(context)
         context.window_manager.modal_handler_add(self)
-        _maya_shelf_redraw(context)
+        _clarity_shelf_redraw(context)
         return {'RUNNING_MODAL'}
 
     def modal(self, context, event):
-        _maya_shelf_config(context)
+        _clarity_shelf_config(context)
         if event.type == 'MOUSEMOVE':
             # The probe also tags the redraw that moves the insertion marker, but only when
             # the target boundary actually changes.
@@ -2898,12 +2911,12 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
             scope, adaptive, row, index = self._drop_target(context, event)
             if scope is None:
                 self._preview_end(context)
-                _maya_shelf_redraw(context)
+                _clarity_shelf_redraw(context)
                 return {'CANCELLED', 'PASS_THROUGH'}
 
             affected_scopes = {self._source_scope, scope}
             scope_configs = {
-                affected_scope: _maya_shelf_config_for_scope(affected_scope)
+                affected_scope: _clarity_shelf_config_for_scope(affected_scope)
                 for affected_scope in affected_scopes
             }
             config_backups = {
@@ -2912,11 +2925,11 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
             }
             changed = False
             if scope != self._source_scope:
-                source_tab = _maya_shelf_tab_for_config(
+                source_tab = _clarity_shelf_tab_for_config(
                     scope_configs[self._source_scope],
                 )
-                target_tab = _maya_shelf_tab_for_config(scope_configs[scope])
-                entry_type, entry = _maya_shelf_entry_remove(source_tab, self.item_id)
+                target_tab = _clarity_shelf_tab_for_config(scope_configs[scope])
+                entry_type, entry = _clarity_shelf_entry_remove(source_tab, self.item_id)
                 if entry is not None:
                     target_ids = {
                         candidate["id"]
@@ -2925,7 +2938,7 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
                     if entry["id"] in target_ids:
                         entry["id"] = uuid.uuid4().hex
                     if adaptive:
-                        _maya_shelf_entry_insert_adaptive(
+                        _clarity_shelf_entry_insert_adaptive(
                             target_tab,
                             entry_type,
                             entry,
@@ -2933,7 +2946,7 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
                             scope,
                         )
                     else:
-                        _maya_shelf_entry_insert_row(
+                        _clarity_shelf_entry_insert_row(
                             target_tab,
                             entry_type,
                             entry,
@@ -2943,12 +2956,12 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
                         )
                     changed = True
             elif adaptive:
-                changed = _maya_shelf_reorder_adaptive(self.item_id, index)
+                changed = _clarity_shelf_reorder_adaptive(self.item_id, index)
             else:
-                changed = _maya_shelf_reorder(self.item_id, row, index)
+                changed = _clarity_shelf_reorder(self.item_id, row, index)
             self._preview_end(context)
             if changed:
-                saved = _maya_shelf_commit(
+                saved = _clarity_shelf_commit(
                     context,
                     self,
                     changed_scopes=affected_scopes,
@@ -2959,31 +2972,31 @@ class TOPBAR_OT_maya_shelf_drag(Operator):
                         config = scope_configs[affected_scope]
                         config.clear()
                         config.update(backup)
-                    _maya_shelf_redraw(context, layout_changed=True)
+                    _clarity_shelf_redraw(context, layout_changed=True)
                     return {'CANCELLED', 'PASS_THROUGH'}
             else:
-                _maya_shelf_redraw(context)
+                _clarity_shelf_redraw(context)
             return {'FINISHED', 'PASS_THROUGH'}
 
         if event.type in {'ESC', 'RIGHTMOUSE', 'WINDOW_DEACTIVATE'}:
             self._preview_end(context)
-            _maya_shelf_redraw(context)
+            _clarity_shelf_redraw(context)
             return {'CANCELLED'}
         return {'RUNNING_MODAL'}
 
     def cancel(self, context):
         self._preview_end(context)
-        _maya_shelf_redraw(context)
+        _clarity_shelf_redraw(context)
 
 
-class TOPBAR_OT_maya_shelf_drag_hover(Operator):
+class TOPBAR_OT_clarity_shelf_drag_hover(Operator):
     """Record which shelf entry the drag cursor is over.
 
-    Called by `topbar.maya_shelf_drag_probe`, which owns the hit test because only C++ can
+    Called by `topbar.clarity_shelf_drag_probe`, which owns the hit test because only C++ can
     see the button rectangles the layout engine produced. It runs this with the hovered
     shelf pushed into the context, so the scope and row are read from there.
     """
-    bl_idname = "topbar.maya_shelf_drag_hover"
+    bl_idname = "topbar.clarity_shelf_drag_hover"
     bl_label = "Shelf Drag Hover"
     bl_options = {'INTERNAL'}
 
@@ -2992,15 +3005,15 @@ class TOPBAR_OT_maya_shelf_drag_hover(Operator):
     after: BoolProperty(default=False)
 
     def execute(self, context):
-        global _maya_shelf_drag_hover
+        global _clarity_shelf_drag_hover
         area = getattr(context, "area", None)
         region = getattr(context, "region", None)
         if not self.found or area is None or area.type not in {'TOPBAR', 'SHELF'}:
-            _maya_shelf_drag_hover = None
+            _clarity_shelf_drag_hover = None
             return {'CANCELLED'}
 
         if area.type == 'SHELF':
-            scope = _maya_shelf_layout_scope_key(context, area)
+            scope = _clarity_shelf_layout_scope_key(context, area)
             adaptive = True
             row = 0
         else:
@@ -3008,10 +3021,10 @@ class TOPBAR_OT_maya_shelf_drag_hover(Operator):
             adaptive = False
             row = 0 if (region is not None and region.type == 'FOOTER') else 1
         if not scope:
-            _maya_shelf_drag_hover = None
+            _clarity_shelf_drag_hover = None
             return {'CANCELLED'}
 
-        _maya_shelf_drag_hover = {
+        _clarity_shelf_drag_hover = {
             "scope": scope,
             "adaptive": adaptive,
             "row": row,
@@ -3021,18 +3034,18 @@ class TOPBAR_OT_maya_shelf_drag_hover(Operator):
         return {'FINISHED'}
 
 
-_MAYA_SHELF_EDITOR_AREA_TYPES = {
+_CLARITY_SHELF_EDITOR_AREA_TYPES = {
     "graph_editor": 'GRAPH_EDITOR',
     "dope_sheet": 'DOPESHEET_EDITOR',
     "nla_editor": 'NLA_EDITOR',
 }
 
-_MAYA_SHELF_SELECT_ACTIONS = {
+_CLARITY_SHELF_SELECT_ACTIONS = {
     "select_all": 'SELECT',
     "select_none": 'DESELECT',
     "select_inverse": 'INVERT',
 }
-_MAYA_SHELF_SELECT_OPERATOR_BY_MODE = {
+_CLARITY_SHELF_SELECT_OPERATOR_BY_MODE = {
     'EDIT_ARMATURE': "armature.select_all",
     'EDIT_CURVE': "curve.select_all",
     'EDIT_CURVES': "curves.select_all",
@@ -3047,14 +3060,14 @@ _MAYA_SHELF_SELECT_OPERATOR_BY_MODE = {
     'SCULPT_CURVES': "curves.select_all",
 }
 
-_MAYA_SHELF_SHADING_TYPES = {
+_CLARITY_SHELF_SHADING_TYPES = {
     "view_wireframe": 'WIREFRAME',
     "view_solid": 'SOLID',
     "view_material": 'MATERIAL',
     "view_rendered": 'RENDERED',
 }
 
-_MAYA_SHELF_OVERLAY_TOGGLES = {
+_CLARITY_SHELF_OVERLAY_TOGGLES = {
     "toggle_overlays": "show_overlays",
     "toggle_grid": "show_floor",
     "toggle_wire_overlay": "show_wireframes",
@@ -3062,29 +3075,29 @@ _MAYA_SHELF_OVERLAY_TOGGLES = {
     "toggle_statistics": "show_stats",
 }
 
-_MAYA_SHELF_SPACE_TOGGLES = {
+_CLARITY_SHELF_SPACE_TOGGLES = {
     "toggle_gizmos": "show_gizmo",
     "toggle_camera_lock": "lock_camera",
 }
 
-_MAYA_SHELF_INTERPOLATION_TYPES = {
+_CLARITY_SHELF_INTERPOLATION_TYPES = {
     "interpolation_constant": 'CONSTANT',
     "interpolation_linear": 'LINEAR',
     "interpolation_bezier": 'BEZIER',
 }
 
 # Actions that want a keyframe editor rather than the 3D Viewport.
-_MAYA_SHELF_ANIMATION_EDITOR_ACTIONS = frozenset({
+_CLARITY_SHELF_ANIMATION_EDITOR_ACTIONS = frozenset({
     "duplicate_keyframes",
     "interpolation_constant",
     "interpolation_linear",
     "interpolation_bezier",
 })
-_MAYA_SHELF_VIEW3D_CONTEXT_ACTIONS = frozenset({
+_CLARITY_SHELF_VIEW3D_CONTEXT_ACTIONS = frozenset({
     "rename_object",
     "viewport_screenshot",
 })
-_MAYA_SHELF_CONTEXT_FREE_ACTIONS = frozenset({
+_CLARITY_SHELF_CONTEXT_FREE_ACTIONS = frozenset({
     "append_file",
     "auto_key_toggle",
     "incremental_save",
@@ -3099,7 +3112,7 @@ _MAYA_SHELF_CONTEXT_FREE_ACTIONS = frozenset({
     "save",
     "save_as",
 })
-_MAYA_SHELF_OPERATOR_AREA_PREFERENCES = {
+_CLARITY_SHELF_OPERATOR_AREA_PREFERENCES = {
     "action": ('DOPESHEET_EDITOR', 'GRAPH_EDITOR'),
     "anim": (
         'VIEW_3D',
@@ -3141,7 +3154,7 @@ _MAYA_SHELF_OPERATOR_AREA_PREFERENCES = {
 }
 
 
-def _maya_shelf_operator(idname):
+def _clarity_shelf_operator(idname):
     """Resolve and validate a `bpy.ops` idname."""
     try:
         module_name, operator_name = idname.split(".", 1)
@@ -3154,11 +3167,11 @@ def _maya_shelf_operator(idname):
     return operator
 
 
-def _maya_shelf_operator_context(context, idname):
+def _clarity_shelf_operator_context(context, idname):
     """Find an area/region where a custom operator actually polls."""
-    operator = _maya_shelf_operator(idname)
+    operator = _clarity_shelf_operator(idname)
     module_name = idname.split(".", 1)[0]
-    preferred_area_types = _MAYA_SHELF_OPERATOR_AREA_PREFERENCES.get(
+    preferred_area_types = _CLARITY_SHELF_OPERATOR_AREA_PREFERENCES.get(
         module_name,
         (),
     )
@@ -3220,11 +3233,11 @@ def _maya_shelf_operator_context(context, idname):
     return None, None
 
 
-def _maya_shelf_action_context(context, action, operator_id):
+def _clarity_shelf_action_context(context, action, operator_id):
     """Area and region used by one shelf command."""
     if action == "set_preview_range":
-        return _maya_shelf_operator_context(context, "anim.previewrange_set")
-    if action in _MAYA_SHELF_VIEW3D_CONTEXT_ACTIONS:
+        return _clarity_shelf_operator_context(context, "anim.previewrange_set")
+    if action in _CLARITY_SHELF_VIEW3D_CONTEXT_ACTIONS:
         area = next(
             (area for area in context.screen.areas if area.type == 'VIEW_3D'),
             None,
@@ -3240,12 +3253,12 @@ def _maya_shelf_action_context(context, action, operator_id):
         if len(parts) == 3 and all(parts[1:]):
             discovered_operator = "{:s}.{:s}".format(parts[1], parts[2])
     if operator_id or discovered_operator:
-        return _maya_shelf_operator_context(
+        return _clarity_shelf_operator_context(
             context, operator_id or discovered_operator,
         )
-    if action in _MAYA_SHELF_CONTEXT_FREE_ACTIONS:
+    if action in _CLARITY_SHELF_CONTEXT_FREE_ACTIONS:
         return context.area, context.region
-    if action in _MAYA_SHELF_ANIMATION_EDITOR_ACTIONS:
+    if action in _CLARITY_SHELF_ANIMATION_EDITOR_ACTIONS:
         area = next(
             (
                 area for area in context.screen.areas
@@ -3270,8 +3283,8 @@ def _maya_shelf_action_context(context, action, operator_id):
     return area, region
 
 
-def _maya_shelf_call_operator(idname, properties, invoke=False):
-    operator = _maya_shelf_operator(idname)
+def _clarity_shelf_call_operator(idname, properties, invoke=False):
+    operator = _clarity_shelf_operator(idname)
     if invoke:
         status = operator('INVOKE_DEFAULT', **properties)
     else:
@@ -3281,7 +3294,7 @@ def _maya_shelf_call_operator(idname, properties, invoke=False):
     return status
 
 
-def _maya_shelf_run_script(context, item):
+def _clarity_shelf_run_script(context, item):
     """Run a Python shelf button. Returns an error message, empty when it succeeded."""
     source = item.get("script_source", "INLINE")
     filename = "<Shelf Button>"
@@ -3341,7 +3354,7 @@ def _maya_shelf_run_script(context, item):
 # Built-in actions that need more than a single operator call. Every handler takes
 # (context, area, action) and raises with a user-facing message when it cannot run.
 
-def _maya_shelf_new_material(context, _area, _action):
+def _clarity_shelf_new_material(context, _area, _action):
     obj = context.active_object
     materials = getattr(getattr(obj, "data", None), "materials", None)
     if materials is None:
@@ -3357,68 +3370,68 @@ def _maya_shelf_new_material(context, _area, _action):
         raise
 
 
-def _maya_shelf_switch_editor(_context, area, action):
-    area.type = _MAYA_SHELF_EDITOR_AREA_TYPES[action]
+def _clarity_shelf_switch_editor(_context, area, action):
+    area.type = _CLARITY_SHELF_EDITOR_AREA_TYPES[action]
 
 
-def _maya_shelf_select(context, _area, action):
-    select_action = _MAYA_SHELF_SELECT_ACTIONS[action]
+def _clarity_shelf_select(context, _area, action):
+    select_action = _CLARITY_SHELF_SELECT_ACTIONS[action]
     if context.mode == 'EDIT_TEXT':
         if select_action != 'SELECT':
             raise RuntimeError("Text Edit mode only supports Select All")
-        _maya_shelf_call_operator("font.select_all", {})
+        _clarity_shelf_call_operator("font.select_all", {})
         return
-    operator_id = _MAYA_SHELF_SELECT_OPERATOR_BY_MODE.get(
+    operator_id = _CLARITY_SHELF_SELECT_OPERATOR_BY_MODE.get(
         context.mode,
         "object.select_all",
     )
-    _maya_shelf_call_operator(operator_id, {"action": select_action})
+    _clarity_shelf_call_operator(operator_id, {"action": select_action})
 
 
-def _maya_shelf_set_shading(_context, area, action):
-    area.spaces.active.shading.type = _MAYA_SHELF_SHADING_TYPES[action]
+def _clarity_shelf_set_shading(_context, area, action):
+    area.spaces.active.shading.type = _CLARITY_SHELF_SHADING_TYPES[action]
 
 
-def _maya_shelf_toggle_xray(_context, area, _action):
+def _clarity_shelf_toggle_xray(_context, area, _action):
     shading = area.spaces.active.shading
     shading.show_xray = not shading.show_xray
 
 
-def _maya_shelf_toggle_overlay(_context, area, action):
+def _clarity_shelf_toggle_overlay(_context, area, action):
     overlay = area.spaces.active.overlay
-    attribute = _MAYA_SHELF_OVERLAY_TOGGLES[action]
+    attribute = _CLARITY_SHELF_OVERLAY_TOGGLES[action]
     setattr(overlay, attribute, not getattr(overlay, attribute))
 
 
-def _maya_shelf_toggle_space(_context, area, action):
+def _clarity_shelf_toggle_space(_context, area, action):
     space = area.spaces.active
-    attribute = _MAYA_SHELF_SPACE_TOGGLES[action]
+    attribute = _CLARITY_SHELF_SPACE_TOGGLES[action]
     setattr(space, attribute, not getattr(space, attribute))
 
 
-def _maya_shelf_apply_active_modifier(context, _area, _action):
+def _clarity_shelf_apply_active_modifier(context, _area, _action):
     obj = context.active_object
     if obj is None or not obj.modifiers:
         raise RuntimeError("The active object has no modifiers")
     modifier = obj.modifiers.active or obj.modifiers[-1]
-    _maya_shelf_call_operator(
+    _clarity_shelf_call_operator(
         "object.modifier_apply",
         {"modifier": modifier.name},
     )
 
 
-def _maya_shelf_apply_all_modifiers(context, _area, _action):
+def _clarity_shelf_apply_all_modifiers(context, _area, _action):
     obj = context.active_object
     if obj is None or not obj.modifiers:
         raise RuntimeError("The active object has no modifiers")
     while obj.modifiers:
-        _maya_shelf_call_operator(
+        _clarity_shelf_call_operator(
             "object.modifier_apply",
             {"modifier": obj.modifiers[0].name},
         )
 
 
-def _maya_shelf_apply_selected_modifiers(context, _area, _action):
+def _clarity_shelf_apply_selected_modifiers(context, _area, _action):
     objects = [obj for obj in context.selected_editable_objects if obj.modifiers]
     if not objects:
         raise RuntimeError("Selected objects have no modifiers")
@@ -3427,7 +3440,7 @@ def _maya_shelf_apply_selected_modifiers(context, _area, _action):
         for obj in objects:
             context.view_layer.objects.active = obj
             while obj.modifiers:
-                _maya_shelf_call_operator(
+                _clarity_shelf_call_operator(
                     "object.modifier_apply",
                     {"modifier": obj.modifiers[0].name},
                 )
@@ -3435,7 +3448,7 @@ def _maya_shelf_apply_selected_modifiers(context, _area, _action):
         context.view_layer.objects.active = active_object
 
 
-def _maya_shelf_clear_constraints(context, _area, _action):
+def _clarity_shelf_clear_constraints(context, _area, _action):
     obj = context.active_object
     if obj is None:
         raise RuntimeError("Select an object first")
@@ -3445,7 +3458,7 @@ def _maya_shelf_clear_constraints(context, _area, _action):
         obj.constraints.clear()
 
 
-def _maya_shelf_edit_keyframes(_context, area, action):
+def _clarity_shelf_edit_keyframes(_context, area, action):
     if area.type == 'GRAPH_EDITOR':
         module_name = "graph"
     elif area.type == 'DOPESHEET_EDITOR':
@@ -3453,19 +3466,19 @@ def _maya_shelf_edit_keyframes(_context, area, action):
     else:
         raise RuntimeError("Open a Dope Sheet or Graph Editor first")
     if action == "duplicate_keyframes":
-        _maya_shelf_call_operator(
+        _clarity_shelf_call_operator(
             module_name + ".duplicate_move",
             {},
             invoke=True,
         )
     else:
-        _maya_shelf_call_operator(
+        _clarity_shelf_call_operator(
             module_name + ".interpolation_type",
-            {"type": _MAYA_SHELF_INTERPOLATION_TYPES[action]},
+            {"type": _CLARITY_SHELF_INTERPOLATION_TYPES[action]},
         )
 
 
-def _maya_shelf_toggle_motion_paths(context, _area, _action):
+def _clarity_shelf_toggle_motion_paths(context, _area, _action):
     obj = context.active_object
     if obj is None:
         raise RuntimeError("Select an object first")
@@ -3474,23 +3487,23 @@ def _maya_shelf_toggle_motion_paths(context, _area, _action):
         if not pose_bones:
             raise RuntimeError("Select at least one pose bone")
         if any(pose_bone.motion_path is not None for pose_bone in pose_bones):
-            _maya_shelf_call_operator("pose.paths_clear", {})
+            _clarity_shelf_call_operator("pose.paths_clear", {})
         else:
-            _maya_shelf_call_operator("pose.paths_calculate", {})
+            _clarity_shelf_call_operator("pose.paths_calculate", {})
     elif obj.motion_path is None:
-        _maya_shelf_call_operator("object.paths_calculate", {})
+        _clarity_shelf_call_operator("object.paths_calculate", {})
     else:
-        _maya_shelf_call_operator(
+        _clarity_shelf_call_operator(
             "object.paths_clear",
             {"only_selected": False},
         )
 
 
-def _maya_shelf_set_preview_range(_context, _area, _action):
-    _maya_shelf_call_operator("anim.previewrange_set", {}, invoke=True)
+def _clarity_shelf_set_preview_range(_context, _area, _action):
+    _clarity_shelf_call_operator("anim.previewrange_set", {}, invoke=True)
 
 
-def _maya_shelf_multires_subdivide(context, _area, _action):
+def _clarity_shelf_multires_subdivide(context, _area, _action):
     obj = context.active_object
     modifier = next(
         (modifier for modifier in obj.modifiers if modifier.type == 'MULTIRES'),
@@ -3498,21 +3511,21 @@ def _maya_shelf_multires_subdivide(context, _area, _action):
     ) if obj is not None else None
     if modifier is None:
         raise RuntimeError("Add a Multires modifier first")
-    _maya_shelf_call_operator(
+    _clarity_shelf_call_operator(
         "object.multires_subdivide",
         {"modifier": modifier.name, "mode": 'CATMULL_CLARK'},
     )
 
 
-def _maya_shelf_incremental_save(_context, _area, _action):
+def _clarity_shelf_incremental_save(_context, _area, _action):
     if not bpy.data.filepath:
-        _maya_shelf_call_operator(
+        _clarity_shelf_call_operator(
             "wm.save_as_mainfile",
             {"show_save_modified_images_dialog": True},
             invoke=True,
         )
     else:
-        _maya_shelf_call_operator(
+        _clarity_shelf_call_operator(
             "wm.save_mainfile",
             {
                 "incremental": True,
@@ -3522,7 +3535,7 @@ def _maya_shelf_incremental_save(_context, _area, _action):
         )
 
 
-def _maya_shelf_render_selected(context, _area, _action):
+def _clarity_shelf_render_selected(context, _area, _action):
     selected = set(context.selected_objects)
     if not selected:
         raise RuntimeError("Select at least one object")
@@ -3530,65 +3543,65 @@ def _maya_shelf_render_selected(context, _area, _action):
     try:
         for obj in context.scene.objects:
             obj.hide_render = obj not in selected
-        _maya_shelf_call_operator("render.render", {})
+        _clarity_shelf_call_operator("render.render", {})
     finally:
         for obj, hide_render in render_states.items():
             obj.hide_render = hide_render
 
 
-def _maya_shelf_open_render_result(_context, _area, _action):
+def _clarity_shelf_open_render_result(_context, _area, _action):
     image = bpy.data.images.get("Render Result")
     if image is None:
         raise RuntimeError("No Render Result is available")
-    _maya_shelf_call_operator("render.view_show", {}, invoke=True)
+    _clarity_shelf_call_operator("render.view_show", {}, invoke=True)
 
 
-def _maya_shelf_purge_orphans(_context, _area, _action):
+def _clarity_shelf_purge_orphans(_context, _area, _action):
     bpy.data.orphans_purge(do_recursive=True)
 
 
-def _maya_shelf_toggle_auto_key(context, _area, _action):
+def _clarity_shelf_toggle_auto_key(context, _area, _action):
     tool_settings = context.scene.tool_settings
     tool_settings.use_keyframe_insert_auto = not tool_settings.use_keyframe_insert_auto
 
 
-_MAYA_SHELF_ACTION_HANDLERS = {
-    "material": _maya_shelf_new_material,
-    "xray_toggle": _maya_shelf_toggle_xray,
-    "apply_active_modifier": _maya_shelf_apply_active_modifier,
-    "apply_all_modifiers": _maya_shelf_apply_all_modifiers,
-    "apply_selected_modifiers": _maya_shelf_apply_selected_modifiers,
-    "clear_constraints": _maya_shelf_clear_constraints,
-    "duplicate_keyframes": _maya_shelf_edit_keyframes,
-    "toggle_motion_paths": _maya_shelf_toggle_motion_paths,
-    "set_preview_range": _maya_shelf_set_preview_range,
-    "multires_subdivide": _maya_shelf_multires_subdivide,
-    "incremental_save": _maya_shelf_incremental_save,
-    "render_selected": _maya_shelf_render_selected,
-    "open_render_result": _maya_shelf_open_render_result,
-    "purge_orphans": _maya_shelf_purge_orphans,
-    "auto_key_toggle": _maya_shelf_toggle_auto_key,
+_CLARITY_SHELF_ACTION_HANDLERS = {
+    "material": _clarity_shelf_new_material,
+    "xray_toggle": _clarity_shelf_toggle_xray,
+    "apply_active_modifier": _clarity_shelf_apply_active_modifier,
+    "apply_all_modifiers": _clarity_shelf_apply_all_modifiers,
+    "apply_selected_modifiers": _clarity_shelf_apply_selected_modifiers,
+    "clear_constraints": _clarity_shelf_clear_constraints,
+    "duplicate_keyframes": _clarity_shelf_edit_keyframes,
+    "toggle_motion_paths": _clarity_shelf_toggle_motion_paths,
+    "set_preview_range": _clarity_shelf_set_preview_range,
+    "multires_subdivide": _clarity_shelf_multires_subdivide,
+    "incremental_save": _clarity_shelf_incremental_save,
+    "render_selected": _clarity_shelf_render_selected,
+    "open_render_result": _clarity_shelf_open_render_result,
+    "purge_orphans": _clarity_shelf_purge_orphans,
+    "auto_key_toggle": _clarity_shelf_toggle_auto_key,
 }
 for _actions, _handler in (
-        (_MAYA_SHELF_EDITOR_AREA_TYPES, _maya_shelf_switch_editor),
-        (_MAYA_SHELF_SELECT_ACTIONS, _maya_shelf_select),
-        (_MAYA_SHELF_SHADING_TYPES, _maya_shelf_set_shading),
-        (_MAYA_SHELF_OVERLAY_TOGGLES, _maya_shelf_toggle_overlay),
-        (_MAYA_SHELF_SPACE_TOGGLES, _maya_shelf_toggle_space),
-        (_MAYA_SHELF_INTERPOLATION_TYPES, _maya_shelf_edit_keyframes),
+        (_CLARITY_SHELF_EDITOR_AREA_TYPES, _clarity_shelf_switch_editor),
+        (_CLARITY_SHELF_SELECT_ACTIONS, _clarity_shelf_select),
+        (_CLARITY_SHELF_SHADING_TYPES, _clarity_shelf_set_shading),
+        (_CLARITY_SHELF_OVERLAY_TOGGLES, _clarity_shelf_toggle_overlay),
+        (_CLARITY_SHELF_SPACE_TOGGLES, _clarity_shelf_toggle_space),
+        (_CLARITY_SHELF_INTERPOLATION_TYPES, _clarity_shelf_edit_keyframes),
 ):
-    _MAYA_SHELF_ACTION_HANDLERS.update(dict.fromkeys(_actions, _handler))
+    _CLARITY_SHELF_ACTION_HANDLERS.update(dict.fromkeys(_actions, _handler))
 del _actions, _handler
 
 
-_MAYA_SHELF_OUTER_UNDO_ACTIONS = frozenset({
+_CLARITY_SHELF_OUTER_UNDO_ACTIONS = frozenset({
     "material",
     "clear_constraints",
     "purge_orphans",
 })
 
 
-class _MayaShelfAction:
+class _ClarityShelfAction:
     """Shared dispatcher for regular actions and the few direct-data undo actions."""
 
     _outer_undo = False
@@ -3603,8 +3616,8 @@ class _MayaShelfAction:
         return properties.tooltip
 
     def execute(self, context):
-        tab = _maya_shelf_active_tab(context)
-        if _maya_shelf_find_separator(tab, self.item_id) is not None:
+        tab = _clarity_shelf_active_tab(context)
+        if _clarity_shelf_find_separator(tab, self.item_id) is not None:
             return {'CANCELLED'}
 
         action = self.action
@@ -3612,7 +3625,7 @@ class _MayaShelfAction:
         command_type = 'BUILTIN' if action else 'OPERATOR' if operator_id else 'BUILTIN'
         item = None
         if self.item_id:
-            item = _maya_shelf_find_item(tab, self.item_id)
+            item = _clarity_shelf_find_item(tab, self.item_id)
             if item is None:
                 self.report({'WARNING'}, "Shelf item no longer exists")
                 return {'CANCELLED'}
@@ -3629,7 +3642,7 @@ class _MayaShelfAction:
 
         needs_outer_undo = (
             command_type == 'BUILTIN' and
-            action in _MAYA_SHELF_OUTER_UNDO_ACTIONS
+            action in _CLARITY_SHELF_OUTER_UNDO_ACTIONS
         )
         if needs_outer_undo != self._outer_undo:
             self.report({'WARNING'}, "Shelf action changed; try again")
@@ -3639,7 +3652,7 @@ class _MayaShelfAction:
             if item is None:
                 self.report({'WARNING'}, "Shelf script no longer exists")
                 return {'CANCELLED'}
-            error = _maya_shelf_run_script(context, item)
+            error = _clarity_shelf_run_script(context, item)
             if error:
                 self.report({'ERROR'}, error)
                 return {'CANCELLED'}
@@ -3647,13 +3660,13 @@ class _MayaShelfAction:
 
         try:
             context_operator_id = operator_id
-            if not context_operator_id and action not in _MAYA_SHELF_ACTION_HANDLERS:
+            if not context_operator_id and action not in _CLARITY_SHELF_ACTION_HANDLERS:
                 _, operators, invoke_operators = self._action_tables()
                 if action in invoke_operators:
                     context_operator_id = invoke_operators[action][0]
                 elif action in operators:
                     context_operator_id = operators[action][0]
-            area, region = _maya_shelf_action_context(
+            area, region = _clarity_shelf_action_context(
                 context,
                 action,
                 context_operator_id,
@@ -3684,42 +3697,42 @@ class _MayaShelfAction:
 
         tool = tool_actions.get(action)
         if tool is not None:
-            _maya_shelf_call_operator("wm.tool_set_by_id", {"name": tool})
+            _clarity_shelf_call_operator("wm.tool_set_by_id", {"name": tool})
             return
 
-        handler = _MAYA_SHELF_ACTION_HANDLERS.get(action)
+        handler = _CLARITY_SHELF_ACTION_HANDLERS.get(action)
         if handler is not None:
             handler(context, area, action)
             return
 
         entry = invoke_operators.get(action)
         if entry is not None:
-            _maya_shelf_call_operator(entry[0], entry[1], invoke=True)
+            _clarity_shelf_call_operator(entry[0], entry[1], invoke=True)
             return
 
         if action.startswith("operator__"):
             parts = action.split("__", 2)
             if len(parts) != 3 or not all(parts[1:]):
                 raise RuntimeError("Malformed shelf operator: {:s}".format(action))
-            _maya_shelf_call_operator(
+            _clarity_shelf_call_operator(
                 "{:s}.{:s}".format(parts[1], parts[2]), {}, invoke=True,
             )
             return
 
         if operator_id:
-            _maya_shelf_call_operator(operator_id, {}, invoke=True)
+            _clarity_shelf_call_operator(operator_id, {}, invoke=True)
             return
 
         entry = operators.get(action)
         if entry is None:
             raise RuntimeError(
                 "Unknown shelf action: {:s}".format(action or "(none)"))
-        _maya_shelf_call_operator(entry[0], entry[1])
+        _clarity_shelf_call_operator(entry[0], entry[1])
 
     @staticmethod
     def _action_tables():
         """Action id to operator mappings. Built once, they are only read here."""
-        tables = _maya_shelf_catalog_cache.get("action_tables")
+        tables = _clarity_shelf_catalog_cache.get("action_tables")
         if tables is not None:
             return tables
 
@@ -3991,26 +4004,40 @@ class _MayaShelfAction:
         }
 
         tables = (tool_actions, operators, invoke_operators)
-        _maya_shelf_catalog_cache["action_tables"] = tables
+        _clarity_shelf_catalog_cache["action_tables"] = tables
         return tables
 
 
-class TOPBAR_OT_maya_shelf_action(_MayaShelfAction, Operator):
-    bl_idname = "topbar.maya_shelf_action"
-    bl_label = "Maya Shelf Action"
+class TOPBAR_OT_clarity_shelf_action(_ClarityShelfAction, Operator):
+    bl_idname = "topbar.clarity_shelf_action"
+    bl_label = "Clarity Shelf Action"
     bl_options = {'INTERNAL'}
 
+    @classmethod
+    def description(cls, context, properties):
+        return _ClarityShelfAction.description(context, properties)
 
-class TOPBAR_OT_maya_shelf_action_undo(_MayaShelfAction, Operator):
-    bl_idname = "topbar.maya_shelf_action_undo"
-    bl_label = "Maya Shelf Action"
+    def execute(self, context):
+        return _ClarityShelfAction.execute(self, context)
+
+
+class TOPBAR_OT_clarity_shelf_action_undo(_ClarityShelfAction, Operator):
+    bl_idname = "topbar.clarity_shelf_action_undo"
+    bl_label = "Clarity Shelf Action"
     bl_options = {'INTERNAL', 'UNDO'}
 
     _outer_undo = True
 
+    @classmethod
+    def description(cls, context, properties):
+        return _ClarityShelfAction.description(context, properties)
 
-class TOPBAR_OT_maya_shelf_preview(Operator):
-    bl_idname = "topbar.maya_shelf_preview"
+    def execute(self, context):
+        return _ClarityShelfAction.execute(self, context)
+
+
+class TOPBAR_OT_clarity_shelf_preview(Operator):
+    bl_idname = "topbar.clarity_shelf_preview"
     bl_label = "Icon Preview"
     bl_options = {'INTERNAL'}
 
@@ -4032,8 +4059,8 @@ class WM_MT_button_context(Menu):
         operator_rna = getattr(button_operator, "bl_rna", None)
         operator_identifier = getattr(operator_rna, "identifier", "")
         if operator_identifier not in {
-            "TOPBAR_OT_maya_shelf_action",
-            "TOPBAR_OT_maya_shelf_action_undo",
+            "TOPBAR_OT_clarity_shelf_action",
+            "TOPBAR_OT_clarity_shelf_action_undo",
         }:
             return
         item_id = getattr(button_operator, "item_id", "")
@@ -4041,9 +4068,9 @@ class WM_MT_button_context(Menu):
             return
 
         layout = self.layout
-        tab = _maya_shelf_active_tab(context)
-        item = _maya_shelf_find_item(tab, item_id)
-        separator = _maya_shelf_find_separator(tab, item_id)
+        tab = _clarity_shelf_active_tab(context)
+        item = _clarity_shelf_find_item(tab, item_id)
+        separator = _clarity_shelf_find_separator(tab, item_id)
         if item is None and separator is None:
             return
         row = (
@@ -4054,49 +4081,49 @@ class WM_MT_button_context(Menu):
 
         layout.separator()
         props = layout.operator(
-            "topbar.maya_shelf_item_add",
+            "topbar.clarity_shelf_item_add",
             text="Add Shelf Icon",
             icon='ADD',
         )
         props.row = row
         props = layout.operator(
-            "topbar.maya_shelf_separator_add",
+            "topbar.clarity_shelf_separator_add",
             text="Add Separator",
             icon='SPLIT_VERTICAL',
         )
-        props.column = _maya_shelf_separator_insert_column(tab, item, separator, row)
+        props.column = _clarity_shelf_separator_insert_column(tab, item, separator, row)
         props.row = row
         props = layout.operator(
-            "topbar.maya_shelf_item_remove_id",
+            "topbar.clarity_shelf_item_remove_id",
             text="Remove Separator" if separator is not None else "Remove from Shelf",
             icon='TRASH',
         )
         props.item_id = item_id
 
 
-def _maya_shelf_is_drag_source(item_id):
+def _clarity_shelf_is_drag_source(item_id):
     return (
-        _maya_shelf_drag_state is not None and
-        _maya_shelf_drag_state.get("kind") == "icon" and
-        _maya_shelf_drag_state.get("source_scope") == _maya_shelf_active_scope and
-        _maya_shelf_drag_state.get("item_id") == item_id
+        _clarity_shelf_drag_state is not None and
+        _clarity_shelf_drag_state.get("kind") == "icon" and
+        _clarity_shelf_drag_state.get("source_scope") == _clarity_shelf_active_scope and
+        _clarity_shelf_drag_state.get("item_id") == item_id
     )
 
 
-def _maya_shelf_action_operator_id(item):
+def _clarity_shelf_action_operator_id(item):
     command_type = item.get(
         "command_type",
         'OPERATOR' if item.get("operator") else 'BUILTIN',
     )
     if (
         command_type == 'BUILTIN' and
-        item.get("action", "") in _MAYA_SHELF_OUTER_UNDO_ACTIONS
+        item.get("action", "") in _CLARITY_SHELF_OUTER_UNDO_ACTIONS
     ):
-        return "topbar.maya_shelf_action_undo"
-    return "topbar.maya_shelf_action"
+        return "topbar.clarity_shelf_action_undo"
+    return "topbar.clarity_shelf_action"
 
 
-def _maya_shelf_draw_separator_button(
+def _clarity_shelf_draw_separator_button(
         container,
         separator,
         *,
@@ -4110,18 +4137,18 @@ def _maya_shelf_draw_separator_button(
     if scale_y is not None:
         divider.alignment = 'CENTER'
         divider.scale_y = scale_y
-    divider.context_string_set("maya_shelf_item_id", separator["id"])
-    divider.context_string_set("maya_shelf_separator", "1")
+    divider.context_string_set("clarity_shelf_item_id", separator["id"])
+    divider.context_string_set("clarity_shelf_separator", "1")
     divider.context_string_set(
-        "maya_shelf_background_color",
-        _maya_shelf_color_string((0.0, 0.0, 0.0, 0.0)),
+        "clarity_shelf_background_color",
+        _clarity_shelf_color_string((0.0, 0.0, 0.0, 0.0)),
     )
     divider.enabled = enabled
-    props = divider.operator("topbar.maya_shelf_action", text="|", emboss=False)
+    props = divider.operator("topbar.clarity_shelf_action", text="|", emboss=False)
     props.item_id = separator["id"]
 
 
-def _maya_shelf_draw_item_button(
+def _clarity_shelf_draw_item_button(
         cell,
         item,
         *,
@@ -4140,25 +4167,25 @@ def _maya_shelf_draw_item_button(
     button = icon_line.row(align=True)
     button.ui_units_x = button_units_x
 
-    custom_icon = _maya_shelf_custom_icon(item.get("custom_icon", ""))
+    custom_icon = _clarity_shelf_custom_icon(item.get("custom_icon", ""))
     background_color = item.get(
-        "background_color", _MAYA_SHELF_DEFAULT_BACKGROUND_COLOR,
+        "background_color", _CLARITY_SHELF_DEFAULT_BACKGROUND_COLOR,
     )
-    icon_color = item.get("icon_color", _MAYA_SHELF_DEFAULT_ICON_COLOR)
-    is_drag_source = _maya_shelf_is_drag_source(item["id"])
+    icon_color = item.get("icon_color", _CLARITY_SHELF_DEFAULT_ICON_COLOR)
+    is_drag_source = _clarity_shelf_is_drag_source(item["id"])
     if is_drag_source:
-        background_color = _MAYA_SHELF_DRAG_SOURCE_COLOR
+        background_color = _CLARITY_SHELF_DRAG_SOURCE_COLOR
     if custom_icon:
         # A user image carries its own colors, only its opacity is configurable.
         icon_color = (1.0, 1.0, 1.0, icon_color[3])
     button.context_string_set(
-        "maya_shelf_drag_source", "1" if is_drag_source else "0",
+        "clarity_shelf_drag_source", "1" if is_drag_source else "0",
     )
     button.context_string_set(
-        "maya_shelf_background_color", _maya_shelf_color_string(background_color),
+        "clarity_shelf_background_color", _clarity_shelf_color_string(background_color),
     )
     button.context_string_set(
-        "maya_shelf_icon_color", _maya_shelf_color_string(icon_color),
+        "clarity_shelf_icon_color", _clarity_shelf_color_string(icon_color),
     )
 
     operator_args = {"text": "", "emboss": True}
@@ -4166,7 +4193,7 @@ def _maya_shelf_draw_item_button(
         operator_args["icon_value"] = custom_icon
     else:
         operator_args["icon"] = item.get("icon", 'NONE')
-    props = button.operator(_maya_shelf_action_operator_id(item), **operator_args)
+    props = button.operator(_clarity_shelf_action_operator_id(item), **operator_args)
     props.action = item.get("action", "")
     props.operator_id = item.get("operator", "")
     props.item_id = item["id"]
@@ -4178,17 +4205,17 @@ def _maya_shelf_draw_item_button(
     label_line.label(text=item.get("short_text", ""))
 
 
-def _maya_shelf_draw_icon_row(layout, row_index, context):
-    tab = _maya_shelf_active_tab(context)
+def _clarity_shelf_draw_icon_row(layout, row_index, context):
+    tab = _clarity_shelf_active_tab(context)
     row = layout.row(align=False)
     row.alignment = 'LEFT'
     row.scale_x = 1.2
     row.scale_y = 1.0
 
-    entries = _maya_shelf_row_entries(tab, row_index)
+    entries = _clarity_shelf_row_entries(tab, row_index)
     for entry_type, entry in entries:
         if entry_type == "SEPARATOR":
-            _maya_shelf_draw_separator_button(
+            _clarity_shelf_draw_separator_button(
                 row,
                 entry,
                 units_x=0.55,
@@ -4198,8 +4225,8 @@ def _maya_shelf_draw_icon_row(layout, row_index, context):
 
         item_column = row.column(align=True)
         item_column.ui_units_x = 1.45
-        item_column.context_string_set("maya_shelf_item_id", entry["id"])
-        _maya_shelf_draw_item_button(
+        item_column.context_string_set("clarity_shelf_item_id", entry["id"])
+        _clarity_shelf_draw_item_button(
             item_column,
             entry,
             button_units_x=0.85,
@@ -4213,32 +4240,32 @@ def _maya_shelf_draw_icon_row(layout, row_index, context):
         tail.label(text="")
 
 
-class TOPBAR_HT_maya_shelf_upper(Header):
+class TOPBAR_HT_clarity_shelf_upper(Header):
     bl_space_type = 'TOPBAR'
     bl_region_type = 'FOOTER'
 
     def draw(self, context):
-        _maya_shelf_draw_icon_row(self.layout, 0, context)
+        _clarity_shelf_draw_icon_row(self.layout, 0, context)
 
 
-class TOPBAR_HT_maya_shelf_lower(Header):
+class TOPBAR_HT_clarity_shelf_lower(Header):
     bl_space_type = 'TOPBAR'
     bl_region_type = 'WINDOW'
 
     def draw(self, context):
-        _maya_shelf_draw_icon_row(self.layout, 1, context)
+        _clarity_shelf_draw_icon_row(self.layout, 1, context)
 
 
-def _maya_shelf_adaptive_entries(tab, scope=None):
+def _clarity_shelf_adaptive_entries(tab, scope=None):
     """Flatten a tab into the single ordered list the Shelf editor lays out."""
     entries = []
-    for row_index in range(_MAYA_SHELF_ROW_COUNT):
-        entries.extend(_maya_shelf_row_entries(tab, row_index, scope))
+    for row_index in range(_CLARITY_SHELF_ROW_COUNT):
+        entries.extend(_clarity_shelf_row_entries(tab, row_index, scope))
     return entries
 
 
-def _maya_shelf_draw_adaptive(layout, context):
-    tab = _maya_shelf_active_tab(context)
+def _clarity_shelf_draw_adaptive(layout, context):
+    tab = _clarity_shelf_active_tab(context)
     flow = layout.grid_flow(
         row_major=True,
         columns=0,
@@ -4249,20 +4276,20 @@ def _maya_shelf_draw_adaptive(layout, context):
     flow.scale_x = 1.05
     flow.scale_y = 1.0
 
-    for entry_type, entry in _maya_shelf_adaptive_entries(tab):
+    for entry_type, entry in _clarity_shelf_adaptive_entries(tab):
         cell = flow.column(align=True)
         cell.ui_units_x = 1.55
 
-        cell.context_string_set("maya_shelf_item_id", entry["id"])
+        cell.context_string_set("clarity_shelf_item_id", entry["id"])
         if entry_type == "SEPARATOR":
-            _maya_shelf_draw_separator_button(
+            _clarity_shelf_draw_separator_button(
                 cell,
                 entry,
                 scale_y=1.6,
             )
             continue
 
-        _maya_shelf_draw_item_button(
+        _clarity_shelf_draw_item_button(
             cell,
             entry,
             button_units_x=0.95,
@@ -4276,23 +4303,23 @@ class SHELF_MT_tabs(Menu):
 
     def draw(self, context):
         layout = self.layout
-        config = _maya_shelf_config(context)
-        active_tab = _maya_shelf_tab_for_config(config)
+        config = _clarity_shelf_config(context)
+        active_tab = _clarity_shelf_tab_for_config(config)
         for tab in config["tabs"]:
             props = layout.operator(
-                "topbar.maya_shelf_tab",
+                "topbar.clarity_shelf_tab",
                 text=tab["name"],
                 icon='CHECKMARK' if tab is active_tab else 'BLANK1',
             )
             props.tab = tab["name"]
         layout.separator()
-        layout.operator("topbar.maya_shelf_tab_add", text="Add Shelf Tab", icon='ADD')
+        layout.operator("topbar.clarity_shelf_tab_add", text="Add Shelf Tab", icon='ADD')
         layout.operator(
-            "topbar.maya_shelf_tab_rename",
+            "topbar.clarity_shelf_tab_rename",
             text="Rename Active Tab",
             icon='GREASEPENCIL',
         )
-        layout.operator("topbar.maya_shelf_tab_remove", text="Remove Active Tab", icon='X')
+        layout.operator("topbar.clarity_shelf_tab_remove", text="Remove Active Tab", icon='X')
 
 
 class SHELF_HT_header(Header):
@@ -4301,7 +4328,7 @@ class SHELF_HT_header(Header):
     def draw(self, context):
         layout = self.layout
         layout.template_header()
-        layout.menu("SHELF_MT_tabs", text=_maya_shelf_active_tab(context)["name"])
+        layout.menu("SHELF_MT_tabs", text=_clarity_shelf_active_tab(context)["name"])
 
 
 class SHELF_PT_main(Panel):
@@ -4311,7 +4338,7 @@ class SHELF_PT_main(Panel):
     bl_options = {'HIDE_HEADER'}
 
     def draw(self, context):
-        _maya_shelf_draw_adaptive(self.layout, context)
+        _clarity_shelf_draw_adaptive(self.layout, context)
 
 
 class TOPBAR_PT_tool_settings_extra(Panel):
@@ -4367,7 +4394,7 @@ class TOPBAR_MT_editor_menus(Menu):
         if getattr(context.area, "show_menus", False):
             layout.menu("TOPBAR_MT_blender", text="", icon='BLENDER')
         else:
-            layout.menu("TOPBAR_MT_blender", text="Maya 2.0")
+            layout.menu("TOPBAR_MT_blender", text="Clarity")
 
         layout.menu("TOPBAR_MT_file")
         layout.menu("TOPBAR_MT_edit")
@@ -4379,7 +4406,7 @@ class TOPBAR_MT_editor_menus(Menu):
 
 
 class TOPBAR_MT_blender(Menu):
-    bl_label = "Maya 2.0"
+    bl_label = "Clarity"
 
     def draw(self, _context):
         layout = self.layout
@@ -5115,29 +5142,77 @@ class TOPBAR_PT_grease_pencil_layers(Panel):
         DATA_PT_grease_pencil_layers.draw_settings(layout, grease_pencil)
 
 
+def _clarity_shelf_legacy_operator_alias(base):
+    """Hidden forwarding class for external scripts using a former operator identifier."""
+    namespace = {
+        "__module__": __name__,
+        "bl_idname": base.bl_idname.replace(".clarity_", ".maya_"),
+        "bl_options": set(getattr(base, "bl_options", set())) | {'INTERNAL'},
+    }
+    for name, value in base.__dict__.items():
+        if name.startswith("__") or name in {"bl_idname", "bl_options", "bl_rna"}:
+            continue
+        namespace[name] = value
+    annotations = {}
+    for owner in reversed(base.__mro__):
+        annotations.update(getattr(owner, "__annotations__", {}))
+    if annotations:
+        namespace["__annotations__"] = annotations
+    for callback in ("poll", "description", "check", "draw", "invoke", "execute", "modal", "cancel"):
+        for owner in base.__mro__:
+            if callback in owner.__dict__:
+                namespace[callback] = owner.__dict__[callback]
+                break
+    # Never inherit from a registered operator class: Blender would reuse its StructRNA and replace
+    # the primary Clarity callback owner. Recreate the class on the same unregistered mixins instead.
+    return type(base.__name__.replace("_clarity_", "_maya_"), base.__bases__, namespace)
+
+
+_CLARITY_SHELF_LEGACY_OPERATOR_CLASSES = tuple(
+    _clarity_shelf_legacy_operator_alias(base)
+    for base in (
+        TOPBAR_OT_clarity_shelf_tab,
+        TOPBAR_OT_clarity_shelf_tab_add,
+        TOPBAR_OT_clarity_shelf_tab_rename,
+        TOPBAR_OT_clarity_shelf_tab_remove,
+        TOPBAR_OT_clarity_shelf_item_add,
+        TOPBAR_OT_clarity_shelf_item_edit,
+        TOPBAR_OT_clarity_shelf_item_remove_id,
+        TOPBAR_OT_clarity_shelf_separator_add,
+        TOPBAR_OT_clarity_shelf_context_menu,
+        TOPBAR_OT_clarity_shelf_drag,
+        TOPBAR_OT_clarity_shelf_drag_hover,
+        TOPBAR_OT_clarity_shelf_action,
+        TOPBAR_OT_clarity_shelf_action_undo,
+        TOPBAR_OT_clarity_shelf_preview,
+    )
+)
+
+
 classes = (
-    TOPBAR_PG_maya_shelf_icon,
-    TOPBAR_PG_maya_shelf_action,
-    TOPBAR_UL_maya_shelf_icons,
-    TOPBAR_UL_maya_shelf_actions,
+    TOPBAR_PG_clarity_shelf_icon,
+    TOPBAR_PG_clarity_shelf_action,
+    TOPBAR_UL_clarity_shelf_icons,
+    TOPBAR_UL_clarity_shelf_actions,
     TOPBAR_HT_upper_bar,
-    TOPBAR_OT_maya_shelf_tab,
-    TOPBAR_OT_maya_shelf_tab_add,
-    TOPBAR_OT_maya_shelf_tab_rename,
-    TOPBAR_OT_maya_shelf_tab_remove,
-    TOPBAR_OT_maya_shelf_item_add,
-    TOPBAR_OT_maya_shelf_item_edit,
-    TOPBAR_OT_maya_shelf_item_remove_id,
-    TOPBAR_OT_maya_shelf_separator_add,
-    TOPBAR_OT_maya_shelf_context_menu,
-    TOPBAR_OT_maya_shelf_drag,
-    TOPBAR_OT_maya_shelf_drag_hover,
-    TOPBAR_OT_maya_shelf_action,
-    TOPBAR_OT_maya_shelf_action_undo,
-    TOPBAR_OT_maya_shelf_preview,
+    TOPBAR_OT_clarity_shelf_tab,
+    TOPBAR_OT_clarity_shelf_tab_add,
+    TOPBAR_OT_clarity_shelf_tab_rename,
+    TOPBAR_OT_clarity_shelf_tab_remove,
+    TOPBAR_OT_clarity_shelf_item_add,
+    TOPBAR_OT_clarity_shelf_item_edit,
+    TOPBAR_OT_clarity_shelf_item_remove_id,
+    TOPBAR_OT_clarity_shelf_separator_add,
+    TOPBAR_OT_clarity_shelf_context_menu,
+    TOPBAR_OT_clarity_shelf_drag,
+    TOPBAR_OT_clarity_shelf_drag_hover,
+    TOPBAR_OT_clarity_shelf_action,
+    TOPBAR_OT_clarity_shelf_action_undo,
+    TOPBAR_OT_clarity_shelf_preview,
+    *_CLARITY_SHELF_LEGACY_OPERATOR_CLASSES,
     WM_MT_button_context,
-    TOPBAR_HT_maya_shelf_upper,
-    TOPBAR_HT_maya_shelf_lower,
+    TOPBAR_HT_clarity_shelf_upper,
+    TOPBAR_HT_clarity_shelf_lower,
     SHELF_MT_tabs,
     SHELF_HT_header,
     SHELF_PT_main,

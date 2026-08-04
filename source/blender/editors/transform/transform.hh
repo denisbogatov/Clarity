@@ -122,8 +122,8 @@ enum eTContext {
   CTX_OBMODE_XFORM_SKIP_CHILDREN = (1 << 14),
   /** Enable edge scrolling in 2D views. */
   CTX_VIEW2D_EDGE_PAN = (1 << 15),
-  /** Transform the Maya custom pivot without touching scene cursor or selection data. */
-  CTX_MAYA_PIVOT = (1 << 16),
+  /** Transform the Clarity custom pivot without touching scene cursor or selection data. */
+  CTX_CLARITY_PIVOT = (1 << 16),
 };
 ENUM_OPERATORS(eTContext)
 
@@ -397,8 +397,8 @@ enum {
   TD_PBONE_LOCAL_MTX_C = 1 << 18,
   /* Grease pencil layer frames. */
   TD_GREASE_PENCIL_FRAME = 1 << 19,
-  /** Object transform is backed by Maya double-precision proxy channels. */
-  TD_MAYA_TRANSFORM = 1 << 20,
+  /** Object transform is backed by Clarity double-precision proxy channels. */
+  TD_CLARITY_TRANSFORM = 1 << 20,
 };
 
 struct TransDataBasic {
@@ -547,30 +547,30 @@ struct TransSnap {
   eSnapFlag flag;
   /* Method(s) used for snapping source to target. */
   eSnapMode mode;
-  /** True when the current snap state was overlaid by Maya snapping. */
-  bool maya_mode_active;
-  /** Restrict edge targets to continuous legacy curve geometry for Maya Curve Snap. */
-  bool maya_curve_targets_only;
-  /** Include object transform pivots as discrete Maya Point Snap targets. */
-  bool maya_include_object_pivots;
+  /** True when the current snap state was overlaid by Clarity snapping. */
+  bool clarity_mode_active;
+  /** Restrict edge targets to continuous legacy curve geometry for Clarity Curve Snap. */
+  bool clarity_curve_targets_only;
+  /** Include object transform pivots as discrete Clarity Point Snap targets. */
+  bool clarity_include_object_pivots;
   /** Constrain translation to the view plane captured when the mode became active. */
-  bool maya_view_plane;
-  float maya_view_plane_normal[3];
-  /** Use deterministic front/back depth pairing for Maya Mesh Center Snap. */
-  bool maya_mesh_center;
+  bool clarity_view_plane;
+  float clarity_view_plane_normal[3];
+  /** Use deterministic front/back depth pairing for Clarity Mesh Center Snap. */
+  bool clarity_mesh_center;
   /**
-   * Radius in pixels around the pointer that Maya snapping accepts a target in, Maya's "Snap
-   * tolerance". Zero while Maya snapping is not driving the transform, and the size of the region
-   * when the tolerance is turned off, which is Maya's "snap to anything viewable".
+   * Radius in pixels around the pointer that Clarity snapping accepts a target in, Clarity's "Snap
+   * tolerance". Zero while Clarity snapping is not driving the transform, and the size of the region
+   * when the tolerance is turned off, which is Clarity's "snap to anything viewable".
    */
-  float maya_snap_dist_px;
+  float clarity_snap_dist_px;
   /**
-   * World-space position of the visible Maya pivot, captured before the transform moved anything.
-   * Maya puts that pivot onto the snap target, so it is the snap source instead of the center of
+   * World-space position of the visible Clarity pivot, captured before the transform moved anything.
+   * Clarity puts that pivot onto the snap target, so it is the snap source instead of the center of
    * the selection. Captured once because the pivot itself travels with the data during the drag.
    */
-  bool maya_pivot_source_valid;
-  float maya_pivot_source[3];
+  bool clarity_pivot_source_valid;
+  float clarity_pivot_source[3];
   /* Part of source to snap to target. */
   eSnapSourceOP source_operation;
   /* Determines which objects are possible target. */

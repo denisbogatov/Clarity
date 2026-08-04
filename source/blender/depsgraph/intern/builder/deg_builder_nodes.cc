@@ -821,8 +821,8 @@ void DepsgraphNodeBuilder::build_object(int base_index,
     data.builder = this;
     BKE_constraints_id_loop(&object->constraints, constraint_walk, IDWALK_NOP, &data);
   }
-  for (MayaConstraint &constraint : object->maya_constraints) {
-    for (MayaConstraintTarget &target : constraint.targets) {
+  for (ClarityConstraint &constraint : object->clarity_constraints) {
+    for (ClarityConstraintTarget &target : constraint.targets) {
       if (target.object != nullptr && target.object != object) {
         build_object(-1, target.object, DEG_ID_LINKED_INDIRECTLY, is_visible);
       }
@@ -1114,7 +1114,7 @@ void DepsgraphNodeBuilder::build_object_transform(Object *object)
         [ob_cow](blender::Depsgraph *depsgraph) { BKE_object_eval_parent(depsgraph, ob_cow); });
   }
   /* Object constraints. */
-  if (object->constraints.first != nullptr || object->maya_constraints.first != nullptr) {
+  if (object->constraints.first != nullptr || object->clarity_constraints.first != nullptr) {
     build_object_constraints(object);
   }
   /* Rest of transformation update. */

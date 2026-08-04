@@ -848,7 +848,7 @@ static void draw_view_axis(RegionView3D *rv3d, const rcti *rect)
 
   float axis_pos[3][2];
   float axis_col[3][4];
-  const float maya_axis_col[3][3] = {
+  const float clarity_axis_col[3][3] = {
       {1.0f, 0.0f, 0.0f},
       {0.0f, 1.0f, 0.0f},
       {0.0f, 0.0f, 1.0f},
@@ -867,8 +867,8 @@ static void draw_view_axis(RegionView3D *rv3d, const rcti *rect)
     axis_pos[i][0] = startx + vec[0] * k;
     axis_pos[i][1] = starty + vec[1] * k;
 
-    /* Maya-style world-axis colors: X red, Y green, Z blue. */
-    copy_v3_v3(axis_col[i], maya_axis_col[i]);
+    /* Clarity-style world-axis colors: X red, Y green, Z blue. */
+    copy_v3_v3(axis_col[i], clarity_axis_col[i]);
     axis_col[i][3] = hypotf(vec[0], vec[1]);                            /* alpha */
   }
 

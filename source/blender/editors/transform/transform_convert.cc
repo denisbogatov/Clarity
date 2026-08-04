@@ -652,7 +652,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 
 int special_transform_moving(TransInfo *t)
 {
-  if (t->options & (CTX_CURSOR | CTX_MAYA_PIVOT)) {
+  if (t->options & (CTX_CURSOR | CTX_CLARITY_PIVOT)) {
     return G_TRANSFORM_CURSOR;
   }
   if (t->spacetype == SPACE_SEQ) {
@@ -893,8 +893,8 @@ static TransConvertTypeInfo *convert_type_get(const TransInfo *t, Object **r_obj
   Object *ob = BKE_view_layer_active_object_get(view_layer);
 
   /* If tests must match recalc_data for correct updates. */
-  if (t->options & CTX_MAYA_PIVOT) {
-    return &TransConvertType_MayaPivot;
+  if (t->options & CTX_CLARITY_PIVOT) {
+    return &TransConvertType_ClarityPivot;
   }
   if (t->options & CTX_CURSOR) {
     if (t->spacetype == SPACE_IMAGE) {

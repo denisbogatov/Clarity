@@ -14,7 +14,7 @@
 #include "BLI_math_quaternion.hh"
 #include "BLI_math_rotation.h"
 
-#include "BKE_object_transform_maya.hh"
+#include "BKE_object_transform_clarity.hh"
 #include "BKE_object_types.hh"
 
 namespace blender {
@@ -22,11 +22,11 @@ namespace blender {
 static bool object_world_orientation_get(const Object &object,
                                          math::QuaternionBase<double> &r_orientation)
 {
-  /* Share the orthonormalization policy of the Maya transform axes. Deriving the basis differently
+  /* Share the orthonormalization policy of the Clarity transform axes. Deriving the basis differently
    * here would offset the pivot orientation from the axes the transform converter uses, and would
    * flip mirrored objects by 180 degrees relative to them. */
   float rotation[3][3];
-  if (!BKE_maya_matrix_orthonormalize(double3x3(double4x4(object.object_to_world())), rotation)) {
+  if (!BKE_clarity_matrix_orthonormalize(double3x3(double4x4(object.object_to_world())), rotation)) {
     return false;
   }
   float quaternion[4];

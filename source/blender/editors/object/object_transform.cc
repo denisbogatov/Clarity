@@ -86,8 +86,8 @@ namespace blender::ed::object {
 
 ObjectTransformRNAPaths transform_rna_paths_get(const Object &object)
 {
-  if (BKE_object_uses_maya_transform(&object)) {
-    return {"maya_transform.translation", "maya_transform.rotation", "maya_transform.scale"};
+  if (BKE_object_uses_clarity_transform(&object)) {
+    return {"clarity_transform.translation", "clarity_transform.rotation", "clarity_transform.scale"};
   }
   return {"location", animrig::get_rotation_mode_path(eRotationModes(object.rotmode)), "scale"};
 }

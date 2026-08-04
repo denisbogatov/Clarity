@@ -245,7 +245,7 @@ enum {
   ED_GIZMO_PRIMITIVE_STYLE_ANNULUS,
   ED_GIZMO_PRIMITIVE_STYLE_CUBE,
   /**
-   * A plane with a circle and a diamond inside it, the Maya Edit Pivot mode indicator. The circle
+   * A plane with a circle and a diamond inside it, the Clarity Edit Pivot mode indicator. The circle
    * and the diamond are decoration and stay out of the selection buffer, so the handle keeps the
    * clickable area of a plain plane.
    */

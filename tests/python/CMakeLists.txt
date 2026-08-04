@@ -251,15 +251,15 @@ add_blender_test(
 )
 
 add_blender_test(
-  maya_interaction_defaults
+  clarity_interaction_defaults
   --factory-startup
-  --python ${CMAKE_CURRENT_LIST_DIR}/maya_interaction_defaults.py
+  --python ${CMAKE_CURRENT_LIST_DIR}/clarity_interaction_defaults.py
 )
 
 add_blender_test(
-  maya_pivot_lifecycle
+  clarity_pivot_lifecycle
   --factory-startup
-  --python ${CMAKE_CURRENT_LIST_DIR}/maya_pivot_lifecycle.py
+  --python ${CMAKE_CURRENT_LIST_DIR}/clarity_pivot_lifecycle.py
 )
 
 # test running operators doesn't segfault under various conditions

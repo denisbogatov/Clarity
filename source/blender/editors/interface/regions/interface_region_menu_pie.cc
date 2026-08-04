@@ -107,7 +107,7 @@ static PieMenu *pie_menu_begin_ex(
   pie->pie_block->pie_data = std::make_unique<PieMenuData>();
 
   if (marking) {
-    /* Maya draws the menu where it will stay and waits for the release, so the item positions the
+    /* Clarity draws the menu where it will stay and waits for the release, so the item positions the
      * pointer is aimed at are the ones the hit test sees from the first mouse move on. */
     pie->pie_block->pie_data->flags |= PIE_MARKING_STYLE | PIE_ANIMATION_FINISHED;
     pie->pie_block->pie_data->alphafac = 1.0f;
@@ -116,7 +116,7 @@ static PieMenu *pie_menu_begin_ex(
   /* if pie is spawned by a left click, release or click event,
    * it is always assumed to be click style.
    *
-   * A marking menu is the exception for a press: `LMB` is how Maya opens it, and the whole
+   * A marking menu is the exception for a press: `LMB` is how Clarity opens it, and the whole
    * interaction is press, mark, release. Only a real release or click event still opens it in the
    * style that waits for a second click. */
   const bool click_style_event = marking ? ELEM(event->val, KM_RELEASE, KM_CLICK) :

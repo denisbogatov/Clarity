@@ -548,9 +548,9 @@ static void applyTranslation(TransInfo *t)
     }
   }
 
-  if (t->tsnap.maya_view_plane && (t->con.mode & CON_APPLY) == 0) {
+  if (t->tsnap.clarity_view_plane && (t->con.mode & CON_APPLY) == 0) {
     project_plane_normalized_v3_v3v3(
-        global_dir, global_dir, t->tsnap.maya_view_plane_normal);
+        global_dir, global_dir, t->tsnap.clarity_view_plane_normal);
   }
 
   applyTranslationValue(t, global_dir);

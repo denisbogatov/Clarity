@@ -1788,7 +1788,7 @@ void GRAPH_OT_handle_type(wmOperatorType *ot)
 /* -------------------------------------------------------------------- */
 /** \name 'Euler Filter' Operator
  *
- * Euler filter tools (as seen in Maya), are necessary for working with 'baked'
+ * Euler filter tools, as used by other DCC applications, are necessary for working with 'baked'
  * rotation curves (with Euler rotations). The main purpose of such tools is to
  * resolve any discontinuities that may arise in the curves due to the clamping
  * of values to -180 degrees to 180 degrees.
