@@ -9,14 +9,19 @@
 #include "MEM_guardedalloc.h"
 
 #include <climits>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
 #include <memory>
 
 #include "DNA_curve_types.h"
+#include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_view3d_types.h"
 
 #include "BLI_math_matrix.h"
+#include "BLI_math_matrix.hh"
 #include "BLI_math_quaternion.hh"
 #include "BLI_math_vector.h"
 #include "BLI_math_vector.hh"
@@ -26,10 +31,16 @@
 #include "BLT_translation.hh"
 
 #include "BKE_context.hh"
+#include "BKE_editmesh.hh"
 #include "BKE_global.hh"
+#include "BKE_object.hh"
 #include "BKE_report.hh"
 #include "BKE_scene.hh"
 #include "BKE_screen.hh"
+
+#include "DEG_depsgraph_query.hh"
+
+#include "bmesh.hh"
 
 #include "RNA_access.hh"
 #include "RNA_define.hh"
@@ -1821,6 +1832,96 @@ static void TRANSFORM_OT_clarity_snap_toggle(wmOperatorType *ot)
       ot->srna, "mode", clarity_snap_toggle_mode_items, CLARITY_SNAP_TOGGLE_POINT, "Mode", "");
 }
 
+/**
+ * One line per pivot click into `BLENDER_CLARITY_SNAP_TRACE_FILE`, the same file the drag writes to.
+ * A click that does not turn the pivot leaves no trace of its own otherwise: the operator simply
+ * returns, and every step that could have stopped it looks the same from outside.
+ */
+static void clarity_pivot_click_trace(const char *stage, const char *format, ...)
+{
+  const char *filepath = std::getenv("BLENDER_CLARITY_SNAP_TRACE_FILE");
+  if (filepath == nullptr) {
+    filepath = std::getenv("BLENDER_MAYA_SNAP_TRACE_FILE");
+  }
+  if (filepath == nullptr) {
+    return;
+  }
+  std::FILE *file = std::fopen(filepath, "a");
+  if (file == nullptr) {
+    return;
+  }
+  std::fprintf(file, "pivot-click %s ", stage);
+  va_list args;
+  va_start(args, format);
+  std::vfprintf(file, format, args);
+  va_end(args);
+  std::fputc('\n', file);
+  std::fclose(file);
+}
+
+/**
+ * Normal of a clicked edge: the average of the normals of the faces that share it.
+ *
+ * Clarity aligns the pivot with the *normal* of whatever component was clicked, and an edge's normal
+ * is the mean of its two faces - a capture of Clarity 2025 shows a clicked vertical edge leaving the
+ * pivot's X axis on the bisector of the two faces beside it, not along the edge. The snap search
+ * hands back `v1 - v0` for an edge, which is why the normal has to be rebuilt here.
+ *
+ * Returns false when the mesh cannot be read, and the caller falls back to the normal of the face
+ * the ray crossed.
+ */
+static bool clarity_pivot_edge_normal_get(const Object *object,
+                                          const int edge_index,
+                                          const float4x4 &object_to_world,
+                                          float r_normal[3])
+{
+  if (object == nullptr || edge_index < 0 || object->type != OB_MESH) {
+    return false;
+  }
+
+  float3 normal_sum(0.0f);
+  Object *object_orig = DEG_get_original(const_cast<Object *>(object));
+  if (BMEditMesh *edit_mesh = object_orig != nullptr ? BKE_editmesh_from_object(object_orig) :
+                                                       nullptr)
+  {
+    BMEdge *edge = BM_edge_at_index_find(edit_mesh->bm, edge_index);
+    if (edge == nullptr) {
+      return false;
+    }
+    BMIter iter;
+    BMFace *face;
+    BM_ITER_ELEM (face, &iter, edge, BM_FACES_OF_EDGE) {
+      normal_sum += float3(face->no);
+    }
+  }
+  else {
+    const Mesh *mesh = BKE_object_get_evaluated_mesh(object);
+    if (mesh == nullptr || !mesh->edges().index_range().contains(edge_index)) {
+      return false;
+    }
+    const OffsetIndices<int> faces = mesh->faces();
+    const Span<int> corner_edges = mesh->corner_edges();
+    const Span<float3> face_normals = mesh->face_normals();
+    for (const int face : faces.index_range()) {
+      if (corner_edges.slice(faces[face]).contains(edge_index)) {
+        normal_sum += face_normals[face];
+      }
+    }
+  }
+
+  if (math::is_zero(normal_sum)) {
+    return false;
+  }
+  /* The snap works in world space, and a scaled object does not carry normals with its matrix. */
+  const float3x3 normal_transform = math::transpose(math::invert(float3x3(object_to_world)));
+  const float3 normal = math::normalize(math::transform_direction(normal_transform, normal_sum));
+  if (math::is_zero(normal)) {
+    return false;
+  }
+  copy_v3_v3(r_normal, normal);
+  return true;
+}
+
 static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
 {
   ARegion *region = CTX_wm_region(C);
@@ -1881,7 +1982,11 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
       CTX_data_ensure_evaluated_depsgraph(C),
       region,
       view,
-      eSnapMode(SCE_SNAP_TO_VERTEX | SCE_SNAP_TO_EDGE | SCE_SNAP_TO_FACE),
+      /* Plain #SCE_SNAP_TO_POINT, for the reason #pivot_snap_target_query spells out: the
+       * #SCE_SNAP_TO_VERTEX composite includes #SCE_SNAP_TO_EDGE_ENDPOINT, and an endpoint asked for
+       * next to edges takes the outer two thirds of every edge, so a click meant for an edge aimed
+       * the pivot at a corner instead. The preview and the click have to agree on the element. */
+      eSnapMode(SCE_SNAP_TO_POINT | SCE_SNAP_TO_EDGE | SCE_SNAP_TO_FACE),
       &snap_params,
       nullptr,
       mouse_float,
@@ -1896,10 +2001,29 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
   ed::transform::snap_object_context_destroy(snap_context);
 
   bool has_position = hit_type != SCE_SNAP_TO_NONE;
-  if (!is_zero_v3(hit_face_normal)) {
-    copy_v3_v3(hit_normal, hit_face_normal);
+  /* What the clicked element hands back is not the same thing for all of them: a face and a vertex
+   * return a normal, an edge returns `v1 - v0`. The pivot aligns with the element's normal in every
+   * case, so an edge has its own rebuilt from the faces beside it. The ray normal is the fallback,
+   * and it is also what an element with no vector of its own gets. */
+  ClarityPivotSnapVector target_vector = has_position ? clarity_pivot_snap_vector_get(hit_type) :
+                                                        ClarityPivotSnapVector::None;
+  if (target_vector == ClarityPivotSnapVector::EdgeDirection) {
+    target_vector = ClarityPivotSnapVector::SurfaceNormal;
+    if (!clarity_pivot_edge_normal_get(
+            hit_object, hit_index, float4x4(hit_object_matrix), hit_normal))
+    {
+      copy_v3_v3(hit_normal, hit_face_normal);
+    }
   }
-  const bool has_orientation = has_position && !is_zero_v3(hit_normal);
+  if (is_zero_v3(hit_normal) && !is_zero_v3(hit_face_normal)) {
+    copy_v3_v3(hit_normal, hit_face_normal);
+    target_vector = ClarityPivotSnapVector::SurfaceNormal;
+  }
+  if (is_zero_v3(hit_normal)) {
+    target_vector = ClarityPivotSnapVector::None;
+  }
+  const bool has_orientation = has_position &&
+                               clarity_pivot_snap_aim_axis_get(target_vector) >= 0;
 
   ed::clarity::ClarityPivotSnapResult snap_result;
   if (has_position) {
@@ -1921,34 +2045,113 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
     snap_result.position_world = double3(hit_position);
     snap_result.type = ed::clarity::ClarityPivotSnapTargetType::ViewPlane;
   }
-  if (!has_position || (orientation_only && !has_orientation)) {
+  clarity_pivot_click_trace("hit",
+                            "type=%d index=%d position=%d orientation=%d vector=%d "
+                            "normal=(%.3f %.3f %.3f) shift=%d ctrl=%d",
+                            int(hit_type),
+                            hit_index,
+                            int(has_position),
+                            int(has_orientation),
+                            int(target_vector),
+                            double(hit_normal[0]),
+                            double(hit_normal[1]),
+                            double(hit_normal[2]),
+                            int(shift),
+                            int(ctrl));
+  ed::clarity::ClarityPivotToolSettings settings;
+  if (!ED_clarity_pivot_tool_settings_get(C, settings)) {
+    clarity_pivot_click_trace("cancelled", "no tool settings");
     return OPERATOR_CANCELLED;
   }
 
-  ed::clarity::ClarityPivotToolSettings settings;
-  if (!ED_clarity_pivot_tool_settings_get(C, settings)) {
+  if (!has_position) {
+    /* Nothing under the pointer, which is Maya's "in the area outside of the object" - and there the
+     * same modifiers mean reset instead of snap. *Reset a component's custom pivot*: a plain click
+     * resets position and orientation, `Ctrl` resets "the custom pivot's orientation" alone, and
+     * `Ctrl + Shift` puts both back "to its reference frame of selected components", which is the
+     * component bounding-box centre and frame the Center reset already produces.
+     *
+     * `Shift` never reaches this branch: it placed the pivot on the view plane above, following
+     * *Change the pivot point* ("Shift + click to place the pivot at the cursor"). The older reset
+     * page reads that gesture as a position reset instead; the two disagree and the newer page
+     * wins, the same way the rest of this operator follows it. */
+    if (!shift && !ctrl && target->type() == ed::clarity::ClarityPivotTargetType::Object) {
+      /* Except for an object's pivot, where the Maya capture is unambiguous: a plain click in empty
+       * space clears the selection and ends Edit Pivot - the manipulator that comes back with the
+       * next selection is the ordinary one, and the pivot keeps the position it was given. The reset
+       * gesture the help documents is titled *Reset a component's custom pivot*, so it stays with the
+       * component pivot. The caller owns the selection, so the click goes back to it. */
+      clarity_pivot_click_trace("pass-through", "empty space, object pivot");
+      return OPERATOR_PASS_THROUGH;
+    }
+    clarity_pivot_click_trace("reset", "shift=%d ctrl=%d", int(shift), int(ctrl));
+    ED_clarity_pivot_undo_begin(C);
+    if (aim_axis) {
+      ED_clarity_pivot_reset_all(C, ed::clarity::CLARITY_PIVOT_RESET_CENTER);
+    }
+    else if (orientation_only) {
+      ED_clarity_pivot_reset_orientation(C);
+    }
+    else {
+      ED_clarity_pivot_reset_all(C, settings.reset_mode);
+    }
+    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+    return OPERATOR_FINISHED;
+  }
+  if (orientation_only && !has_orientation) {
+    clarity_pivot_click_trace("cancelled", "nothing under the pointer to align to");
     return OPERATOR_CANCELLED;
   }
-  const bool apply_position = !orientation_only && !aim_axis && settings.snap_position;
+  /* A click orients, it does not move. Two Maya 2025 screen recordings show the pivot centre holding
+   * the same screen position through every click - on a face, on a vertex, on an edge - while its
+   * axes turn to what was clicked, and the cursor carries the label `orient` while hovering. The
+   * help reads the other way ("click a component to snap and align the pivot", "by default, pivot
+   * position and orientation snap to the selected component"), and the capture wins.
+   *
+   * Position is what a drag is for, and what `Shift` asks for explicitly: "Shift + click to place
+   * the pivot at the cursor". #ClarityPivotToolSettings::snap_position still gates both of those -
+   * it is the magnet a drag snaps with - so it stays on by default and simply has no plain click
+   * left to govern. */
+  const bool apply_position = position_only && settings.snap_position;
+  if (apply_position && position_only && settings.active_axis_handle) {
+    /* A `Shift + click` with an axis handle selected snaps along that axis alone. */
+    snap_result.position_world = ED_clarity_pivot_position_axis_constrain(
+        frame, *snap_result.position_world, settings.active_axis);
+  }
   bool apply_orientation = !position_only && settings.snap_orientation;
   if (apply_orientation) {
     apply_orientation = aim_axis || has_orientation;
     if (apply_orientation) {
-      const double3 orientation_target = aim_axis ?
-                                             double3(hit_position) :
-                                             frame.position_world + double3(hit_normal);
-      if (!ED_clarity_pivot_orientation_aim(frame,
-                                         orientation_target,
-                                         aim_axis ? settings.active_axis : 2,
-                                         double3(region_view->viewinv[1])))
+      /* "If the center handle or X-axis handle is selected, the custom pivot aims its X-axis" - the
+       * centre is not a fourth axis, so it aims X rather than whatever axis was picked last. */
+      const int aim_target_axis = settings.active_axis_handle ? settings.active_axis : 0;
+      const int target_axis = aim_axis ? aim_target_axis :
+                                         clarity_pivot_snap_aim_axis_get(target_vector);
+      double3 orientation_target = double3(hit_position);
+      if (!aim_axis) {
+        /* Always a normal by now, and a normal carries its own side. */
+        orientation_target = frame.position_world + double3(hit_normal);
+      }
+      if (!ED_clarity_pivot_orientation_aim(
+              frame, orientation_target, target_axis, double3(region_view->viewinv[1])))
       {
         apply_orientation = false;
+        clarity_pivot_click_trace("aim-failed", "axis=%d", target_axis);
       }
       else {
         snap_result.orientation_world = frame.orientation_world;
       }
     }
   }
+  clarity_pivot_click_trace(
+      "apply",
+      "position=%d orientation=%d snap_pos=%d snap_ori=%d active_axis=%d axis_handle=%d",
+      int(apply_position),
+      int(apply_orientation),
+      int(settings.snap_position),
+      int(settings.snap_orientation),
+      settings.active_axis,
+      int(settings.active_axis_handle));
   if (!apply_position && !apply_orientation) {
     return OPERATOR_FINISHED;
   }
@@ -1962,6 +2165,7 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
     changed = target->orientation_set(*snap_result.orientation_world, false);
   }
   if (!changed) {
+    clarity_pivot_click_trace("rejected", "the pivot target refused the write");
     target->cancel();
     ED_clarity_undo_step_clear(C);
     return OPERATOR_CANCELLED;

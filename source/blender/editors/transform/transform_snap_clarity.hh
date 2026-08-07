@@ -81,7 +81,33 @@ ClaritySnapPlan transform_snap_clarity_plan_get(const ClaritySnapPlanInput &inpu
  * element under the pointer and leaves it following the pointer while there is none, so the two
  * positions the transform can offer have to be kept apart: the one it applied (which already
  * carries the snap) and the one the pointer alone asks for.
+ *
+ * A drag moves the pivot and nothing else. Clarity splits the two halves across two interactions:
+ * "hold C or V and middle-drag ... to snap the pivot to that object's edges or vertices" is
+ * positional, while "click a component to snap and align the pivot to the selected component" is
+ * what turns it, with `Ctrl + click` for the orientation alone. Turning the pivot mid-drag put it in
+ * a new frame every time the element under the pointer changed, which is not a thing Clarity does and
+ * not a thing a drag can undo.
  * \{ */
+
+/**
+ * What the vector a snap returns alongside its position actually is, for the click that aligns the
+ * pivot with a component.
+ *
+ * A click always puts the component's *normal* on the pivot's X axis - a capture of Clarity 2025
+ * shows a clicked face leaving X on the face normal, a clicked corner on the vertex normal, and a
+ * clicked edge on the bisector of the two faces beside it, never along the edge. The snap backend
+ * however keeps one field for all element types and fills it with `v1 - v0` for an edge, so an edge
+ * hit is the one case whose normal has to be rebuilt from the mesh before it can be used.
+ */
+enum class ClarityPivotSnapVector : uint8_t {
+  /** The target says nothing about direction, so the pivot keeps the orientation it had. */
+  None = 0,
+  /** Usable as it stands: a face normal, or the vertex normal of a point or an edge endpoint. */
+  SurfaceNormal,
+  /** A direction along the edge. The caller replaces it with the mean normal of its faces. */
+  EdgeDirection,
+};
 
 struct ClarityPivotSnapInput {
   /** What the transform applied, snap included. Also the one that honors numeric input. */
@@ -99,23 +125,22 @@ struct ClarityPivotSnapInput {
   bool has_target = false;
   /** An axis or plane handle of the manipulator is driving the drag. */
   bool has_constraint = false;
-  /** That target carries a surface normal, so it can aim the pivot as well as place it. */
-  bool target_has_normal = false;
-  /** Edit Pivot settings: either half of a snap can be turned off independently. */
+  /** Edit Pivot's `snapPos`: with it off the pointer keeps the pivot and the target only shows. */
   bool snap_position = true;
-  bool snap_orientation = true;
 };
 
 struct ClarityPivotSnapDecision {
   double3 position = double3(0.0);
   /** The position is the target itself, not a dragged one. */
   bool from_target = false;
-  /** The target's normal re-aims the pivot. */
-  bool aim_at_normal = false;
 };
 
 ClarityPivotSnapDecision clarity_pivot_snap_decision_get(const ClarityPivotSnapInput &input);
 
+/** Which vector a clicked element carries, from the element type that won the search. */
+ClarityPivotSnapVector clarity_pivot_snap_vector_get(eSnapMode target_type);
+/** The pivot axis that vector is turned onto, -1 when it defines no direction. */
+int clarity_pivot_snap_aim_axis_get(ClarityPivotSnapVector target_vector);
 /** \} */
 
 }  // namespace blender::ed::transform

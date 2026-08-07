@@ -9,6 +9,7 @@
 #pragma once
 
 #include "BKE_layer.hh"
+#include "BKE_object_custom_pivot.hh"
 
 #include "overlay_base.hh"
 
@@ -55,7 +56,11 @@ class Origins : Overlay {
     const bool is_library = ID_REAL_USERS(&ob->id) > 1 || ID_IS_LINKED(ob);
     BKE_view_layer_synced_ensure(
         *DEG_get_bmain(state.depsgraph), state.scene, const_cast<ViewLayer *>(state.view_layer));
-    const float4 location = float4(ob->object_to_world().location(), 0.0f);
+    /* The origin dot marks where the object transforms from, which is the authored pivot whenever
+     * there is one - drawing it at the object origin put the marker somewhere the object does not
+     * rotate or scale around. #BKE_object_origin_display_position_get falls back to the origin for
+     * every object that has no pivot of its own, which is all of them outside the pivot tools. */
+    const float4 location = float4(float3(BKE_object_origin_display_position_get(*ob)), 0.0f);
 
     if (ob == BKE_view_layer_active_object_get(state.view_layer)) {
       select_buf_.select_append(res.select_id(ob_ref));

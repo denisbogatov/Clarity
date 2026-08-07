@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 #include "DNA_action_types.h"
 #include "DNA_armature_types.h"
@@ -295,6 +296,147 @@ TEST(object_transform_clarity_parenting, PivotWorldSettersPreserveMatrix)
   EXPECT_NEAR(BKE_object_clarity_scale_pivot_world_get(object, parent_effect).z,
               target_world.z,
               1.0e-11);
+
+  MEM_SAFE_DELETE(object.clarity_transform);
+}
+
+/**
+ * The pivot has to survive a round trip: an authored pivot returns to the object origin and the
+ * object stays where it was. Zeroing the pivot channels while keeping their compensation left the
+ * pivot at the compensation offset - away from the origin, with nothing reporting it - which no
+ * further reset could undo.
+ */
+TEST(object_transform_clarity_parenting, ZeroPivotsReturnsPivotToOriginAndKeepsWorld)
+{
+  Object object;
+  ClarityObjectTransform *transform = clarity_transform_create(object);
+  transform->translation[0] = 2.0;
+  transform->translation[1] = -3.0;
+  transform->translation[2] = 1.5;
+  transform->rotation[0] = 0.4;
+  transform->rotation[1] = -0.25;
+  transform->rotation[2] = 0.9;
+  transform->rotation_order = CLARITY_ROT_ORDER_ZXY;
+  transform->rotate_axis[2] = 0.2;
+  transform->scale[0] = -2.0;
+  transform->scale[1] = 0.75;
+  transform->scale[2] = 1.5;
+  transform->shear[0] = 0.3;
+  transform->shear[2] = -0.2;
+
+  double4x4 offset_parent_matrix = translation_matrix({1.0, -2.0, 0.5});
+  offset_parent_matrix[1][0] = 0.25;
+  std::copy_n(offset_parent_matrix.base_ptr(), 16, &transform->offset_parent_matrix[0][0]);
+  double4x4 parent_effect = translation_matrix({10.0, 20.0, 30.0});
+  parent_effect[0][0] = 0.5;
+  parent_effect[1][1] = -1.25;
+  parent_effect[2][2] = 2.0;
+
+  const double4x4 matrix_before = BKE_clarity_transform_world_matrix(*transform, parent_effect);
+  const double3 origin_before = matrix_before.location();
+  const double3 translation_before(transform->translation);
+  const double3 target_world = {9.25, -4.5, 6.75};
+
+  /* Both pivots land on one point, the way an Edit Pivot move does. */
+  ASSERT_TRUE(BKE_object_clarity_pivots_world_set(object, parent_effect, target_world, true));
+  expect_matrix_near(BKE_clarity_transform_world_matrix(*transform, parent_effect), matrix_before);
+  const double3 moved_rotate = BKE_object_clarity_rotate_pivot_world_get(object, parent_effect);
+  const double3 moved_scale = BKE_object_clarity_scale_pivot_world_get(object, parent_effect);
+  for (int axis = 0; axis < 3; axis++) {
+    EXPECT_NEAR(moved_rotate[axis], target_world[axis], 1.0e-11);
+    EXPECT_NEAR(moved_scale[axis], target_world[axis], 1.0e-11);
+  }
+  /* The move is only compensated when it has something to compensate. */
+  EXPECT_TRUE(double3(transform->rotate_pivot_translate) != double3(0.0));
+
+  BKE_clarity_transform_zero_pivots(*transform);
+
+  for (int axis = 0; axis < 3; axis++) {
+    EXPECT_DOUBLE_EQ(transform->rotate_pivot[axis], 0.0);
+    EXPECT_DOUBLE_EQ(transform->rotate_pivot_translate[axis], 0.0);
+    EXPECT_DOUBLE_EQ(transform->scale_pivot[axis], 0.0);
+    EXPECT_DOUBLE_EQ(transform->scale_pivot_translate[axis], 0.0);
+  }
+  expect_matrix_near(BKE_clarity_transform_world_matrix(*transform, parent_effect), matrix_before);
+  const double3 zeroed_rotate = BKE_object_clarity_rotate_pivot_world_get(object, parent_effect);
+  const double3 zeroed_scale = BKE_object_clarity_scale_pivot_world_get(object, parent_effect);
+  for (int axis = 0; axis < 3; axis++) {
+    EXPECT_NEAR(zeroed_rotate[axis], origin_before[axis], 1.0e-11);
+    EXPECT_NEAR(zeroed_scale[axis], origin_before[axis], 1.0e-11);
+    /* A preserving move leaves the translation the pivot chain contributes untouched, so the fold
+     * has nothing to add: an Edit Pivot session never rewrites the translate channel. Clarity's own
+     * capture shows the same - its Zero reset after a preserving move returns the initial translate
+     * with rounding noise only. */
+    EXPECT_NEAR(transform->translation[axis], translation_before[axis], 1.0e-11);
+  }
+
+  MEM_SAFE_DELETE(object.clarity_transform);
+}
+
+/**
+ * Pivot channels that were authored without compensation - imported data, or `xform -pivots` with
+ * preserve off - are the case the fold exists for: the pivot has to reach the origin and the object
+ * must not move, so the translate channel has to absorb the difference.
+ */
+TEST(object_transform_clarity_parenting, ZeroPivotsFoldsUncompensatedPivotsIntoTranslation)
+{
+  Object object;
+  ClarityObjectTransform *transform = clarity_transform_create(object);
+  transform->translation[0] = 1.25;
+  transform->translation[1] = -2.5;
+  transform->translation[2] = 3.75;
+  transform->rotation[0] = 0.35;
+  transform->rotation[1] = -0.6;
+  transform->rotation[2] = 1.2;
+  transform->scale[0] = 2.0;
+  transform->scale[1] = -0.5;
+  transform->scale[2] = 1.25;
+  transform->shear[0] = 0.2;
+  transform->shear[1] = -0.3;
+  transform->shear[2] = 0.4;
+  transform->rotate_pivot[0] = 2.0;
+  transform->rotate_pivot[1] = -1.0;
+  transform->rotate_pivot[2] = 0.5;
+  transform->scale_pivot[0] = -1.0;
+  transform->scale_pivot[1] = 3.0;
+
+  const double4x4 parent_effect = translation_matrix({10.0, 20.0, 30.0});
+  const double4x4 matrix_before = BKE_clarity_transform_world_matrix(*transform, parent_effect);
+  const double3 translation_before(transform->translation);
+
+  BKE_clarity_transform_zero_pivots(*transform);
+
+  expect_matrix_near(BKE_clarity_transform_world_matrix(*transform, parent_effect), matrix_before);
+  EXPECT_TRUE(double3(transform->translation) != translation_before);
+  const double3 zeroed_rotate = BKE_object_clarity_rotate_pivot_world_get(object, parent_effect);
+  for (int axis = 0; axis < 3; axis++) {
+    EXPECT_NEAR(zeroed_rotate[axis], matrix_before.location()[axis], 1.0e-11);
+  }
+
+  MEM_SAFE_DELETE(object.clarity_transform);
+}
+
+/**
+ * A scale the pivot chain cannot invert must leave every channel alone. Writing the rotate pivot and
+ * failing on the scale pivot left the object rotating and scaling around two different points.
+ */
+TEST(object_transform_clarity_parenting, PivotsWorldSetIsAtomic)
+{
+  Object object;
+  ClarityObjectTransform *transform = clarity_transform_create(object);
+  transform->translation[0] = 2.0;
+  transform->rotation[1] = -0.25;
+  transform->scale[1] = 0.0;
+
+  const double4x4 parent_effect = translation_matrix({10.0, 20.0, 30.0});
+  const double3 target_world = {9.25, -4.5, 6.75};
+  const ClarityObjectTransform before = *transform;
+  EXPECT_FALSE(BKE_object_clarity_pivots_world_set(object, parent_effect, target_world, true));
+  EXPECT_EQ(std::memcmp(transform, &before, sizeof(before)), 0);
+
+  const double3 not_finite = {std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0};
+  EXPECT_FALSE(BKE_object_clarity_pivots_world_set(object, parent_effect, not_finite, true));
+  EXPECT_EQ(std::memcmp(transform, &before, sizeof(before)), 0);
 
   MEM_SAFE_DELETE(object.clarity_transform);
 }

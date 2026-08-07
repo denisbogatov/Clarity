@@ -42,6 +42,13 @@ enum class ClarityMoveOrientation : uint8_t {
   Component = 2,
   /** Rotate Tool only: derive axes from the object's Euler rotation order. */
   Gimbal = 3,
+  /**
+   * Clarity `mode = 6`, its Custom axis orientation: the frame the pivot was authored with. No menu
+   * offers it, which is the point - in Clarity the marking menu shows nothing checked while custom
+   * pivot editing is on, because the mode it switched to is not one of the entries. Reported, never
+   * requested: #transform_orientation_set is only ever asked for a mode the menu can show.
+   */
+  Custom = 4,
 };
 
 /**
@@ -108,6 +115,19 @@ ClarityMoveToolState move_tool_state_get(const bContext *C);
 
 /** Resolve the transform orientation owned by one Clarity transform tool. */
 ClarityMoveOrientation transform_orientation_get(const bContext *C, ClarityToolID tool);
+/**
+ * `Custom axis orientation` of a transform tool: the frame Edit Pivot authors, which stays selected
+ * after the mode ends until the user picks a coordinate system or the frame itself goes away.
+ */
+bool orientation_custom_get(const bContext *C, ClarityToolID tool);
+void orientation_custom_set(const bContext *C, ClarityToolID tool, bool value);
+/**
+ * Give each transform tool its own coordinate system, seeded with the one it starts in: `Object` for
+ * Rotate, `World` for Move and Scale. Runs until the user picks one for a tool, after which that
+ * slot is left alone.
+ */
+void transform_orientation_defaults_ensure(bContext *C);
+
 
 bool move_option_get(const ClarityMoveToolState &state, ClarityMoveOption option);
 bool move_option_set(bContext *C, ClarityMoveOption option, bool value);

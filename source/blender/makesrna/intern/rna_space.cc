@@ -186,7 +186,7 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
     {SPACE_ITEM,
      "ITEM",
      ICON_OBJECT_DATA,
-     "Item",
+     "Transform",
      "Persistent transform properties for the active selection"},
     {SPACE_USERPREF,
      "PREFERENCES",

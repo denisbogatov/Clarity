@@ -108,6 +108,8 @@ struct ClarityPivotToolSettings {
   bool show_orientation_handle = true;
   eClarityPivotResetMode reset_mode = CLARITY_PIVOT_RESET_CENTER;
   int active_axis = 0;
+  /** An X/Y/Z handle is the selected one, rather than the centre handle. */
+  bool active_axis_handle = false;
 };
 
 struct ClarityObjectRuntimeRef {
@@ -244,6 +246,27 @@ ed::clarity::ClarityDispatchResult ED_clarity_event_dispatch(bContext *C, const 
 int ED_clarity_interaction_frame_rate_limit(const bContext *C);
 bool ED_clarity_navigation_debug_active(const bContext *C);
 ed::clarity::ClarityPivotEditTarget ED_clarity_pivot_edit_target_get(const bContext *C);
+/**
+ * True while a running modal transform is the one editing the pivot. Edit Pivot being on is not the
+ * same question: the mode can be on while something else is dragged, and only a pivot drag writes the
+ * pivot on every step - which is what makes the runtime pivot, rather than the manipulator's own
+ * matrix, the truthful source for the handles.
+ */
+bool ED_clarity_pivot_drag_active(const bContext *C);
+/**
+ * Whether the authored pivot frame owns the manipulator's axes right now. The pivot always owns the
+ * manipulator's position; its axes are a separate question, answered by the transform orientation:
+ * `Global` keeps world axes, `Local` asks for the authored frame. Entering Edit Pivot selects `Local`
+ * itself, the way Maya's custom pivot editing mode selects its `Custom` axis orientation.
+ */
+bool ED_clarity_pivot_orientation_owns_axes(const bContext *C);
+/**
+ * Reconcile the authored pivot frame with the current selection: it belongs to the selection it was
+ * aimed at, and goes when that is gone. Called from the manipulator refresh as well as from the event
+ * dispatcher, so a selection changed by a script - which sends a notifier but no event - reaches the
+ * same rule.
+ */
+void ED_clarity_pivot_selection_state_sync(const bContext *C);
 bool ED_clarity_pivot_custom_matrix_get(const bContext *C,
                                      ed::clarity::ClarityPivotUsage usage,
                                      float r_matrix[4][4]);
@@ -274,6 +297,18 @@ bool ED_clarity_pivot_tool_settings_get(const bContext *C,
 bool ED_clarity_pivot_tool_settings_set(const bContext *C,
                                      const ed::clarity::ClarityPivotToolSettings &settings);
 void ED_clarity_pivot_active_axis_set(const bContext *C, int active_axis);
+/**
+ * The position a `Shift + click` writes while an axis handle is the selected one.
+ *
+ * *Snap the custom pivot to a component*: "to snap the custom pivot's position along a single axis,
+ * select one of the axis handles (X, Y, Z) on the custom pivot manipulator and Shift-click a
+ * component". The axis is the manipulator's, so the target is projected onto that axis of the
+ * current frame and the other two components stay where the pivot already was. Returns \a
+ * target_world unchanged when the frame carries no usable orientation.
+ */
+double3 ED_clarity_pivot_position_axis_constrain(const ed::clarity::ClarityPivotFrame &frame,
+                                                 const double3 &target_world,
+                                                 int active_axis);
 bool ED_clarity_pivot_orientation_aim(ed::clarity::ClarityPivotFrame &frame,
                                    const double3 &target_world,
                                    int active_axis,

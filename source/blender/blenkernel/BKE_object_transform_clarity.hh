@@ -86,6 +86,16 @@ bool BKE_object_clarity_set_world_matrix(Object &object,
 void BKE_clarity_transform_set_rotate_pivot(ClarityObjectTransform &transform,
                                          const double3 &new_pivot,
                                          bool preserve);
+/**
+ * Clarity's `xform -zeroTransformPivots`: send both pivots and both pivot translations back to the
+ * object origin and fold what they contributed into the translate channel, so the DAG local matrix
+ * - and therefore the object, its geometry and its children - does not move.
+ *
+ * This is the only operation that can undo an authored pivot: the preserving setters keep their
+ * compensation in `rotate_pivot_translate` / `scale_pivot_translate`, which is part of where the
+ * pivot is.
+ */
+void BKE_clarity_transform_zero_pivots(ClarityObjectTransform &transform);
 void BKE_clarity_transform_set_scale_pivot(ClarityObjectTransform &transform,
                                         const double3 &new_pivot,
                                         bool preserve);
@@ -112,6 +122,14 @@ bool BKE_object_clarity_scale_pivot_world_set(Object &object,
                                            const double4x4 &parent_effect_matrix,
                                            const double3 &world_position,
                                            bool preserve);
+/**
+ * Move both pivots to one world position, the way Clarity's `xform -pivots` does. All or nothing: a
+ * transform whose channels cannot express the move keeps every channel it had.
+ */
+bool BKE_object_clarity_pivots_world_set(Object &object,
+                                      const double4x4 &parent_effect_matrix,
+                                      const double3 &world_position,
+                                      bool preserve);
 bool BKE_object_clarity_local_axis_world_get(const Object &object,
                                           const double4x4 &parent_effect_matrix,
                                           float r_axis[3][3]);

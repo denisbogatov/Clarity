@@ -131,4 +131,41 @@ TEST(object_custom_pivot, MirroredMatrixRoundTripKeepsQuaternionHemisphere)
   MEM_delete(object.runtime);
 }
 
+/**
+ * Where the origin overlay puts its dot.
+ *
+ * The marker names the point the object transforms around, so an authored pivot has to move it.
+ * Falling back to the object origin is what keeps every object without a pivot - which is all of
+ * them until a pivot tool touches one - drawn exactly where it was before.
+ */
+TEST(object_custom_pivot, TheOriginMarkerFollowsTheAuthoredPivot)
+{
+  Object object{};
+  object.runtime = MEM_new<ObjectRuntime>(__func__);
+  object.runtime->object_to_world = float4x4::identity();
+  object.runtime->object_to_world.location() = float3(1.0f, 2.0f, 3.0f);
+
+  const double3 origin(1.0, 2.0, 3.0);
+  EXPECT_FALSE(BKE_object_pivot_valid(object, false));
+  EXPECT_NEAR(math::distance(BKE_object_origin_display_position_get(object), origin), 0.0, 1.0e-6);
+
+  const double3 rotate_world(-5.0, 0.5, 7.0);
+  EXPECT_TRUE(BKE_object_custom_pivot_position_world_set(object, false, rotate_world));
+  EXPECT_TRUE(BKE_object_pivot_valid(object, false));
+  EXPECT_NEAR(
+      math::distance(BKE_object_origin_display_position_get(object), rotate_world), 0.0, 1.0e-6);
+
+  /* Data carrying only a scale pivot still has a pivot to mark. */
+  const double3 scale_world(4.0, 4.0, -2.0);
+  BKE_object_custom_pivot_position_clear(object, true, false);
+  EXPECT_TRUE(BKE_object_custom_pivot_position_world_set(object, true, scale_world));
+  EXPECT_FALSE(BKE_object_pivot_valid(object, false));
+  EXPECT_NEAR(
+      math::distance(BKE_object_origin_display_position_get(object), scale_world), 0.0, 1.0e-6);
+
+  BKE_object_custom_pivot_reset(object);
+  EXPECT_NEAR(math::distance(BKE_object_origin_display_position_get(object), origin), 0.0, 1.0e-6);
+  MEM_delete(object.runtime);
+}
+
 }  // namespace blender::bke::tests

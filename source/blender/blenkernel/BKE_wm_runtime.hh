@@ -135,6 +135,12 @@ struct WindowManagerRuntime {
   bool clarity_interaction_enabled;
   /** #ed::clarity::ClarityToolID of the globally active Clarity tool, mirrored for UI reads. */
   uint8_t clarity_tool;
+  /**
+   * #ed::clarity::ClarityMoveOrientation the active Clarity tool resolves to, mirrored for the same
+   * reason and for the pivot reference tests: the answer is computed from the tool's orientation slot
+   * and its `Custom axis orientation` flag, neither of which a UI or a script can read on its own.
+   */
+  uint8_t clarity_transform_orientation;
   uint8_t clarity_snap_mode;
   uint8_t clarity_snap_temporary_mode;
   /** #ed::clarity::eClarityStepSnapMode of the Step Snap widget. */

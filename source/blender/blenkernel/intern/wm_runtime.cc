@@ -27,6 +27,10 @@ WindowManagerRuntime::WindowManagerRuntime()
   this->clarity_interaction_enabled = U.interaction_preset == INTERACTION_PRESET_CLARITY;
   /* #ed::clarity::ClarityToolID::Select, the tool a fresh runtime starts on. */
   this->clarity_tool = 1;
+  /* #ed::clarity::ClarityMoveOrientation::World, which is what an unset orientation slot resolves to.
+   * Left indeterminate it read back as no enum value at all, and the first script to ask - the pivot
+   * reference capture - got an empty string instead of a coordinate system. */
+  this->clarity_transform_orientation = 1;
   this->clarity_snap_mode = 0;
   this->clarity_snap_temporary_mode = 0;
   /* Clarity's own defaults: relative steps of one unit and of 15 degrees. */

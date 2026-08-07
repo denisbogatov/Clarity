@@ -819,9 +819,16 @@ short transform_orientation_matrix_get(bContext *C,
    * drag has to follow the same axes. Without this the arrows point along the pivot while the
    * transform still runs in the scene orientation, and dragging an axis moves in another
    * direction. The pivot position still does not affect translation, that is decided separately in
-   * #createTransInfo. */
+   * #createTransInfo.
+   *
+   * Which orientations ask for the authored frame is #ED_clarity_pivot_orientation_owns_axes, the one
+   * function the manipulator asks as well: `Object` and, while it is on, Edit Pivot - which reports a
+   * mode of its own, so a drag inside the mode follows the frame the handles are drawn in even when the
+   * tool is set to `World`. The explicit `Local` stays in the condition for a transform whose
+   * orientation was overridden by its operator rather than read from the tool. */
   float clarity_pivot_orientation[3][3];
   if (ELEM(t->mode, TFM_TRANSLATION, TFM_ROTATION, TFM_TRACKBALL, TFM_RESIZE) &&
+      (orient_index == V3D_ORIENT_LOCAL || ED_clarity_pivot_orientation_owns_axes(C)) &&
       ED_clarity_pivot_custom_orientation_get(C, clarity_pivot_orientation))
   {
     copy_m3_m3(r_spacemtx, clarity_pivot_orientation);

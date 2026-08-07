@@ -33,6 +33,28 @@ from bpy.app.translations import (
 )
 
 
+def _transform_orientation_slot(context):
+    # The slot the active tool's manipulator actually reads.
+    #
+    # Clarity keeps one coordinate system per transform tool, the way Maya keeps rotateToolOri apart
+    # from moveToolOri and scaleToolOri, and the tool's own coordinate-system menu writes that slot.
+    # The header and its popover have to show the same one: reading slot 0 unconditionally left them
+    # on the scene default, a value no transform tool was using, so picking Object for Move changed
+    # nothing visible here. A slot that was never switched on falls back to the scene default, which
+    # is what BKE_scene_orientation_slot_get does for the transform itself.
+    slots = context.scene.transform_orientation_slots
+    window_manager = context.window_manager
+    index = 0
+    if getattr(window_manager, "clarity_interaction_enabled", False):
+        # Move's slot for a tool that has none of its own, the same fallback the manipulator applies:
+        # Select can be the active tool while Edit Pivot still draws the pivot handles, and those
+        # handles are Move's. Falling back to the scene default here instead showed a value no
+        # transform tool was using.
+        index = {'MOVE': 1, 'ROTATE': 2, 'SCALE': 3}.get(window_manager.clarity_tool, 1)
+    slot = slots[index]
+    return slot if (index != 0 and slot.use) else slots[0]
+
+
 def _toggle_xray_operator(layout, context, text=None):
     # The X-ray toggle has to have special logic since it affects a different property in pose mode.
     # See #70433 and #58661.
@@ -707,7 +729,7 @@ class ITEM_HT_header(Header):
     def draw(self, _context):
         layout = self.layout
         layout.template_header()
-        layout.label(text="Item")
+        layout.label(text="Transform")
 
 
 class VIEW3D_HT_header(Header):
@@ -729,7 +751,7 @@ class VIEW3D_HT_header(Header):
 
         # Orientation
         if has_pose_mode or object_mode in {'OBJECT', 'EDIT', 'EDIT_GPENCIL'}:
-            orient_slot = scene.transform_orientation_slots[0]
+            orient_slot = _transform_orientation_slot(context)
             row = layout.row(align=True)
 
             sub = row.row()
@@ -6241,9 +6263,8 @@ class VIEW3D_MT_orientations_pie(Menu):
     def draw(self, context):
         layout = self.layout
         pie = layout.menu_pie()
-        scene = context.scene
 
-        pie.prop(scene.transform_orientation_slots[0], "type", expand=True)
+        pie.prop(_transform_orientation_slot(context), "type", expand=True)
 
 
 class VIEW3D_MT_snap_pie(Menu):
@@ -8419,8 +8440,7 @@ class VIEW3D_PT_transform_orientations(Panel):
         layout = self.layout
         layout.label(text="Transform Orientations")
 
-        scene = context.scene
-        orient_slot = scene.transform_orientation_slots[0]
+        orient_slot = _transform_orientation_slot(context)
         orientation = orient_slot.custom_orientation
 
         row = layout.row()
@@ -8730,7 +8750,7 @@ class VIEW3D_PT_view3d_stereo(Panel):
 class VIEW3D_PT_context_properties(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "Item"
+    bl_category = "Transform"
     bl_label = "Properties"
     bl_options = {'DEFAULT_CLOSED'}
 
@@ -8771,7 +8791,7 @@ class VIEW3D_PT_context_properties(Panel):
 class VIEW3D_PT_active_spline(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "Item"
+    bl_category = "Transform"
     bl_label = "Active Spline"
 
     @classmethod

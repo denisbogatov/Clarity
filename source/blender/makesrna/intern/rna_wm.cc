@@ -1597,6 +1597,12 @@ static int rna_WindowManager_clarity_tool_get(PointerRNA *ptr)
   return wm->runtime->clarity_tool;
 }
 
+static int rna_WindowManager_clarity_transform_orientation_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  return wm->runtime->clarity_transform_orientation;
+}
+
 static int rna_WindowManager_clarity_snap_mode_get(PointerRNA *ptr)
 {
   const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
@@ -3270,6 +3276,26 @@ static void rna_def_windowmanager(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop, "Clarity Interaction", "Enable Clarity viewport interaction and transform snapping");
   RNA_def_property_update(prop, NC_WINDOW, nullptr);
+
+  static const EnumPropertyItem clarity_transform_orientation_items[] = {
+      /* Values follow #ed::clarity::ClarityMoveOrientation. */
+      {0, "OBJECT", 0, "Object", ""},
+      {1, "WORLD", 0, "World", ""},
+      {2, "COMPONENT", 0, "Component", ""},
+      {3, "GIMBAL", 0, "Gimbal", ""},
+      {4, "CUSTOM", 0, "Custom", ""},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
+  prop = RNA_def_property(srna, "clarity_transform_orientation", PROP_ENUM, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_enum_items(prop, clarity_transform_orientation_items);
+  RNA_def_property_enum_funcs(
+      prop, "rna_WindowManager_clarity_transform_orientation_get", nullptr, nullptr);
+  RNA_def_property_ui_text(prop,
+                           "Clarity Transform Orientation",
+                           "Coordinate system the active Clarity tool resolves to, including the "
+                           "Custom axis orientation that pivot editing selects");
 
   prop = RNA_def_property(srna, "clarity_tool", PROP_ENUM, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);

@@ -528,7 +528,10 @@ static void CLARITY_OT_selection_settings_set(wmOperatorType *ot)
   ot->idname = "CLARITY_OT_selection_settings_set";
   ot->exec = clarity_selection_settings_set_exec;
   ot->poll = ED_operator_view3d_active;
-  ot->flag = OPTYPE_REGISTER;
+  /* A setting written from a menu or a panel, not an edit to adjust afterwards: registering
+   * these put their fields into Adjust Last Operation. See
+   * #CLARITY_OT_transform_orientation_set. */
+  ot->flag = 0;
 
   RNA_def_float(ot->srna,
                 "click_box_size",
@@ -577,7 +580,10 @@ static void CLARITY_OT_pivot_pin_toggle(wmOperatorType *ot)
   ot->idname = "CLARITY_OT_pivot_pin_toggle";
   ot->exec = clarity_pivot_pin_toggle_exec;
   ot->poll = ED_operator_view3d_active;
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  /* A setting written from a menu or a panel, not an edit to adjust afterwards: registering
+   * these put their fields into Adjust Last Operation. See
+   * #CLARITY_OT_transform_orientation_set. */
+  ot->flag = OPTYPE_UNDO;
 }
 
 static const EnumPropertyItem clarity_pivot_reset_mode_items[] = {
@@ -626,7 +632,10 @@ static void CLARITY_OT_pivot_edit_toggle(wmOperatorType *ot)
   ot->idname = "CLARITY_OT_pivot_edit_toggle";
   ot->exec = clarity_pivot_edit_toggle_exec;
   ot->poll = ED_operator_view3d_active;
-  ot->flag = OPTYPE_REGISTER;
+  /* A setting written from a menu or a panel, not an edit to adjust afterwards: registering
+   * these put their fields into Adjust Last Operation. See
+   * #CLARITY_OT_transform_orientation_set. */
+  ot->flag = 0;
 }
 
 static wmOperatorStatus clarity_pivot_settings_set_exec(bContext *C, wmOperator *op)
@@ -662,7 +671,10 @@ static void CLARITY_OT_pivot_settings_set(wmOperatorType *ot)
   ot->idname = "CLARITY_OT_pivot_settings_set";
   ot->exec = clarity_pivot_settings_set_exec;
   ot->poll = ED_operator_view3d_active;
-  ot->flag = OPTYPE_REGISTER;
+  /* A setting written from a menu or a panel, not an edit to adjust afterwards: registering
+   * these put their fields into Adjust Last Operation. See
+   * #CLARITY_OT_transform_orientation_set. */
+  ot->flag = 0;
   RNA_def_boolean(
       ot->srna, "snap_position", true, "Snap Position", "Apply snap targets to pivot position");
   RNA_def_boolean(ot->srna,
@@ -1971,11 +1983,13 @@ bool middle_mouse_axis_drag_handle(bContext *C,
   float pivot_matrix[4][4];
   const bool has_custom_pivot_matrix = ED_clarity_pivot_custom_matrix_get(
       C, ClarityPivotUsage::Display, pivot_matrix);
-  if (has_custom_pivot_matrix) {
+  if (has_custom_pivot_matrix && ED_clarity_pivot_orientation_owns_axes(C)) {
     float orient_matrix[3][3];
     copy_m3_m4(orient_matrix, pivot_matrix);
     /* With orient_type left unset, a supplied matrix is the transform API's custom-matrix
-     * orientation. This keeps the constraint on the visible Clarity pivot axis. */
+     * orientation. This keeps the constraint on the visible Clarity pivot axis - and only while the
+     * pivot frame is the one being drawn: under `World` the handles are world-aligned, so the axis
+     * this drag constrains to has to be as well. */
     RNA_float_set_array(&ptr, "orient_matrix", &orient_matrix[0][0]);
   }
 

@@ -6,6 +6,7 @@
  * \ingroup edobj
  */
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <numeric>
@@ -33,6 +34,7 @@
 #include "BLI_vector.hh"
 
 #include "BKE_armature.hh"
+#include "BKE_clarity_constraints.hh"
 #include "BKE_context.hh"
 #include "BKE_curve.hh"
 #include "BKE_curves.hh"
@@ -48,6 +50,8 @@
 #include "BKE_mesh.hh"
 #include "BKE_multires.hh"
 #include "BKE_object.hh"
+#include "BKE_object_custom_pivot.hh"
+#include "BKE_object_transform_clarity.hh"
 #include "BKE_report.hh"
 #include "BKE_scene.hh"
 #include "BKE_tracking.hh"
@@ -661,6 +665,186 @@ static bool apply_objects_internal_need_single_user(bContext *C)
   return (ID_REAL_USERS(ob->data) > CTX_DATA_COUNT(C, selected_editable_objects));
 }
 
+/**
+ * The channel factors Apply bakes into the geometry, read from whichever transform model owns the
+ * object. `BKE_object_to_mat3` and its neighbours only see the Blender channels, and an object using
+ * the Clarity model keeps its transform in `clarity_transform` - baking the stale Blender channels
+ * moved the mesh while the object kept its real transform, and the pivot ended up somewhere that
+ * belonged to neither.
+ *
+ * The pivots are folded out first, on a copy: Clarity's `zeroTransformPivots` sends both pivots and
+ * both compensations into the translate channel without changing the matrix, leaving one
+ * translation, one rotation and one scale - the same shape the Blender channels have, and the only
+ * shape the zeroing after the bake can leave at identity. A compensation left in place would shift
+ * the object by itself the moment translate is zeroed.
+ */
+struct ObjectApplyFactors {
+  float rotation[3][3];
+  float scale[3][3];
+  /** Rotation times scale, what #BKE_object_to_mat3 returns for the Blender model. */
+  float linear[3][3];
+  float translation[3];
+  /** The channels with the pivots folded in, ready to be zeroed once the bake succeeded. */
+  ClarityObjectTransform clarity_folded;
+  bool uses_clarity_transform;
+};
+
+static void object_apply_factors_get(const Object *ob, ObjectApplyFactors &factors)
+{
+  factors.uses_clarity_transform = BKE_object_uses_clarity_transform(ob);
+  if (factors.uses_clarity_transform) {
+    factors.clarity_folded = *ob->clarity_transform;
+    BKE_clarity_transform_zero_pivots(factors.clarity_folded);
+
+    ClarityObjectTransform rotation_only = factors.clarity_folded;
+    std::fill_n(rotation_only.translation, 3, 0.0);
+    std::fill_n(rotation_only.shear, 3, 0.0);
+    std::fill_n(rotation_only.scale, 3, 1.0);
+    const float4x4 rotation_matrix(BKE_clarity_transform_channel_matrix(rotation_only));
+    copy_m3_m4(factors.rotation, rotation_matrix.ptr());
+
+    ClarityObjectTransform scale_only = factors.clarity_folded;
+    std::fill_n(scale_only.translation, 3, 0.0);
+    std::fill_n(scale_only.rotation, 3, 0.0);
+    std::fill_n(scale_only.rotate_axis, 3, 0.0);
+    const float4x4 scale_matrix(BKE_clarity_transform_channel_matrix(scale_only));
+    copy_m3_m4(factors.scale, scale_matrix.ptr());
+
+    mul_m3_m3m3(factors.linear, factors.rotation, factors.scale);
+    for (int axis = 0; axis < 3; axis++) {
+      factors.translation[axis] = float(factors.clarity_folded.translation[axis]);
+    }
+    return;
+  }
+
+  BKE_object_rot_to_mat3(ob, factors.rotation, true);
+  BKE_object_scale_to_mat3(ob, factors.scale);
+  BKE_object_to_mat3(ob, factors.linear);
+  add_v3_v3v3(factors.translation, ob->loc, ob->dloc);
+}
+
+/**
+ * Where the authored pivot point was, in world space, so it can be put back after the bake.
+ *
+ * Apply leaves the object's world matrix alone - the geometry absorbs exactly what the channels lose
+ * - so the world point the pivot sat on is the same geometry it sat on, before and after. Recording
+ * the world position and re-authoring it is therefore all it takes for the pivot to stay put, and it
+ * works the same whether the pivot lives in the Clarity DAG channels or in the shim.
+ *
+ * The position only. An authored orientation is not carried over: the rotation it was aimed against
+ * has just been baked into the geometry, so after an apply the pivot's axes are the object's own.
+ */
+struct ObjectApplyPivot {
+  double3 rotate_world = double3(0.0);
+  double3 scale_world = double3(0.0);
+  bool rotate_valid = false;
+  bool scale_valid = false;
+};
+
+static double4x4 object_apply_parent_effect_matrix_get(const Object *ob)
+{
+  if (ob->parent == nullptr) {
+    return double4x4::identity();
+  }
+  float parent_effect[4][4];
+  BKE_object_get_parent_matrix(ob, ob->parent, parent_effect);
+  return double4x4(float4x4(parent_effect));
+}
+
+static void object_apply_pivot_snapshot_get(const Object *ob, ObjectApplyPivot &pivot)
+{
+  pivot.rotate_valid = BKE_object_pivot_valid(*ob, false) &&
+                       BKE_object_pivot_world_get(*ob, false, pivot.rotate_world);
+  pivot.scale_valid = BKE_object_pivot_valid(*ob, true) &&
+                      BKE_object_pivot_world_get(*ob, true, pivot.scale_world);
+  /* The authored orientation is deliberately not carried over. Apply bakes the rotation into the
+   * geometry and leaves the object at identity, so there is nothing left for a frame to be authored
+   * against: the axes go back to the object's own, which is what `Object` shows after an apply. The
+   * position is the part the user placed by hand, and #object_apply_pivot_restore puts it back. */
+}
+
+/**
+ * Put the pivot back on the world point it was authored at. The channels have just been zeroed, so
+ * the preserving setter writes no compensation worth speaking of: with rotation and scale at
+ * identity the pivot offset alone reproduces the matrix.
+ */
+static void object_apply_pivot_restore(Object *ob, const ObjectApplyPivot &pivot)
+{
+  if (!pivot.rotate_valid && !pivot.scale_valid) {
+    return;
+  }
+  if (BKE_object_uses_clarity_transform(ob)) {
+    const double4x4 parent_effect = object_apply_parent_effect_matrix_get(ob);
+    if (pivot.rotate_valid) {
+      BKE_object_clarity_rotate_pivot_world_set(*ob, parent_effect, pivot.rotate_world, true);
+    }
+    if (pivot.scale_valid) {
+      BKE_object_clarity_scale_pivot_world_set(*ob, parent_effect, pivot.scale_world, true);
+    }
+    BKE_object_clarity_evaluated_channels_invalidate(*ob);
+    return;
+  }
+  if (pivot.rotate_valid) {
+    BKE_object_custom_pivot_position_world_set(*ob, false, pivot.rotate_world);
+  }
+  if (pivot.scale_valid) {
+    BKE_object_custom_pivot_position_world_set(*ob, true, pivot.scale_world);
+  }
+}
+
+/**
+ * Zero what was baked, pivots included: their compensation channels are part of the matrix, and
+ * leaving them behind shifts the object by exactly that offset the moment translate is zeroed. The
+ * authored pivot point is restored afterwards by #object_apply_pivot_restore, so what this leaves at
+ * the object origin is the channel value, not the pivot the user placed.
+ */
+static void object_apply_channels_zero(Object *ob,
+                                       const ObjectApplyFactors &factors,
+                                       const bool apply_loc,
+                                       const bool apply_rot,
+                                       const bool apply_scale)
+{
+  if (factors.uses_clarity_transform) {
+    ClarityObjectTransform &transform = *ob->clarity_transform;
+    transform = factors.clarity_folded;
+    if (apply_loc) {
+      std::fill_n(transform.translation, 3, 0.0);
+    }
+    if (apply_rot) {
+      std::fill_n(transform.rotation, 3, 0.0);
+      std::fill_n(transform.rotate_axis, 3, 0.0);
+    }
+    if (apply_scale) {
+      std::fill_n(transform.scale, 3, 1.0);
+      std::fill_n(transform.shear, 3, 0.0);
+    }
+    BKE_object_clarity_evaluated_channels_invalidate(*ob);
+  }
+  /* Only the positions: the shim stores those in object space, which the bake just redefined, and
+   * #object_apply_pivot_restore puts the authored point back. The authored orientation is a world
+   * frame and the bake does not change the object's world orientation, so it survives untouched -
+   * `interactionScenarios.freeze_transformations` shows Maya's surviving a Freeze Transformations
+   * the same way. */
+  BKE_object_custom_pivot_position_clear(*ob, true, true);
+
+  if (apply_loc) {
+    zero_v3(ob->loc);
+    zero_v3(ob->dloc);
+  }
+  if (apply_scale) {
+    copy_v3_fl(ob->scale, 1.0f);
+    copy_v3_fl(ob->dscale, 1.0f);
+  }
+  if (apply_rot) {
+    zero_v3(ob->rot);
+    zero_v3(ob->drot);
+    unit_qt(ob->quat);
+    unit_qt(ob->dquat);
+    unit_axis_angle(ob->rotAxis, &ob->rotAngle);
+    unit_axis_angle(ob->drotAxis, &ob->drotAngle);
+  }
+}
+
 static wmOperatorStatus apply_objects_internal(bContext *C,
                                                ReportList *reports,
                                                bool apply_loc,
@@ -816,21 +1000,28 @@ static wmOperatorStatus apply_objects_internal(bContext *C,
   bool has_non_invertable_matrix = false;
 
   for (Object *ob : objects) {
+    /* Whichever transform model owns this object hands over the same three factors. */
+    ObjectApplyFactors factors;
+    object_apply_factors_get(ob, factors);
+    /* Read while the object still has its old frame: the world point is what survives the bake. */
+    ObjectApplyPivot pivot;
+    object_apply_pivot_snapshot_get(ob, pivot);
+
     /* calculate rotation/scale matrix */
     if (apply_scale && apply_rot) {
-      BKE_object_to_mat3(ob, rsmat);
+      copy_m3_m3(rsmat, factors.linear);
     }
     else if (apply_scale) {
-      BKE_object_scale_to_mat3(ob, rsmat);
+      copy_m3_m3(rsmat, factors.scale);
     }
     else if (apply_rot) {
       float tmat[3][3], timat[3][3];
 
       /* simple rotation matrix */
-      BKE_object_rot_to_mat3(ob, rsmat, true);
+      copy_m3_m3(rsmat, factors.rotation);
 
       /* correct for scale, note mul_m3_m3m3 has swapped args! */
-      BKE_object_scale_to_mat3(ob, tmat);
+      copy_m3_m3(tmat, factors.scale);
       if (!invert_m3_m3(timat, tmat)) {
         BKE_reportf(
             reports,
@@ -851,12 +1042,12 @@ static wmOperatorStatus apply_objects_internal(bContext *C,
 
     /* calculate translation */
     if (apply_loc) {
-      add_v3_v3v3(mat[3], ob->loc, ob->dloc);
+      copy_v3_v3(mat[3], factors.translation);
 
       if (!(apply_scale && apply_rot)) {
         float tmat[3][3];
         /* correct for scale and rotation that is still applied */
-        BKE_object_to_mat3(ob, obmat);
+        copy_m3_m3(obmat, factors.linear);
         invert_m3_m3(iobmat, obmat);
         mul_m3_m3m3(tmat, rsmat, iobmat);
         mul_m3_v3(tmat, mat[3]);
@@ -1037,7 +1228,18 @@ static wmOperatorStatus apply_objects_internal(bContext *C,
       mul_m4_m4_post(_mat, obact_parent);
       mul_m4_m4_post(_mat, obact_parentinv);
 
-      if (apply_loc && apply_scale && apply_rot) {
+      if (factors.uses_clarity_transform) {
+        /* The Clarity channels are the object's transform, so the shared data's matrix has to be
+         * written there. Pivots are not preserved: this object is being given the active object's
+         * frame, and a pivot compensation carried over from its own would offset it. */
+        ClarityTransformSetOptions options;
+        options.preserve_pivots = false;
+        options.preserve_rotate_axis = false;
+        BKE_object_clarity_set_world_matrix(
+            *ob, double4x4::identity(), double4x4(float4x4(_mat)), options);
+        BKE_object_clarity_evaluated_channels_invalidate(*ob);
+      }
+      else if (apply_loc && apply_scale && apply_rot) {
         BKE_object_apply_mat4(ob, _mat, false, true);
       }
       else {
@@ -1061,23 +1263,14 @@ static wmOperatorStatus apply_objects_internal(bContext *C,
       }
     }
     else {
-      if (apply_loc) {
-        zero_v3(ob->loc);
-        zero_v3(ob->dloc);
-      }
-      if (apply_scale) {
-        copy_v3_fl(ob->scale, 1.0f);
-        copy_v3_fl(ob->dscale, 1.0f);
-      }
-      if (apply_rot) {
-        zero_v3(ob->rot);
-        zero_v3(ob->drot);
-        unit_qt(ob->quat);
-        unit_qt(ob->dquat);
-        unit_axis_angle(ob->rotAxis, &ob->rotAngle);
-        unit_axis_angle(ob->drotAxis, &ob->drotAngle);
-      }
+      object_apply_channels_zero(ob, factors, apply_loc, apply_rot, apply_scale);
     }
+
+    /* Apply keeps the object's world matrix, so the pivot goes back on the world point it was
+     * authored at - the same geometry it was on before. The frame it is converted through is the one
+     * the channels have now, which is why the matrices are recalculated first. */
+    BKE_object_where_is_calc(depsgraph, scene, ob);
+    object_apply_pivot_restore(ob, pivot);
 
     Object *ob_eval = DEG_get_evaluated(depsgraph, ob);
     BKE_object_transform_copy(ob_eval, ob);

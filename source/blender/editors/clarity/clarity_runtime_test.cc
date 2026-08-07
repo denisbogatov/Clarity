@@ -237,6 +237,161 @@ TEST(clarity_input, CtrlEMapsExclusivelyToExtrude)
   EXPECT_EQ(action->id, ClarityActionID::ToolHotkeyReleased);
 }
 
+/**
+ * The left button click Edit Pivot acts on, recognized from the press and release pair.
+ *
+ * A #KM_CLICK never reaches the dispatcher, so the gesture has to be read off the release. What the
+ * release alone can prove is checked here; whether a press was still pending is the handler's half
+ * of the question and lives in #ClarityPivotEditState::click_press_pending.
+ */
+TEST(clarity_input, TheClickIsTheReleaseThatStayedWhereThePressWas)
+{
+  wmEvent event{};
+  event.type = LEFTMOUSE;
+  event.val = KM_RELEASE;
+  event.prev_press_type = LEFTMOUSE;
+  event.prev_val = KM_PRESS;
+  event.xy[0] = 400;
+  event.xy[1] = 300;
+  event.prev_press_xy[0] = 400;
+  event.prev_press_xy[1] = 300;
+  EXPECT_TRUE(left_mouse_click_release_is(event));
+
+  /* A release that travelled is the tail of a drag, and the marquee or the manipulator owns it. */
+  event.xy[0] = 480;
+  EXPECT_FALSE(left_mouse_click_release_is(event));
+  event.xy[0] = 400;
+
+  /* The second press of a double click is the topology gesture. Its release keeps `prev_val` at the
+   * #KM_PRESS the double click was promoted from, so only the pending press can tell them apart -
+   * but a release whose press never happened must not pass here either. */
+  event.prev_val = KM_RELEASE;
+  EXPECT_FALSE(left_mouse_click_release_is(event));
+  event.prev_val = KM_PRESS;
+
+  /* `Alt` belongs to viewport navigation from the moment the button goes down. */
+  event.prev_press_modifier = KM_ALT;
+  EXPECT_FALSE(left_mouse_click_release_is(event));
+  event.prev_press_modifier = wmEventModifierFlag(0);
+
+  /* Selection modifiers change what the click means, never whether there was one. */
+  event.prev_press_modifier = wmEventModifierFlag(KM_SHIFT | KM_CTRL);
+  EXPECT_TRUE(left_mouse_click_release_is(event));
+  event.prev_press_modifier = wmEventModifierFlag(0);
+
+  event.val = KM_PRESS;
+  EXPECT_FALSE(left_mouse_click_release_is(event));
+  event.val = KM_RELEASE;
+
+  event.type = RIGHTMOUSE;
+  event.prev_press_type = RIGHTMOUSE;
+  EXPECT_FALSE(left_mouse_click_release_is(event));
+}
+
+/**
+ * The presses a click can still grow out of.
+ *
+ * Only the press half can tell a click from a double click: the release that follows a
+ * #KM_DBL_CLICK keeps `prev_val` at the #KM_PRESS the double click was promoted from, so it looks
+ * exactly like the release of a plain click. This is also the one rule the event-driven test cannot
+ * reach - #WM_event_add_simulate never promotes a simulated press to a double click.
+ */
+TEST(clarity_input, ADoubleClickPressIsNotAClickPress)
+{
+  wmEvent event{};
+  event.type = LEFTMOUSE;
+  event.val = KM_PRESS;
+  EXPECT_TRUE(left_mouse_click_press_arms(event));
+
+  /* The gesture is a topology selection, and its release belongs to it. */
+  event.val = KM_DBL_CLICK;
+  EXPECT_FALSE(left_mouse_click_press_arms(event));
+
+  event.val = KM_PRESS;
+  event.modifier = KM_ALT;
+  EXPECT_FALSE(left_mouse_click_press_arms(event));
+
+  /* The modifiers that change what the click means leave it a click. */
+  event.modifier = wmEventModifierFlag(KM_SHIFT | KM_CTRL);
+  EXPECT_TRUE(left_mouse_click_press_arms(event));
+
+  event.modifier = wmEventModifierFlag(0);
+  event.val = KM_RELEASE;
+  EXPECT_FALSE(left_mouse_click_press_arms(event));
+
+  event.val = KM_PRESS;
+  event.type = MIDDLEMOUSE;
+  EXPECT_FALSE(left_mouse_click_press_arms(event));
+}
+
+/**
+ * `Shift + click` with an axis handle selected.
+ *
+ * "To snap the custom pivot's position along a single axis, select one of the axis handles (X, Y, Z)
+ * on the custom pivot manipulator and Shift-click a component" - the axis is the manipulator's own,
+ * not a world axis, so a turned pivot constrains along its own handle.
+ */
+TEST(clarity_pivot, ASingleAxisSnapKeepsTheOtherTwoComponents)
+{
+  ClarityPivotFrame frame;
+  frame.position_world = double3(1.0, 2.0, 3.0);
+  frame.position_valid = true;
+  frame.orientation_valid = true;
+
+  const double3 target(5.0, 7.0, -4.0);
+  const auto expect_position = [](const double3 &result, const double3 &expected) {
+    EXPECT_NEAR(result.x, expected.x, 1.0e-9);
+    EXPECT_NEAR(result.y, expected.y, 1.0e-9);
+    EXPECT_NEAR(result.z, expected.z, 1.0e-9);
+  };
+
+  expect_position(ED_clarity_pivot_position_axis_constrain(frame, target, 0),
+                  double3(5.0, 2.0, 3.0));
+  expect_position(ED_clarity_pivot_position_axis_constrain(frame, target, 1),
+                  double3(1.0, 7.0, 3.0));
+  expect_position(ED_clarity_pivot_position_axis_constrain(frame, target, 2),
+                  double3(1.0, 2.0, -4.0));
+
+  /* A quarter turn about Z puts the pivot's X handle along world Y. */
+  const double half = std::sqrt(0.5);
+  frame.orientation_world = math::QuaternionBase<double>(half, 0.0, 0.0, half);
+  expect_position(ED_clarity_pivot_position_axis_constrain(frame, target, 0),
+                  double3(1.0, 7.0, 3.0));
+
+  /* Without a frame to constrain against the target is taken whole, which is the unconstrained
+   * `Shift + click` the centre handle asks for. */
+  frame.orientation_valid = false;
+  expect_position(ED_clarity_pivot_position_axis_constrain(frame, target, 0), target);
+  frame.orientation_valid = true;
+  expect_position(ED_clarity_pivot_position_axis_constrain(frame, target, -1), target);
+}
+
+/**
+ * Maya's two ways into Custom Pivot mode share one key, and the release decides which was used.
+ *
+ * "Press and hold the D key to temporarily enter custom pivot editing mode" - release leaves it -
+ * while "press D or Insert" toggles a mode that stays. A tap is not a short hold, it is the other
+ * gesture.
+ */
+TEST(clarity_pivot, OnlyAHeldKeyLeavesTheModeOnRelease)
+{
+  const double tap_timeout = 0.2;
+
+  /* Held past the timeout by the press that switched the mode on: the hold ends here. */
+  EXPECT_TRUE(pivot_edit_key_release_exits(true, 0.9, tap_timeout));
+
+  /* Tapped: the toggle stays on, and the release must not undo it. */
+  EXPECT_FALSE(pivot_edit_key_release_exits(true, 0.05, tap_timeout));
+  EXPECT_FALSE(pivot_edit_key_release_exits(true, tap_timeout, tap_timeout));
+
+  /* The press found the mode already on, so it was the toggle turning it off. Its release cannot
+   * turn it back on however long the key was down. */
+  EXPECT_FALSE(pivot_edit_key_release_exits(false, 5.0, tap_timeout));
+
+  /* A timeout of zero is the preference set to "never treat it as a tap": every hold exits. */
+  EXPECT_TRUE(pivot_edit_key_release_exits(true, 0.001, 0.0));
+}
+
 TEST(clarity_input, MarkingMenuGesturesMapToTheirOwnActions)
 {
   wmEvent event{};

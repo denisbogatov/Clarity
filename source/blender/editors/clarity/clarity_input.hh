@@ -122,6 +122,32 @@ struct ClarityInputAction {
  */
 ClaritySnapMode snap_key_event_mode_get(int key_type, short key_val, uint8_t modifier);
 
+/**
+ * Whether \a event is the left button release that completes a click rather than a drag.
+ *
+ * A #KM_CLICK never reaches #ED_clarity_event_dispatch. Blender synthesizes it inside
+ * #wm_handlers_do, hands the promoted event to that one handler list and restores it before
+ * returning, while the dispatcher runs between the modal and the region handler passes - so it only
+ * ever sees the queued #KM_PRESS and #KM_RELEASE. Neither can #wmWindow::event_queue_check_click
+ * stand in for the promotion: `view3d.select` sits on the left button *press* in the Industry
+ * Compatible keymap Clarity builds on, and handling that press is what clears the flag.
+ *
+ * This is the same test #wm_handlers_do makes before it promotes a release, so a gesture recognized
+ * here is exactly the one Blender would have called a click. The caller still owns the question of
+ * whether a press was pending: the release alone cannot tell a click from the tail of a drag that
+ * happened to end where it started.
+ */
+bool left_mouse_click_release_is(const wmEvent &event);
+
+/**
+ * Whether \a event is a left button press that can still become a click.
+ *
+ * The second press of a double click carries #KM_DBL_CLICK instead of #KM_PRESS, and that gesture
+ * belongs to topology selection: its release must not also act as a click. `Alt` is viewport
+ * navigation from the moment the button goes down.
+ */
+bool left_mouse_click_press_arms(const wmEvent &event);
+
 }  // namespace ed::clarity
 
 std::optional<ed::clarity::ClarityInputAction> ED_clarity_input_translate(const bContext *C,

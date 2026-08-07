@@ -10,6 +10,7 @@
  * Used for 3D View
  */
 
+#include <cmath>
 #include <cstdio>
 
 #include "BLI_array_utils.h"
@@ -1110,10 +1111,18 @@ int calc_gizmo_stats(const bContext *C,
                                        C, ed::clarity::ClarityPivotUsage::Display, clarity_pivot_matrix);
 
   if (rv3d) {
-    /* Transform widget centroid/center. Not while a Clarity pivot override is placing the
-     * manipulator: this runs on every gizmo statistics pass, and overwriting the matrix here made
-     * the pivot manipulator jump back to the selection centre on those frames. */
-    if (!clarity_pivot_override) {
+    /* Transform widget centroid/center. While a Clarity pivot override is placing the manipulator
+     * only the axes are taken from here: #copy_m4_m3 also zeroes the location, and this runs on
+     * every gizmo statistics pass, which made the pivot manipulator jump back to the selection
+     * centre on those frames. The axes themselves still belong to the orientation setting - the
+     * pivot frame replaces them later, in #gizmo_prepare_mat, and only when it owns them. */
+    if (clarity_pivot_override) {
+      for (int axis = 0; axis < 3; axis++) {
+        copy_v3_v3(rv3d->twmat[axis], tbounds->axis[axis]);
+        rv3d->twmat[axis][3] = 0.0f;
+      }
+    }
+    else {
       copy_m4_m3(rv3d->twmat, tbounds->axis);
     }
     rv3d->twdrawflag = short(0xFFFF);
@@ -1260,7 +1269,19 @@ static bool gizmo_3d_calc_pos(const bContext *C,
 
 void gizmo_prepare_mat(const bContext *C, RegionView3D *rv3d, const TransformBounds *tbounds)
 {
-  if (ED_clarity_pivot_custom_matrix_get(C, ed::clarity::ClarityPivotUsage::Display, rv3d->twmat)) {
+  float clarity_pivot_matrix[4][4];
+  if (ED_clarity_pivot_custom_matrix_get(
+          C, ed::clarity::ClarityPivotUsage::Display, clarity_pivot_matrix))
+  {
+    /* The pivot owns where the manipulator sits. Its axes are a separate question: only the
+     * orientation that asks for the authored frame gets it, and `Global` keeps the world axes
+     * #calc_gizmo_stats already put in the matrix. */
+    if (ED_clarity_pivot_orientation_owns_axes(C)) {
+      copy_m4_m4(rv3d->twmat, clarity_pivot_matrix);
+    }
+    else {
+      copy_v3_v3(rv3d->twmat[3], clarity_pivot_matrix[3]);
+    }
     return;
   }
   Scene *scene = CTX_data_scene(C);
@@ -1794,6 +1815,43 @@ static GizmoGroup *gizmogroup_init(wmGizmoGroup *gzgroup)
 }
 
 /**
+ * The pivot the running drag is writing, when that drag is the one editing the pivot.
+ *
+ * Gated on the drag rather than on Edit Pivot being on: the mode can be on while something else is
+ * dragged, and pinning the handles to the pivot then left the manipulator sitting away from the
+ * object it belonged to. A non-finite matrix is refused for the same reason - the handles have to
+ * stay somewhere the user can reach them.
+ */
+static bool gizmo_3d_clarity_pivot_matrix_get(const bContext *C,
+                                              const RegionView3D *rv3d,
+                                              float r_matrix[4][4])
+{
+  if (!ED_clarity_pivot_drag_active(C)) {
+    return false;
+  }
+  float pivot_matrix[4][4];
+  if (!ED_clarity_pivot_custom_matrix_get(
+          C, ed::clarity::ClarityPivotUsage::Display, pivot_matrix))
+  {
+    return false;
+  }
+  if (!std::isfinite(pivot_matrix[3][0]) || !std::isfinite(pivot_matrix[3][1]) ||
+      !std::isfinite(pivot_matrix[3][2]))
+  {
+    return false;
+  }
+  if (ED_clarity_pivot_orientation_owns_axes(C)) {
+    copy_m4_m4(r_matrix, pivot_matrix);
+    return true;
+  }
+  /* Only the position is the pivot's. The axes stay the ones the last refresh resolved from the
+   * orientation setting, so a drag under `World` keeps world-aligned handles. */
+  copy_m4_m4(r_matrix, rv3d->twmat);
+  copy_v3_v3(r_matrix[3], pivot_matrix[3]);
+  return true;
+}
+
+/**
  * Custom handler for gizmo widgets
  */
 static wmOperatorStatus gizmo_modal(bContext *C,
@@ -1849,7 +1907,16 @@ static wmOperatorStatus gizmo_modal(bContext *C,
       float scale_buf[3];
       float *scale = nullptr;
       bool update = false;
-      copy_m4_m4(twmat, rv3d->twmat);
+      /* Edit Pivot writes the pivot on every modal step, so the runtime pivot - not the mouse - says
+       * where the manipulator is. `rv3d->twmat` is only refreshed outside the drag, and adding the
+       * transform delta to it misses what snapping decided: a snapped pivot is placed on its target
+       * absolutely, not displaced by the pointer, so the manipulator was drawn beside the highlighted
+       * component for the whole drag and only landed on it when the release refreshed the group.
+       * #WIDGETGROUP_gizmo_draw_prepare reads the same pivot again just before drawing, which is what
+       * makes the result independent of this handler's order against the transform's own modal. */
+      float pivot_matrix[4][4];
+      const bool pivot_is_live = gizmo_3d_clarity_pivot_matrix_get(C, rv3d, pivot_matrix);
+      copy_m4_m4(twmat, pivot_is_live ? pivot_matrix : rv3d->twmat);
 
       if (axis_type == MAN_AXES_SCALE) {
         scale = scale_buf;
@@ -1871,7 +1938,8 @@ static wmOperatorStatus gizmo_modal(bContext *C,
          * is released. The dragged dial keeps the matrix its drag was set up with — that one carries
          * the angle feedback — so only the other handles follow. */
         if (ggd->use_clarity_center_style &&
-            transform_apply_matrix(static_cast<TransInfo *>(op->customdata), twmat))
+            (pivot_is_live ||
+             transform_apply_matrix(static_cast<TransInfo *>(op->customdata), twmat)))
         {
           MAN_ITER_AXES_BEGIN (axis, axis_idx_other) {
             if (axis == widget || (axis->flag & WM_GIZMO_HIDDEN)) {
@@ -1883,7 +1951,9 @@ static wmOperatorStatus gizmo_modal(bContext *C,
           ED_region_tag_redraw_editor_overlays(region);
         }
       }
-      else if (transform_apply_matrix(static_cast<TransInfo *>(op->customdata), twmat)) {
+      else if (pivot_is_live ||
+               transform_apply_matrix(static_cast<TransInfo *>(op->customdata), twmat))
+      {
         update = true;
       }
 
@@ -2189,6 +2259,10 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
     return;
   }
 
+  /* Before anything is read from the pivot: a selection that no longer carries the authored frame has
+   * to have dropped it by the time this refresh decides what the manipulator shows. */
+  ED_clarity_pivot_selection_state_sync(C);
+
   bool clarity_edit_pivot;
   const int twtype = gizmogroup_twtype_calc(C, ggd, v3d, &clarity_edit_pivot);
   if (ggd->use_twtype_refresh) {
@@ -2226,7 +2300,16 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
   }
 
   if (clarity_pivot) {
-    copy_m4_m4(rv3d->twmat, clarity_pivot_matrix);
+    /* The pivot owns where the manipulator sits; the axes belong to the orientation setting unless it
+     * is the one that asks for the authored frame. Taking the whole matrix here showed the pivot's
+     * frame even with `World` selected - and this is the path that actually refreshes the group, so
+     * the same split in #gizmo_prepare_mat never got a say. */
+    if (ED_clarity_pivot_orientation_owns_axes(C)) {
+      copy_m4_m4(rv3d->twmat, clarity_pivot_matrix);
+    }
+    else {
+      copy_v3_v3(rv3d->twmat[3], clarity_pivot_matrix[3]);
+    }
   }
   else {
     gizmo_3d_calc_pos(
@@ -2304,6 +2387,40 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
     return;
   }
   gizmo_get_idot(rv3d, idot);
+
+  /* While Edit Pivot owns a drag the runtime pivot is the only truthful source for the handles: it
+   * is written on every modal step, and a snapped pivot is placed on its target absolutely instead
+   * of being displaced by the pointer. Reading it here, on the draw that follows the event, keeps
+   * the answer independent of whether the gizmo handler ran before or after the transform
+   * recalculated the pivot - #gizmo_modal on its own can be one event behind. */
+  if (is_modal) {
+    float pivot_matrix[4][4];
+    if (gizmo_3d_clarity_pivot_matrix_get(C, rv3d, pivot_matrix)) {
+      wmGizmo *modal_gizmo = WM_gizmomap_get_modal(gzgroup->parent_gzmap);
+      const int modal_axis_idx = modal_gizmo != nullptr ?
+                                     BLI_array_findindex(
+                                         ggd->gizmos, ARRAY_SIZE(ggd->gizmos), &modal_gizmo) :
+                                     -1;
+      const short modal_axis_type = modal_axis_idx != -1 ? gizmo_get_axis_type(modal_axis_idx) :
+                                                           -1;
+      /* A scale drag feeds its own value into the handles and moves no pivot, so it keeps the
+       * matrices #gizmo_modal gives it. */
+      if (modal_axis_type != MAN_AXES_SCALE) {
+        MAN_ITER_AXES_BEGIN (axis, axis_idx) {
+          if (axis->flag & WM_GIZMO_HIDDEN) {
+            continue;
+          }
+          /* The dragged dial carries the angle feedback in the matrix its drag was set up with -
+           * the same split #gizmo_modal makes. */
+          if (modal_axis_type == MAN_AXES_ROTATE && axis_idx == modal_axis_idx) {
+            continue;
+          }
+          gizmo_refresh_from_matrix(axis, axis_idx, ggd->twtype, pivot_matrix, nullptr);
+        }
+        MAN_ITER_AXES_END;
+      }
+    }
+  }
 
   /* *** set properties for axes *** */
   MAN_ITER_AXES_BEGIN (axis, axis_idx) {
@@ -2486,19 +2603,26 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
   GizmoGroup *ggd = static_cast<GizmoGroup *>(gzgroup->customdata);
   const int axis_idx = BLI_array_findindex(ggd->gizmos, ARRAY_SIZE(ggd->gizmos), &gz);
 
-  if (ED_clarity_interaction_enabled(C) &&
-      ELEM(axis_idx,
-           MAN_AXIS_TRANS_X,
-           MAN_AXIS_TRANS_Y,
-           MAN_AXIS_TRANS_Z,
-           MAN_AXIS_ROT_X,
-           MAN_AXIS_ROT_Y,
-           MAN_AXIS_ROT_Z,
-           MAN_AXIS_SCALE_X,
-           MAN_AXIS_SCALE_Y,
-           MAN_AXIS_SCALE_Z))
-  {
-    ED_clarity_pivot_active_axis_set(C, gizmo_orientation_axis(axis_idx, nullptr));
+  if (ED_clarity_interaction_enabled(C)) {
+    /* Which handle is selected is pivot state in Clarity: it constrains a single-axis position snap
+     * and picks the axis the aim turns. The centre handles report themselves too, because "no axis
+     * handle is selected" is a state of its own and not the absence of an event. */
+    if (ELEM(axis_idx,
+             MAN_AXIS_TRANS_X,
+             MAN_AXIS_TRANS_Y,
+             MAN_AXIS_TRANS_Z,
+             MAN_AXIS_ROT_X,
+             MAN_AXIS_ROT_Y,
+             MAN_AXIS_ROT_Z,
+             MAN_AXIS_SCALE_X,
+             MAN_AXIS_SCALE_Y,
+             MAN_AXIS_SCALE_Z))
+    {
+      ED_clarity_pivot_active_axis_set(C, gizmo_orientation_axis(axis_idx, nullptr));
+    }
+    else if (ELEM(axis_idx, MAN_AXIS_TRANS_C, MAN_AXIS_SCALE_C, MAN_AXIS_ROT_C, MAN_AXIS_ROT_T)) {
+      ED_clarity_pivot_active_axis_set(C, -1);
+    }
   }
 
   const float mval[2] = {float(event->mval[0]), float(event->mval[1])};

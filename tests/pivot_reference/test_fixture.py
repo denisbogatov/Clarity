@@ -80,6 +80,32 @@ class MayaPivotFixtureTest(unittest.TestCase):
         self.assertSequenceNear(center["worldMatrix"], initial["worldMatrix"])
         self.assertSequenceNear(zero["worldMatrix"], initial["worldMatrix"])
 
+    def test_zero_reset_also_clears_pivot_translations(self):
+        """Zero reset puts the pivot back on the object origin, translations included.
+
+        Both reset scenarios move the pivot first, and `xform -pivots` preserves the overall
+        transformation by default, so the state Maya resets from is the one captured by
+        `object_pivot_move`: pivots and pivot translations both non-zero. Zeroing only the
+        pivot channels would leave the pivot at the compensation offset instead of at the
+        origin, which is what `-zeroTransformPivots` exists to avoid.
+        """
+        _, moved, _ = self.states("object_pivot_move")
+        self.assertNotEqual(moved["rotatePivotTranslate"], [0.0, 0.0, 0.0])
+        self.assertNotEqual(moved["scalePivotTranslate"], [0.0, 0.0, 0.0])
+
+        initial, zero, _ = self.states("reset_position_zero")
+        self.assertSequenceNear(zero["rotatePivotTranslate"], [0.0, 0.0, 0.0])
+        self.assertSequenceNear(zero["scalePivotTranslate"], [0.0, 0.0, 0.0])
+        self.assertSequenceNear(zero["rotatePivotWorld"], initial["rotatePivotWorld"])
+        self.assertSequenceNear(zero["scalePivotWorld"], initial["scalePivotWorld"])
+        # The initial pivot sits on the object origin, so the reset one has to as well.
+        self.assertSequenceNear(zero["rotatePivotWorld"], zero["worldMatrix"][12:15])
+
+    def test_center_reset_keeps_the_preserving_compensation(self):
+        """Center reset is a preserving pivot move, so its compensation channels stay."""
+        _, center, _ = self.states("reset_position_center")
+        self.assertNotEqual(center["rotatePivotTranslate"], [0.0, 0.0, 0.0])
+
     def test_orientation_reset_does_not_change_object_channels(self):
         initial, result, _ = self.states("reset_orientation")
         for channel in (

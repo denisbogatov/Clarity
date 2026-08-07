@@ -134,17 +134,17 @@ static void clarity_pivot_snap_trace(ClarityPivotTransData &data,
   }
   data.trace_update_count++;
   std::fprintf(data.trace_file,
-               "pivot-snap snap_to=%d tol_px=%.1f mval=(%.0f %.0f) target=%d normal=%d "
-               "snap_pos=%d snap_orient=%d applied=(%.4f %.4f %.4f) pointer=(%.4f %.4f %.4f) "
-               "target_co=(%.4f %.4f %.4f) result=(%.4f %.4f %.4f) from_target=%d aim=%d\n",
+               "pivot-snap snap_to=%d tol_px=%.1f mval=(%.0f %.0f) target=%d target_type=%d "
+               "snap_pos=%d applied=(%.4f %.4f %.4f) "
+               "pointer=(%.4f %.4f %.4f) target_co=(%.4f %.4f %.4f) result=(%.4f %.4f %.4f) "
+               "from_target=%d\n",
                int(t->tsnap.mode),
                double(t->tsnap.clarity_snap_dist_px),
                double(t->mval[0]),
                double(t->mval[1]),
                int(input.has_target),
-               int(input.target_has_normal),
+               int(t->tsnap.target_type),
                int(input.snap_position),
-               int(input.snap_orientation),
                input.applied_position.x,
                input.applied_position.y,
                input.applied_position.z,
@@ -157,8 +157,7 @@ static void clarity_pivot_snap_trace(ClarityPivotTransData &data,
                decision.position.x,
                decision.position.y,
                decision.position.z,
-               int(decision.from_target),
-               int(decision.aim_at_normal));
+               int(decision.from_target));
 }
 
 static void recalcDataClarityPivot(TransInfo *t)
@@ -200,28 +199,30 @@ static void recalcDataClarityPivot(TransInfo *t)
                                                double3(constrained);
     }
     snap_input.has_target = validSnap(t);
-    snap_input.target_has_normal = !is_zero_v3(t->tsnap.snapNormal);
     snap_input.snap_position = settings.snap_position;
-    snap_input.snap_orientation = settings.snap_orientation;
 
     const ClarityPivotSnapDecision decision = clarity_pivot_snap_decision_get(snap_input);
     clarity_pivot_snap_trace(data, t, snap_input, decision);
     if (!data.target->position_set(decision.position, true)) {
+      /* The write is all-or-nothing, so the pivot simply stays where the last accepted update left
+       * it. Worth a trace line: to the user this looks like the pivot ignoring the mouse. */
+      if (data.trace_file != nullptr) {
+        std::fprintf(data.trace_file,
+                     "pivot-position-rejected target=(%.4f %.4f %.4f)\n",
+                     decision.position.x,
+                     decision.position.y,
+                     decision.position.z);
+        std::fflush(data.trace_file);
+      }
       return;
     }
 
-    if (decision.aim_at_normal) {
-      clarity::ClarityPivotFrame snapped_frame = data.initial_frame;
-      snapped_frame.position_world = decision.position;
-      const double3 surface_normal(t->tsnap.snapNormal);
-      /* Same reference frame the click path uses: the view up decides the secondary axis, so a
-       * dragged and a clicked snap onto the same face produce the same pivot. */
-      if (ED_clarity_pivot_orientation_aim(
-              snapped_frame, decision.position + surface_normal, 2, double3(t->viewinv[1])))
-      {
-        data.target->orientation_set(snapped_frame.orientation_world, false);
-      }
-    }
+    /* The orientation is deliberately left alone: a drag moves the pivot, and a click on a
+     * component is what aligns it - `TRANSFORM_OT_clarity_pivot_click`, mirroring Clarity's own split
+     * between "middle-drag to snap the pivot to edges or vertices" and "click a component to snap
+     * and align the pivot to it". Turning the pivot on every snapped update handed it a new frame
+     * whenever the element under the pointer changed, and the drag that caused it could not put it
+     * back. */
     return;
   }
 

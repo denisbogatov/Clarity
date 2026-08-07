@@ -14,6 +14,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <limits>
 #include <optional>
 #include <string>
@@ -73,6 +74,7 @@
 
 #include "clarity_session.hh"
 #include "clarity_input.hh"
+#include "clarity_marking_menu.hh"
 #include "clarity_tool_presentation.hh"
 #include "clarity_tools.hh"
 
@@ -1224,16 +1226,9 @@ static double4x4 clarity_parent_effect_matrix_get(const Object &object)
 /* -------------------------------------------------------------------- */
 /** \name Object Pivot Resolver
  *
- * Clarity keeps exactly one rotate and one scale pivot per transform node. An object using the Clarity
- * transform model stores them in its DAG channels, where they take part in the matrix composition
- * and therefore in every later rotation, and where moving the pivot is compensated by
- * `rotatePivotTranslate` / `scalePivotTranslate` so the object does not move.
- *
- * #ObjectCustomPivot is the shim for objects still using the Blender transform model, which has no
- * such channel: there the pivot is tool state until it is baked.
- *
- * Everything in the pivot tool layer goes through this resolver, so an object never ends up with
- * two competing pivots.
+ * The rule itself lives in #BKE_object_pivot_world_get, because the origin overlay needs the same
+ * answer and the draw module cannot reach into the editors. These are the names the pivot tool
+ * layer reads it under.
  * \{ */
 
 static bool object_pivot_uses_dag_channels(const Object &object)
@@ -1241,59 +1236,47 @@ static bool object_pivot_uses_dag_channels(const Object &object)
   return BKE_object_uses_clarity_transform(&object);
 }
 
-/** True when the pivot is authored away from the object origin. */
 static bool object_pivot_valid(const Object &object, const bool use_scale_pivot)
 {
-  if (object_pivot_uses_dag_channels(object)) {
-    const ClarityObjectTransform &transform = *object.clarity_transform;
-    const double3 pivot(use_scale_pivot ? transform.scale_pivot : transform.rotate_pivot);
-    return pivot != double3(0.0);
-  }
-  return BKE_object_custom_pivot_position_valid(object, use_scale_pivot);
+  return BKE_object_pivot_valid(object, use_scale_pivot);
 }
 
 static bool object_pivot_world_get(const Object &object,
                                    const bool use_scale_pivot,
                                    double3 &r_position)
 {
-  if (object_pivot_uses_dag_channels(object)) {
-    if (!object_pivot_valid(object, use_scale_pivot)) {
-      return false;
-    }
-    const double4x4 parent_effect = clarity_parent_effect_matrix_get(object);
-    r_position = use_scale_pivot ?
-                     BKE_object_clarity_scale_pivot_world_get(object, parent_effect) :
-                     BKE_object_clarity_rotate_pivot_world_get(object, parent_effect);
-    return true;
-  }
-  return BKE_object_custom_pivot_position_world_get(object, use_scale_pivot, r_position);
+  return BKE_object_pivot_world_get(object, use_scale_pivot, r_position);
 }
 
 /**
- * Move the pivot to \a position. Clarity never moves the object while editing the pivot, so the DAG
+ * Move both pivots to \a position. Clarity never moves the object while editing the pivot, so the DAG
  * path always compensates in the pivot translate channels.
+ *
+ * Editing the pivot validates rotate and scale together, so they are written together: a transform
+ * carrying one pivot on the target and the other one behind rotates and scales around two different
+ * points, and no later edit or reset can tell that apart from an authored pivot.
  */
-static bool object_pivot_world_set(Object &object,
-                                   const bool use_scale_pivot,
-                                   const double3 &position)
+static bool object_pivots_world_set(Object &object, const double3 &position)
 {
   if (object_pivot_uses_dag_channels(object)) {
-    const double4x4 parent_effect = clarity_parent_effect_matrix_get(object);
-    return use_scale_pivot ? BKE_object_clarity_scale_pivot_world_set(
-                                 object, parent_effect, position, true) :
-                             BKE_object_clarity_rotate_pivot_world_set(
-                                 object, parent_effect, position, true);
+    return BKE_object_clarity_pivots_world_set(
+        object, clarity_parent_effect_matrix_get(object), position, true);
   }
-  return BKE_object_custom_pivot_position_world_set(object, use_scale_pivot, position);
+  /* The shim stores plain object-local positions: both writes are rejected by the same singular
+   * object matrix, so neither can land without the other. */
+  return BKE_object_custom_pivot_position_world_set(object, false, position) &&
+         BKE_object_custom_pivot_position_world_set(object, true, position);
 }
 
-/** Send both pivots back to the object origin, keeping the object in place. */
+/**
+ * Send both pivots back to the object origin, keeping the object in place. Clarity's
+ * `manipPivot -resetMode 1`, "zero pivot at object-space origin", which its `xform
+ * -zeroTransformPivots` implements by folding the pivot channels into the translate channel.
+ */
 static void object_pivot_clear(Object &object)
 {
   if (object_pivot_uses_dag_channels(object)) {
-    ClarityObjectTransform &transform = *object.clarity_transform;
-    BKE_clarity_transform_set_rotate_pivot(transform, double3(0.0), true);
-    BKE_clarity_transform_set_scale_pivot(transform, double3(0.0), true);
+    BKE_clarity_transform_zero_pivots(*object.clarity_transform);
     BKE_object_clarity_evaluated_channels_invalidate(object);
     return;
   }
@@ -1380,15 +1363,9 @@ static bool manipulator_pivot_sync_from_object(ClarityWindowRuntime &runtime, Ob
   }
 
   ClarityManipulatorPivotState &pivot = runtime.tool.manipulator_pivot;
-  /* The manipulator anchors on the rotate pivot, falling back to a scale-only pivot and finally to
-   * the object origin. */
-  double3 position_world;
-  if (!object_pivot_world_get(object, false, position_world) &&
-      !object_pivot_world_get(object, true, position_world))
-  {
-    position_world = double3(object.object_to_world().location());
-  }
-  pivot.position_world = position_world;
+  /* The manipulator anchors where the origin overlay draws its dot: rotate pivot, then a scale-only
+   * pivot, then the object origin. One function, so the handle and the marker cannot disagree. */
+  pivot.position_world = BKE_object_origin_display_position_get(object);
   math::QuaternionBase<double> orientation_world;
   if (!BKE_object_custom_pivot_orientation_world_get(object, orientation_world)) {
     return false;
@@ -1455,6 +1432,10 @@ static std::optional<double3> object_hierarchy_bounds_center_world_get(const bCo
   return has_bounds ? std::optional<double3>((minimum + maximum) * 0.5) : std::nullopt;
 }
 
+/* Defined below, with the rest of the pivot mode state they belong to. */
+static void orientation_custom_clear_all(const bContext *C);
+static void orientation_custom_select(const bContext *C, ClarityWindowRuntime &runtime);
+
 class ClarityObjectPivotEditTarget final : public ClarityPivotEditTargetBackend {
  private:
   bContext *context_;
@@ -1506,9 +1487,7 @@ class ClarityObjectPivotEditTarget final : public ClarityPivotEditTargetBackend 
   {
     /* Editing the pivot never moves the object, so both pivots follow the manipulator. */
     UNUSED_VARS(preserve);
-    if (!object_pivot_world_set(object_, false, position_world) ||
-        !object_pivot_world_set(object_, true, position_world))
-    {
+    if (!object_pivots_world_set(object_, position_world)) {
       return false;
     }
     runtime_.tool.manipulator_pivot.position_world = position_world;
@@ -1534,6 +1513,11 @@ class ClarityObjectPivotEditTarget final : public ClarityPivotEditTargetBackend 
     runtime_.tool.manipulator_pivot.orientation_world = math::normalize(orientation_world);
     runtime_.tool.manipulator_pivot.orientation_valid = true;
     runtime_.tool.manipulator_pivot.last_object = ED_clarity_object_runtime_ref_create(object_);
+    /* This object now carries an authored frame, and it is the one #pivot_orientation_selection_sync
+     * watches the selection of. */
+    runtime_.tool.manipulator_pivot.authored_orientation_object =
+        ED_clarity_object_runtime_ref_create(object_);
+    orientation_custom_select(context_, runtime_);
     orientation_changed_ = true;
     if (bake) {
       return ED_clarity_pivot_bake(context_, CLARITY_PIVOT_BAKE_ORIENTATION);
@@ -1554,9 +1538,16 @@ class ClarityObjectPivotEditTarget final : public ClarityPivotEditTargetBackend 
 
     /* Reset Position clears both pivots, matching Edit Pivot Move which validates both. */
     object_pivot_clear(object_);
-    runtime_.tool.manipulator_pivot.position_world = double3(
-        object_.object_to_world().location());
+    /* Read the pivot back instead of assuming where the clear left it. The manipulator and the
+     * channels disagreeing is the one state the pivot tool cannot recover from: the gizmo offers a
+     * position the transform does not use, and every further edit starts from that wrong frame. */
+    double3 position_world;
+    if (!object_pivot_world_get(object_, false, position_world)) {
+      position_world = double3(object_.object_to_world().location());
+    }
+    runtime_.tool.manipulator_pivot.position_world = position_world;
     runtime_.tool.manipulator_pivot.position_valid = true;
+    runtime_.tool.manipulator_pivot.last_object = ED_clarity_object_runtime_ref_create(object_);
     notify_changed();
   }
 
@@ -1570,6 +1561,8 @@ class ClarityObjectPivotEditTarget final : public ClarityPivotEditTargetBackend 
     }
     runtime_.tool.manipulator_pivot.orientation_valid = false;
     runtime_.tool.manipulator_pivot.last_object = ED_clarity_object_runtime_ref_create(object_);
+    object_runtime_ref_clear(runtime_.tool.manipulator_pivot.authored_orientation_object);
+    orientation_custom_clear_all(context_);
     notify_changed();
   }
 
@@ -1651,6 +1644,7 @@ class ClarityComponentPivotEditTarget final : public ClarityPivotEditTargetBacke
     custom_.rotation_quaternion[2] = float(normalized.y);
     custom_.rotation_quaternion[3] = float(normalized.z);
     custom_.orientation_valid = true;
+    orientation_custom_select(context_, runtime_);
     return true;
   }
 
@@ -1676,6 +1670,7 @@ class ClarityComponentPivotEditTarget final : public ClarityPivotEditTargetBacke
     copy_v3_v3(custom_.location, position);
     custom_.position_valid = position_valid;
     manipulator_pivot_sync_from_component(runtime_, custom_);
+    orientation_custom_clear_all(context_);
   }
 
   void cancel() override
@@ -1748,7 +1743,12 @@ static void pivot_snap_target_query(const bContext *C,
       CTX_data_ensure_evaluated_depsgraph(C),
       &region,
       &view,
-      eSnapMode(SCE_SNAP_TO_VERTEX | SCE_SNAP_TO_EDGE | SCE_SNAP_TO_FACE),
+      /* #SCE_SNAP_TO_POINT, not the #SCE_SNAP_TO_VERTEX composite: that one carries
+       * #SCE_SNAP_TO_EDGE_ENDPOINT, and asking for endpoints alongside edges hands the outer two
+       * thirds of every edge to its nearest vertex (#SnapData::snap_edge_points_impl splits the edge
+       * into `1 / (2 * modes - 1)` bands). An edge could only highlight while the pointer was over its
+       * middle third, which is why hovering one mostly pre-highlighted the face or a corner. */
+      eSnapMode(SCE_SNAP_TO_POINT | SCE_SNAP_TO_EDGE | SCE_SNAP_TO_FACE),
       &snap_params,
       nullptr,
       mouse_float,
@@ -1790,12 +1790,10 @@ void pivot_edit_snap_preview_update(const bContext *C,
                                     const int2 &mouse_region)
 {
   ClarityPivotEditState &state = runtime.pivot_edit;
-  /* The preview exists only as feedback for the snap key the user is holding right now. A running
-   * drag has no hover target either, and its snapping must not pull an extra depsgraph evaluation
-   * into the modal loop. */
-  if (state.target == ClarityPivotEditTarget::None || runtime.transform_active ||
-      runtime.temporary.snap.is_empty())
-  {
+  /* Edit Pivot pre-highlights whatever the pointer is over, with or without a snap key: that is how
+   * Clarity tells the user which component a click would use. A running drag has no hover target, and
+   * its snapping must not pull an extra depsgraph evaluation into the modal loop. */
+  if (state.target == ClarityPivotEditTarget::None || runtime.transform_active) {
     pivot_edit_snap_preview_clear(runtime);
     return;
   }
@@ -1849,6 +1847,7 @@ void pivot_edit_end(bContext *C, ClarityWindowRuntime &runtime)
   ClarityPivotEditState &state = runtime.pivot_edit;
   const ClarityPivotEditTarget ended_target = state.target;
 
+
   state.phase = ClarityPivotEditPhase::Normal;
   state.target = ClarityPivotEditTarget::None;
   state.scene = nullptr;
@@ -1861,6 +1860,9 @@ void pivot_edit_end(bContext *C, ClarityWindowRuntime &runtime)
   state.persistent = false;
   state.exit_after_drag = false;
   state.restart_after_drag = false;
+  state.click_press_pending = false;
+  state.key_press_entered_mode = false;
+  state.key_press_time = 0.0;
   runtime.temporary.edit_pivot = false;
   pivot_edit_snap_preview_clear(runtime);
 
@@ -1940,6 +1942,13 @@ static bool pivot_edit_begin(bContext *C, ClarityWindowRuntime &runtime)
   state.phase = ClarityPivotEditPhase::PersistentPivot;
   runtime.temporary.edit_pivot = true;
 
+  /* The tool's coordinate system is not touched by entering the mode. The help reads "Custom axis
+   * orientation is automatically selected when you activate custom pivot editing mode", and the
+   * capture refines it: `interactionScenarios.pivot_edit_component_frame` shows the Move context
+   * still on `2` (World) after `ctxEditMode`, and on `6` (Custom) only once an orientation is
+   * authored. #orientation_custom_select does that, from the write itself.
+   */
+
   pivot_edit_status_set(C, target);
   if (target == ClarityPivotEditTarget::ObjectOrigin) {
     WM_event_add_notifier(C, NC_SCENE | ND_TOOLSETTINGS, nullptr);
@@ -1964,6 +1973,10 @@ bool pivot_edit_resume_persistent(bContext *C, ClarityWindowRuntime &runtime)
 bool pivot_edit_toggle_persistent(bContext *C, ClarityWindowRuntime &runtime)
 {
   ClarityPivotEditState &state = runtime.pivot_edit;
+  /* Any other route into the toggle - `Insert`, the Tool Settings button - ends the hold a held `D`
+   * was keeping open, so its release cannot switch the mode a second time. #pivot_edit_key_press
+   * arms it again after this returns. */
+  state.key_press_entered_mode = false;
   if (!state.persistent) {
     return pivot_edit_resume_persistent(C, runtime);
   }
@@ -2035,17 +2048,107 @@ bool pivot_edit_pin_toggle(bContext *C, ClarityWindowRuntime &runtime)
   return true;
 }
 
+bool pivot_edit_key_release_exits(const bool entered_mode_with_this_press,
+                                  const double held_seconds,
+                                  const double tap_timeout_seconds)
+{
+  return entered_mode_with_this_press && held_seconds > tap_timeout_seconds;
+}
+
+bool pivot_edit_key_press(bContext *C, ClarityWindowRuntime &runtime)
+{
+  ClarityPivotEditState &state = runtime.pivot_edit;
+  const bool was_on = state.persistent;
+  const bool handled = pivot_edit_toggle_persistent(C, runtime);
+  /* Only a press that switched the mode on can be the hold Maya exits on release. */
+  state.key_press_entered_mode = handled && !was_on && state.persistent;
+  state.key_press_time = state.key_press_entered_mode ? BLI_time_now_seconds() : 0.0;
+  return handled;
+}
+
+bool pivot_edit_key_release(bContext *C, ClarityWindowRuntime &runtime)
+{
+  ClarityPivotEditState &state = runtime.pivot_edit;
+  const bool entered_mode_with_this_press = state.key_press_entered_mode;
+  const double held_seconds = BLI_time_now_seconds() - state.key_press_time;
+  state.key_press_entered_mode = false;
+  state.key_press_time = 0.0;
+  if (!pivot_edit_key_release_exits(
+          entered_mode_with_this_press, held_seconds, 0.01 * double(U.pie_tap_timeout)))
+  {
+    return true;
+  }
+  pivot_edit_toggle_persistent(C, runtime);
+  return true;
+}
+
 ClarityDispatchResult pivot_edit_click_handle_action(bContext *C,
                                                    ClarityWindowRuntime &runtime,
                                                    const ClarityInputAction &action)
 {
-  if (runtime.pivot_edit.target == ClarityPivotEditTarget::None ||
-      !ELEM(action.id,
-            ClarityActionID::SelectPrimary,
-            ClarityActionID::SelectAdd,
-            ClarityActionID::SelectRemove,
-            ClarityActionID::SelectToggle))
+  /* The resolved target is the whole condition. `persistent` without one is the armed state
+   * #pivot_edit_resume_persistent leaves behind when the context cannot host a pivot - a linked
+   * object, a type with no pivot capability, a matrix that will not orthonormalize - and the click
+   * has nothing to act on there: #TRANSFORM_OT_clarity_pivot_click asks
+   * #ED_clarity_pivot_edit_target_get for the same field and cancels on #ClarityPivotEditTarget::None. */
+  ClarityPivotEditState &state = runtime.pivot_edit;
+  const bool has_pivot_target = state.target != ClarityPivotEditTarget::None;
+
+  /* Follow the left button from press to release, because the click Blender would have made out of
+   * the pair never arrives - see #left_mouse_click_release_is. Everything that is not that pair
+   * drops the pending press, so the release of a drag or of a double click cannot place the pivot.
+   * The marquee needs no defense here: #left_mouse_marquee_drag_handle already refuses to start
+   * while Edit Pivot owns a target. */
+  const wmEvent *event = action.source_event;
+  bool click_release = false;
+  bool claim_press = false;
+  if (event != nullptr && event->type == LEFTMOUSE) {
+    if (left_mouse_click_press_arms(*event)) {
+      /* Only a plain press can be a handle pick, and the manipulator is asked about it exactly as
+       * #left_mouse_marquee_drag_handle asks: a press on a highlighted handle is the gizmo's, and
+       * letting it through is what selects the handle and starts a pivot drag.
+       *
+       * The modifier clicks are never handle picks - Maya spells all three out as pivot snapping
+       * (`Ctrl + click` orientation, `Shift + click` position, `Ctrl + Shift + click` aim) - and
+       * they cannot be gated on the highlight either: the first click leaves the pivot under the
+       * pointer, so the manipulator is highlighted for the next one, and gating there sent the
+       * `Ctrl` press to `view3d.select`, which cleared the selection. */
+      const bool has_pivot_modifier = (event->modifier & (KM_SHIFT | KM_CTRL)) != 0;
+      claim_press = has_pivot_target && !runtime.transform_active &&
+                    (has_pivot_modifier ||
+                     !WM_gizmomap_region_is_highlighted(CTX_wm_region(C)));
+      state.click_press_pending = claim_press;
+    }
+    else if (event->val == KM_RELEASE) {
+      click_release = state.click_press_pending && left_mouse_click_release_is(*event);
+      state.click_press_pending = false;
+    }
+    else {
+      /* A #KM_DBL_CLICK press, or one held with `Alt`. Neither ends in a click. */
+      state.click_press_pending = false;
+    }
+  }
+  else if (state.click_press_pending && event != nullptr && ISMOUSE_MOTION(event->type) &&
+           event->prev_press_type == LEFTMOUSE && WM_event_drag_test(event, event->prev_press_xy))
   {
+    /* Past the drag threshold the gesture is a drag, whoever ends up owning it. */
+    state.click_press_pending = false;
+  }
+
+  if (claim_press) {
+    /* Swallowed before any keymap sees it. `view3d.select` sits on the left button press, so a press
+     * that reaches it changes the component selection, and Maya's `Ctrl + click a component to snap
+     * its axis orientation` invokes no selection operator at all - the whole gesture belongs to the
+     * pivot. The release is what runs the operator, one event later. */
+    return ClarityDispatchResult::Handled;
+  }
+
+  const bool is_click_action = ELEM(action.id,
+                                    ClarityActionID::SelectPrimary,
+                                    ClarityActionID::SelectAdd,
+                                    ClarityActionID::SelectRemove,
+                                    ClarityActionID::SelectToggle);
+  if (!has_pivot_target || !(is_click_action || click_release)) {
     return ClarityDispatchResult::PassThrough;
   }
 
@@ -2054,14 +2157,210 @@ ClarityDispatchResult pivot_edit_click_handle_action(bContext *C,
     return ClarityDispatchResult::PassThrough;
   }
   PointerRNA properties = WM_operator_properties_create_ptr(operator_type);
-  const int mouse[2] = {action.mouse_region.x, action.mouse_region.y};
+  /* A recognized release reads the press: where the button went down, and the modifiers that were
+   * held for it, exactly like the marquee reads the press that started its drag. The pointer is
+   * free to drift within the drag threshold while the button is down. */
+  int mouse[2] = {action.mouse_region.x, action.mouse_region.y};
+  bool shift = action.shift;
+  bool ctrl = action.ctrl;
+  if (click_release) {
+    shift = (event->prev_press_modifier & KM_SHIFT) != 0;
+    ctrl = (event->prev_press_modifier & KM_CTRL) != 0;
+    if (const ARegion *region = CTX_wm_region(C)) {
+      mouse[0] = event->prev_press_xy[0] - region->winrct.xmin;
+      mouse[1] = event->prev_press_xy[1] - region->winrct.ymin;
+    }
+  }
   RNA_int_set_array(&properties, "mouse", mouse);
-  RNA_boolean_set(&properties, "shift", action.shift);
-  RNA_boolean_set(&properties, "ctrl", action.ctrl);
-  WM_operator_name_call_ptr(
+  RNA_boolean_set(&properties, "shift", shift);
+  RNA_boolean_set(&properties, "ctrl", ctrl);
+  const wmOperatorStatus status = WM_operator_name_call_ptr(
       C, operator_type, wm::OpCallContext::ExecDefault, &properties, action.source_event);
   WM_operator_properties_free(&properties);
+  if ((status & OPERATOR_PASS_THROUGH) != 0) {
+    /* The click landed on nothing while an object pivot was being edited, and there Maya deselects:
+     * the object loses its outline and manipulator, and the mode is over - the next selection comes
+     * back with the ordinary manipulator. The gesture is put together here rather than let through to
+     * the keymap because the press it belongs to was swallowed one event ago. */
+    ClarityInputAction select_action = action;
+    select_action.id = ClarityActionID::SelectPrimary;
+    select_action.phase = ClarityActionPhase::Begin;
+    select_action.mouse_region = int2(mouse[0], mouse[1]);
+    select_action.shift = false;
+    select_action.ctrl = false;
+    selection_handle_action(C, runtime, select_action);
+    /* The mode ends first: while it owns the object, the orientation is treated as still being
+     * authored and is deliberately left alone. */
+    pivot_edit_end(C, runtime);
+    pivot_orientation_selection_sync(C, runtime);
+  }
   return ClarityDispatchResult::Handled;
+}
+
+/**
+ * Select `Custom axis orientation` for the tool whose manipulator the frame was just authored on.
+ *
+ * Authoring is what selects it - see the capture cited in #pivot_edit_begin - and because it is a tool
+ * setting it stays selected after Edit Pivot ends. The tool's own mode underneath is never written, so
+ * dropping `Custom` reveals it again, which is what Maya's context does when the frame dies.
+ */
+static void orientation_custom_select(const bContext *C, ClarityWindowRuntime &runtime)
+{
+  orientation_custom_set(C,
+                         ELEM(runtime.tool.active,
+                              ClarityToolID::Move,
+                              ClarityToolID::Rotate,
+                              ClarityToolID::Scale) ?
+                             runtime.tool.active :
+                             ClarityToolID::Move,
+                         true);
+}
+
+/**
+ * Drop `Custom axis orientation` from every transform tool. The frame it points at is gone - reset, or
+ * left behind with the selection it was aimed at - so each tool goes back to its own coordinate system.
+ */
+static void orientation_custom_clear_all(const bContext *C)
+{
+  orientation_custom_set(C, ClarityToolID::Move, false);
+  orientation_custom_set(C, ClarityToolID::Rotate, false);
+  orientation_custom_set(C, ClarityToolID::Scale, false);
+}
+
+/**
+ * Return the tools to their own coordinate systems once the component selection the frame was aimed at
+ * is gone: a cleared selection, a different component picked, a grown or shrunk one.
+ *
+ * Cannot live in #pivot_edit_selection_changed for the same reason as its object counterpart - that one
+ * only runs when Clarity itself handled a selection action, and a plain component pick is handled by
+ * `view3d.select` from Blender's own keymap. Checked once per dispatched event instead, and only while
+ * a tool actually has `Custom` selected, so the cost exists only in that state: the three selection
+ * counters BMesh maintains, plus the active element from its selection history. The full signature -
+ * which walks the mesh to hash the selected elements - stays where it was, on the resync.
+ */
+void pivot_component_orientation_selection_sync(bContext *C, ClarityWindowRuntime &runtime)
+{
+  if (runtime.transform_active || runtime.active_session) {
+    return;
+  }
+  if (!orientation_custom_get(C, ClarityToolID::Move) &&
+      !orientation_custom_get(C, ClarityToolID::Rotate) &&
+      !orientation_custom_get(C, ClarityToolID::Scale))
+  {
+    return;
+  }
+  ClarityCustomPivotData *custom = runtime.pivot_edit.custom.get();
+  const Scene *scene = CTX_data_scene(C);
+  if (custom == nullptr || custom->pinned || !custom->selection_signature_valid ||
+      scene == nullptr || custom->scene != scene ||
+      CTX_data_mode_enum(C) != CTX_MODE_EDIT_MESH)
+  {
+    return;
+  }
+
+  Object *active_object = CTX_data_active_object(C);
+  int selected_counts[3] = {0, 0, 0};
+  int active_element_index = -1;
+  char active_element_type = 0;
+  for (Object *object : pivot_edit_mesh_objects_get(C)) {
+    BMEditMesh *em = BKE_editmesh_from_object(object);
+    if (em == nullptr || em->bm == nullptr) {
+      continue;
+    }
+    selected_counts[0] += em->bm->totvertsel;
+    selected_counts[1] += em->bm->totedgesel;
+    selected_counts[2] += em->bm->totfacesel;
+    if (object != active_object) {
+      continue;
+    }
+    BMEditSelection active_selection;
+    if (BM_select_history_active_get(em->bm, &active_selection)) {
+      /* A no-op while the indices are clean, which they are after a selection change. */
+      BM_mesh_elem_index_ensure(em->bm, BM_VERT | BM_EDGE | BM_FACE);
+      active_element_index = BM_elem_index_get(active_selection.ele);
+      active_element_type = active_selection.htype;
+    }
+  }
+
+  if (custom->selection_mode == scene->toolsettings->selectmode &&
+      std::equal(selected_counts, selected_counts + 3, custom->selected_counts) &&
+      custom->active_element_index == active_element_index &&
+      custom->active_element_type == active_element_type)
+  {
+    return;
+  }
+
+  /* The frame belonged to the selection that just went away. Both pivots are invalidated so the next
+   * read recomputes them from what is selected now, exactly as #pivot_edit_selection_changed does. */
+  custom->position_valid = false;
+  custom->orientation_valid = false;
+  runtime.tool.manipulator_pivot.position_valid = false;
+  runtime.tool.manipulator_pivot.orientation_valid = false;
+  orientation_custom_clear_all(C);
+}
+
+/**
+ * Drop an authored pivot orientation once its object is no longer selected: the frame was aimed at
+ * that selection, so losing it puts the axes back to the ones the object has of its own. The pivot
+ * position stays where the user put it, which is why only the orientation is reset.
+ *
+ * This cannot live in #pivot_edit_selection_changed. That one only runs when Clarity itself handled a
+ * selection action, and an ordinary object pick is not one of those: no #KM_CLICK ever reaches the
+ * dispatcher, so the press falls through to `view3d.select` in Blender's own keymap and Clarity never
+ * sees the selection change. Checked once per dispatched event instead, which is the only place that
+ * notices a selection whoever changed it.
+ */
+void pivot_orientation_selection_sync(bContext *C, ClarityWindowRuntime &runtime)
+{
+  if (runtime.transform_active || runtime.active_session) {
+    return;
+  }
+  ClarityManipulatorPivotState &pivot = runtime.tool.manipulator_pivot;
+  if (object_runtime_ref_is_empty(pivot.authored_orientation_object)) {
+    return;
+  }
+  Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  if (bmain == nullptr || scene == nullptr || view_layer == nullptr) {
+    return;
+  }
+  Object *object = ED_clarity_object_runtime_ref_resolve(*bmain,
+                                                         pivot.authored_orientation_object);
+  if (object == nullptr || !BKE_object_custom_pivot_orientation_valid(*object)) {
+    /* Deleted, or the orientation went away by another route. */
+    object_runtime_ref_clear(pivot.authored_orientation_object);
+    return;
+  }
+  /* Edit Pivot owns the object while the mode is on: the frame is being authored, and an object that
+   * is active without being selected must not lose it in the middle of that. */
+  if (runtime.pivot_edit.target != ClarityPivotEditTarget::None &&
+      runtime.pivot_edit.object == object)
+  {
+    return;
+  }
+  BKE_view_layer_synced_ensure(*bmain, scene, view_layer);
+  const Base *base = BKE_view_layer_base_find(view_layer, object);
+  if (base != nullptr && (base->flag & BASE_SELECTED) != 0) {
+    return;
+  }
+  /* Its own undo step: whoever changed the selection has already pushed one by the time this runs,
+   * and without a step of its own the cleared orientation would survive an undo of that change. The
+   * reset makes the condition false, so this happens once per selection change, not once per event. */
+  pivot_undo_step_begin(C, runtime);
+  if (manipulator_pivot_last_object_resolve(C, runtime) == object) {
+    /* The manipulator still shows this pivot, so the reset goes through the object backend and keeps
+     * the runtime frame and the channels in step - the same path the Tool Settings button takes. */
+    ClarityObjectPivotEditTarget(C, runtime, *object).reset_orientation();
+  }
+  else {
+    /* The manipulator has already moved on to another object; only the authored data is left. */
+    BKE_object_custom_pivot_orientation_clear(*object);
+    orientation_custom_clear_all(C);
+    WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, object);
+  }
+  object_runtime_ref_clear(pivot.authored_orientation_object);
+  ED_undo_push(C, "Reset Clarity Pivot Orientation");
 }
 
 void pivot_edit_selection_changed(bContext *C, ClarityWindowRuntime &runtime)
@@ -2078,6 +2377,9 @@ void pivot_edit_selection_changed(bContext *C, ClarityWindowRuntime &runtime)
     custom->orientation_valid = false;
     runtime.tool.manipulator_pivot.position_valid = false;
     runtime.tool.manipulator_pivot.orientation_valid = false;
+    /* The frame the selection carried is gone, so the tool has no `Custom` left to point at: it goes
+     * back to its own coordinate system, which is what the next selection is measured in. */
+    orientation_custom_clear_all(C);
   }
 }
 
@@ -2090,6 +2392,25 @@ void tool_mirror_sync(const bContext *C, const ClarityToolID tool)
   if (wm != nullptr && wm->runtime != nullptr) {
     wm->runtime->clarity_tool = uint8_t(tool);
   }
+  orientation_mirror_sync(C);
+}
+
+void orientation_mirror_sync(const bContext *C)
+{
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm == nullptr || wm->runtime == nullptr) {
+    return;
+  }
+  const ClarityWindowRuntime *runtime = runtime_get(C);
+  ClarityToolID tool = runtime != nullptr ? runtime->tool.active : ClarityToolID::Move;
+  /* The same fallback the manipulator uses: only the three transform tools own a coordinate system,
+   * and anything else - Select, while Edit Pivot still draws the pivot handles - reads Move's, which is
+   * where those handles come from. Reporting the raw active tool instead answered `World` for a frame
+   * the manipulator was already drawing, because `Custom` is kept per tool and Select has no entry. */
+  if (!ELEM(tool, ClarityToolID::Move, ClarityToolID::Rotate, ClarityToolID::Scale)) {
+    tool = ClarityToolID::Move;
+  }
+  wm->runtime->clarity_transform_orientation = uint8_t(transform_orientation_get(C, tool));
 }
 
 void snap_override_mirror_sync(const bContext *C, const ClarityWindowRuntime &runtime)
@@ -2158,9 +2479,8 @@ void snap_override_key_state_reconcile(const bContext *C, ClarityWindowRuntime &
     return;
   }
   snap_override_mirror_sync(C, runtime);
-  if (runtime.temporary.snap.is_empty()) {
-    pivot_edit_snap_preview_clear(runtime);
-  }
+  /* The pre-highlight does not belong to the snap key - it follows the pointer for as long as Edit
+   * Pivot is on - so a released key leaves it alone. */
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
 }
 
@@ -2175,6 +2495,12 @@ void pivot_edit_input_reset(bContext *C, ClarityWindowRuntime &runtime)
    * re-entering the window. Only the transient input overlays are dropped, and a drag that was
    * interrupted rebuilds its manipulator once the transform finishes. */
   ClarityPivotEditState &state = runtime.pivot_edit;
+  /* No release held across the focus change will be delivered here, so neither the press waiting to
+   * become a click nor the one holding the mode open can be completed. Dropping the hold leaves the
+   * mode on, which another press undoes; keeping it armed would exit on an unrelated release. */
+  state.click_press_pending = false;
+  state.key_press_entered_mode = false;
+  state.key_press_time = 0.0;
   if (state.persistent && runtime.transform_active &&
       state.target != ClarityPivotEditTarget::None)
   {
@@ -2289,6 +2615,74 @@ ed::clarity::ClarityPivotEditTarget ED_clarity_pivot_edit_target_get(const bCont
 namespace ed::clarity {
 
 /**
+ * Tool whose orientation the pivot manipulator follows. Only the three transform tools own a slot;
+ * anything else - Select while Edit Pivot draws the pivot handles anyway - reads Move's, which is
+ * the manipulator those handles come from.
+ */
+static ClarityToolID pivot_orientation_tool_get(const bContext *C)
+{
+  const ClarityWindowRuntime *runtime = runtime_get(C);
+  const ClarityToolID tool = runtime != nullptr ? runtime->tool.active : ClarityToolID::Move;
+  return ELEM(tool, ClarityToolID::Move, ClarityToolID::Rotate, ClarityToolID::Scale) ?
+             tool :
+             ClarityToolID::Move;
+}
+
+}  // namespace ed::clarity
+
+void ED_clarity_pivot_selection_state_sync(const bContext *C)
+{
+  ed::clarity::ClarityWindowRuntime *runtime = ed::clarity::runtime_get(C);
+  if (runtime == nullptr) {
+    return;
+  }
+  /* Both rules are about a frame whose selection is gone, and both are cheap enough to ask on a
+   * refresh: they leave after two comparisons unless a frame is actually authored. Reaching them from
+   * here as well as from the dispatcher is what makes them hold for a selection changed by a script -
+   * a notifier refreshes the manipulator, where an event never arrives. The context is const because
+   * a refresh is; the rules write the pivot the refresh is about to read. */
+  bContext *context = const_cast<bContext *>(C);
+  ed::clarity::pivot_orientation_selection_sync(context, *runtime);
+  ed::clarity::pivot_component_orientation_selection_sync(context, *runtime);
+}
+
+bool ED_clarity_pivot_orientation_owns_axes(const bContext *C)
+{
+  /* The pivot always owns where the manipulator sits; the axes are the orientation's answer. Two of
+   * its modes give them to the pivot frame: `Custom`, which is what Edit Pivot reports while it is on
+   * - Maya's "Custom axis orientation is automatically selected when you activate custom pivot editing
+   * mode", the mode its marking menu shows nothing checked for - and `Object`, this fork's reading of
+   * an authored frame once the mode is over. `World` keeps world axes over an authored pivot: Maya's
+   * *Set a custom axis orientation* ends with "these commands only affect axis orientation and not
+   * pivot position", and the converse holds here.
+   *
+   * Asked of the active tool, through the same function the menu reads: every transform tool owns its
+   * orientation, the way Maya keeps `manipPivot -moveToolOri / -rotateToolOri / -scaleToolOri` apart.
+   * Reading the scene's default slot answered for a setting no tool was using, which is what made the
+   * menu look inert. */
+  const ed::clarity::ClarityMoveOrientation orientation = ed::clarity::transform_orientation_get(
+      C, ed::clarity::pivot_orientation_tool_get(C));
+  return ELEM(orientation,
+              ed::clarity::ClarityMoveOrientation::Object,
+              ed::clarity::ClarityMoveOrientation::Custom);
+}
+
+bool ED_clarity_pivot_drag_active(const bContext *C)
+{
+  const ed::clarity::ClarityWindowRuntime *runtime = ed::clarity::runtime_get(C);
+  if (runtime == nullptr || !runtime->transform_active) {
+    return false;
+  }
+  /* #PivotCommitPending is still the same drag: its outcome was decided early, the modal loop is
+   * not over. */
+  return ELEM(runtime->pivot_edit.phase,
+              ed::clarity::ClarityPivotEditPhase::PivotDragging,
+              ed::clarity::ClarityPivotEditPhase::PivotCommitPending);
+}
+
+namespace ed::clarity {
+
+/**
  * The custom pivot must not silently take over every Blender pivot mode. Individual Custom Pivots
  * are not implemented, so a selection asking for per-element centers keeps the standard Blender
  * behavior.
@@ -2352,6 +2746,53 @@ static bool pivot_custom_prepare_for_read(const bContext *C, ClarityWindowRuntim
 
 }  // namespace ed::clarity
 
+/**
+ * Temporary: report which frame the pivot manipulator was handed and what it was built from, so a
+ * basis that does not follow the object can be told apart from an object whose channels carry no
+ * rotation at all. Printed only when the answer changes, on the manipulator trace. Remove with the
+ * rest of the pivot diagnostics.
+ */
+static void pivot_frame_trace(const Object &object, const float matrix[4][4])
+{
+  if (!ED_clarity_gizmo_trace_enabled()) {
+    return;
+  }
+  const float4x4 object_to_world(object.object_to_world());
+  const ObjectCustomPivot *pivot = object.custom_pivot;
+  static float last[6] = {};
+  const float current[6] = {matrix[0][0],
+                            matrix[0][1],
+                            matrix[0][2],
+                            object_to_world[0][0],
+                            object_to_world[0][1],
+                            object_to_world[0][2]};
+  bool changed = false;
+  for (int i = 0; i < 6; i++) {
+    changed |= std::abs(current[i] - last[i]) > 1.0e-4f;
+  }
+  if (!changed) {
+    return;
+  }
+  std::copy_n(current, 6, last);
+  fprintf(stderr,
+          "PIVOTFRAME %.3f object=%s pivot_x=(%.3f %.3f %.3f) object_x=(%.3f %.3f %.3f) "
+          "authored=%d local_quat=(%.3f %.3f %.3f %.3f)\n",
+          BLI_time_now_seconds(),
+          object.id.name + 2,
+          double(current[0]),
+          double(current[1]),
+          double(current[2]),
+          double(current[3]),
+          double(current[4]),
+          double(current[5]),
+          int(pivot != nullptr && pivot->orientation_valid != 0),
+          pivot != nullptr ? pivot->orientation[0] : 1.0,
+          pivot != nullptr ? pivot->orientation[1] : 0.0,
+          pivot != nullptr ? pivot->orientation[2] : 0.0,
+          pivot != nullptr ? pivot->orientation[3] : 0.0);
+  fflush(stderr);
+}
+
 bool ED_clarity_pivot_custom_matrix_get(const bContext *C,
                                      const ed::clarity::ClarityPivotUsage usage,
                                      float r_matrix[4][4])
@@ -2384,6 +2825,7 @@ bool ED_clarity_pivot_custom_matrix_get(const bContext *C,
                                   float(orientation_world.z)};
     quat_to_mat4(r_matrix, orientation);
     copy_v3fl_v3db(r_matrix[3], static_cast<const double *>(position_world));
+    pivot_frame_trace(*object, r_matrix);
     return true;
   }
   if (runtime == nullptr) {
@@ -2399,6 +2841,9 @@ bool ED_clarity_pivot_custom_matrix_get(const bContext *C,
   }
   quat_to_mat4(r_matrix, custom->rotation_quaternion);
   copy_v3_v3(r_matrix[3], custom->location);
+  if (custom->object != nullptr) {
+    pivot_frame_trace(*custom->object, r_matrix);
+  }
   return true;
 }
 
@@ -2584,6 +3029,7 @@ bool ED_clarity_pivot_tool_settings_get(const bContext *C,
   r_settings.show_orientation_handle = pivot.show_orientation_handle;
   r_settings.reset_mode = pivot.reset_mode;
   r_settings.active_axis = pivot.active_axis;
+  r_settings.active_axis_handle = pivot.active_axis_handle;
   return true;
 }
 
@@ -2607,9 +3053,19 @@ bool ED_clarity_pivot_tool_settings_set(const bContext *C,
 
 void ED_clarity_pivot_active_axis_set(const bContext *C, const int active_axis)
 {
-  if (ed::clarity::ClarityWindowRuntime *runtime = ed::clarity::runtime_get(C)) {
-    runtime->tool.manipulator_pivot.active_axis = clamp_i(active_axis, 0, 2);
+  ed::clarity::ClarityWindowRuntime *runtime = ed::clarity::runtime_get(C);
+  if (runtime == nullptr) {
+    return;
   }
+  ed::clarity::ClarityManipulatorPivotState &pivot = runtime->tool.manipulator_pivot;
+  if (active_axis < 0) {
+    /* The centre handle. It leaves #active_axis alone so the middle-button axis drag keeps the
+     * axis the user last picked, and only drops the constraint a single-axis snap would apply. */
+    pivot.active_axis_handle = false;
+    return;
+  }
+  pivot.active_axis = clamp_i(active_axis, 0, 2);
+  pivot.active_axis_handle = true;
 }
 
 static bool clarity_pivot_bake_children_supported(const Main &bmain, const Object &parent)
@@ -2726,6 +3182,17 @@ bool ED_clarity_pivot_bake(bContext *C, const ed::clarity::eClarityPivotBakeMode
     return false;
   }
 
+  /* Baking the orientation replaces the object's basis, and the pivot channels are numbers in that
+   * basis: left alone they keep their values and lose their place, which is what sent the pivot from
+   * `(9.25, -4.5, 6.75)` to `(4.183, -3.437, 12.138)` in the capture while Maya held it still. The
+   * world point is recorded here and re-authored after the bake. A position bake needs none of this -
+   * it clears those channels on purpose, the pivot having become the origin. */
+  double3 pivot_world_before;
+  const bool preserve_pivot_position = bake_orientation && !bake_position &&
+                                       ed::clarity::object_pivot_valid(*object, false) &&
+                                       ed::clarity::object_pivot_world_get(
+                                           *object, false, pivot_world_before);
+
   const double4x4 world_before(object->object_to_world());
   double4x4 target_world = world_before;
   if (bake_position) {
@@ -2792,6 +3259,13 @@ bool ED_clarity_pivot_bake(bContext *C, const ed::clarity::eClarityPivotBakeMode
     return false;
   }
 
+  if (preserve_pivot_position) {
+    /* The preserving write, so putting the pivot back cannot move the object it was measured against -
+     * the compensation channels absorb the difference, and the children restored below stay valid. */
+    ed::clarity::object_pivots_world_set(*object, pivot_world_before);
+    BKE_object_where_is_calc(depsgraph, scene, object);
+  }
+
   if (!child_states.is_empty() &&
       !clarity_pivot_preserve_direct_children(depsgraph, scene, *object, child_states))
   {
@@ -2817,6 +3291,22 @@ bool ED_clarity_pivot_bake(bContext *C, const ed::clarity::eClarityPivotBakeMode
   WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, object);
   WM_event_add_notifier(C, NC_GEOM | ND_DATA, object->data);
   return true;
+}
+
+double3 ED_clarity_pivot_position_axis_constrain(const ed::clarity::ClarityPivotFrame &frame,
+                                                 const double3 &target_world,
+                                                 const int active_axis)
+{
+  if (!frame.position_valid || !frame.orientation_valid || active_axis < 0 || active_axis > 2) {
+    return target_world;
+  }
+  const double3x3 basis = math::from_rotation<double3x3>(frame.orientation_world);
+  double axis_length;
+  const double3 axis = math::normalize_and_get_length(basis[active_axis], axis_length);
+  if (axis_length <= 1.0e-12) {
+    return target_world;
+  }
+  return frame.position_world + axis * math::dot(target_world - frame.position_world, axis);
 }
 
 bool ED_clarity_pivot_orientation_aim(ed::clarity::ClarityPivotFrame &frame,
@@ -2901,14 +3391,12 @@ bool ED_clarity_snap_key_event_apply(const bContext *C,
     return true;
   }
 
-  /* The snap preview lives and dies with the held keys, so it follows the same state. */
-  if (snap.is_empty()) {
-    ed::clarity::pivot_edit_snap_preview_clear(*runtime);
-  }
-  else {
-    ed::clarity::pivot_edit_snap_preview_update(
-        C, *runtime, ed::clarity::pointer_region_position_get(C));
-  }
+  /* A snap key changes which elements can win, so the pre-highlight is asked again for the same
+   * pointer position - the cached answer is keyed on the pointer alone. It does not end with the
+   * key: in Edit Pivot the pointer always highlights what a click would use. */
+  ed::clarity::pivot_edit_snap_preview_clear(*runtime);
+  ed::clarity::pivot_edit_snap_preview_update(
+      C, *runtime, ed::clarity::pointer_region_position_get(C));
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
   return true;
 }

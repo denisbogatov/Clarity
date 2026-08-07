@@ -1170,6 +1170,32 @@ struct PointPrimitiveBuf : public VertexPrimitiveBuf {
   }
 };
 
+struct TrianglePrimitiveBuf : public VertexPrimitiveBuf {
+
+ public:
+  TrianglePrimitiveBuf(const SelectionType selection_type, const char *name = nullptr)
+      : VertexPrimitiveBuf(selection_type, name)
+  {
+  }
+
+  void append(const float3 &a,
+              const float3 &b,
+              const float3 &c,
+              const float4 &color,
+              select::ID select_id = select::SelectMap::select_invalid_id())
+  {
+    select_buf.select_append(select_id);
+    VertexPrimitiveBuf::append(a, color);
+    VertexPrimitiveBuf::append(b, color);
+    VertexPrimitiveBuf::append(c, color);
+  }
+
+  void end_sync(PassSimple::Sub &pass)
+  {
+    VertexPrimitiveBuf::end_sync(pass, GPU_PRIM_TRIS);
+  }
+};
+
 struct LinePrimitiveBuf : public VertexPrimitiveBuf {
 
  public:

@@ -336,12 +336,10 @@ TEST(transform_snap_clarity_pivot, PivotFollowsThePointerWithoutATarget)
 {
   ClarityPivotSnapInput input = clarity_pivot_input();
   input.has_target = false;
-  input.target_has_normal = true;
 
   const ClarityPivotSnapDecision decision = clarity_pivot_snap_decision_get(input);
   EXPECT_EQ(decision.position, input.applied_position);
   EXPECT_FALSE(decision.from_target);
-  EXPECT_FALSE(decision.aim_at_normal);
 }
 
 /** The magnet: the pivot lands on the target itself, never offset by the drag that took it there. */
@@ -378,37 +376,101 @@ TEST(transform_snap_clarity_pivot, AConstrainedDragKeepsThePivotOnItsConstraint)
   EXPECT_EQ(clarity_pivot_snap_decision_get(input).position, input.target_position);
 }
 
-/** Position snapping off keeps the pointer in charge, and the target may still aim the pivot. */
+/** Position snapping off keeps the pointer in charge of the move. */
 TEST(transform_snap_clarity_pivot, PositionSnapOffLeavesThePointerInChargeOfTheMove)
 {
   ClarityPivotSnapInput input = clarity_pivot_input();
   input.has_target = true;
-  input.target_has_normal = true;
   input.snap_position = false;
 
   const ClarityPivotSnapDecision decision = clarity_pivot_snap_decision_get(input);
   EXPECT_EQ(decision.position, input.pointer_position);
   EXPECT_FALSE(decision.from_target);
-  EXPECT_TRUE(decision.aim_at_normal);
 }
 
-/** A vertex has no surface normal, so a snap onto one places the pivot without turning it. */
-TEST(transform_snap_clarity_pivot, AimingNeedsANormalAndItsOwnSetting)
+/**
+ * A drag places the pivot and never turns it, whatever it snapped to. Clarity keeps the two apart:
+ * "hold C or V and middle-drag ... to snap the pivot to that object's edges or vertices" against
+ * "click a component to snap and align the pivot to the selected component". Aiming the pivot at
+ * every snapped update gave it a new frame each time the element under the pointer changed, so a
+ * drag that crossed a corner left the axes turned and the drag could not turn them back.
+ *
+ * The decision therefore carries a position and the flag saying where it came from, and the drag has
+ * nothing else to apply.
+ */
+TEST(transform_snap_clarity_pivot, ADragPlacesThePivotWithoutTurningIt)
 {
   ClarityPivotSnapInput input = clarity_pivot_input();
   input.has_target = true;
 
-  input.target_has_normal = false;
-  EXPECT_FALSE(clarity_pivot_snap_decision_get(input).aim_at_normal);
+  const ClarityPivotSnapDecision snapped = clarity_pivot_snap_decision_get(input);
+  EXPECT_EQ(snapped.position, input.target_position);
+  EXPECT_TRUE(snapped.from_target);
 
-  input.target_has_normal = true;
-  EXPECT_TRUE(clarity_pivot_snap_decision_get(input).aim_at_normal);
+  /* The same target one update later, after the pointer left it: still only a position. */
+  input.has_target = false;
+  const ClarityPivotSnapDecision released = clarity_pivot_snap_decision_get(input);
+  EXPECT_EQ(released.position, input.applied_position);
+  EXPECT_FALSE(released.from_target);
+}
 
-  input.snap_orientation = false;
-  const ClarityPivotSnapDecision decision = clarity_pivot_snap_decision_get(input);
-  EXPECT_FALSE(decision.aim_at_normal);
-  /* Turning the aim off must not stop the pivot from being placed. */
-  EXPECT_EQ(decision.position, input.target_position);
+/**
+ * The click that aligns the pivot with a component reads one vector per hit, and it means something
+ * different for each element: a face and a vertex return a normal, an edge returns the direction
+ * between its two vertices, a grid intersection returns nothing. Clarity aligns all of them with the
+ * pivot's X axis - "the manipulator's X-axis aims at the selected vertex, aligns along the selected
+ * edge, and aligns along the face normal of the selected face" - but the kinds still have to be told
+ * apart, because only an edge may be reported from either end.
+ */
+TEST(transform_snap_clarity_pivot, EachElementAimsTheAxisItsVectorBelongsTo)
+{
+  EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_FACE),
+            ClarityPivotSnapVector::SurfaceNormal);
+  EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_FACE_MIDPOINT),
+            ClarityPivotSnapVector::SurfaceNormal);
+  EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_VOLUME),
+            ClarityPivotSnapVector::SurfaceNormal);
+  /* `cb_snap_edge` stores `v1 - v0`, and the endpoint case deliberately keeps the vertex normal. */
+  EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_EDGE),
+            ClarityPivotSnapVector::EdgeDirection);
+  EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_EDGE_MIDPOINT),
+            ClarityPivotSnapVector::EdgeDirection);
+  EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_EDGE_PERPENDICULAR),
+            ClarityPivotSnapVector::EdgeDirection);
+  EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_POINT),
+            ClarityPivotSnapVector::SurfaceNormal);
+  EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_EDGE_ENDPOINT),
+            ClarityPivotSnapVector::SurfaceNormal);
+  /* A grid intersection is a bare position. */
+  EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_GRID), ClarityPivotSnapVector::None);
+  EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_NONE), ClarityPivotSnapVector::None);
+
+  EXPECT_EQ(clarity_pivot_snap_aim_axis_get(ClarityPivotSnapVector::SurfaceNormal), 0);
+  EXPECT_EQ(clarity_pivot_snap_aim_axis_get(ClarityPivotSnapVector::EdgeDirection), 0);
+  EXPECT_EQ(clarity_pivot_snap_aim_axis_get(ClarityPivotSnapVector::None), -1);
+}
+
+/**
+ * An edge is the one element whose vector cannot be used as it stands: the search returns the line
+ * between its two vertices, while the pivot needs the edge's normal - the mean of the faces beside
+ * it. The kind says so, and `clarity_pivot_edge_normal_get` rebuilds it before the aim.
+ */
+TEST(transform_snap_clarity_pivot, OnlyAnEdgeNeedsItsNormalRebuilt)
+{
+  for (const eSnapMode mode :
+       {SCE_SNAP_TO_EDGE, SCE_SNAP_TO_EDGE_MIDPOINT, SCE_SNAP_TO_EDGE_PERPENDICULAR})
+  {
+    EXPECT_EQ(clarity_pivot_snap_vector_get(mode), ClarityPivotSnapVector::EdgeDirection);
+    EXPECT_EQ(clarity_pivot_snap_aim_axis_get(clarity_pivot_snap_vector_get(mode)), 0);
+  }
+  for (const eSnapMode mode : {SCE_SNAP_TO_FACE,
+                               SCE_SNAP_TO_FACE_MIDPOINT,
+                               SCE_SNAP_TO_VOLUME,
+                               SCE_SNAP_TO_POINT,
+                               SCE_SNAP_TO_EDGE_ENDPOINT})
+  {
+    EXPECT_EQ(clarity_pivot_snap_vector_get(mode), ClarityPivotSnapVector::SurfaceNormal);
+  }
 }
 
 /** \} */

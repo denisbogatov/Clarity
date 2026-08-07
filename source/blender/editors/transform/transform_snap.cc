@@ -11,6 +11,7 @@
 #include "BLI_math_matrix.h"
 #include "BLI_math_rotation.h"
 #include "BLI_math_vector.h"
+#include "BLI_math_vector.hh"
 #include "BLI_time.h"
 
 #include "DNA_userdef_types.h"
@@ -709,6 +710,40 @@ ClaritySnapPlan transform_snap_clarity_plan_get(const ClaritySnapPlanInput &inpu
   return plan;
 }
 
+ClarityPivotSnapVector clarity_pivot_snap_vector_get(const eSnapMode target_type)
+{
+  /* `cb_snap_edge` and the edge midpoint/perpendicular paths store `v1 - v0`, the raycast and the
+   * face midpoint store the face normal, a point and an edge endpoint store the vertex normal. The
+   * element that won the search is the only thing that says which of the three came back. */
+  if (target_type & (SCE_SNAP_TO_EDGE | SCE_SNAP_TO_EDGE_MIDPOINT | SCE_SNAP_TO_EDGE_PERPENDICULAR))
+  {
+    return ClarityPivotSnapVector::EdgeDirection;
+  }
+  if (target_type & (SCE_SNAP_TO_FACE | SCE_SNAP_TO_FACE_MIDPOINT | SCE_SNAP_TO_VOLUME |
+                     SCE_SNAP_TO_POINT | SCE_SNAP_TO_EDGE_ENDPOINT))
+  {
+    return ClarityPivotSnapVector::SurfaceNormal;
+  }
+  /* A grid or increment target is a bare position. */
+  return ClarityPivotSnapVector::None;
+}
+
+int clarity_pivot_snap_aim_axis_get(const ClarityPivotSnapVector target_vector)
+{
+  switch (target_vector) {
+    case ClarityPivotSnapVector::SurfaceNormal:
+    case ClarityPivotSnapVector::EdgeDirection:
+      /* X is the axis a component aligns in Clarity: "the manipulator's X-axis aims at the selected
+       * vertex, aligns along the selected edge, and aligns along the face normal of the selected
+       * face". The same axis its `Ctrl + Shift` aim uses by default, so a snapped and an aimed pivot
+       * agree. The other two axes stay as close to the previous frame as the aim allows. */
+      return 0;
+    case ClarityPivotSnapVector::None:
+      break;
+  }
+  return -1;
+}
+
 ClarityPivotSnapDecision clarity_pivot_snap_decision_get(const ClarityPivotSnapInput &input)
 {
   ClarityPivotSnapDecision decision;
@@ -734,7 +769,7 @@ ClarityPivotSnapDecision clarity_pivot_snap_decision_get(const ClarityPivotSnapI
      * which is what #pointer_position is for. */
     decision.position = input.pointer_position;
   }
-  decision.aim_at_normal = input.snap_orientation && input.target_has_normal;
+  /* No orientation here on purpose: a drag places the pivot, a click on a component aligns it. */
   return decision;
 }
 

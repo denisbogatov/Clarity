@@ -1,0 +1,143 @@
+initial
+select_object
+  (nothing changed)
+tool_move
+  tool.currentContext : selectSuperContext -> Move
+tool_rotate
+  tool.contextMode.rotate.mode : 3 -> 0
+  tool.currentContext : Move -> Rotate
+tool_scale
+  tool.contextMode.scale.mode : 6 -> 0
+  tool.currentContext : Rotate -> Scale
+tool_move_again
+  tool.currentContext : Scale -> Move
+pick_world
+  (nothing changed)
+pick_object
+  tool.contextMode.move.mode : 2 -> 0
+pick_world_again
+  tool.contextMode.move.mode : 0 -> 2
+enter_pivot_edit
+  (nothing changed)
+aim_orientation
+  tool.contextMode.move.mode : 2 -> 6
+  tool.manipPivot.oriValid : False -> True
+  tool.manipPivot.orientation[0] : (0.0, 0.0, 0.0) -> (0.40142572795869585, -0.7155849933176751, 0.20943951023931956)
+  tool.manipPivot.valid : False -> True
+  transform.manipPivot.orientationValid : False -> True
+  transform.manipPivot.orientation[0] : [0.0, 0.0, 0.0] -> [0.40143, -0.71558, 0.20944]
+  transform.manipPivot.valid : False -> True
+move_pivots
+  transform.rotatePivot : [0.0, 0.0, 0.0] -> [-3.05439, 2.73055, -4.62827]
+  transform.rotatePivotTranslate : [0.0, 0.0, 0.0] -> [-1.49783, -0.88739, 0.87512]
+  transform.rotatePivotWorld : [-1.61965, -8.93527, 6.63751] -> [9.25, -4.5, 6.75]
+  transform.scalePivot : [0.0, 0.0, 0.0] -> [-2.67962, -9.16371, -3.70262]
+  transform.scalePivotTranslate : [0.0, 0.0, 0.0] -> [-0.37477, 11.89426, -0.92565]
+  transform.scalePivotWorld : [-1.61965, -8.93527, 6.63751] -> [9.25, -4.5, 6.75]
+pin_on
+  tool.manipPivot.pinPivot : False -> True
+  transform.manipPivot.pinned : False -> True
+select_vertices
+  tool.selection[0] : pivotSubject -> pivotSubjectShape.vtx[0:1]
+select_edge
+  tool.selection[0] : pivotSubjectShape.vtx[0:1] -> pivotSubjectShape.e[3]
+select_face
+  tool.selection[0] : pivotSubjectShape.e[3] -> pivotSubjectShape.f[2]
+pin_off
+  tool.manipPivot.pinPivot : True -> False
+  transform.manipPivot.pinned : True -> False
+select_other_face
+  tool.contextMode.move.mode : 6 -> 2
+  tool.manipPivot.oriValid : True -> False
+  tool.manipPivot.orientation[0] : (0.40142572795869585, -0.7155849933176751, 0.20943951023931956) -> (0.0, 0.0, 0.0)
+  tool.manipPivot.valid : True -> False
+  tool.selection[0] : pivotSubjectShape.f[2] -> pivotSubjectShape.f[4]
+  transform.manipPivot.orientationValid : True -> False
+  transform.manipPivot.orientation[0] : [0.40143, -0.71558, 0.20944] -> [0.0, 0.0, 0.0]
+  transform.manipPivot.valid : True -> False
+back_to_object
+  tool.selection[0] : pivotSubjectShape.f[4] -> pivotSubject
+aim_orientation_again
+  tool.contextMode.move.mode : 2 -> 6
+  tool.manipPivot.oriValid : False -> True
+  tool.manipPivot.orientation[0] : (0.0, 0.0, 0.0) -> (0.40142572795869585, -0.7155849933176751, 0.20943951023931956)
+  tool.manipPivot.valid : False -> True
+  transform.manipPivot.orientationValid : False -> True
+  transform.manipPivot.orientation[0] : [0.0, 0.0, 0.0] -> [0.40143, -0.71558, 0.20944]
+  transform.manipPivot.valid : False -> True
+leave_pivot_edit
+  (nothing changed)
+reset_orientation
+  tool.contextMode.move.mode : 6 -> 2
+  tool.manipPivot.oriValid : True -> False
+  tool.manipPivot.orientation[0] : (0.40142572795869585, -0.7155849933176751, 0.20943951023931956) -> (0.0, 0.0, 0.0)
+  tool.manipPivot.valid : True -> False
+  transform.manipPivot.orientationValid : True -> False
+  transform.manipPivot.orientation[0] : [0.40143, -0.71558, 0.20944] -> [0.0, 0.0, 0.0]
+  transform.manipPivot.valid : True -> False
+aim_orientation_third
+  tool.contextMode.move.mode : 2 -> 6
+  tool.manipPivot.oriValid : False -> True
+  tool.manipPivot.orientation[0] : (0.0, 0.0, 0.0) -> (0.40142572795869585, -0.7155849933176751, 0.20943951023931956)
+  tool.manipPivot.valid : False -> True
+  transform.manipPivot.orientationValid : False -> True
+  transform.manipPivot.orientation[0] : [0.0, 0.0, 0.0] -> [0.40143, -0.71558, 0.20944]
+  transform.manipPivot.valid : False -> True
+reset_mode_zero
+  tool.manipPivot.resetMode : 0 -> 1
+  transform.manipPivot.resetMode : 0 -> 1
+reset_position
+  transform.rotatePivot : [-3.05439, 2.73055, -4.62827] -> [0.0, 0.0, 0.0]
+  transform.rotatePivotTranslate : [-1.49783, -0.88739, 0.87512] -> [0.0, 0.0, 0.0]
+  transform.rotatePivotWorld : [9.25, -4.5, 6.75] -> [-1.61965, -8.93527, 6.63751]
+  transform.scalePivot : [-2.67962, -9.16371, -3.70262] -> [0.0, 0.0, 0.0]
+  transform.scalePivotTranslate : [-0.37477, 11.89426, -0.92565] -> [0.0, 0.0, 0.0]
+  transform.scalePivotWorld : [9.25, -4.5, 6.75] -> [-1.61965, -8.93527, 6.63751]
+move_pivots_again
+  transform.rotatePivot : [0.0, 0.0, 0.0] -> [-3.05439, 2.73055, -4.62827]
+  transform.rotatePivotTranslate : [0.0, 0.0, 0.0] -> [-1.49783, -0.88739, 0.87512]
+  transform.rotatePivotWorld : [-1.61965, -8.93527, 6.63751] -> [9.25, -4.5, 6.75]
+  transform.scalePivot : [0.0, 0.0, 0.0] -> [-2.67962, -9.16371, -3.70262]
+  transform.scalePivotTranslate : [0.0, 0.0, 0.0] -> [-0.37477, 11.89426, -0.92565]
+  transform.scalePivotWorld : [-1.61965, -8.93527, 6.63751] -> [9.25, -4.5, 6.75]
+bake_orientation
+  transform.matrix : [0.78217, 1.29041, 1.31266, 0.0, 0.41064, -0.12303, -0.27611, 0.0, -0.35292, -1.12719, 0.74701, 0.0, 1.25, -2.5, 3.75, 1.0] -> [-1.87192, 0.11909, -0.69408, 0.0, -0.05221, -0.34768, 0.36931, 0.0, 0.74347, -0.59005, -1.02578, 0.0, -6.04392, -5.70853, -2.27683, 1.0]
+  transform.rotate : [20.0, -35.0, 70.0] -> [-33.45904, 165.91653, -11.33989]
+  transform.worldMatrix : [-2.51615, 0.18412, 0.54103, 0.0, -0.47262, -0.01053, -0.70777, 0.0, 0.05499, -1.30508, 1.32976, 0.0, -1.61965, -8.93527, 6.63751, 1.0] -> [3.80182, 0.80614, 1.07929, 0.0, -0.1962, -0.49182, 0.50989, 0.0, -0.39748, -0.02048, -1.83, 0.0, 16.16784, -6.92254, 7.53877, 1.0]
+bake_position
+  transform.matrix : [-1.87192, 0.11909, -0.69408, 0.0, -0.05221, -0.34768, 0.36931, 0.0, 0.74347, -0.59005, -1.02578, 0.0, -6.04392, -5.70853, -2.27683, 1.0] -> [-1.87192, 0.11909, -0.69408, 0.0, -0.05221, -0.34768, 0.36931, 0.0, 0.74347, -0.59005, -1.02578, 0.0, -3.30222, -0.65684, -0.00316, 1.0]
+  transform.rotatePivot : [-3.05439, 2.73055, -4.62827] -> [0.0, 0.0, 0.0]
+  transform.rotatePivotTranslate : [-1.49783, -0.88739, 0.87512] -> [0.0, 0.0, 0.0]
+  transform.scalePivot : [-2.67962, -9.16371, -3.70262] -> [0.0, 0.0, 0.0]
+  transform.scalePivotTranslate : [-0.37477, 11.89426, -0.92565] -> [0.0, 0.0, 0.0]
+  transform.translate : [1.25, -2.5, 3.75] -> [-3.30222, -0.65684, -0.00316]
+  transform.worldMatrix : [3.80182, 0.80614, 1.07929, 0.0, -0.1962, -0.49182, 0.50989, 0.0, -0.39748, -0.02048, -1.83, 0.0, 16.16784, -6.92254, 7.53877, 1.0] -> [3.80182, 0.80614, 1.07929, 0.0, -0.1962, -0.49182, 0.50989, 0.0, -0.39748, -0.02048, -1.83, 0.0, 9.25, -4.5, 6.75, 1.0]
+rotate_object
+  transform.matrix : [-1.87192, 0.11909, -0.69408, 0.0, -0.05221, -0.34768, 0.36931, 0.0, 0.74347, -0.59005, -1.02578, 0.0, -3.30222, -0.65684, -0.00316, 1.0] -> [1.91946, -0.55279, -0.10052, 0.0, -0.19989, -0.26147, -0.38946, 0.0, -0.49224, -0.56679, 1.1788, 0.0, -3.30222, -0.65684, -0.00316, 1.0]
+  transform.rotate : [-33.45904, 165.91653, -11.33989] -> [40.0, 15.0, -25.0]
+  transform.worldMatrix : [3.80182, 0.80614, 1.07929, 0.0, -0.1962, -0.49182, 0.50989, 0.0, -0.39748, -0.02048, -1.83, 0.0, 9.25, -4.5, 6.75, 1.0] -> [-3.1987, -0.7157, -1.97029, 0.0, 0.68387, 0.04057, -0.20725, 0.0, -0.09577, -1.06671, 1.88885, 0.0, 9.25, -4.5, 6.75, 1.0]
+freeze
+  transform.matrix : [1.91946, -0.55279, -0.10052, 0.0, -0.19989, -0.26147, -0.38946, 0.0, -0.49224, -0.56679, 1.1788, 0.0, -3.30222, -0.65684, -0.00316, 1.0] -> [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+  transform.rotate : [40.0, 15.0, -25.0] -> [0.0, -0.0, -0.0]
+  transform.rotateAxis : [11.0, -7.0, 5.0] -> [0.0, -0.0, 0.0]
+  transform.rotatePivot : [0.0, 0.0, 0.0] -> [-3.30222, -0.65684, -0.00316]
+  transform.scale : [2.0, -0.5, 1.25] -> [1.0, 1.0, 1.0]
+  transform.scalePivot : [0.0, 0.0, 0.0] -> [-3.30222, -0.65684, -0.00316]
+  transform.shear : [0.2, -0.3, 0.4] -> [0.0, 0.0, 0.0]
+  transform.translate : [-3.30222, -0.65684, -0.00316] -> [0.0, 0.0, 0.0]
+  transform.worldMatrix : [-3.1987, -0.7157, -1.97029, 0.0, 0.68387, 0.04057, -0.20725, 0.0, -0.09577, -1.06671, 1.88885, 0.0, 9.25, -4.5, 6.75, 1.0] -> [-1.72679, -0.16457, -1.00188, 0.0, -0.05847, 0.82791, -0.11943, 0.0, -0.83042, -0.57555, 1.12656, 0.0, 3.50674, -4.50146, 3.36667, 1.0]
+clear_selection
+  tool.contextMode.move.mode : 6 -> 2
+  tool.manipPivot.oriValid : True -> False
+  tool.manipPivot.orientation[0] : (0.40142572795869585, -0.7155849933176751, 0.20943951023931956) -> (0.0, 0.0, 0.0)
+  tool.manipPivot.valid : True -> False
+  tool.selection[0] : pivotSubject -> (absent)
+  transform.manipPivot.orientationValid : True -> False
+  transform.manipPivot.orientation[0] : [0.40143, -0.71558, 0.20944] -> [0.0, 0.0, 0.0]
+  transform.manipPivot.valid : True -> False
+select_again
+  tool.selection[0] : (absent) -> pivotSubject
+undo
+  tool.selection[0] : pivotSubject -> (absent)
+redo
+  tool.selection[0] : (absent) -> pivotSubject

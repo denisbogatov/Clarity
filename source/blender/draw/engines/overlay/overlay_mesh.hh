@@ -57,10 +57,20 @@ class ClarityPivotSnapPreview : Overlay {
  private:
   PassSimple ps_ = {"Clarity Pivot Snap Preview"};
   LinePrimitiveBuf lines_;
+  /** Clarity fills a highlighted face as well as outlining it. */
+  TrianglePrimitiveBuf faces_ = {SelectionType::DISABLED,
+                                 "clarity_pivot_snap_preview_faces"};
   StorageVectorBuffer<VertexData> points_ = {"clarity_pivot_snap_preview_points"};
 
   ed::clarity::ClarityPivotSnapResult target_;
-  float4 color_ = float4(0.15f, 1.0f, 0.35f, 1.0f);
+  /**
+   * Clarity's pre-highlight orange, measured off a 2025 capture: the vertex marker, the edge and the
+   * face outline are all `239, 99, 5`, and the face is filled with the same colour at low alpha.
+   *
+   * Held linear, because that is what the overlay pipeline writes: handing it the sRGB numbers
+   * displayed them as `237, 164, 52`, an amber that is not the colour Clarity uses.
+   */
+  float4 color_ = float4(0.863f, 0.127f, 0.0015f, 1.0f);
   bool object_synced_ = false;
   bool in_front_ = false;
 
@@ -101,6 +111,7 @@ class ClarityPivotSnapPreview : Overlay {
     object_synced_ = false;
     in_front_ = false;
     lines_.clear();
+    faces_.clear();
     points_.clear();
 
     enabled_ = state.is_space_v3d() && !state.hide_overlays && !state.is_depth_only_drawing &&
@@ -121,9 +132,13 @@ class ClarityPivotSnapPreview : Overlay {
       return;
     }
 
-    const double3 &position = *target_.position_world;
-    points_.append(
-        VertexData{float4(float(position.x), float(position.y), float(position.z), 0.0f), color_});
+    /* A point marker belongs to a point. Appending it for every target drew a dot in the middle of
+     * a hovered face, which is not something Clarity puts there: a face highlights as a face. */
+    if (target_.type == ed::clarity::ClarityPivotSnapTargetType::Vertex) {
+      const double3 &position = *target_.position_world;
+      points_.append(VertexData{
+          float4(float(position.x), float(position.y), float(position.z), 0.0f), color_});
+    }
   }
 
   void object_sync(Manager & /*manager*/,
@@ -176,6 +191,12 @@ class ClarityPivotSnapPreview : Overlay {
         lines_.append(position_world(float3(loop->v->co)),
                       position_world(float3(loop->next->v->co)),
                       color_);
+        if (loop != loop_first && loop->next != loop_first) {
+          faces_.append(position_world(float3(loop_first->v->co)),
+                        position_world(float3(loop->v->co)),
+                        position_world(float3(loop->next->v->co)),
+                        color_);
+        }
         loop = loop->next;
       } while (loop != loop_first);
       return;
@@ -205,6 +226,7 @@ class ClarityPivotSnapPreview : Overlay {
     if (face.size() < 2) {
       return;
     }
+    const int vert_first = corner_verts[face[0]];
     for (const int i : IndexRange(face.size())) {
       const int vert = corner_verts[face[i]];
       const int vert_next = corner_verts[face[(i + 1) % face.size()]];
@@ -214,6 +236,12 @@ class ClarityPivotSnapPreview : Overlay {
         continue;
       }
       lines_.append(position_world(positions[vert]), position_world(positions[vert_next]), color_);
+      if (i > 0 && i + 1 < face.size() && positions.index_range().contains(vert_first)) {
+        faces_.append(position_world(positions[vert_first]),
+                      position_world(positions[vert]),
+                      position_world(positions[vert_next]),
+                      color_);
+      }
     }
   }
 
@@ -227,18 +255,26 @@ class ClarityPivotSnapPreview : Overlay {
     ps_.bind_ubo(OVERLAY_GLOBALS_SLOT, &res.globals_buf);
     ps_.bind_ubo(DRW_CLIPPING_UBO_SLOT, &res.clip_planes_buf);
     {
+      /* The fill Clarity puts under a highlighted face: the same colour, barely opaque. No depth
+       * test, so it does not fight for depth with the very face it covers. */
+      PassSimple::Sub &sub = ps_.sub("component_fill");
+      sub.state_set(DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ALPHA, state.clipping_plane_count);
+      sub.shader_set(res.shaders->armature_wire.get());
+      sub.push_constant("alpha", 0.14f);
+      faces_.end_sync(sub);
+    }
+    {
+      /* The highlight belongs to the component under the pointer, so it is drawn over the surface
+       * it lies on rather than being half-swallowed by it. */
       PassSimple::Sub &sub = ps_.sub("component_outline");
-      sub.state_set(DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH |
-                        DRW_STATE_DEPTH_LESS_EQUAL,
-                    state.clipping_plane_count);
+      sub.state_set(DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ALPHA, state.clipping_plane_count);
       sub.shader_set(res.shaders->armature_wire.get());
       sub.push_constant("alpha", 1.0f);
       lines_.end_sync(sub);
     }
     {
       PassSimple::Sub &sub = ps_.sub("snap_position");
-      sub.state_set(DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH |
-                        DRW_STATE_DEPTH_LESS_EQUAL | DRW_STATE_BLEND_ALPHA,
+      sub.state_set(DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ALPHA,
                     state.clipping_plane_count);
       sub.shader_set(res.shaders->extra_point.get());
       points_.push_update();

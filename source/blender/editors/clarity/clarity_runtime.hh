@@ -124,6 +124,28 @@ struct ClarityPivotEditState {
   /** Rebuild the mode for the new context once the running pivot drag finishes. */
   bool restart_after_drag = false;
   bool data_origin_was_enabled = false;
+  /**
+   * A left button press is down and may still become the click that places the pivot.
+   *
+   * Clarity has to track this itself. Blender clears its own #wmWindow::event_queue_check_click as
+   * soon as a handler takes the press, and `view3d.select` takes every one of them, so the release
+   * is never promoted to a #KM_CLICK the dispatcher could act on. Dropped by whatever proves the
+   * gesture is not a plain click: the drag threshold, or a #KM_DBL_CLICK press that belongs to the
+   * topology selection instead.
+   */
+  bool click_press_pending = false;
+  /**
+   * The `D` press that turned the mode on is still down, and releasing it may turn it back off.
+   *
+   * Maya offers the key both ways: "press and hold the D key to temporarily enter custom pivot
+   * editing mode" and release to leave it, or "press D or Insert" for a toggle that stays. A tap is
+   * therefore not a very short hold, it is the other gesture, and only the time the key was down
+   * separates them. Cleared whenever the release can no longer be trusted to arrive, so a lost one
+   * leaves the mode on - recoverable with another press - instead of arming it forever.
+   */
+  bool key_press_entered_mode = false;
+  /** When that press arrived, from #BLI_time_now_seconds. */
+  double key_press_time = 0.0;
   std::unique_ptr<ClarityCustomPivotData> custom;
   bool follow_transform = false;
   float follow_location_initial[3] = {};
@@ -362,12 +384,39 @@ int navigation_frame_rate_limit_setting(const bContext *C);
 std::FILE *navigation_trace_file_open();
 bool pivot_edit_toggle_persistent(bContext *C, ClarityWindowRuntime &runtime);
 bool pivot_edit_resume_persistent(bContext *C, ClarityWindowRuntime &runtime);
+
+/**
+ * Whether releasing the Edit Pivot key leaves the mode again.
+ *
+ * The rule behind Maya's two ways in. Only a press that turned the mode *on* can take it back out:
+ * pressing the key while the mode is already on is the toggle turning it off, and the release that
+ * follows must not turn it on again. Beyond that it is the hold that exits and the tap that stays,
+ * which is the same question Blender's pie menus ask of a key, so it is answered with the same
+ * preference (#UserDef::pie_tap_timeout) rather than a constant of our own.
+ */
+bool pivot_edit_key_release_exits(bool entered_mode_with_this_press,
+                                  double held_seconds,
+                                  double tap_timeout_seconds);
+
+/** Handle the Edit Pivot key. Returns whether the event was consumed. */
+bool pivot_edit_key_press(bContext *C, ClarityWindowRuntime &runtime);
+bool pivot_edit_key_release(bContext *C, ClarityWindowRuntime &runtime);
 bool pivot_edit_pin_toggle(bContext *C, ClarityWindowRuntime &runtime);
 void pivot_edit_tool_changed(bContext *C, ClarityWindowRuntime &runtime);
 ClarityDispatchResult pivot_edit_click_handle_action(bContext *C,
                                                    ClarityWindowRuntime &runtime,
                                                    const ClarityInputAction &action);
 void pivot_edit_selection_changed(bContext *C, ClarityWindowRuntime &runtime);
+/**
+ * Clear an authored pivot orientation whose object is no longer selected. Runs per dispatched event,
+ * because an ordinary object pick never reaches Clarity's own selection handling.
+ */
+void pivot_orientation_selection_sync(bContext *C, ClarityWindowRuntime &runtime);
+/**
+ * The same for a component frame: once the selection it was aimed at is gone, the tools go back to
+ * their own coordinate systems and the pivot recomputes from what is selected now.
+ */
+void pivot_component_orientation_selection_sync(bContext *C, ClarityWindowRuntime &runtime);
 /**
  * Refresh the hovered snap target used by the pivot snap preview. Clears the target unless Edit
  * Pivot owns a manipulator, a temporary snap key is held and no transform is running, and skips
@@ -392,6 +441,12 @@ float snap_tolerance_radius_px(const ClaritySnapToleranceSettings &settings,
  * next drag will use. Called from every place that changes the tool, and from nowhere else.
  */
 void tool_mirror_sync(const bContext *C, ClarityToolID tool);
+/**
+ * Mirror the coordinate system the active tool resolves to into the window-manager runtime, where a
+ * script can read it. Computed from the tool's orientation slot and its `Custom` flag, so it has to be
+ * refreshed whenever either can have changed - the dispatcher does it once per event.
+ */
+void orientation_mirror_sync(const bContext *C);
 void snap_override_mirror_sync(const bContext *C, const ClarityWindowRuntime &runtime);
 void snap_override_revision_reconcile(const bContext *C, ClarityWindowRuntime &runtime);
 void snap_override_key_state_reconcile(const bContext *C, ClarityWindowRuntime &runtime);

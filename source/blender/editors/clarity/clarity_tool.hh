@@ -48,7 +48,25 @@ struct ClarityManipulatorPivotState {
   bool preserve_children = true;
   bool show_orientation_handle = true;
   ClarityObjectRuntimeRef last_object;
+  /**
+   * Object whose pivot orientation the user aimed at a selection. Tracked apart from #last_object
+   * because that one follows whichever object the manipulator is currently on: a persistent Edit
+   * Pivot rebinds it to the newly selected object, and the object that is about to lose its authored
+   * frame is precisely the one no longer selected. Cleared when the orientation is reset.
+   */
+  ClarityObjectRuntimeRef authored_orientation_object;
   int active_axis = 0;
+  /**
+   * Whether the selected manipulator handle is an axis handle rather than the centre one.
+   *
+   * Maya reads the selected handle twice while editing a pivot. *Snap the custom pivot to a
+   * component*: "to snap the custom pivot's position along a single axis, select one of the axis
+   * handles (X, Y, Z) on the custom pivot manipulator and Shift-click a component". And for the
+   * aim, "if the center handle or X-axis handle is selected, the custom pivot aims its X-axis" -
+   * so the centre is not a fourth axis, it is the absence of a constraint. #active_axis keeps the
+   * last axis for the middle-button drag, which is why the distinction needs its own flag.
+   */
+  bool active_axis_handle = false;
   /**
    * Orientation the manipulator had the last time it was derived from a world matrix. An
    * orthonormalized basis has several valid solutions that differ by a half turn, and the raw
@@ -72,6 +90,20 @@ struct ClarityToolState {
    * silently resetting it to Select.
    */
   bool adopted_from_view = false;
+  /**
+   * `Custom axis orientation`, per transform tool: Move, Rotate, Scale.
+   *
+   * Clarity's fourth coordinate system is not one of the entries its marking menu offers, and the
+   * Rotate Tool page says where it comes from: "Custom axis orientation is automatically selected
+   * when you activate custom pivot editing mode". It is a tool setting, so it stays selected after
+   * the mode ends - the frame a user aimed at a component is still what the manipulator shows -
+   * until they pick a coordinate system for that tool, or until the frame itself goes away.
+   *
+   * Kept here rather than in the scene's orientation slots on purpose: putting it there meant
+   * creating, syncing and removing a named orientation around every route out of the mode, and one
+   * missed restore silently rewrote the user's own setting.
+   */
+  bool orientation_custom[3] = {false, false, false};
   ClarityManipulatorPivotState manipulator_pivot;
 };
 

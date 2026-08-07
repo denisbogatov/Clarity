@@ -71,6 +71,58 @@ static int transform_orientation_slot_flag_get(const ClarityToolID tool)
   return -1;
 }
 
+/**
+ * Index of a tool's `Custom axis orientation` flag in #ClarityToolState::orientation_custom, -1 for a
+ * tool that has no coordinate system of its own.
+ */
+static int orientation_custom_index_get(const ClarityToolID tool)
+{
+  switch (tool) {
+    case ClarityToolID::Move:
+      return 0;
+    case ClarityToolID::Rotate:
+      return 1;
+    case ClarityToolID::Scale:
+      return 2;
+    case ClarityToolID::None:
+    case ClarityToolID::Select:
+    case ClarityToolID::MultiCut:
+    case ClarityToolID::TargetWeld:
+    case ClarityToolID::QuadDraw:
+      break;
+  }
+  return -1;
+}
+
+bool orientation_custom_get(const bContext *C, const ClarityToolID tool)
+{
+  const int index = orientation_custom_index_get(tool);
+  if (index < 0) {
+    return false;
+  }
+  const ClarityWindowRuntime *runtime = runtime_get(C);
+  return runtime != nullptr && runtime->tool.orientation_custom[index];
+}
+
+void orientation_custom_set(const bContext *C, const ClarityToolID tool, const bool value)
+{
+  const int index = orientation_custom_index_get(tool);
+  if (index < 0) {
+    return;
+  }
+  ClarityWindowRuntime *runtime = runtime_ensure(C);
+  if (runtime == nullptr || runtime->tool.orientation_custom[index] == value) {
+    return;
+  }
+  runtime->tool.orientation_custom[index] = value;
+  /* Refreshed here, not only once per event: a script - the pivot reference capture among them - can
+   * change this without any event following, and the mirrored value would then be the previous one. */
+  orientation_mirror_sync(C);
+  /* The manipulator, its drag and the menu all read this, so a change has to redraw them. */
+  WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM, nullptr);
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+}
+
 static TransformOrientationSlot *transform_orientation_slot_get(const bContext *C,
                                                                  const ClarityToolID tool,
                                                                  const bool activate_tool_slot)
@@ -92,6 +144,43 @@ static TransformOrientationSlot *transform_orientation_slot_get(const bContext *
     slot->flag |= SELECT;
   }
   return slot;
+}
+
+void transform_orientation_defaults_ensure(bContext *C)
+{
+  Scene *scene = CTX_data_scene(C);
+  if (scene == nullptr) {
+    return;
+  }
+  /* The defaults are not the same for the three tools, and the capture is what they come from:
+   * `fixtures/maya_2025_pivot_debug.log` reads each context's `-mode` as the tool is activated for the
+   * first time, and gets `2` for Move - World - against `0` for Rotate and `0` for Scale, both Object.
+   * The Scale Tool page claims World for itself; where a page and a capture disagree the capture wins,
+   * as it does for the edge normal of a pivot click. Each tool gets its own slot switched on, which is
+   * also what makes the header show the tool being used rather than a shared fallback, and a slot that
+   * is already on is left alone: from the first time the user picks a coordinate system for a tool,
+   * that slot owns the answer. */
+  const struct {
+    int slot;
+    int orientation;
+  } defaults[] = {
+      {SCE_ORIENT_TRANSLATE, V3D_ORIENT_GLOBAL},
+      {SCE_ORIENT_ROTATE, V3D_ORIENT_LOCAL},
+      {SCE_ORIENT_SCALE, V3D_ORIENT_LOCAL},
+  };
+  bool changed = false;
+  for (const auto &entry : defaults) {
+    TransformOrientationSlot *slot = &scene->orientation_slots[entry.slot];
+    if ((slot->flag & SELECT) != 0) {
+      continue;
+    }
+    slot->flag |= SELECT;
+    BKE_scene_orientation_slot_set_index(slot, entry.orientation);
+    changed = true;
+  }
+  if (changed) {
+    WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM, nullptr);
+  }
 }
 
 static ClarityMoveOrientation move_orientation_from_blender(const int orientation_type)
@@ -119,6 +208,9 @@ static int move_orientation_to_blender(const ClarityMoveOrientation orientation)
       return V3D_ORIENT_NORMAL;
     case ClarityMoveOrientation::Gimbal:
       return V3D_ORIENT_GIMBAL;
+    case ClarityMoveOrientation::Custom:
+      /* Never requested - it is what Edit Pivot reports while it owns the axes, and the pivot frame
+       * is not a slot value. Answering `World` keeps the mapping total. */
     case ClarityMoveOrientation::World:
       break;
   }
@@ -151,6 +243,14 @@ ClarityMoveToolState move_tool_state_get(const bContext *C)
 
 ClarityMoveOrientation transform_orientation_get(const bContext *C, const ClarityToolID tool)
 {
+  /* `Custom axis orientation` first: it is the one mode no menu entry carries, so nothing shows as
+   * checked while it is selected - which is what Clarity's own marking menu does - and it is selected
+   * by pivot editing rather than from the menu. It stays selected after the mode ends, so the frame a
+   * user aimed at a component keeps being the frame the manipulator uses. The tool's own mode is
+   * untouched underneath and comes back the moment a coordinate system is picked for the tool. */
+  if (orientation_custom_get(C, tool)) {
+    return ClarityMoveOrientation::Custom;
+  }
   if (const TransformOrientationSlot *slot = transform_orientation_slot_get(C, tool, false)) {
     return move_orientation_from_blender(BKE_scene_orientation_slot_get_index(slot));
   }
@@ -254,7 +354,17 @@ bool transform_orientation_set(bContext *C,
   if (slot == nullptr) {
     return false;
   }
+  /* Picking a coordinate system for the tool is what leaves `Custom` behind, and it takes the frame
+   * with it: in `interactionScenarios.pivot_edit_selects_custom`, the step that sets the Move context
+   * to `Object` comes back with `manipPivot -q -oriValid` false. Unconditional, as that capture is -
+   * the frame goes whether or not `Custom` was the mode being left. */
+  const bool select_custom = orientation == ClarityMoveOrientation::Custom;
+  if (!select_custom) {
+    ED_clarity_pivot_reset_orientation(C);
+  }
+  orientation_custom_set(C, tool, select_custom);
   BKE_scene_orientation_slot_set_index(slot, move_orientation_to_blender(orientation));
+  orientation_mirror_sync(C);
   move_menu_state_changed(C, true);
   return true;
 }
@@ -458,7 +568,11 @@ static void CLARITY_OT_transform_orientation_set(wmOperatorType *ot)
   ot->idname = "CLARITY_OT_transform_orientation_set";
   ot->exec = clarity_transform_orientation_set_exec;
   ot->poll = ED_operator_view3d_active;
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  /* No #OPTYPE_REGISTER: these are settings a menu writes, and registering them put a "Clarity
+   * Transform Orientation" block with `Tool` and `Orientation` fields into Adjust Last Operation,
+   * offering to re-run a coordinate-system change as if it were an edit. Undo still applies - the
+   * orientation lives in the scene. */
+  ot->flag = OPTYPE_UNDO;
 
   RNA_def_enum(ot->srna,
                "tool",
@@ -490,7 +604,8 @@ static void CLARITY_OT_move_option_toggle(wmOperatorType *ot)
   ot->idname = "CLARITY_OT_move_option_toggle";
   ot->exec = clarity_move_option_toggle_exec;
   ot->poll = ED_operator_view3d_active;
-  ot->flag = OPTYPE_REGISTER;
+  /* A menu setting, not an edit to adjust afterwards - see #CLARITY_OT_transform_orientation_set. */
+  ot->flag = 0;
 
   RNA_def_enum(ot->srna,
                "option",
@@ -514,7 +629,8 @@ static void CLARITY_OT_selection_constraint_set(wmOperatorType *ot)
   ot->idname = "CLARITY_OT_selection_constraint_set";
   ot->exec = clarity_selection_constraint_set_exec;
   ot->poll = ED_operator_view3d_active;
-  ot->flag = OPTYPE_REGISTER;
+  /* A menu setting, not an edit to adjust afterwards - see #CLARITY_OT_transform_orientation_set. */
+  ot->flag = 0;
 
   RNA_def_enum(ot->srna,
                "constraint",
@@ -538,7 +654,8 @@ static void CLARITY_OT_transform_constraint_set(wmOperatorType *ot)
   ot->idname = "CLARITY_OT_transform_constraint_set";
   ot->exec = clarity_transform_constraint_set_exec;
   ot->poll = ED_operator_view3d_active;
-  ot->flag = OPTYPE_REGISTER;
+  /* A menu setting, not an edit to adjust afterwards - see #CLARITY_OT_transform_orientation_set. */
+  ot->flag = 0;
 
   RNA_def_enum(ot->srna,
                "constraint",

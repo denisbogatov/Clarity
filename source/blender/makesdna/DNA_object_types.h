@@ -507,7 +507,8 @@ struct ClarityObjectTransform {
 
 /**
  * Optional pivot data used by the Clarity interaction preset without changing the object's
- * transform model. Positions and orientation are stored in object-local space.
+ * transform model. Positions are stored in object-local space; the orientation is a world frame,
+ * the way Maya's `manipPivot -ori` is - it does not follow the object it belongs to.
  */
 struct ObjectCustomPivot {
   double rotate_pivot[3] = {};

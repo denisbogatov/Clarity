@@ -1871,7 +1871,7 @@ void ED_spacetype_item()
 {
   std::unique_ptr<SpaceType> st = std::make_unique<SpaceType>();
   st->spaceid = SPACE_ITEM;
-  STRNCPY_UTF8(st->name, "Item");
+  STRNCPY_UTF8(st->name, "Transform");
   st->create = item_create;
   st->free = item_free;
   st->init = view3d_init;

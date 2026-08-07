@@ -1694,55 +1694,41 @@ static void v3d_editvertex_buts(
 
 #undef TRANSFORM_MEDIAN_ARRAY_LEN
 
+/* Forward declaration, the channel-box helpers live next to the transform panel. */
+static ui::Layout &clarity_channel_row(ui::Layout &col, StringRef label);
+
 static void v3d_object_dimension_buts(bContext *C, ui::Layout *layout, View3D *v3d, Object *ob)
 {
-  ui::Block *block = (layout) ? layout->block() : nullptr;
-  ui::Layout *sub_layout = layout ? &layout->absolute(false) : nullptr;
   TransformProperties *tfp = v3d_transform_props_ensure(v3d);
   const bool is_editable = ID_IS_EDITABLE(&ob->id);
 
-  if (block) {
+  if (layout) {
     BLI_assert(C == nullptr);
-    int yi = 200;
-    const int butw = 200;
-    const int buth = 20 * UI_SCALE_FAC;
+    ui::Block *block = layout->block();
 
     BKE_object_dimensions_eval_cached_get(ob, tfp->ob_dims);
     copy_v3_v3(tfp->ob_dims_orig, tfp->ob_dims);
     copy_v3_v3(tfp->ob_scale_orig, ob->scale);
     copy_m4_m4(tfp->ob_obmat_orig, ob->object_to_world().ptr());
 
-    if (!is_editable && sub_layout) {
-      sub_layout->enabled_set(false);
-    }
+    ui::Layout &col = layout->column(true);
+    col.enabled_set(is_editable);
 
-    uiDefBut(block,
-             ui::ButtonType::Label,
-             IFACE_("Dimensions:"),
-             0,
-             yi -= buth,
-             butw,
-             buth,
-             nullptr,
-             0,
-             0,
-             "");
-    block_align_begin(block);
-    const float lim = FLT_MAX;
+    const char *axis[3] = {" X", " Y", " Z"};
     for (int i = 0; i < 3; i++) {
-      ui::Button *but;
-      const char text[3] = {char('X' + i), ':', '\0'};
-      but = uiDefButV(block,
-                      ui::ButtonType::Num,
-                      text,
-                      0,
-                      yi -= buth,
-                      butw,
-                      buth,
-                      &(tfp->ob_dims[i]),
-                      0.0f,
-                      lim,
-                      "");
+      ui::Layout &value = clarity_channel_row(col, std::string(IFACE_("Dimension")) + axis[i]);
+      ui::block_layout_set_current(block, &value);
+      ui::Button *but = uiDefButV(block,
+                                  ui::ButtonType::Num,
+                                  "",
+                                  0,
+                                  0,
+                                  UI_UNIT_X * 5,
+                                  UI_UNIT_Y,
+                                  &(tfp->ob_dims[i]),
+                                  0.0f,
+                                  FLT_MAX,
+                                  "");
       button_retval_set(but, B_TRANSFORM_PANEL_DIMS);
       button_number_step_size_set(but, 10);
       button_number_precision_set(but, 3);
@@ -1751,7 +1737,7 @@ static void v3d_object_dimension_buts(bContext *C, ui::Layout *layout, View3D *v
         button_disable(but, "Cannot edit this property from a linked data-block");
       }
     }
-    block_align_end(block);
+    ui::block_layout_set_current(block, layout);
   }
   else { /* apply */
     int axis_mask = 0;
@@ -1985,96 +1971,98 @@ static void view3d_panel_vgroup(const bContext *C, Panel *panel)
   }
 }
 
-static void v3d_transform_butsR(ui::Layout &layout, PointerRNA *ptr)
+static constexpr float CLARITY_CHANNEL_ROW_SCALE_Y = 0.8f;
+static constexpr float CLARITY_CHANNEL_LABEL_SPLIT = 0.55f;
+
+/**
+ * Compact channel-box row: right-aligned attribute name and a single value field, without
+ * decorators or lock toggles. Returns the layout for the value side.
+ */
+static ui::Layout &clarity_channel_row(ui::Layout &col, const StringRef label)
 {
-  ui::Layout *split = &layout.split(0.8f, false);
+  ui::Layout &split = col.split(CLARITY_CHANNEL_LABEL_SPLIT, true);
+  split.scale_y_set(CLARITY_CHANNEL_ROW_SCALE_Y);
+  ui::Layout &name = split.row(true);
+  name.alignment_set(ui::LayoutAlign::Right);
+  name.label(label, ICON_NONE);
+  return split.row(true);
+}
+
+static void clarity_channel_prop(ui::Layout &col,
+                                 PointerRNA *ptr,
+                                 const StringRefNull propname,
+                                 const int index,
+                                 const StringRef label,
+                                 const ui::eUI_Item_Flag flag = UI_ITEM_NONE)
+{
+  PropertyRNA *prop = RNA_struct_find_property(ptr, propname.c_str());
+  if (prop == nullptr) {
+    return;
+  }
+  clarity_channel_row(col, label).prop(ptr, prop, index, 0, flag, "", ICON_NONE);
+}
+
+static void clarity_channel_vector(ui::Layout &col,
+                                   PointerRNA *ptr,
+                                   const StringRefNull propname,
+                                   const char *label)
+{
+  const char *axis[3] = {" X", " Y", " Z"};
+  for (int i = 0; i < 3; i++) {
+    clarity_channel_prop(col, ptr, propname, i, std::string(label) + axis[i]);
+  }
+}
+
+/**
+ * Clarity channel box for the Transforms tab: the active item name followed by tightly packed
+ * Translate/Rotate/Scale/Visibility channels.
+ */
+static void v3d_clarity_channel_box(ui::Layout &layout, PointerRNA *ptr, const char *item_name)
+{
+  ui::Layout &col = layout.column(true);
+  col.use_property_split_set(false);
+  col.use_property_decorate_set(false);
+
+  if (item_name != nullptr) {
+    ui::Layout &title = col.row(true);
+    title.scale_y_set(CLARITY_CHANNEL_ROW_SCALE_Y);
+    title.alignment_set(ui::LayoutAlign::Left);
+    title.label(item_name, ICON_NONE);
+  }
 
   if (ptr->type == RNA_PoseBone) {
-    PointerRNA boneptr;
-    Bone *bone;
-
-    boneptr = RNA_pointer_get(ptr, "bone");
-    bone = static_cast<Bone *>(boneptr.data);
-    split->active_set(!(bone->parent && bone->flag & BONE_CONNECTED));
+    PointerRNA boneptr = RNA_pointer_get(ptr, "bone");
+    const Bone *bone = static_cast<const Bone *>(boneptr.data);
+    col.active_set(!(bone->parent && bone->flag & BONE_CONNECTED));
   }
-  ui::Layout *colsub = &split->column(true);
-  colsub->prop(ptr, "location", UI_ITEM_NONE, std::nullopt, ICON_NONE);
-  colsub = &split->column(true);
-  colsub->emboss_set(ui::EmbossType::NoneOrStatus);
-  colsub->label("", ICON_NONE);
-  colsub->prop(
-      ptr, "lock_location", ui::ITEM_R_TOGGLE | ui::ITEM_R_ICON_ONLY, "", ICON_DECORATE_UNLOCKED);
 
-  split = &layout.split(0.8f, false);
+  clarity_channel_vector(col, ptr, "location", IFACE_("Translate"));
 
   switch (RNA_enum_get(ptr, "rotation_mode")) {
-    case ROT_MODE_QUAT: /* quaternion */
-      colsub = &split->column(true);
-      colsub->prop(ptr, "rotation_quaternion", UI_ITEM_NONE, IFACE_("Rotation"), ICON_NONE);
-      colsub = &split->column(true);
-      colsub->emboss_set(ui::EmbossType::NoneOrStatus);
-      colsub->prop(ptr, "lock_rotations_4d", ui::ITEM_R_TOGGLE, IFACE_("4L"), ICON_NONE);
-      if (RNA_boolean_get(ptr, "lock_rotations_4d")) {
-        colsub->prop(ptr,
-                     "lock_rotation_w",
-                     ui::ITEM_R_TOGGLE | ui::ITEM_R_ICON_ONLY,
-                     "",
-                     ICON_DECORATE_UNLOCKED);
-      }
-      else {
-        colsub->label("", ICON_NONE);
-      }
-      colsub->prop(ptr,
-                   "lock_rotation",
-                   ui::ITEM_R_TOGGLE | ui::ITEM_R_ICON_ONLY,
-                   "",
-                   ICON_DECORATE_UNLOCKED);
+    case ROT_MODE_QUAT:
+      clarity_channel_prop(col, ptr, "rotation_quaternion", 1, IFACE_("Rotate X"));
+      clarity_channel_prop(col, ptr, "rotation_quaternion", 2, IFACE_("Rotate Y"));
+      clarity_channel_prop(col, ptr, "rotation_quaternion", 3, IFACE_("Rotate Z"));
+      clarity_channel_prop(col, ptr, "rotation_quaternion", 0, IFACE_("Rotate W"));
       break;
-    case ROT_MODE_AXISANGLE: /* axis angle */
-      colsub = &split->column(true);
-      colsub->prop(ptr, "rotation_axis_angle", UI_ITEM_NONE, IFACE_("Rotation"), ICON_NONE);
-      colsub = &split->column(true);
-      colsub->emboss_set(ui::EmbossType::NoneOrStatus);
-      colsub->prop(ptr, "lock_rotations_4d", ui::ITEM_R_TOGGLE, IFACE_("4L"), ICON_NONE);
-      if (RNA_boolean_get(ptr, "lock_rotations_4d")) {
-        colsub->prop(ptr,
-                     "lock_rotation_w",
-                     ui::ITEM_R_TOGGLE | ui::ITEM_R_ICON_ONLY,
-                     "",
-                     ICON_DECORATE_UNLOCKED);
-      }
-      else {
-        colsub->label("", ICON_NONE);
-      }
-      colsub->prop(ptr,
-                   "lock_rotation",
-                   ui::ITEM_R_TOGGLE | ui::ITEM_R_ICON_ONLY,
-                   "",
-                   ICON_DECORATE_UNLOCKED);
+    case ROT_MODE_AXISANGLE:
+      clarity_channel_prop(col, ptr, "rotation_axis_angle", 0, IFACE_("Rotate Angle"));
+      clarity_channel_prop(col, ptr, "rotation_axis_angle", 1, IFACE_("Rotate Axis X"));
+      clarity_channel_prop(col, ptr, "rotation_axis_angle", 2, IFACE_("Rotate Axis Y"));
+      clarity_channel_prop(col, ptr, "rotation_axis_angle", 3, IFACE_("Rotate Axis Z"));
       break;
-    default: /* euler rotations */
-      colsub = &split->column(true);
-      colsub->prop(ptr, "rotation_euler", UI_ITEM_NONE, IFACE_("Rotation"), ICON_NONE);
-      colsub = &split->column(true);
-      colsub->emboss_set(ui::EmbossType::NoneOrStatus);
-      colsub->label("", ICON_NONE);
-      colsub->prop(ptr,
-                   "lock_rotation",
-                   ui::ITEM_R_TOGGLE | ui::ITEM_R_ICON_ONLY,
-                   "",
-                   ICON_DECORATE_UNLOCKED);
+    default:
+      clarity_channel_vector(col, ptr, "rotation_euler", IFACE_("Rotate"));
       break;
   }
-  layout.prop(ptr, "rotation_mode", UI_ITEM_NONE, "", ICON_NONE);
+  clarity_channel_prop(col, ptr, "rotation_mode", -1, IFACE_("Rotate Order"));
 
-  split = &layout.split(0.8f, false);
-  colsub = &split->column(true);
-  colsub->prop(ptr, "scale", UI_ITEM_NONE, std::nullopt, ICON_NONE);
-  colsub = &split->column(true);
-  colsub->emboss_set(ui::EmbossType::NoneOrStatus);
-  colsub->label("", ICON_NONE);
-  colsub->prop(
-      ptr, "lock_scale", ui::ITEM_R_TOGGLE | ui::ITEM_R_ICON_ONLY, "", ICON_DECORATE_UNLOCKED);
+  clarity_channel_vector(col, ptr, "scale", IFACE_("Scale"));
+
+  if (ptr->type != RNA_PoseBone) {
+    clarity_channel_prop(
+        col, ptr, "hide_viewport", -1, IFACE_("Visibility"), ui::ITEM_R_CHECKBOX_INVERT);
+  }
 }
 
 static void v3d_posearmature_buts(ui::Layout &layout, Object *ob)
@@ -2093,7 +2081,7 @@ static void v3d_posearmature_buts(ui::Layout &layout, Object *ob)
   /* XXX: RNA buts show data in native types (i.e. quaternion, 4-component axis/angle, etc.)
    * but old-school UI shows in eulers always. Do we want to be able to still display in Eulers?
    * Maybe needs RNA/UI options to display rotations as different types. */
-  v3d_transform_butsR(col, &pchanptr);
+  v3d_clarity_channel_box(col, &pchanptr, pchan->name);
 }
 
 static void v3d_editarmature_buts(ui::Layout &layout, Object *ob)
@@ -2227,52 +2215,30 @@ static void item_panel_transform_empty_draw(ui::Layout &layout, View3D *v3d)
   copy_v3_fl(tfp->ob_scale_orig, 1.0f);
   zero_v3(tfp->ob_dims);
 
-  ui::Block *block = layout.absolute().block();
-  const int butw = 200;
-  const int buth = 20 * UI_SCALE_FAC;
-  int yi = 360;
+  ui::Block *block = layout.block();
+  ui::Layout &col = layout.column(true);
+  col.label(IFACE_("No active selection"), ICON_NONE);
 
-  uiDefBut(block,
-           ui::ButtonType::Label,
-           IFACE_("No active selection"),
-           0,
-           yi -= buth,
-           butw,
-           buth,
-           nullptr,
-           0,
-           0,
-           "");
-
-  const char *axis_labels[3] = {IFACE_("X:"), IFACE_("Y:"), IFACE_("Z:")};
+  const char *axis_labels[3] = {" X", " Y", " Z"};
   auto draw_vector = [&](const char *label,
                          float values[3],
                          const PropertyUnit unit,
                          const float min,
                          const float max) {
-    uiDefBut(block,
-             ui::ButtonType::Label,
-             label,
-             0,
-             yi -= buth,
-             butw,
-             buth,
-             nullptr,
-             0,
-             0,
-             "");
     for (int axis = 0; axis < 3; axis++) {
+      ui::Layout &value = clarity_channel_row(col, std::string(label) + axis_labels[axis]);
+      ui::block_layout_set_current(block, &value);
       ui::Button *but = uiDefButV(block,
-                                 ui::ButtonType::Num,
-                                 axis_labels[axis],
-                                 0,
-                                 yi -= buth,
-                                 butw,
-                                 buth,
-                                 &values[axis],
-                                 min,
-                                 max,
-                                 "");
+                                  ui::ButtonType::Num,
+                                  "",
+                                  0,
+                                  0,
+                                  UI_UNIT_X * 5,
+                                  UI_UNIT_Y,
+                                  &values[axis],
+                                  min,
+                                  max,
+                                  "");
       button_number_precision_set(but, RNA_TRANSLATION_PREC_DEFAULT);
       button_unit_type_set(but, unit);
       button_flag_enable(but, ui::BUT_DISABLED);
@@ -2280,11 +2246,13 @@ static void item_panel_transform_empty_draw(ui::Layout &layout, View3D *v3d)
   };
 
   draw_vector(
-      IFACE_("Location:"), tfp->ve_median.generic.location, PROP_UNIT_LENGTH, -FLT_MAX, FLT_MAX);
+      IFACE_("Translate"), tfp->ve_median.generic.location, PROP_UNIT_LENGTH, -FLT_MAX, FLT_MAX);
   draw_vector(
-      IFACE_("Rotation:"), tfp->median.generic.location, PROP_UNIT_ROTATION, -FLT_MAX, FLT_MAX);
-  draw_vector(IFACE_("Scale:"), tfp->ob_scale_orig, PROP_UNIT_NONE, -FLT_MAX, FLT_MAX);
-  draw_vector(IFACE_("Dimensions:"), tfp->ob_dims, PROP_UNIT_LENGTH, 0.0f, FLT_MAX);
+      IFACE_("Rotate"), tfp->median.generic.location, PROP_UNIT_ROTATION, -FLT_MAX, FLT_MAX);
+  draw_vector(IFACE_("Scale"), tfp->ob_scale_orig, PROP_UNIT_NONE, -FLT_MAX, FLT_MAX);
+  draw_vector(IFACE_("Dimension"), tfp->ob_dims, PROP_UNIT_LENGTH, 0.0f, FLT_MAX);
+
+  ui::block_layout_set_current(block, &layout);
 }
 
 static void view3d_panel_transform(const bContext *C, Panel *panel)
@@ -2326,7 +2294,7 @@ static void view3d_panel_transform(const bContext *C, Panel *panel)
   }
   else {
     PointerRNA obptr = RNA_id_pointer_create(&ob->id);
-    v3d_transform_butsR(col, &obptr);
+    v3d_clarity_channel_box(col, &obptr, ob->id.name + 2);
 
     /* Dimensions and editmode are mostly the same check. */
     if (OB_TYPE_SUPPORT_EDITMODE(ob->type) || ELEM(ob->type, OB_VOLUME, OB_CURVES, OB_POINTCLOUD))
@@ -3035,7 +3003,7 @@ void view3d_buttons_register(ARegionType *art)
   pt = MEM_new_zeroed<PanelType>("spacetype view3d panel object");
   STRNCPY_UTF8(pt->idname, "VIEW3D_PT_transform");
   STRNCPY_UTF8(pt->label, N_("Transform")); /* XXX C panels unavailable through RNA bpy.types! */
-  STRNCPY_UTF8(pt->category, "Item");
+  STRNCPY_UTF8(pt->category, "Transform");
   STRNCPY_UTF8(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
   pt->draw = view3d_panel_transform;
   pt->poll = view3d_panel_transform_poll;
@@ -3045,7 +3013,7 @@ void view3d_buttons_register(ARegionType *art)
   STRNCPY_UTF8(pt->idname, "VIEW3D_PT_vgroup");
   STRNCPY_UTF8(pt->label,
                N_("Vertex Weights")); /* XXX C panels unavailable through RNA bpy.types! */
-  STRNCPY_UTF8(pt->category, "Item");
+  STRNCPY_UTF8(pt->category, "Transform");
   STRNCPY_UTF8(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
   pt->draw = view3d_panel_vgroup;
   pt->poll = view3d_panel_vgroup_poll;
@@ -3054,7 +3022,7 @@ void view3d_buttons_register(ARegionType *art)
   pt = MEM_new_zeroed<PanelType>("spacetype view3d panel curves");
   STRNCPY_UTF8(pt->idname, "VIEW3D_PT_curves");
   STRNCPY_UTF8(pt->label, N_("Curve Data")); /* XXX C panels unavailable through RNA bpy.types! */
-  STRNCPY_UTF8(pt->category, "Item");
+  STRNCPY_UTF8(pt->category, "Transform");
   STRNCPY_UTF8(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
   pt->draw = view3d_panel_curve_data;
   pt->poll = view3d_panel_curve_data_poll;
@@ -3069,6 +3037,8 @@ void view3d_item_buttons_register(ARegionType *art)
   STRNCPY_UTF8(pt->idname, "ITEM_PT_transform");
   STRNCPY_UTF8(pt->label, N_("Transform"));
   STRNCPY_UTF8(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+  /* The channel box is the whole editor, a collapsible sub-panel header only adds noise. */
+  pt->flag = PANEL_TYPE_NO_HEADER;
   pt->draw = view3d_panel_transform;
   pt->poll = item_panel_transform_poll;
   BLI_addtail(&art->paneltypes, pt);

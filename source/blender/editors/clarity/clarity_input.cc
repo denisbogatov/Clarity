@@ -10,6 +10,7 @@
 
 #include "BLI_utildefines.h"
 
+#include "WM_api.hh"
 #include "WM_types.hh"
 #include "wm_event_types.hh"
 
@@ -58,6 +59,19 @@ ClaritySnapMode snap_key_event_mode_get(const int key_type,
     blocked |= int(KM_SHIFT);
   }
   return (int(modifier) & blocked) == 0 ? mode : ClaritySnapMode::None;
+}
+
+bool left_mouse_click_press_arms(const wmEvent &event)
+{
+  return event.type == LEFTMOUSE && event.val == KM_PRESS && (event.modifier & KM_ALT) == 0;
+}
+
+bool left_mouse_click_release_is(const wmEvent &event)
+{
+  return event.type == LEFTMOUSE && event.val == KM_RELEASE &&
+         event.prev_press_type == LEFTMOUSE && event.prev_val == KM_PRESS &&
+         (event.prev_press_modifier & KM_ALT) == 0 &&
+         !WM_event_drag_test(&event, event.prev_press_xy);
 }
 
 }  // namespace ed::clarity
@@ -266,7 +280,12 @@ std::optional<ed::clarity::ClarityInputAction> ED_clarity_input_translate(
     action.phase = ed::clarity::ClarityActionPhase::Begin;
   }
   /* The marquee has no entry here on purpose: Blender never queues a #KM_PRESS_DRAG event, so it is
-   * recognized from the motion that crosses the drag threshold. See #left_mouse_marquee_drag_handle. */
+   * recognized from the motion that crosses the drag threshold. See #left_mouse_marquee_drag_handle.
+   *
+   * Nor does it queue a #KM_CLICK: the promotion lives inside #wm_handlers_do and is undone before
+   * that call returns, so no event carrying this value ever reaches the dispatcher. The branch below
+   * therefore only describes the gesture - the handlers that need the click recognize it from the
+   * press and release themselves, with #left_mouse_click_release_is. */
   else if (event.type == LEFTMOUSE && event.val == KM_CLICK && !action.alt) {
     if (action.ctrl && action.shift) {
       /* This chord belongs exclusively to the additive marquee. A click without a drag is consumed

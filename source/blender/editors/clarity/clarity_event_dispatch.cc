@@ -294,21 +294,22 @@ static ed::clarity::ClarityDispatchResult clarity_dispatch_idle_action(
   }
 
   if (action.id == ed::clarity::ClarityActionID::EditPivotKeyPressed) {
-    /* Edit Pivot is a toggle, like in Clarity: one press turns the mode on and it stays on until the
-     * key is pressed again. Holding the key is not part of the model, so there is no momentary
-     * state that could survive a lost key release. */
+    /* Clarity offers the key both ways, like Maya: "press and hold the D key to temporarily enter
+     * custom pivot editing mode", or press it to toggle a mode that stays. The press is the same
+     * either way - which gesture it was is only decided when the key comes back up. */
     if (action.source_event != nullptr &&
         (action.source_event->flag & WM_EVENT_IS_REPEAT) != 0)
     {
       /* Keeping the key down must not flip the mode over and over. */
       return ed::clarity::ClarityDispatchResult::Handled;
     }
-    return ed::clarity::pivot_edit_toggle_persistent(C, runtime) ?
+    return ed::clarity::pivot_edit_key_press(C, runtime) ?
                ed::clarity::ClarityDispatchResult::Handled :
                ed::clarity::ClarityDispatchResult::PassThrough;
   }
   if (action.id == ed::clarity::ClarityActionID::EditPivotKeyReleased) {
-    /* Consumed so the release cannot reach a Blender keymap; the toggle already happened. */
+    /* Always consumed, whether or not it ends a hold, so it cannot reach a Blender keymap. */
+    ed::clarity::pivot_edit_key_release(C, runtime);
     return ed::clarity::ClarityDispatchResult::Handled;
   }
   if (action.id == ed::clarity::ClarityActionID::Cancel &&
@@ -573,7 +574,18 @@ ed::clarity::ClarityDispatchResult ED_clarity_event_dispatch(bContext *C, const 
   /* Validate before translating: events that carry no Clarity action (undo, mode switch, deleting the
    * active object from another editor) must still be able to end a temporary Edit Pivot instead of
    * leaving it armed until the next recognized action. */
+  /* Only reached while the Clarity preset owns the viewport, so a plain Blender scene keeps its own
+   * defaults. Cheap and self-cancelling: the slot it seeds is switched on by the seed itself. */
+  ed::clarity::transform_orientation_defaults_ensure(C);
+
   ed::clarity::pivot_edit_validate(C, *runtime);
+  /* Same reason, one step further: the authored pivot frame belongs to the selection it was aimed at,
+   * and an ordinary object pick is handled by Blender's keymap, so this is the only place that sees
+   * the selection it left behind. */
+  ed::clarity::pivot_orientation_selection_sync(C, *runtime);
+  ed::clarity::pivot_component_orientation_selection_sync(C, *runtime);
+  /* After the two rules above, so the mirrored value is the one they left behind. */
+  ed::clarity::orientation_mirror_sync(C);
   ED_clarity_tool_gizmo_state_ensure(C, runtime->tool);
 
   const std::optional<ed::clarity::ClarityInputAction> action = ED_clarity_input_translate(C, *event);

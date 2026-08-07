@@ -743,6 +743,89 @@ static bool position_is_finite(const double3 &position)
   return std::isfinite(position.x) && std::isfinite(position.y) && std::isfinite(position.z);
 }
 
+/**
+ * Move the rotate pivot to \a world_position on a transform the caller owns. Returns false without
+ * writing anything when the channels cannot express the move, so a failed half of a paired write
+ * can never be left behind.
+ */
+static bool clarity_transform_rotate_pivot_world_set(ClarityObjectTransform &transform,
+                                                     const double4x4 &parent_effect_matrix,
+                                                     const double3 &world_position,
+                                                     const bool preserve)
+{
+  const double4x4 position_prefix = clarity_parent_offset_prefix(transform,
+                                                                 parent_effect_matrix) *
+                                    translation_matrix(transform.translation);
+  bool prefix_inverse_success;
+  const double4x4 prefix_inverse = math::invert(position_prefix, prefix_inverse_success);
+  if (!prefix_inverse_success) {
+    return false;
+  }
+  const double3 target_in_translation_space = math::transform_point(prefix_inverse,
+                                                                    world_position);
+
+  double3 new_pivot = target_in_translation_space - double3(transform.rotate_pivot_translate);
+  if (preserve) {
+    const double3 old_pivot(transform.rotate_pivot);
+    const double3x3 rotation = double3x3(
+        euler_rotation_matrix(transform.rotation, transform.rotation_order) *
+        rotate_axis_matrix(transform));
+    bool rotation_inverse_success;
+    const double3x3 rotation_inverse = math::invert(rotation, rotation_inverse_success);
+    if (!rotation_inverse_success) {
+      return false;
+    }
+    /* `rotatePivotTranslate` absorbs the move, so the pair has to solve for the sum the pivot
+     * world position is made of: `rotate_pivot_translate + rotate_pivot`. */
+    new_pivot = old_pivot +
+                rotation_inverse *
+                    (target_in_translation_space - double3(transform.rotate_pivot_translate) -
+                     old_pivot);
+  }
+
+  BKE_clarity_transform_set_rotate_pivot(transform, new_pivot, preserve);
+  return true;
+}
+
+/** #clarity_transform_rotate_pivot_world_set for the scale pivot and its shear/scale chain. */
+static bool clarity_transform_scale_pivot_world_set(ClarityObjectTransform &transform,
+                                                    const double4x4 &parent_effect_matrix,
+                                                    const double3 &world_position,
+                                                    const bool preserve)
+{
+  const double4x4 position_prefix =
+      clarity_parent_offset_prefix(transform, parent_effect_matrix) *
+      translation_matrix(transform.translation) *
+      translation_matrix(transform.rotate_pivot_translate) *
+      translation_matrix(transform.rotate_pivot) *
+      euler_rotation_matrix(transform.rotation, transform.rotation_order) *
+      rotate_axis_matrix(transform) * translation_matrix_negated(transform.rotate_pivot);
+  bool prefix_inverse_success;
+  const double4x4 prefix_inverse = math::invert(position_prefix, prefix_inverse_success);
+  if (!prefix_inverse_success) {
+    return false;
+  }
+  const double3 target_in_scale_space = math::transform_point(prefix_inverse, world_position);
+
+  double3 new_pivot = target_in_scale_space - double3(transform.scale_pivot_translate);
+  if (preserve) {
+    const double3 old_pivot(transform.scale_pivot);
+    const double3x3 scale_shear = double3x3(shear_matrix(transform.shear) *
+                                            scale_matrix(transform.scale));
+    bool scale_shear_inverse_success;
+    const double3x3 scale_shear_inverse = math::invert(scale_shear, scale_shear_inverse_success);
+    if (!scale_shear_inverse_success) {
+      return false;
+    }
+    new_pivot = old_pivot +
+                scale_shear_inverse *
+                    (target_in_scale_space - double3(transform.scale_pivot_translate) - old_pivot);
+  }
+
+  BKE_clarity_transform_set_scale_pivot(transform, new_pivot, preserve);
+  return true;
+}
+
 bool BKE_object_clarity_rotate_pivot_world_set(Object &object,
                                             const double4x4 &parent_effect_matrix,
                                             const double3 &world_position,
@@ -753,35 +836,11 @@ bool BKE_object_clarity_rotate_pivot_world_set(Object &object,
   }
 
   ClarityObjectTransform result = *object.clarity_transform;
-  const double4x4 position_prefix = clarity_parent_offset_prefix(result, parent_effect_matrix) *
-                                    translation_matrix(result.translation);
-  bool prefix_inverse_success;
-  const double4x4 prefix_inverse = math::invert(position_prefix, prefix_inverse_success);
-  if (!prefix_inverse_success) {
+  if (!clarity_transform_rotate_pivot_world_set(
+          result, parent_effect_matrix, world_position, preserve))
+  {
     return false;
   }
-  const double3 target_in_translation_space = math::transform_point(prefix_inverse,
-                                                                    world_position);
-
-  double3 new_pivot = target_in_translation_space -
-                      double3(result.rotate_pivot_translate);
-  if (preserve) {
-    const double3 old_pivot(result.rotate_pivot);
-    const double3x3 rotation = double3x3(
-        euler_rotation_matrix(result.rotation, result.rotation_order) *
-        rotate_axis_matrix(result));
-    bool rotation_inverse_success;
-    const double3x3 rotation_inverse = math::invert(rotation, rotation_inverse_success);
-    if (!rotation_inverse_success) {
-      return false;
-    }
-    new_pivot = old_pivot +
-                rotation_inverse *
-                    (target_in_translation_space -
-                     double3(result.rotate_pivot_translate) - old_pivot);
-  }
-
-  BKE_clarity_transform_set_rotate_pivot(result, new_pivot, preserve);
   *object.clarity_transform = result;
   BKE_object_clarity_evaluated_channels_invalidate(object);
   return true;
@@ -797,40 +856,63 @@ bool BKE_object_clarity_scale_pivot_world_set(Object &object,
   }
 
   ClarityObjectTransform result = *object.clarity_transform;
-  const double4x4 position_prefix =
-      clarity_parent_offset_prefix(result, parent_effect_matrix) *
-      translation_matrix(result.translation) *
-      translation_matrix(result.rotate_pivot_translate) *
-      translation_matrix(result.rotate_pivot) *
-      euler_rotation_matrix(result.rotation, result.rotation_order) *
-      rotate_axis_matrix(result) * translation_matrix_negated(result.rotate_pivot);
-  bool prefix_inverse_success;
-  const double4x4 prefix_inverse = math::invert(position_prefix, prefix_inverse_success);
-  if (!prefix_inverse_success) {
+  if (!clarity_transform_scale_pivot_world_set(
+          result, parent_effect_matrix, world_position, preserve))
+  {
     return false;
   }
-  const double3 target_in_scale_space = math::transform_point(prefix_inverse, world_position);
-
-  double3 new_pivot = target_in_scale_space - double3(result.scale_pivot_translate);
-  if (preserve) {
-    const double3 old_pivot(result.scale_pivot);
-    const double3x3 scale_shear = double3x3(shear_matrix(result.shear) *
-                                            scale_matrix(result.scale));
-    bool scale_shear_inverse_success;
-    const double3x3 scale_shear_inverse = math::invert(scale_shear,
-                                                       scale_shear_inverse_success);
-    if (!scale_shear_inverse_success) {
-      return false;
-    }
-    new_pivot = old_pivot +
-                scale_shear_inverse *
-                    (target_in_scale_space - double3(result.scale_pivot_translate) - old_pivot);
-  }
-
-  BKE_clarity_transform_set_scale_pivot(result, new_pivot, preserve);
   *object.clarity_transform = result;
   BKE_object_clarity_evaluated_channels_invalidate(object);
   return true;
+}
+
+bool BKE_object_clarity_pivots_world_set(Object &object,
+                                      const double4x4 &parent_effect_matrix,
+                                      const double3 &world_position,
+                                      const bool preserve)
+{
+  if (!BKE_object_uses_clarity_transform(&object) || !position_is_finite(world_position)) {
+    return false;
+  }
+
+  /* Both pivots are solved on one copy and committed together: an object left with a rotate pivot
+   * on the target and a scale pivot still behind rotates and scales around two different points,
+   * and nothing in the tool layer can tell that state from an authored one. The scale pivot is
+   * solved after the rotate pivot on purpose - its chain contains the rotate pivot channels. */
+  ClarityObjectTransform result = *object.clarity_transform;
+  if (!clarity_transform_rotate_pivot_world_set(
+          result, parent_effect_matrix, world_position, preserve) ||
+      !clarity_transform_scale_pivot_world_set(
+          result, parent_effect_matrix, world_position, preserve))
+  {
+    return false;
+  }
+  *object.clarity_transform = result;
+  BKE_object_clarity_evaluated_channels_invalidate(object);
+  return true;
+}
+
+void BKE_clarity_transform_zero_pivots(ClarityObjectTransform &transform)
+{
+  /* Clarity's `xform -zeroTransformPivots`: "reset pivot points and pivot translations without
+   * changing the overall matrix by applying these values into the translation channel". Every pivot
+   * channel is a translation sitting between the linear factors of the composition, so the whole
+   * group folds into one offset of the translate channel and the matrix comes out unchanged.
+   *
+   * Zeroing the pivots while keeping the compensation in `*PivotTranslate` instead - which is what
+   * the preserving setter does - leaves the pivot at the compensation offset rather than at the
+   * object origin, and no further reset can bring it back. */
+  ClarityObjectTransform pivots_only = transform;
+  std::fill_n(pivots_only.translation, 3, 0.0);
+  const double3 folded = BKE_clarity_transform_channel_matrix(pivots_only).location();
+
+  for (int axis = 0; axis < 3; axis++) {
+    transform.translation[axis] += folded[axis];
+    transform.rotate_pivot[axis] = 0.0;
+    transform.rotate_pivot_translate[axis] = 0.0;
+    transform.scale_pivot[axis] = 0.0;
+    transform.scale_pivot_translate[axis] = 0.0;
+  }
 }
 
 static bool orthonormalize_matrix(const double3x3 &matrix, float r_axis[3][3])
