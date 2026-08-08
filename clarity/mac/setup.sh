@@ -215,6 +215,10 @@ if [ "${CHECK_ONLY}" = "1" ]; then
   fi
 else
   git -C "${SOURCE_DIR}" config lfs.remote.searchall true
+  # GitHub refuses new LFS objects in a fork - its storage belongs to the parent repository - so
+  # this fork's own binary fixtures exist as pointers that no remote can resolve. Without this a
+  # checkout aborts on the first one; with it the pointer is written instead and work continues.
+  git -C "${SOURCE_DIR}" config lfs.skipdownloaderrors true
   if git -C "${SOURCE_DIR}" remote get-url lfs-fallback >/dev/null 2>&1; then
     ok "LFS fallback remote already configured"
   else
@@ -238,12 +242,18 @@ else
 
   DELETED_COUNT="$(git -C "${SOURCE_DIR}" ls-files --deleted 2>/dev/null | wc -l | tr -d ' ')"
   POINTER_COUNT="$(git -C "${SOURCE_DIR}" lfs ls-files 2>/dev/null | grep -c ' - ' | tr -d ' ')"
+  if [ "${DELETED_COUNT}" != "0" ]; then
+    bad "${DELETED_COUNT} file(s) are still missing from the working tree."
+  fi
+  if [ "${POINTER_COUNT}" != "0" ]; then
+    # Not a failure: nothing under the reference fixtures is compiled, tested or launched. Those
+    # captures are compared against Autodesk Maya, which only exists on the Windows machine.
+    warn "${POINTER_COUNT} file(s) are unresolved LFS pointers - their objects exist on no remote."
+    git -C "${SOURCE_DIR}" lfs ls-files 2>/dev/null | grep ' - ' | awk '{print "         " $3}' | head -5
+    say "         The build does not use them; only the Maya reference comparison does."
+  fi
   if [ "${DELETED_COUNT}" = "0" ] && [ "${POINTER_COUNT}" = "0" ]; then
     ok "Checkout is complete"
-  else
-    bad "Still incomplete: ${DELETED_COUNT} missing file(s), ${POINTER_COUNT} unresolved pointer(s)."
-    err "         If these are files of your own fork rather than upstream ones, the objects were"
-    err "         never uploaded to GitHub and no fallback can supply them."
   fi
 fi
 

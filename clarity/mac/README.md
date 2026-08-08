@@ -13,6 +13,12 @@ live on projects.blender.org. A plain `git clone` therefore dies in the smudge f
 on the first asset and leaves an incomplete checkout. Skip the smudge, and let `setup.sh` fetch
 the files afterwards from a remote that has them:
 
+GitHub also refuses new LFS objects in a fork, because a fork's LFS storage belongs to the parent
+repository. This fork's own binary fixtures - the Maya reference captures under
+`tests/pivot_reference/fixtures` - therefore stay pointers here and cannot be resolved from
+anywhere. Nothing in the build, the tests or the launch touches them, and `setup.sh` reports them
+as a warning rather than a failure.
+
 ```sh
 GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/denisbogatov/Clarity.git
 ```
