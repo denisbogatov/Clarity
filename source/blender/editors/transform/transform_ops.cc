@@ -1975,18 +1975,19 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
   const float previous_position[3] = {float(frame.position_world.x),
                                       float(frame.position_world.y),
                                       float(frame.position_world.z)};
-  float snap_distance = ED_clarity_snap_tolerance_px_get(
+  const float tolerance_px = ED_clarity_snap_tolerance_px_get(
       C, transform_clarity_region_extent(region));
-  const eSnapMode hit_type = ed::transform::snap_object_project_view3d_ex(
+
+  /* Vertices first and alone, then edges and faces - the two passes #pivot_snap_target_query
+   * explains, and for the same reason. The preview and the click have to agree on the element, so
+   * they ask the same way. */
+  float snap_distance = tolerance_px;
+  eSnapMode hit_type = ed::transform::snap_object_project_view3d_ex(
       snap_context,
       CTX_data_ensure_evaluated_depsgraph(C),
       region,
       view,
-      /* Plain #SCE_SNAP_TO_POINT, for the reason #pivot_snap_target_query spells out: the
-       * #SCE_SNAP_TO_VERTEX composite includes #SCE_SNAP_TO_EDGE_ENDPOINT, and an endpoint asked for
-       * next to edges takes the outer two thirds of every edge, so a click meant for an edge aimed
-       * the pivot at a corner instead. The preview and the click have to agree on the element. */
-      eSnapMode(SCE_SNAP_TO_POINT | SCE_SNAP_TO_EDGE | SCE_SNAP_TO_FACE),
+      eSnapMode(SCE_SNAP_TO_VERTEX),
       &snap_params,
       nullptr,
       mouse_float,
@@ -1998,6 +1999,26 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
       &hit_object,
       hit_object_matrix,
       hit_face_normal);
+  if (hit_type == SCE_SNAP_TO_NONE) {
+    snap_distance = tolerance_px;
+    hit_type = ed::transform::snap_object_project_view3d_ex(
+        snap_context,
+        CTX_data_ensure_evaluated_depsgraph(C),
+        region,
+        view,
+        eSnapMode(SCE_SNAP_TO_EDGE | SCE_SNAP_TO_FACE),
+        &snap_params,
+        nullptr,
+        mouse_float,
+        previous_position,
+        &snap_distance,
+        hit_position,
+        hit_normal,
+        &hit_index,
+        &hit_object,
+        hit_object_matrix,
+        hit_face_normal);
+  }
   ed::transform::snap_object_context_destroy(snap_context);
 
   bool has_position = hit_type != SCE_SNAP_TO_NONE;

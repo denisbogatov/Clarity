@@ -1737,18 +1737,26 @@ static void pivot_snap_target_query(const bContext *C,
                              float(previous_position.z)};
   /* Same tolerance a drag would snap with, so the preview never promises a target the drag would
    * not take. */
-  float snap_distance = ED_clarity_snap_tolerance_px_get(C, max_ii(region.winx, region.winy));
-  const eSnapMode hit_type = ed::transform::snap_object_project_view3d_ex(
+  const float tolerance_px = ED_clarity_snap_tolerance_px_get(C,
+                                                              max_ii(region.winx, region.winy));
+
+  /* Two passes, because Blender's edge bands do not divide the way this needs them to.
+   *
+   * A mesh vertex is only ever reported through #SCE_SNAP_TO_EDGE_ENDPOINT: #SCE_SNAP_TO_POINT
+   * covers loose points, and #snap_edge_points is the one path that turns an edge hit into one of
+   * its ends. But asking for endpoints and edges together splits every edge into
+   * `1 / (2 * modes - 1)` bands - a third at each end - so an edge could only highlight over its
+   * middle third however long it was on screen. Asking for the two separately keeps both: the
+   * vertex pass runs alone, where the whole edge maps to its nearest end, and its pixel tolerance
+   * is what decides whether the pointer is close enough. Miss it, and the edge answers along its
+   * whole length. The second pass costs a query only while the first found nothing. */
+  float snap_distance = tolerance_px;
+  eSnapMode hit_type = ed::transform::snap_object_project_view3d_ex(
       snap_context,
       CTX_data_ensure_evaluated_depsgraph(C),
       &region,
       &view,
-      /* #SCE_SNAP_TO_POINT, not the #SCE_SNAP_TO_VERTEX composite: that one carries
-       * #SCE_SNAP_TO_EDGE_ENDPOINT, and asking for endpoints alongside edges hands the outer two
-       * thirds of every edge to its nearest vertex (#SnapData::snap_edge_points_impl splits the edge
-       * into `1 / (2 * modes - 1)` bands). An edge could only highlight while the pointer was over its
-       * middle third, which is why hovering one mostly pre-highlighted the face or a corner. */
-      eSnapMode(SCE_SNAP_TO_POINT | SCE_SNAP_TO_EDGE | SCE_SNAP_TO_FACE),
+      eSnapMode(SCE_SNAP_TO_VERTEX),
       &snap_params,
       nullptr,
       mouse_float,
@@ -1760,6 +1768,26 @@ static void pivot_snap_target_query(const bContext *C,
       &hit_object,
       hit_object_matrix,
       hit_face_normal);
+  if (hit_type == SCE_SNAP_TO_NONE) {
+    snap_distance = tolerance_px;
+    hit_type = ed::transform::snap_object_project_view3d_ex(
+        snap_context,
+        CTX_data_ensure_evaluated_depsgraph(C),
+        &region,
+        &view,
+        eSnapMode(SCE_SNAP_TO_EDGE | SCE_SNAP_TO_FACE),
+        &snap_params,
+        nullptr,
+        mouse_float,
+        previous,
+        &snap_distance,
+        hit_position,
+        hit_normal,
+        &hit_index,
+        &hit_object,
+        hit_object_matrix,
+        hit_face_normal);
+  }
   if (hit_type == SCE_SNAP_TO_NONE) {
     return;
   }

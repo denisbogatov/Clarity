@@ -118,8 +118,9 @@ static void clarity_pivot_drag_trace_begin(const TransInfo *t, ClarityPivotTrans
   if (data.trace_file == nullptr) {
     return;
   }
-  /* The snapping state is decided after the conversion, so only the mode is meaningful here. */
-  std::fprintf(data.trace_file, "pivot-drag-begin mode=%d\n", int(t->mode));
+  /* The snapping state is decided after the conversion, so only the mode and the constraint the
+   * pressed handle asked for are meaningful here. */
+  std::fprintf(data.trace_file, "pivot-drag-begin mode=%d con=%d\n", int(t->mode), int(t->con.mode));
   /* Keep the trace useful if Blender hangs mid-drag without flushing every modal update. */
   std::fflush(data.trace_file);
 }

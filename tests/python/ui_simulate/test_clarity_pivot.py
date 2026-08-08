@@ -810,3 +810,186 @@ def pivot_snap_drag_lands_on_the_target():
                  "the pivot did not land on the target: {!r} against {!r}".format(result, target))
     t.assertGreater((result - pointer).length, 1.0e-6,
                     "the target and the pointer agree, so this drag proves nothing")
+
+
+def _pivot_axis_arrow_pixels(object, region, region_3d, axis_index):
+    """
+    Where one pivot axis arrow runs on screen: its centre, its direction, and the two distances the
+    stem spans, in window pixels.
+
+    The manipulator is drawn at a constant pixel size - one gizmo unit is `gizmo_size` pixels in the
+    view plane - and Edit Pivot lays the arrows out from 0.415 to 1.415 units, the range that clears
+    the orientation rings. A world axis is foreshortened by however far it leans out of that plane,
+    which is the ratio between its projected length and a view-plane vector's.
+    """
+    import bpy
+    from bpy_extras.view3d_utils import location_3d_to_region_2d
+    from mathutils import Vector
+
+    origin = object.matrix_world.translation
+    axis = Vector((0.0, 0.0, 0.0))
+    axis[axis_index] = 1.0
+    in_view_plane = region_3d.view_rotation @ Vector((1.0, 0.0, 0.0))
+
+    here = location_3d_to_region_2d(region, region_3d, origin)
+    along = location_3d_to_region_2d(region, region_3d, origin + axis)
+    across = location_3d_to_region_2d(region, region_3d, origin + in_view_plane)
+    if here is None or along is None or across is None:
+        raise Exception("the manipulator is off screen")
+    if (across - here).length < 1.0:
+        raise Exception("the view has no scale to measure the manipulator against")
+
+    unit = bpy.context.preferences.view.gizmo_size * ((along - here).length / (across - here).length)
+    centre = Vector((region.x + here.x, region.y + here.y))
+    return centre, (along - here).normalized(), 0.415 * unit, 1.415 * unit
+
+
+def pivot_axis_handle_drags_the_pivot_along_one_axis():
+    """
+    A press on an axis arrow starts a pivot move constrained to that axis, and nothing else.
+
+    Maya's number for the gesture is in `fixtures/maya_2025_pivot_gestures.json`: a press 75 px out
+    along X answers `move -r -1.405948 0 0`, one component. The rule on this side is pinned by
+    `AConstrainedDragKeepsThePivotOnItsConstraint`, and until now nothing could reach it - the
+    trackball Edit Pivot brings in with the rotate layout claimed every pixel out to 75 px, so the
+    press never arrived. `probe_clarity_pivot_handles` measured that, and `MAN_AXIS_ROT_T` is hidden
+    in the mode because of it. This test is what keeps the arrow reachable.
+
+    The drag is cancelled: what is being checked is which transform the press began and under which
+    constraint, and letting it finish would only move the pivot.
+    """
+    import bpy
+
+    e, t, window = ui.test_window()
+    trace = _trace_reset()
+
+    bpy.context.preferences.inputs.interaction_preset = 'CLARITY'
+    yield
+
+    area, region = _view3d_area_region(window)
+    region_3d = area.spaces[0].region_3d
+    object = bpy.data.objects["Cube"]
+    with bpy.context.temp_override(window=window, area=area, region=region):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.context.view_layer.objects.active = object
+        object.select_set(True)
+    yield
+
+    centre, direction, start, end = _pivot_axis_arrow_pixels(object, region, region_3d, 0)
+    t.assertGreater(end - start, 10.0, "the X arrow is too short on screen to aim at")
+    grab = centre + direction * ((start + end) * 0.5)
+    grab = (int(round(grab.x)), int(round(grab.y)))
+
+    e.cursor_position_set(int(round(centre.x)), int(round(centre.y)), move=True)
+    yield
+    # `W` is Clarity's Move tool, and it is here because of a defect this test is not the place to
+    # assert: in a session where no Clarity transform tool has ever been chosen, the manipulator's
+    # axis arrows answer no press at all. `probe_clarity_pivot_handles` pins that down - the same
+    # gizmo objects at the same addresses, the same eleven offered to the pick, the same geometry in
+    # the select buffer and the same cursor, and zero hits until `W` has been pressed once, after
+    # which every later pass answers. See "The cold session" in
+    # `tests/pivot_reference/behavior_matrix.md`. A Maya user reaches for `W` before anything else;
+    # this test does the same so that it is testing the axis rule and not that.
+    yield e.w()
+    # `D` toggles Edit Pivot; without it the press belongs to the object manipulator.
+    yield e.d()
+
+    # Over the arrow, and only then the press: a handle is offered a plain press once it is
+    # highlighted, and the highlight is computed from the move.
+    e.cursor_position_set(*grab, move=True)
+    yield
+    e.cursor_position_set(*grab, move=True)
+    yield
+    e.leftmouse.press()
+    yield
+    for step in range(1, 4):
+        e.cursor_position_set(grab[0] + step * 6, grab[1], move=True)
+        yield
+    yield e.esc()
+    e.leftmouse.release()
+    yield
+
+    begins = _trace_lines("pivot-drag-begin")
+    t.assertTrue(
+        begins,
+        "the press at {!r}, on the X arrow between {:.0f} and {:.0f} px from the centre {!r}, "
+        "started no pivot drag, see {:s}".format(
+            grab, start, end, (int(centre.x), int(centre.y)), trace),
+    )
+    fields = _trace_fields(begins[-1])
+    t.assertEqual(fields["mode"], "1",
+                  "the arrow started transform mode " + fields["mode"] + ", not a translation")
+    constraint = int(fields["con"])
+    t.assertTrue(constraint & 1, "the drag the arrow started carries no constraint")
+    t.assertTrue(constraint & 2, "the drag is constrained, but not to the pivot's X axis")
+
+
+def pivot_click_aligns_the_pivot_to_the_clicked_vertex():
+    """
+    A click on a vertex aims the pivot along that vertex's normal.
+
+    The sibling of `pivot_click_aligns_the_pivot_to_the_clicked_edge`, and it exists because that one
+    kept passing while vertices stopped working entirely: a mesh vertex is reported only through
+    `SCE_SNAP_TO_EDGE_ENDPOINT`, `SCE_SNAP_TO_POINT` covers loose points, and asking for endpoints
+    alongside edges hands a third of every edge to each of its ends. `pivot_snap_target_query` and
+    the click now ask in two passes for that reason, and this is what holds the vertex half of it.
+
+    The cube's corner is the case that cannot pass by accident: its vertex normal is the diagonal,
+    45 degrees from every face beside it and from every edge meeting it.
+    """
+    import bpy
+    from mathutils import Vector
+
+    e, t, window = ui.test_window()
+    trace = _trace_reset()
+
+    bpy.context.preferences.inputs.interaction_preset = 'CLARITY'
+    yield
+
+    area, region = _view3d_area_region(window)
+    region_3d = area.spaces[0].region_3d
+    object = bpy.data.objects["Cube"]
+    with bpy.context.temp_override(window=window, area=area, region=region):
+        bpy.context.view_layer.objects.active = object
+        object.select_set(True)
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_mode(type='VERT')
+        bpy.ops.mesh.select_all(action='SELECT')
+    yield
+
+    candidates = _vertex_pixels(object, region, region_3d)
+    t.assertTrue(candidates, "no vertex of the cube is on screen to click")
+    index, pixel, world = candidates[0]
+
+    e.cursor_position_set(*pixel, move=True)
+    yield
+    # `D` toggles Edit Pivot. Without the mode the click below is an ordinary selection.
+    yield e.d()
+
+    e.leftmouse.press()
+    yield
+    e.leftmouse.release()
+    yield
+
+    hits = _trace_lines("pivot-click hit")
+    t.assertTrue(hits, "the click never reached TRANSFORM_OT_clarity_pivot_click, see " + trace)
+    fields = _trace_fields(hits[-1])
+
+    # `SCE_SNAP_TO_VERTEX`, the composite of `SCE_SNAP_TO_POINT` and `SCE_SNAP_TO_EDGE_ENDPOINT`.
+    t.assertTrue(
+        int(fields["type"]) & 5,
+        "a click on vertex {:d} at {!r} reported snap type {:s}, not a vertex".format(
+            index, pixel, fields["type"]),
+    )
+    t.assertEqual(int(fields["index"]), index, "the click aimed at a different vertex")
+
+    normal = Vector([float(value) for value in fields["normal"].split()])
+    expected = world.normalized()
+    t.assertGreater(
+        normal.dot(expected), 0.99,
+        "expected the corner's own normal {!r}, got {!r}".format(
+            tuple(round(value, 3) for value in expected),
+            tuple(round(value, 3) for value in normal),
+        ),
+    )

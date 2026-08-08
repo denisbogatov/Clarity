@@ -45,6 +45,7 @@
 #include "DEG_depsgraph.hh"
 
 /* Own includes. */
+#include "WM_gizmo_api.hh"
 #include "wm_gizmo_intern.hh"
 #include "wm_gizmo_wmapi.hh"
 
@@ -561,7 +562,8 @@ void WM_gizmomap_draw(wmGizmoMap *gzmap,
 static void gizmo_draw_select_3d_loop(const bContext *C,
                                       wmGizmo **visible_gizmos,
                                       const int visible_gizmos_len,
-                                      bool *r_use_select_bias)
+                                      bool *r_use_select_bias,
+                                      const bool trace)
 {
   /* WORKAROUND(#132196): `GPU_DEPTH_NONE` leads to issues with Intel GPU drivers on Windows
    * where camera gizmos cannot be shifted. `glGetQueryObjectuiv` for `GL_SAMPLES_PASSED`
@@ -573,6 +575,24 @@ static void gizmo_draw_select_3d_loop(const bContext *C,
   /* Set default depth state. */
   GPU_depth_test(use_intel_gpu_workaround ? GPU_DEPTH_ALWAYS : GPU_DEPTH_NONE);
   GPU_depth_mask(true);
+
+  /* The state the handles are rasterized under. Everything above this is identical between a
+   * session that can pick an axis arrow and one that cannot, so what the arrows are drawn *into* is
+   * the only place left to look. Temporary, with the rest of the Clarity gizmo trace. */
+  if (trace) {
+    int scissor[4];
+    int viewport[4];
+    GPU_scissor_get(scissor);
+    GPU_viewport_size_get_i(viewport);
+    fprintf(stderr,
+            "GZTRACE drawstate: depth_test=%d depth_mask=%d scissor=(%d %d %d %d) "
+            "viewport=(%d %d %d %d)\n",
+            int(GPU_depth_test_get()),
+            int(GPU_depth_mask_get()),
+            UNPACK4(scissor),
+            UNPACK4(viewport));
+    fflush(stderr);
+  }
   bool is_depth_prev = false;
   bool is_depth_skip_prev = false;
 
@@ -608,9 +628,36 @@ static void gizmo_draw_select_3d_loop(const bContext *C,
       *r_use_select_bias = true;
     }
 
+    /* Where this gizmo puts itself in the buffer the press is read from. A handle that never
+     * answers has either not been drawn here or has been drawn somewhere else, and these two lines
+     * are the only place that can tell the two apart. */
+    if (trace) {
+      float matrix_final[4][4];
+      WM_gizmo_calc_matrix_final(gz, matrix_final);
+
+      fprintf(stderr,
+              "GZTRACE %.3f drawsel: id=%d gz=%p %s scale=%.3f origin=(%.3f %.3f %.3f) "
+              "axis=(%.3f %.3f %.3f) depth_skip=%d\n",
+              BLI_time_now_seconds(),
+              select_id,
+              static_cast<const void *>(gz),
+              gz->type->idname,
+              double(gz->scale_final),
+              double(matrix_final[3][0]),
+              double(matrix_final[3][1]),
+              double(matrix_final[3][2]),
+              double(matrix_final[2][0]),
+              double(matrix_final[2][1]),
+              double(matrix_final[2][2]),
+              int(is_depth_skip));
+    }
+
     /* Pass the selection id shifted by 8 bits. Last 8 bits are used for selected gizmo part id. */
 
     gz->type->draw_select(C, gz, select_id << 8);
+  }
+  if (trace) {
+    fflush(stderr);
   }
 
   /* Reset depth state. */
@@ -621,6 +668,23 @@ static void gizmo_draw_select_3d_loop(const bContext *C,
   if (is_depth_skip_prev) {
     GPU_depth_mask(true);
   }
+}
+
+/** Which gizmo the select buffer ended up handing the press to, and by which of the two rules. */
+static void gizmo_trace_pick_winner(const char *rule, wmGizmo **visible_gizmos, const int hit_id)
+{
+  if (!ED_clarity_gizmo_trace_enabled()) {
+    return;
+  }
+  wmGizmo *gz = hit_id != -1 ? visible_gizmos[hit_id >> 8] : nullptr;
+  fprintf(stderr,
+          "GZTRACE %.3f pick: winner rule=%s id=%d gz=%p %s\n",
+          BLI_time_now_seconds(),
+          rule,
+          hit_id >> 8,
+          static_cast<const void *>(gz),
+          gz ? gz->type->idname : "none");
+  fflush(stderr);
 }
 
 static int gizmo_find_intersected_3d_intern(wmGizmo **visible_gizmos,
@@ -649,15 +713,18 @@ static int gizmo_find_intersected_3d_intern(wmGizmo **visible_gizmos,
   /* TODO: waiting for the GPU in the middle of the event loop for every
    * mouse move is bad for performance, we need to find a solution to not
    * use the GPU or draw something once, see #61474. */
+  /* The first pass only, or every reading is printed twice. */
+  const bool trace = ED_clarity_gizmo_trace_enabled();
+
   GPU_select_begin(&buffer, &rect, GPU_SELECT_NEAREST_FIRST_PASS, 0);
   /* Do the drawing. */
-  gizmo_draw_select_3d_loop(C, visible_gizmos, visible_gizmos_len, &use_select_bias);
+  gizmo_draw_select_3d_loop(C, visible_gizmos, visible_gizmos_len, &use_select_bias, trace);
 
   hits = GPU_select_end();
 
   if (hits > 0) {
     GPU_select_begin(&buffer, &rect, GPU_SELECT_NEAREST_SECOND_PASS, hits);
-    gizmo_draw_select_3d_loop(C, visible_gizmos, visible_gizmos_len, &use_select_bias);
+    gizmo_draw_select_3d_loop(C, visible_gizmos, visible_gizmos_len, &use_select_bias, false);
     GPU_select_end();
   }
 
@@ -665,6 +732,39 @@ static int gizmo_find_intersected_3d_intern(wmGizmo **visible_gizmos,
       wm, CTX_wm_window(C), depsgraph, CTX_data_scene(C), region, v3d, nullptr, nullptr, nullptr);
 
   const Span<GPUSelectResult> hit_results = buffer.storage.as_span().take_front(hits);
+
+  /* What the select buffer actually answered, which is the only thing that decides the press.
+   * #wmGizmoType::test_select is not consulted for gizmos that draw themselves into it, so reading
+   * it by hand says nothing. Temporary, with the rest of the Clarity gizmo trace. */
+  if (trace) {
+    /* The summary goes out even with nothing hit: a pick that answers nothing is a reading, and
+     * without the cursor on it there is no way to tell a miss from a pick that never ran. */
+    fprintf(stderr,
+            "GZTRACE %.3f pick: at=(%d %d) hotspot=%d offered=%d hits=%d\n",
+            BLI_time_now_seconds(),
+            co[0],
+            co[1],
+            hotspot,
+            visible_gizmos_len,
+            int(hits));
+    for (const GPUSelectResult &hit_result : hit_results) {
+      wmGizmo *gz = visible_gizmos[hit_result.id >> 8];
+      fprintf(stderr,
+              "GZTRACE %.3f pick: hotspot=%d hits=%d id=%d gz=%p %s depth=%.6f bias=%.1f "
+              "scale=%.3f\n",
+              BLI_time_now_seconds(),
+              hotspot,
+              int(hits),
+              int(hit_result.id >> 8),
+              static_cast<const void *>(gz),
+              gz->type->idname,
+              double(hit_result.depth) / double(UINT_MAX),
+              double(gz->select_bias),
+              double(gz->scale_final));
+    }
+    fflush(stderr);
+  }
+
   if (use_select_bias && (hits > 1)) {
     float co_direction[3];
     float co_screen[3] = {float(co[0]), float(co[1]), 0.0f};
@@ -699,11 +799,16 @@ static int gizmo_find_intersected_3d_intern(wmGizmo **visible_gizmos,
         hit_found = hit_result.id;
       }
     }
+    gizmo_trace_pick_winner("bias", visible_gizmos, hit_found);
     return hit_found;
   }
 
   const GPUSelectResult *hit_near = GPU_select_buffer_near(hit_results);
-  return hit_near ? hit_near->id : -1;
+  const int hit_id = hit_near ? hit_near->id : -1;
+  if (hits > 0) {
+    gizmo_trace_pick_winner("nearest", visible_gizmos, hit_id);
+  }
+  return hit_id;
 }
 
 /**

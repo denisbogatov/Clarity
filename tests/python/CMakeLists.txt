@@ -1746,6 +1746,7 @@ if(WITH_UI_TESTS)
     # synthesizes `KM_CLICK` inside `wm_handlers_do` and undoes the promotion before that call
     # returns, so only real events get there.
     test_clarity_pivot.pivot_click_aligns_the_pivot_to_the_clicked_edge
+    test_clarity_pivot.pivot_click_aligns_the_pivot_to_the_clicked_vertex
     test_clarity_pivot.pivot_click_leaves_a_drag_alone
     test_clarity_pivot.pivot_edit_key_holds_momentarily_and_taps_toggle
     test_clarity_pivot.pivot_click_does_not_change_the_selection
@@ -1755,6 +1756,7 @@ if(WITH_UI_TESTS)
     test_clarity_pivot.pivot_click_selects_the_custom_axis_orientation
     test_clarity_pivot.pivot_frame_goes_with_the_selection
     test_clarity_pivot.pivot_snap_drag_lands_on_the_target
+    test_clarity_pivot.pivot_axis_handle_drags_the_pivot_along_one_axis
   )
   foreach(ui_test ${_ui_tests})
     add_blender_test_ui(

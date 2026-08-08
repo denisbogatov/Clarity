@@ -19,6 +19,7 @@
 #include "BLI_listbase.h"
 #include "BLI_math_geom.h"
 #include "BLI_math_matrix.h"
+#include "BLI_math_vector.h"
 #include "BLI_path_utils.hh"
 #include "BLI_time.h"
 
@@ -2212,6 +2213,23 @@ static void gizmogroup_apply_clarity_center_style(GizmoGroup *ggd,
   for (int axis_idx = MAN_AXIS_RANGE_TRANS_START; axis_idx < MAN_AXIS_RANGE_TRANS_END; axis_idx++) {
     gizmo_3d_setup_draw_from_twtype(ggd->gizmos[axis_idx], axis_idx, translate_twtype);
   }
+  if (use_edit_pivot_style) {
+    /* Measured, not guessed: that layout runs the arrows from 13 to 61 px out, and the trackball
+     * Edit Pivot adds is a filled disc 75 px across at the same centre, so every pixel an arrow
+     * covers belongs to the disc first and no press can reach one. The rotate-aware range is what
+     * Blender's combined manipulator uses to clear its own rings, and it is what Maya draws: the
+     * arrows outside the orientation rings. The stem is kept - that range alone would leave only
+     * the cone heads. */
+    for (const int axis_idx : {MAN_AXIS_TRANS_X, MAN_AXIS_TRANS_Y, MAN_AXIS_TRANS_Z}) {
+      wmGizmo *axis = ggd->gizmos[axis_idx];
+      float start;
+      float end;
+      gizmo_line_range(ggd->twtype, MAN_AXES_TRANSLATE, &start, &end);
+      mul_v3_v3fl(axis->matrix_offset[3], axis->matrix_offset[2], start);
+      RNA_float_set(axis->ptr, "length", end - start);
+      RNA_enum_set(axis->ptr, "draw_options", ED_GIZMO_ARROW_DRAW_FLAG_STEM);
+    }
+  }
   /* Clarity draws the whole ring, not just the half facing the view, and draws it thin: measured on the
    * reference capture the rings are about two pixels and the axis stems one, against Blender's three
    * and two. */
@@ -2339,6 +2357,83 @@ static void gizmogroup_hide_all(GizmoGroup *ggd)
   MAN_ITER_AXES_END;
 }
 
+/**
+ * Every number that decides where a handle lands on screen, one line per axis. #wmGizmo::scale_final
+ * is a frame behind here - the gizmo map recomputes it after `draw_prepare`, so the first block of a
+ * session reads every scale as zero. `draw_prepare` runs on every redraw and this is nineteen lines,
+ * so it is rate limited to one block a second - except for the first few hundred, or a simulated
+ * session that lasts a second or two would never get past the cold one.
+ * Temporary, like the rest of #GIZMO_TRACE.
+ */
+static void gizmo_trace_dump_axes(const ARegion *region, const GizmoGroup *ggd, const char *tag)
+{
+  static int count = 0;
+  static double time_prev = 0.0;
+  const double time_now = BLI_time_now_seconds();
+  if (count >= 400 && time_now - time_prev < 1.0) {
+    return;
+  }
+  count++;
+  time_prev = time_now;
+
+  static const char *axis_names[MAN_AXIS_LAST] = {
+      "TRANS_X", "TRANS_Y", "TRANS_Z",  "TRANS_C",  "TRANS_XY", "TRANS_YZ", "TRANS_ZX",
+      "ROT_X",   "ROT_Y",   "ROT_Z",    "ROT_C",    "ROT_T",    "SCALE_X",  "SCALE_Y",
+      "SCALE_Z", "SCALE_C", "SCALE_XY", "SCALE_YZ", "SCALE_ZX",
+  };
+
+  MAN_ITER_AXES_BEGIN (axis, axis_idx) {
+    float matrix_final[4][4];
+    WM_gizmo_calc_matrix_final(axis, matrix_final);
+
+    float length = -1.0f;
+    if (PropertyRNA *prop = RNA_struct_find_property(axis->ptr, "length")) {
+      if (RNA_property_type(prop) == PROP_FLOAT) {
+        length = RNA_property_float_get(axis->ptr, prop);
+      }
+    }
+    int draw_options = -1;
+    if (PropertyRNA *prop = RNA_struct_find_property(axis->ptr, "draw_options")) {
+      if (RNA_property_type(prop) == PROP_ENUM) {
+        draw_options = RNA_property_enum_get(axis->ptr, prop);
+      }
+    }
+
+    /* The tip of the arrow, or the rim of a dial: both sit at the gizmo's own length along Z. */
+    float tip_co[3] = {0.0f, 0.0f, length > 0.0f ? length : 1.0f};
+    mul_m4_v3(matrix_final, tip_co);
+
+    float origin_px[2] = {-1.0f, -1.0f};
+    float tip_px[2] = {-1.0f, -1.0f};
+    ED_view3d_project_float_global(region, matrix_final[3], origin_px, V3D_PROJ_TEST_NOP);
+    ED_view3d_project_float_global(region, tip_co, tip_px, V3D_PROJ_TEST_NOP);
+
+    GIZMO_TRACE(
+        "%s %-8s gz=%p hidden=%d basis=%.3f final=%.5f len=%.3f offset=(%.3f %.3f %.3f) opts=%d "
+        "bias=%.1f lw=%.1f alpha=%.2f origin=(%.1f %.1f) tip=(%.1f %.1f) reach=%.1fpx",
+        tag,
+        axis_names[axis_idx],
+        static_cast<const void *>(axis),
+        int((axis->flag & WM_GIZMO_HIDDEN) != 0),
+        double(axis->scale_basis),
+        double(axis->scale_final),
+        double(length),
+        double(axis->matrix_offset[3][0]),
+        double(axis->matrix_offset[3][1]),
+        double(axis->matrix_offset[3][2]),
+        draw_options,
+        double(axis->select_bias),
+        double(axis->line_width),
+        double(axis->color[3]),
+        double(origin_px[0]),
+        double(origin_px[1]),
+        double(tip_px[0]),
+        double(tip_px[1]),
+        double(len_v2v2(origin_px, tip_px)));
+  }
+  MAN_ITER_AXES_END;
+}
+
 static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgroup)
 {
   GizmoGroup *ggd = static_cast<GizmoGroup *>(gzgroup->customdata);
@@ -2441,6 +2536,14 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
                                         gizmo_3d_translate_layout_twtype_get(use_clarity_palette,
                                                                              ggd->twtype) :
                                         ggd->twtype;
+      /* Edit Pivot turns the rotate layout on to get the orientation rings, and the trackball comes
+       * with it. Maya's pivot manipulator has no such handle - and measured here, its filled disc
+       * takes every pixel out to 75 px, so no press ever reaches an axis arrow: the same walk with
+       * the plain move manipulator, the same three arrows, answers from 30 px out. */
+      if (axis_idx == MAN_AXIS_ROT_T && ggd->use_clarity_edit_pivot_style) {
+        WM_gizmo_set_flag(axis, WM_GIZMO_HIDDEN, true);
+        continue;
+      }
       if (gizmo_is_axis_visible(rv3d, visibility_twtype, idot, axis_type, axis_idx)) {
         /* XXX maybe unset _HIDDEN flag on redraw? */
         WM_gizmo_set_flag(axis, WM_GIZMO_HIDDEN, false);
@@ -2492,6 +2595,17 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
                 double(rv3d->twmat[3][0]),
                 double(rv3d->twmat[3][1]),
                 double(rv3d->twmat[3][2]));
+    GIZMO_TRACE("draw_prepare: twmat rows (%.3f %.3f %.3f) (%.3f %.3f %.3f) (%.3f %.3f %.3f)",
+                double(rv3d->twmat[0][0]),
+                double(rv3d->twmat[0][1]),
+                double(rv3d->twmat[0][2]),
+                double(rv3d->twmat[1][0]),
+                double(rv3d->twmat[1][1]),
+                double(rv3d->twmat[1][2]),
+                double(rv3d->twmat[2][0]),
+                double(rv3d->twmat[2][1]),
+                double(rv3d->twmat[2][2]));
+    gizmo_trace_dump_axes(region, ggd, "draw_prepare:");
   }
 
   /* Refresh handled above when using view orientation. */
@@ -3012,12 +3126,15 @@ void transform_gizmo_3d_model_from_constraint_and_mode_restore(TransInfo *t)
 
   GizmoGroup *ggd = static_cast<GizmoGroup *>(gzgroup_xform->customdata);
 
-  /* #wmGizmoGroup::draw_prepare will handle the rest. */
+  /* #wmGizmoGroup::draw_prepare will handle the rest - but only if it is allowed to: this writes the
+   * upstream layout over the Clarity one, and the style cache would otherwise see its three inputs
+   * unchanged and skip putting it back. */
   MAN_ITER_AXES_BEGIN (axis, axis_idx) {
     gizmo_3d_setup_draw_default(axis, axis_idx);
     gizmo_3d_setup_draw_from_twtype(axis, axis_idx, ggd->twtype);
   }
   MAN_ITER_AXES_END;
+  ggd->clarity_style_cache.invalidate();
 }
 
 bool calc_pivot_pos(const bContext *C, const short pivot_type, float r_pivot_pos[3])

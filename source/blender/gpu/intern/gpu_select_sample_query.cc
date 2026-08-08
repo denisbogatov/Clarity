@@ -9,6 +9,7 @@
  * similar to `glRenderMode(GL_SELECT)` since the goal is to maintain compatibility.
  */
 
+#include <cstdio>
 #include <cstdlib>
 
 #include "GPU_debug.hh"
@@ -134,6 +135,24 @@ bool gpu_select_query_load_id(uint id)
   return true;
 }
 
+/**
+ * How many samples each id's draw actually produced.
+ *
+ * This is the only place that can tell a gizmo which drew and covered nothing from one which was
+ * never drawn: everything above only sees the hit list the queries add up to. Enabled by
+ * `BLENDER_CLARITY_GIZMO_TRACE`, and temporary with it - this file is below the editors and cannot
+ * ask them, so it reads the variable itself.
+ */
+static bool gpu_select_query_trace_enabled()
+{
+  static int enabled = -1;
+  if (enabled == -1) {
+    const char *value = std::getenv("BLENDER_CLARITY_GIZMO_TRACE");
+    enabled = (value != nullptr && value[0] != '\0' && value[0] != '0') ? 1 : 0;
+  }
+  return enabled == 1;
+}
+
 uint gpu_select_query_end()
 {
   uint hits = 0;
@@ -145,6 +164,18 @@ uint gpu_select_query_end()
   Span<uint> ids = *g_query_state.ids;
   Vector<uint32_t, QUERY_MIN_LEN> result(ids.size());
   g_query_state.queries->get_occlusion_result(result);
+
+  if (gpu_select_query_trace_enabled()) {
+    fprintf(stderr,
+            "GZTRACE queryend: mode=%d viewport=(%d %d %d %d) ids=%d\n",
+            int(g_query_state.mode),
+            UNPACK4(g_query_state.viewport),
+            int(ids.size()));
+    for (int i = 0; i < result.size(); i++) {
+      fprintf(stderr, "GZTRACE query: id=%u samples=%u\n", ids[i], result[i]);
+    }
+    fflush(stderr);
+  }
 
   for (int i = 0; i < result.size(); i++) {
     if (result[i] != 0) {
