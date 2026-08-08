@@ -1741,6 +1741,20 @@ if(WITH_UI_TESTS)
     test_render.interactive_rendering_eevee
     test_render.animation_rendering_and_player
     test_bpy_types.unregister_referenced_type
+
+    # Edit Pivot. The click these drive is the one gesture no scripted session reaches: Blender
+    # synthesizes `KM_CLICK` inside `wm_handlers_do` and undoes the promotion before that call
+    # returns, so only real events get there.
+    test_clarity_pivot.pivot_click_aligns_the_pivot_to_the_clicked_edge
+    test_clarity_pivot.pivot_click_leaves_a_drag_alone
+    test_clarity_pivot.pivot_edit_key_holds_momentarily_and_taps_toggle
+    test_clarity_pivot.pivot_click_does_not_change_the_selection
+    test_clarity_pivot.pivot_click_outside_the_object_resets
+    test_clarity_pivot.pivot_click_places_the_object_origin
+    test_clarity_pivot.pivot_click_repeats_on_a_second_click
+    test_clarity_pivot.pivot_click_selects_the_custom_axis_orientation
+    test_clarity_pivot.pivot_frame_goes_with_the_selection
+    test_clarity_pivot.pivot_snap_drag_lands_on_the_target
   )
   foreach(ui_test ${_ui_tests})
     add_blender_test_ui(

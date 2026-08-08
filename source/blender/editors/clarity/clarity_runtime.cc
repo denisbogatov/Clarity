@@ -2746,53 +2746,6 @@ static bool pivot_custom_prepare_for_read(const bContext *C, ClarityWindowRuntim
 
 }  // namespace ed::clarity
 
-/**
- * Temporary: report which frame the pivot manipulator was handed and what it was built from, so a
- * basis that does not follow the object can be told apart from an object whose channels carry no
- * rotation at all. Printed only when the answer changes, on the manipulator trace. Remove with the
- * rest of the pivot diagnostics.
- */
-static void pivot_frame_trace(const Object &object, const float matrix[4][4])
-{
-  if (!ED_clarity_gizmo_trace_enabled()) {
-    return;
-  }
-  const float4x4 object_to_world(object.object_to_world());
-  const ObjectCustomPivot *pivot = object.custom_pivot;
-  static float last[6] = {};
-  const float current[6] = {matrix[0][0],
-                            matrix[0][1],
-                            matrix[0][2],
-                            object_to_world[0][0],
-                            object_to_world[0][1],
-                            object_to_world[0][2]};
-  bool changed = false;
-  for (int i = 0; i < 6; i++) {
-    changed |= std::abs(current[i] - last[i]) > 1.0e-4f;
-  }
-  if (!changed) {
-    return;
-  }
-  std::copy_n(current, 6, last);
-  fprintf(stderr,
-          "PIVOTFRAME %.3f object=%s pivot_x=(%.3f %.3f %.3f) object_x=(%.3f %.3f %.3f) "
-          "authored=%d local_quat=(%.3f %.3f %.3f %.3f)\n",
-          BLI_time_now_seconds(),
-          object.id.name + 2,
-          double(current[0]),
-          double(current[1]),
-          double(current[2]),
-          double(current[3]),
-          double(current[4]),
-          double(current[5]),
-          int(pivot != nullptr && pivot->orientation_valid != 0),
-          pivot != nullptr ? pivot->orientation[0] : 1.0,
-          pivot != nullptr ? pivot->orientation[1] : 0.0,
-          pivot != nullptr ? pivot->orientation[2] : 0.0,
-          pivot != nullptr ? pivot->orientation[3] : 0.0);
-  fflush(stderr);
-}
-
 bool ED_clarity_pivot_custom_matrix_get(const bContext *C,
                                      const ed::clarity::ClarityPivotUsage usage,
                                      float r_matrix[4][4])
@@ -2825,7 +2778,6 @@ bool ED_clarity_pivot_custom_matrix_get(const bContext *C,
                                   float(orientation_world.z)};
     quat_to_mat4(r_matrix, orientation);
     copy_v3fl_v3db(r_matrix[3], static_cast<const double *>(position_world));
-    pivot_frame_trace(*object, r_matrix);
     return true;
   }
   if (runtime == nullptr) {
@@ -2841,9 +2793,6 @@ bool ED_clarity_pivot_custom_matrix_get(const bContext *C,
   }
   quat_to_mat4(r_matrix, custom->rotation_quaternion);
   copy_v3_v3(r_matrix[3], custom->location);
-  if (custom->object != nullptr) {
-    pivot_frame_trace(*custom->object, r_matrix);
-  }
   return true;
 }
 

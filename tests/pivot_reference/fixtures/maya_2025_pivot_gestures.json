@@ -1,0 +1,4525 @@
+{
+  "schema": 1,
+  "mayaVersion": "2025",
+  "apiVersion": 20250300,
+  "subject": "pivotSubject",
+  "shape": "|pivotParent|pivotSubject|pivotSubjectShape",
+  "steps": [
+    {
+      "step": "initial",
+      "state": {
+        "transform": {
+          "translate": [
+            1.25,
+            -2.5,
+            3.75
+          ],
+          "rotate": [
+            20.0,
+            -35.0,
+            70.0
+          ],
+          "rotateOrder": 4,
+          "rotateAxis": [
+            11.0,
+            -7.0,
+            5.0
+          ],
+          "scale": [
+            2.0,
+            -0.5,
+            1.25
+          ],
+          "shear": [
+            0.2,
+            -0.3,
+            0.4
+          ],
+          "rotatePivot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotatePivotTranslate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scalePivot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scalePivotTranslate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotatePivotWorld": [
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805
+          ],
+          "scalePivotWorld": [
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805
+          ],
+          "offsetParentMatrix": [
+            1.0,
+            0.15,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            -0.25,
+            0.0,
+            0.1,
+            0.0,
+            1.0,
+            0.0,
+            2.0,
+            -1.0,
+            0.5,
+            1.0
+          ],
+          "matrix": [
+            0.7821673966271256,
+            1.290405869377882,
+            1.312656411986266,
+            0.0,
+            0.41064411765009645,
+            -0.12303041927453284,
+            -0.27610672677880643,
+            0.0,
+            -0.35291753424902295,
+            -1.1271863668947866,
+            0.7470107819209318,
+            0.0,
+            1.25,
+            -2.5,
+            3.75,
+            1.0
+          ],
+          "worldMatrix": [
+            -2.516148492731161,
+            0.18412331487673883,
+            0.5410311656699804,
+            0.0,
+            -0.4726175381041189,
+            -0.010525625604435457,
+            -0.7077744859389568,
+            0.0,
+            0.05498851478131639,
+            -1.3050754371229976,
+            1.3297601077638515,
+            0.0,
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805,
+            1.0
+          ],
+          "worldBoundingBox": [
+            -7.985822546776092,
+            -13.055672097121793,
+            0.6916531665513572,
+            2.0066983048268483,
+            -4.814870342212587,
+            12.583374088230252
+          ],
+          "firstVertexWorld": [
+            2.0066983048268483,
+            -13.01356959470405,
+            11.501311756890292
+          ],
+          "manipPivot": {
+            "valid": false,
+            "positionValid": false,
+            "orientationValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinned": false,
+            "snapPosition": true,
+            "snapOrientation": true,
+            "resetMode": 0,
+            "bakeOrientationAutomatically": false
+          }
+        },
+        "tool": {
+          "contextMode": {
+            "move": {
+              "context": "Move",
+              "mode": 2,
+              "attempts": {}
+            },
+            "rotate": {
+              "context": "Rotate",
+              "mode": 0,
+              "attempts": {}
+            },
+            "scale": {
+              "context": "Scale",
+              "mode": 0,
+              "attempts": {}
+            }
+          },
+          "manipPivot": {
+            "valid": false,
+            "posValid": false,
+            "oriValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinPivot": false,
+            "snapPos": true,
+            "snapOri": true,
+            "resetMode": 0,
+            "bakeOri": false,
+            "moveToolOri": null,
+            "rotateToolOri": null,
+            "scaleToolOri": null
+          },
+          "currentContext": "Move",
+          "selectMode": {
+            "object": true,
+            "component": false
+          },
+          "selectType": {
+            "vertex": true,
+            "edge": false,
+            "facet": false
+          },
+          "selection": [
+            "pivotSubject"
+          ]
+        },
+        "geometry": {
+          "vertices": [
+            [
+              2.0066983048268483,
+              -13.01356959470405,
+              11.501311756890292
+            ],
+            [
+              -3.0255986806354738,
+              -12.645322964950573,
+              12.583374088230254
+            ],
+            [
+              0.11622815241037276,
+              -13.055672097121793,
+              8.670213813134467
+            ],
+            [
+              -4.916068833051949,
+              -12.687425467368314,
+              9.752276144474425
+            ],
+            [
+              -0.21370293627752535,
+              -5.225219474383807,
+              0.6916531665513572
+            ],
+            [
+              -5.245999921739847,
+              -4.856972844630329,
+              1.7737154978913177
+            ],
+            [
+              1.6767672161389502,
+              -5.183116971966065,
+              3.5227511103071842
+            ],
+            [
+              -3.355529769323372,
+              -4.814870342212587,
+              4.604813441647145
+            ]
+          ],
+          "edgeMidpoints": [
+            {
+              "edge": 0,
+              "vertices": [
+                0,
+                1
+              ],
+              "midpoint": [
+                -0.50945,
+                -12.82945,
+                12.04234
+              ]
+            },
+            {
+              "edge": 1,
+              "vertices": [
+                2,
+                3
+              ],
+              "midpoint": [
+                -2.39992,
+                -12.87155,
+                9.21124
+              ]
+            },
+            {
+              "edge": 2,
+              "vertices": [
+                4,
+                5
+              ],
+              "midpoint": [
+                -2.72985,
+                -5.0411,
+                1.23268
+              ]
+            },
+            {
+              "edge": 3,
+              "vertices": [
+                6,
+                7
+              ],
+              "midpoint": [
+                -0.83938,
+                -4.99899,
+                4.06378
+              ]
+            },
+            {
+              "edge": 4,
+              "vertices": [
+                0,
+                2
+              ],
+              "midpoint": [
+                1.06146,
+                -13.03462,
+                10.08576
+              ]
+            },
+            {
+              "edge": 5,
+              "vertices": [
+                1,
+                3
+              ],
+              "midpoint": [
+                -3.97083,
+                -12.66637,
+                11.16783
+              ]
+            },
+            {
+              "edge": 6,
+              "vertices": [
+                2,
+                4
+              ],
+              "midpoint": [
+                -0.04874,
+                -9.14045,
+                4.68093
+              ]
+            },
+            {
+              "edge": 7,
+              "vertices": [
+                3,
+                5
+              ],
+              "midpoint": [
+                -5.08103,
+                -8.7722,
+                5.763
+              ]
+            },
+            {
+              "edge": 8,
+              "vertices": [
+                4,
+                6
+              ],
+              "midpoint": [
+                0.73153,
+                -5.20417,
+                2.1072
+              ]
+            },
+            {
+              "edge": 9,
+              "vertices": [
+                5,
+                7
+              ],
+              "midpoint": [
+                -4.30076,
+                -4.83592,
+                3.18926
+              ]
+            },
+            {
+              "edge": 10,
+              "vertices": [
+                6,
+                0
+              ],
+              "midpoint": [
+                1.84173,
+                -9.09834,
+                7.51203
+              ]
+            },
+            {
+              "edge": 11,
+              "vertices": [
+                7,
+                1
+              ],
+              "midpoint": [
+                -3.19056,
+                -8.7301,
+                8.59409
+              ]
+            }
+          ]
+        },
+        "analysis": {
+          "pivotPosition": [
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805
+          ],
+          "pivotSource": "rotatePivot world",
+          "manipPivotPosition": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "manipPivotPositionValid": false,
+          "nearest": {
+            "what": "e[11] midpoint",
+            "at": [
+              -3.19056,
+              -8.7301,
+              8.59409
+            ],
+            "distance": 2.517547
+          }
+        }
+      },
+      "changes": {}
+    },
+    {
+      "step": "setup",
+      "state": {
+        "transform": {
+          "translate": [
+            1.25,
+            -2.5,
+            3.75
+          ],
+          "rotate": [
+            20.0,
+            -35.0,
+            70.0
+          ],
+          "rotateOrder": 4,
+          "rotateAxis": [
+            11.0,
+            -7.0,
+            5.0
+          ],
+          "scale": [
+            2.0,
+            -0.5,
+            1.25
+          ],
+          "shear": [
+            0.2,
+            -0.3,
+            0.4
+          ],
+          "rotatePivot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotatePivotTranslate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scalePivot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scalePivotTranslate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotatePivotWorld": [
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805
+          ],
+          "scalePivotWorld": [
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805
+          ],
+          "offsetParentMatrix": [
+            1.0,
+            0.15,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            -0.25,
+            0.0,
+            0.1,
+            0.0,
+            1.0,
+            0.0,
+            2.0,
+            -1.0,
+            0.5,
+            1.0
+          ],
+          "matrix": [
+            0.7821673966271256,
+            1.290405869377882,
+            1.312656411986266,
+            0.0,
+            0.41064411765009645,
+            -0.12303041927453284,
+            -0.27610672677880643,
+            0.0,
+            -0.35291753424902295,
+            -1.1271863668947866,
+            0.7470107819209318,
+            0.0,
+            1.25,
+            -2.5,
+            3.75,
+            1.0
+          ],
+          "worldMatrix": [
+            -2.516148492731161,
+            0.18412331487673883,
+            0.5410311656699804,
+            0.0,
+            -0.4726175381041189,
+            -0.010525625604435457,
+            -0.7077744859389568,
+            0.0,
+            0.05498851478131639,
+            -1.3050754371229976,
+            1.3297601077638515,
+            0.0,
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805,
+            1.0
+          ],
+          "worldBoundingBox": [
+            -7.985822546776092,
+            -13.055672097121793,
+            0.6916531665513572,
+            2.0066983048268483,
+            -4.814870342212587,
+            12.583374088230252
+          ],
+          "firstVertexWorld": [
+            2.0066983048268483,
+            -13.01356959470405,
+            11.501311756890292
+          ],
+          "manipPivot": {
+            "valid": false,
+            "positionValid": false,
+            "orientationValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinned": false,
+            "snapPosition": true,
+            "snapOrientation": true,
+            "resetMode": 0,
+            "bakeOrientationAutomatically": false
+          }
+        },
+        "tool": {
+          "contextMode": {
+            "move": {
+              "context": "Move",
+              "mode": 2,
+              "attempts": {}
+            },
+            "rotate": {
+              "context": "Rotate",
+              "mode": 0,
+              "attempts": {}
+            },
+            "scale": {
+              "context": "Scale",
+              "mode": 0,
+              "attempts": {}
+            }
+          },
+          "manipPivot": {
+            "valid": false,
+            "posValid": false,
+            "oriValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinPivot": false,
+            "snapPos": true,
+            "snapOri": true,
+            "resetMode": 0,
+            "bakeOri": false,
+            "moveToolOri": null,
+            "rotateToolOri": null,
+            "scaleToolOri": null
+          },
+          "currentContext": "Move",
+          "selectMode": {
+            "object": true,
+            "component": false
+          },
+          "selectType": {
+            "vertex": true,
+            "edge": false,
+            "facet": false
+          },
+          "selection": [
+            "pivotSubject"
+          ]
+        },
+        "geometry": {
+          "vertices": [
+            [
+              2.0066983048268483,
+              -13.01356959470405,
+              11.501311756890292
+            ],
+            [
+              -3.0255986806354738,
+              -12.645322964950573,
+              12.583374088230254
+            ],
+            [
+              0.11622815241037276,
+              -13.055672097121793,
+              8.670213813134467
+            ],
+            [
+              -4.916068833051949,
+              -12.687425467368314,
+              9.752276144474425
+            ],
+            [
+              -0.21370293627752535,
+              -5.225219474383807,
+              0.6916531665513572
+            ],
+            [
+              -5.245999921739847,
+              -4.856972844630329,
+              1.7737154978913177
+            ],
+            [
+              1.6767672161389502,
+              -5.183116971966065,
+              3.5227511103071842
+            ],
+            [
+              -3.355529769323372,
+              -4.814870342212587,
+              4.604813441647145
+            ]
+          ],
+          "edgeMidpoints": [
+            {
+              "edge": 0,
+              "vertices": [
+                0,
+                1
+              ],
+              "midpoint": [
+                -0.50945,
+                -12.82945,
+                12.04234
+              ]
+            },
+            {
+              "edge": 1,
+              "vertices": [
+                2,
+                3
+              ],
+              "midpoint": [
+                -2.39992,
+                -12.87155,
+                9.21124
+              ]
+            },
+            {
+              "edge": 2,
+              "vertices": [
+                4,
+                5
+              ],
+              "midpoint": [
+                -2.72985,
+                -5.0411,
+                1.23268
+              ]
+            },
+            {
+              "edge": 3,
+              "vertices": [
+                6,
+                7
+              ],
+              "midpoint": [
+                -0.83938,
+                -4.99899,
+                4.06378
+              ]
+            },
+            {
+              "edge": 4,
+              "vertices": [
+                0,
+                2
+              ],
+              "midpoint": [
+                1.06146,
+                -13.03462,
+                10.08576
+              ]
+            },
+            {
+              "edge": 5,
+              "vertices": [
+                1,
+                3
+              ],
+              "midpoint": [
+                -3.97083,
+                -12.66637,
+                11.16783
+              ]
+            },
+            {
+              "edge": 6,
+              "vertices": [
+                2,
+                4
+              ],
+              "midpoint": [
+                -0.04874,
+                -9.14045,
+                4.68093
+              ]
+            },
+            {
+              "edge": 7,
+              "vertices": [
+                3,
+                5
+              ],
+              "midpoint": [
+                -5.08103,
+                -8.7722,
+                5.763
+              ]
+            },
+            {
+              "edge": 8,
+              "vertices": [
+                4,
+                6
+              ],
+              "midpoint": [
+                0.73153,
+                -5.20417,
+                2.1072
+              ]
+            },
+            {
+              "edge": 9,
+              "vertices": [
+                5,
+                7
+              ],
+              "midpoint": [
+                -4.30076,
+                -4.83592,
+                3.18926
+              ]
+            },
+            {
+              "edge": 10,
+              "vertices": [
+                6,
+                0
+              ],
+              "midpoint": [
+                1.84173,
+                -9.09834,
+                7.51203
+              ]
+            },
+            {
+              "edge": 11,
+              "vertices": [
+                7,
+                1
+              ],
+              "midpoint": [
+                -3.19056,
+                -8.7301,
+                8.59409
+              ]
+            }
+          ]
+        },
+        "analysis": {
+          "pivotPosition": [
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805
+          ],
+          "pivotSource": "rotatePivot world",
+          "manipPivotPosition": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "manipPivotPositionValid": false,
+          "nearest": {
+            "what": "e[11] midpoint",
+            "at": [
+              -3.19056,
+              -8.7301,
+              8.59409
+            ],
+            "distance": 2.517547
+          }
+        }
+      },
+      "changes": {},
+      "automated": true,
+      "panel": "modelPanel4",
+      "camera": "persp",
+      "viewportSize": [
+        1661,
+        1118
+      ],
+      "viewportOrigin": [
+        367,
+        183
+      ],
+      "subjectSpreadPixels": 424,
+      "visibleVertices": 8,
+      "pivotPixel": [
+        1240,
+        781
+      ],
+      "input": [
+        "панель modelPanel4 1661x1118 в 367,183, камера persp",
+        "объект 424 px, видимых вершин 8, пивот в (1240, 781)"
+      ]
+    },
+    {
+      "step": "pivot_drag_free",
+      "state": {
+        "transform": {
+          "translate": [
+            1.25,
+            -2.5,
+            3.75
+          ],
+          "rotate": [
+            20.0,
+            -35.0,
+            70.0
+          ],
+          "rotateOrder": 4,
+          "rotateAxis": [
+            11.0,
+            -7.0,
+            5.0
+          ],
+          "scale": [
+            2.0,
+            -0.5,
+            1.25
+          ],
+          "shear": [
+            0.2,
+            -0.3,
+            0.4
+          ],
+          "rotatePivot": [
+            -2.669304834266766,
+            -0.6455869347606072,
+            0.8194700120291707
+          ],
+          "rotatePivotTranslate": [
+            2.365718968464274,
+            -1.7708999617440155,
+            -2.3300753841548723
+          ],
+          "scalePivot": [
+            -1.1143944213717794,
+            1.9467498791445508,
+            0.6555760096233367
+          ],
+          "scalePivotTranslate": [
+            -1.554910412894986,
+            -2.592336813905158,
+            0.16389400240583368
+          ],
+          "rotatePivotWorld": [
+            0.30031205109578085,
+            -10.016524122310186,
+            5.528490444820765
+          ],
+          "scalePivotWorld": [
+            0.30031205109578085,
+            -10.016524122310186,
+            5.528490444820765
+          ],
+          "offsetParentMatrix": [
+            1.0,
+            0.15,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            -0.25,
+            0.0,
+            0.1,
+            0.0,
+            1.0,
+            0.0,
+            2.0,
+            -1.0,
+            0.5,
+            1.0
+          ],
+          "matrix": [
+            0.7821673966271256,
+            1.290405869377882,
+            1.312656411986266,
+            0.0,
+            0.41064411765009645,
+            -0.12303041927453284,
+            -0.27610672677880643,
+            0.0,
+            -0.35291753424902295,
+            -1.1271863668947866,
+            0.7470107819209318,
+            0.0,
+            1.2500000000000004,
+            -2.4999999999999987,
+            3.749999999999995,
+            1.0
+          ],
+          "worldMatrix": [
+            -2.516148492731161,
+            0.18412331487673883,
+            0.5410311656699804,
+            0.0,
+            -0.4726175381041189,
+            -0.010525625604435457,
+            -0.7077744859389568,
+            0.0,
+            0.05498851478131639,
+            -1.3050754371229976,
+            1.3297601077638515,
+            0.0,
+            -1.619650808456497,
+            -8.935271219667186,
+            6.637513627390799,
+            1.0
+          ],
+          "worldBoundingBox": [
+            -7.98582254677609,
+            -13.05567209712179,
+            0.691653166551351,
+            2.006698304826851,
+            -4.814870342212584,
+            12.583374088230247
+          ],
+          "firstVertexWorld": [
+            2.006698304826851,
+            -13.013569594704046,
+            11.501311756890287
+          ],
+          "manipPivot": {
+            "valid": false,
+            "positionValid": false,
+            "orientationValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinned": false,
+            "snapPosition": true,
+            "snapOrientation": true,
+            "resetMode": 0,
+            "bakeOrientationAutomatically": false
+          }
+        },
+        "tool": {
+          "contextMode": {
+            "move": {
+              "context": "Move",
+              "mode": 2,
+              "attempts": {}
+            },
+            "rotate": {
+              "context": "Rotate",
+              "mode": 0,
+              "attempts": {}
+            },
+            "scale": {
+              "context": "Scale",
+              "mode": 0,
+              "attempts": {}
+            }
+          },
+          "manipPivot": {
+            "valid": false,
+            "posValid": false,
+            "oriValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinPivot": false,
+            "snapPos": true,
+            "snapOri": true,
+            "resetMode": 0,
+            "bakeOri": false,
+            "moveToolOri": null,
+            "rotateToolOri": null,
+            "scaleToolOri": null
+          },
+          "currentContext": "Move",
+          "selectMode": {
+            "object": true,
+            "component": false
+          },
+          "selectType": {
+            "vertex": true,
+            "edge": false,
+            "facet": false
+          },
+          "selection": [
+            "pivotSubject"
+          ]
+        },
+        "geometry": {
+          "vertices": [
+            [
+              2.006698304826851,
+              -13.013569594704046,
+              11.501311756890287
+            ],
+            [
+              -3.025598680635471,
+              -12.64532296495057,
+              12.583374088230247
+            ],
+            [
+              0.11622815241037543,
+              -13.05567209712179,
+              8.67021381313446
+            ],
+            [
+              -4.916068833051947,
+              -12.68742546736831,
+              9.75227614447442
+            ],
+            [
+              -0.21370293627752268,
+              -5.225219474383803,
+              0.691653166551351
+            ],
+            [
+              -5.245999921739845,
+              -4.8569728446303255,
+              1.7737154978913114
+            ],
+            [
+              1.6767672161389529,
+              -5.1831169719660615,
+              3.522751110307178
+            ],
+            [
+              -3.355529769323369,
+              -4.814870342212584,
+              4.6048134416471385
+            ]
+          ],
+          "edgeMidpoints": [
+            {
+              "edge": 0,
+              "vertices": [
+                0,
+                1
+              ],
+              "midpoint": [
+                -0.50945,
+                -12.82945,
+                12.04234
+              ]
+            },
+            {
+              "edge": 1,
+              "vertices": [
+                2,
+                3
+              ],
+              "midpoint": [
+                -2.39992,
+                -12.87155,
+                9.21124
+              ]
+            },
+            {
+              "edge": 2,
+              "vertices": [
+                4,
+                5
+              ],
+              "midpoint": [
+                -2.72985,
+                -5.0411,
+                1.23268
+              ]
+            },
+            {
+              "edge": 3,
+              "vertices": [
+                6,
+                7
+              ],
+              "midpoint": [
+                -0.83938,
+                -4.99899,
+                4.06378
+              ]
+            },
+            {
+              "edge": 4,
+              "vertices": [
+                0,
+                2
+              ],
+              "midpoint": [
+                1.06146,
+                -13.03462,
+                10.08576
+              ]
+            },
+            {
+              "edge": 5,
+              "vertices": [
+                1,
+                3
+              ],
+              "midpoint": [
+                -3.97083,
+                -12.66637,
+                11.16783
+              ]
+            },
+            {
+              "edge": 6,
+              "vertices": [
+                2,
+                4
+              ],
+              "midpoint": [
+                -0.04874,
+                -9.14045,
+                4.68093
+              ]
+            },
+            {
+              "edge": 7,
+              "vertices": [
+                3,
+                5
+              ],
+              "midpoint": [
+                -5.08103,
+                -8.7722,
+                5.763
+              ]
+            },
+            {
+              "edge": 8,
+              "vertices": [
+                4,
+                6
+              ],
+              "midpoint": [
+                0.73153,
+                -5.20417,
+                2.1072
+              ]
+            },
+            {
+              "edge": 9,
+              "vertices": [
+                5,
+                7
+              ],
+              "midpoint": [
+                -4.30076,
+                -4.83592,
+                3.18926
+              ]
+            },
+            {
+              "edge": 10,
+              "vertices": [
+                6,
+                0
+              ],
+              "midpoint": [
+                1.84173,
+                -9.09834,
+                7.51203
+              ]
+            },
+            {
+              "edge": 11,
+              "vertices": [
+                7,
+                1
+              ],
+              "midpoint": [
+                -3.19056,
+                -8.7301,
+                8.59409
+              ]
+            }
+          ]
+        },
+        "analysis": {
+          "pivotPosition": [
+            0.30031205109578085,
+            -10.016524122310186,
+            5.528490444820765
+          ],
+          "pivotSource": "rotatePivot world",
+          "manipPivotPosition": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "manipPivotPositionValid": false,
+          "nearest": {
+            "what": "e[6] midpoint",
+            "at": [
+              -0.04874,
+              -9.14045,
+              4.68093
+            ],
+            "distance": 1.267952
+          }
+        }
+      },
+      "changes": {
+        "analysis.nearest.at": {
+          "from": [
+            -3.19056,
+            -8.7301,
+            8.59409
+          ],
+          "to": [
+            -0.04874,
+            -9.14045,
+            4.68093
+          ]
+        },
+        "analysis.nearest.distance": {
+          "from": 2.51755,
+          "to": 1.26795
+        },
+        "analysis.nearest.what": {
+          "from": "e[11] midpoint",
+          "to": "e[6] midpoint"
+        },
+        "analysis.pivotPosition": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            0.30031,
+            -10.01652,
+            5.52849
+          ]
+        },
+        "transform.rotatePivot": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            -2.6693,
+            -0.64559,
+            0.81947
+          ]
+        },
+        "transform.rotatePivotTranslate": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            2.36572,
+            -1.7709,
+            -2.33008
+          ]
+        },
+        "transform.rotatePivotWorld": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            0.30031,
+            -10.01652,
+            5.52849
+          ]
+        },
+        "transform.scalePivot": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            -1.11439,
+            1.94675,
+            0.65558
+          ]
+        },
+        "transform.scalePivotTranslate": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            -1.55491,
+            -2.59234,
+            0.16389
+          ]
+        },
+        "transform.scalePivotWorld": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            0.30031,
+            -10.01652,
+            5.52849
+          ]
+        }
+      },
+      "commands": [
+        "ctxEditMode;",
+        "move -r 1.919963 -1.081253 -1.109023 pivotSubject.scalePivot pivotSubject.rotatePivot ;"
+      ],
+      "instruction": "1. Войти в режим редактирования пивота (ctxEditMode).\n2. Потянуть пивот за центр на 70x40 пикселей без модификаторов.",
+      "question": "база: свободный драг оставляет пивот там, где отпустили курсор",
+      "automated": true,
+      "screenshot": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_01_pivot_drag_free_after.png",
+      "screenshots": {
+        "before": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_01_pivot_drag_free_before.png",
+        "after": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_01_pivot_drag_free_after.png",
+        "drag": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_01_pivot_drag_free_drag.png"
+      },
+      "input": [
+        "драг (1240, 781) -> (1310, 821) (80 px) hold=-"
+      ],
+      "verdict": "жест сработал"
+    },
+    {
+      "step": "pivot_drag_vertex_snap",
+      "state": {
+        "transform": {
+          "translate": [
+            1.25,
+            -2.5,
+            3.75
+          ],
+          "rotate": [
+            20.0,
+            -35.0,
+            70.0
+          ],
+          "rotateOrder": 4,
+          "rotateAxis": [
+            11.0,
+            -7.0,
+            5.0
+          ],
+          "scale": [
+            2.0,
+            -0.5,
+            1.25
+          ],
+          "shear": [
+            0.2,
+            -0.3,
+            0.4
+          ],
+          "rotatePivot": [
+            1.075000298711323,
+            2.499999952819331,
+            3.7499998644786707
+          ],
+          "rotatePivotTranslate": [
+            -2.1728736072696955,
+            -4.34509205605031,
+            0.3559024381663789
+          ],
+          "scalePivot": [
+            1.000000128324676,
+            -2.0000000140557255,
+            2.999999891582939
+          ],
+          "scalePivotTranslate": [
+            0.0750001703866468,
+            4.499999966875056,
+            0.749999972895732
+          ],
+          "rotatePivotWorld": [
+            -3.0255990028381334,
+            -12.645322799682617,
+            12.5833740234375
+          ],
+          "scalePivotWorld": [
+            -3.0255990028381334,
+            -12.645322799682617,
+            12.5833740234375
+          ],
+          "offsetParentMatrix": [
+            1.0,
+            0.15,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            -0.25,
+            0.0,
+            0.1,
+            0.0,
+            1.0,
+            0.0,
+            2.0,
+            -1.0,
+            0.5,
+            1.0
+          ],
+          "matrix": [
+            0.7821673966271256,
+            1.290405869377882,
+            1.312656411986266,
+            0.0,
+            0.41064411765009645,
+            -0.12303041927453284,
+            -0.27610672677880643,
+            0.0,
+            -0.35291753424902295,
+            -1.1271863668947866,
+            0.7470107819209318,
+            0.0,
+            1.250000000000005,
+            -2.499999999999998,
+            3.75,
+            1.0
+          ],
+          "worldMatrix": [
+            -2.516148492731161,
+            0.18412331487673883,
+            0.5410311656699804,
+            0.0,
+            -0.4726175381041189,
+            -0.010525625604435457,
+            -0.7077744859389568,
+            0.0,
+            0.05498851478131639,
+            -1.3050754371229976,
+            1.3297601077638515,
+            0.0,
+            -1.6196508084565084,
+            -8.935271219667188,
+            6.6375136273908,
+            1.0
+          ],
+          "worldBoundingBox": [
+            -7.985822546776101,
+            -13.05567209712179,
+            0.6916531665513519,
+            2.0066983048268394,
+            -4.814870342212585,
+            12.583374088230249
+          ],
+          "firstVertexWorld": [
+            2.0066983048268394,
+            -13.013569594704048,
+            11.501311756890289
+          ],
+          "manipPivot": {
+            "valid": false,
+            "positionValid": false,
+            "orientationValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinned": false,
+            "snapPosition": true,
+            "snapOrientation": true,
+            "resetMode": 0,
+            "bakeOrientationAutomatically": false
+          }
+        },
+        "tool": {
+          "contextMode": {
+            "move": {
+              "context": "Move",
+              "mode": 2,
+              "attempts": {}
+            },
+            "rotate": {
+              "context": "Rotate",
+              "mode": 0,
+              "attempts": {}
+            },
+            "scale": {
+              "context": "Scale",
+              "mode": 0,
+              "attempts": {}
+            }
+          },
+          "manipPivot": {
+            "valid": false,
+            "posValid": false,
+            "oriValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinPivot": false,
+            "snapPos": true,
+            "snapOri": true,
+            "resetMode": 0,
+            "bakeOri": false,
+            "moveToolOri": null,
+            "rotateToolOri": null,
+            "scaleToolOri": null
+          },
+          "currentContext": "Move",
+          "selectMode": {
+            "object": true,
+            "component": false
+          },
+          "selectType": {
+            "vertex": true,
+            "edge": false,
+            "facet": false
+          },
+          "selection": [
+            "pivotSubject"
+          ]
+        },
+        "geometry": {
+          "vertices": [
+            [
+              2.0066983048268394,
+              -13.013569594704048,
+              11.501311756890289
+            ],
+            [
+              -3.0255986806354827,
+              -12.64532296495057,
+              12.583374088230247
+            ],
+            [
+              0.11622815241036388,
+              -13.05567209712179,
+              8.67021381313446
+            ],
+            [
+              -4.916068833051958,
+              -12.687425467368312,
+              9.752276144474422
+            ],
+            [
+              -0.21370293627753423,
+              -5.225219474383805,
+              0.6916531665513519
+            ],
+            [
+              -5.245999921739856,
+              -4.856972844630327,
+              1.7737154978913123
+            ],
+            [
+              1.6767672161389413,
+              -5.183116971966063,
+              3.522751110307179
+            ],
+            [
+              -3.3555297693233808,
+              -4.814870342212585,
+              4.604813441647139
+            ]
+          ],
+          "edgeMidpoints": [
+            {
+              "edge": 0,
+              "vertices": [
+                0,
+                1
+              ],
+              "midpoint": [
+                -0.50945,
+                -12.82945,
+                12.04234
+              ]
+            },
+            {
+              "edge": 1,
+              "vertices": [
+                2,
+                3
+              ],
+              "midpoint": [
+                -2.39992,
+                -12.87155,
+                9.21124
+              ]
+            },
+            {
+              "edge": 2,
+              "vertices": [
+                4,
+                5
+              ],
+              "midpoint": [
+                -2.72985,
+                -5.0411,
+                1.23268
+              ]
+            },
+            {
+              "edge": 3,
+              "vertices": [
+                6,
+                7
+              ],
+              "midpoint": [
+                -0.83938,
+                -4.99899,
+                4.06378
+              ]
+            },
+            {
+              "edge": 4,
+              "vertices": [
+                0,
+                2
+              ],
+              "midpoint": [
+                1.06146,
+                -13.03462,
+                10.08576
+              ]
+            },
+            {
+              "edge": 5,
+              "vertices": [
+                1,
+                3
+              ],
+              "midpoint": [
+                -3.97083,
+                -12.66637,
+                11.16783
+              ]
+            },
+            {
+              "edge": 6,
+              "vertices": [
+                2,
+                4
+              ],
+              "midpoint": [
+                -0.04874,
+                -9.14045,
+                4.68093
+              ]
+            },
+            {
+              "edge": 7,
+              "vertices": [
+                3,
+                5
+              ],
+              "midpoint": [
+                -5.08103,
+                -8.7722,
+                5.763
+              ]
+            },
+            {
+              "edge": 8,
+              "vertices": [
+                4,
+                6
+              ],
+              "midpoint": [
+                0.73153,
+                -5.20417,
+                2.1072
+              ]
+            },
+            {
+              "edge": 9,
+              "vertices": [
+                5,
+                7
+              ],
+              "midpoint": [
+                -4.30076,
+                -4.83592,
+                3.18926
+              ]
+            },
+            {
+              "edge": 10,
+              "vertices": [
+                6,
+                0
+              ],
+              "midpoint": [
+                1.84173,
+                -9.09834,
+                7.51203
+              ]
+            },
+            {
+              "edge": 11,
+              "vertices": [
+                7,
+                1
+              ],
+              "midpoint": [
+                -3.19056,
+                -8.7301,
+                8.59409
+              ]
+            }
+          ]
+        },
+        "analysis": {
+          "pivotPosition": [
+            -3.0255990028381334,
+            -12.645322799682617,
+            12.5833740234375
+          ],
+          "pivotSource": "rotatePivot world",
+          "manipPivotPosition": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "manipPivotPositionValid": false,
+          "nearest": {
+            "what": "vtx[1]",
+            "at": [
+              -3.0255986806354827,
+              -12.64532296495057,
+              12.583374088230247
+            ],
+            "distance": 0.0
+          }
+        }
+      },
+      "changes": {
+        "analysis.nearest.at": {
+          "from": [
+            -3.19056,
+            -8.7301,
+            8.59409
+          ],
+          "to": [
+            -3.0256,
+            -12.64532,
+            12.58337
+          ]
+        },
+        "analysis.nearest.distance": {
+          "from": 2.51755,
+          "to": 0.0
+        },
+        "analysis.nearest.what": {
+          "from": "e[11] midpoint",
+          "to": "vtx[1]"
+        },
+        "analysis.pivotPosition": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            -3.0256,
+            -12.64532,
+            12.58337
+          ]
+        },
+        "transform.rotatePivot": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            1.075,
+            2.5,
+            3.75
+          ]
+        },
+        "transform.rotatePivotTranslate": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            -2.17287,
+            -4.34509,
+            0.3559
+          ]
+        },
+        "transform.rotatePivotWorld": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            -3.0256,
+            -12.64532,
+            12.58337
+          ]
+        },
+        "transform.scalePivot": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            1.0,
+            -2.0,
+            3.0
+          ]
+        },
+        "transform.scalePivotTranslate": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            0.075,
+            4.5,
+            0.75
+          ]
+        },
+        "transform.scalePivotWorld": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            -3.0256,
+            -12.64532,
+            12.58337
+          ]
+        }
+      },
+      "commands": [
+        "SnapToPointPress;",
+        "snapMode -point 1;",
+        "move -rpr -3.025599 -12.645323 12.583374 pivotSubject.scalePivot pivotSubject.rotatePivot ;",
+        "SnapToPointRelease;",
+        "snapMode -point 0;"
+      ],
+      "instruction": "1. Взяться за манипулятор со смещением 8x8 пикселей от центра.\n2. С зажатым V дотащить его до самой дальней видимой вершины и отпустить.",
+      "question": "садится ли пивот точно на вершину или сохраняет смещение захвата",
+      "automated": true,
+      "screenshot": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_02_pivot_drag_vertex_snap_after.png",
+      "screenshots": {
+        "before": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_02_pivot_drag_vertex_snap_before.png",
+        "after": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_02_pivot_drag_vertex_snap_after.png",
+        "drag": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_02_pivot_drag_vertex_snap_drag.png"
+      },
+      "input": [
+        "драг (1248, 789) -> (1067, 941) (236 px) hold=V"
+      ],
+      "verdict": "жест сработал"
+    },
+    {
+      "step": "pivot_drag_edge_snap",
+      "state": {
+        "transform": {
+          "translate": [
+            1.25,
+            -2.5,
+            3.75
+          ],
+          "rotate": [
+            20.0,
+            -35.0,
+            70.0
+          ],
+          "rotateOrder": 4,
+          "rotateAxis": [
+            11.0,
+            -7.0,
+            5.0
+          ],
+          "scale": [
+            2.0,
+            -0.5,
+            1.25
+          ],
+          "shear": [
+            0.2,
+            -0.3,
+            0.4
+          ],
+          "rotatePivot": [
+            -1.5002354424092645,
+            1.2828355704820509,
+            4.7823863884946896
+          ],
+          "rotatePivotTranslate": [
+            0.691176576031306,
+            -5.711358233674325,
+            -2.2326405531727014
+          ],
+          "scalePivot": [
+            0.030252135561153706,
+            1.2602379698316515,
+            3.825909110795753
+          ],
+          "scalePivotTranslate": [
+            -1.5304875779704188,
+            0.022597600650399396,
+            0.956477277698936
+          ],
+          "rotatePivotWorld": [
+            -2.0809991807868,
+            -13.936065894393135,
+            10.84945800576556
+          ],
+          "scalePivotWorld": [
+            -2.0809991807867987,
+            -13.936065894393135,
+            10.84945800576556
+          ],
+          "offsetParentMatrix": [
+            1.0,
+            0.15,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            -0.25,
+            0.0,
+            0.1,
+            0.0,
+            1.0,
+            0.0,
+            2.0,
+            -1.0,
+            0.5,
+            1.0
+          ],
+          "matrix": [
+            0.7821673966271256,
+            1.290405869377882,
+            1.312656411986266,
+            0.0,
+            0.41064411765009645,
+            -0.12303041927453284,
+            -0.27610672677880643,
+            0.0,
+            -0.35291753424902295,
+            -1.1271863668947866,
+            0.7470107819209318,
+            0.0,
+            1.250000000000004,
+            -2.4999999999999987,
+            3.749999999999994,
+            1.0
+          ],
+          "worldMatrix": [
+            -2.516148492731161,
+            0.18412331487673883,
+            0.5410311656699804,
+            0.0,
+            -0.4726175381041189,
+            -0.010525625604435457,
+            -0.7077744859389568,
+            0.0,
+            0.05498851478131639,
+            -1.3050754371229976,
+            1.3297601077638515,
+            0.0,
+            -1.6196508084565004,
+            -8.935271219667186,
+            6.637513627390794,
+            1.0
+          ],
+          "worldBoundingBox": [
+            -7.9858225467760935,
+            -13.05567209712179,
+            0.6916531665513457,
+            2.0066983048268474,
+            -4.814870342212584,
+            12.583374088230242
+          ],
+          "firstVertexWorld": [
+            2.0066983048268474,
+            -13.013569594704046,
+            11.501311756890281
+          ],
+          "manipPivot": {
+            "valid": false,
+            "positionValid": false,
+            "orientationValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinned": false,
+            "snapPosition": true,
+            "snapOrientation": true,
+            "resetMode": 0,
+            "bakeOrientationAutomatically": false
+          }
+        },
+        "tool": {
+          "contextMode": {
+            "move": {
+              "context": "Move",
+              "mode": 2,
+              "attempts": {}
+            },
+            "rotate": {
+              "context": "Rotate",
+              "mode": 0,
+              "attempts": {}
+            },
+            "scale": {
+              "context": "Scale",
+              "mode": 0,
+              "attempts": {}
+            }
+          },
+          "manipPivot": {
+            "valid": false,
+            "posValid": false,
+            "oriValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinPivot": false,
+            "snapPos": true,
+            "snapOri": true,
+            "resetMode": 0,
+            "bakeOri": false,
+            "moveToolOri": null,
+            "rotateToolOri": null,
+            "scaleToolOri": null
+          },
+          "currentContext": "Move",
+          "selectMode": {
+            "object": true,
+            "component": false
+          },
+          "selectType": {
+            "vertex": true,
+            "edge": false,
+            "facet": false
+          },
+          "selection": [
+            "pivotSubject"
+          ]
+        },
+        "geometry": {
+          "vertices": [
+            [
+              2.0066983048268474,
+              -13.013569594704046,
+              11.501311756890281
+            ],
+            [
+              -3.0255986806354747,
+              -12.64532296495057,
+              12.583374088230242
+            ],
+            [
+              0.11622815241037188,
+              -13.05567209712179,
+              8.670213813134454
+            ],
+            [
+              -4.91606883305195,
+              -12.68742546736831,
+              9.752276144474415
+            ],
+            [
+              -0.21370293627752623,
+              -5.225219474383803,
+              0.6916531665513457
+            ],
+            [
+              -5.245999921739848,
+              -4.8569728446303255,
+              1.7737154978913061
+            ],
+            [
+              1.6767672161389493,
+              -5.1831169719660615,
+              3.5227511103071727
+            ],
+            [
+              -3.3555297693233728,
+              -4.814870342212584,
+              4.604813441647133
+            ]
+          ],
+          "edgeMidpoints": [
+            {
+              "edge": 0,
+              "vertices": [
+                0,
+                1
+              ],
+              "midpoint": [
+                -0.50945,
+                -12.82945,
+                12.04234
+              ]
+            },
+            {
+              "edge": 1,
+              "vertices": [
+                2,
+                3
+              ],
+              "midpoint": [
+                -2.39992,
+                -12.87155,
+                9.21124
+              ]
+            },
+            {
+              "edge": 2,
+              "vertices": [
+                4,
+                5
+              ],
+              "midpoint": [
+                -2.72985,
+                -5.0411,
+                1.23268
+              ]
+            },
+            {
+              "edge": 3,
+              "vertices": [
+                6,
+                7
+              ],
+              "midpoint": [
+                -0.83938,
+                -4.99899,
+                4.06378
+              ]
+            },
+            {
+              "edge": 4,
+              "vertices": [
+                0,
+                2
+              ],
+              "midpoint": [
+                1.06146,
+                -13.03462,
+                10.08576
+              ]
+            },
+            {
+              "edge": 5,
+              "vertices": [
+                1,
+                3
+              ],
+              "midpoint": [
+                -3.97083,
+                -12.66637,
+                11.16783
+              ]
+            },
+            {
+              "edge": 6,
+              "vertices": [
+                2,
+                4
+              ],
+              "midpoint": [
+                -0.04874,
+                -9.14045,
+                4.68093
+              ]
+            },
+            {
+              "edge": 7,
+              "vertices": [
+                3,
+                5
+              ],
+              "midpoint": [
+                -5.08103,
+                -8.7722,
+                5.763
+              ]
+            },
+            {
+              "edge": 8,
+              "vertices": [
+                4,
+                6
+              ],
+              "midpoint": [
+                0.73153,
+                -5.20417,
+                2.1072
+              ]
+            },
+            {
+              "edge": 9,
+              "vertices": [
+                5,
+                7
+              ],
+              "midpoint": [
+                -4.30076,
+                -4.83592,
+                3.18926
+              ]
+            },
+            {
+              "edge": 10,
+              "vertices": [
+                6,
+                0
+              ],
+              "midpoint": [
+                1.84173,
+                -9.09834,
+                7.51203
+              ]
+            },
+            {
+              "edge": 11,
+              "vertices": [
+                7,
+                1
+              ],
+              "midpoint": [
+                -3.19056,
+                -8.7301,
+                8.59409
+              ]
+            }
+          ]
+        },
+        "analysis": {
+          "pivotPosition": [
+            -2.0809991807868,
+            -13.936065894393135,
+            10.84945800576556
+          ],
+          "pivotSource": "rotatePivot world",
+          "manipPivotPosition": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "manipPivotPositionValid": false,
+          "nearest": {
+            "what": "e[1] midpoint",
+            "at": [
+              -2.39992,
+              -12.87155,
+              9.21124
+            ],
+            "distance": 1.979561
+          }
+        }
+      },
+      "changes": {
+        "analysis.nearest.at": {
+          "from": [
+            -3.19056,
+            -8.7301,
+            8.59409
+          ],
+          "to": [
+            -2.39992,
+            -12.87155,
+            9.21124
+          ]
+        },
+        "analysis.nearest.distance": {
+          "from": 2.51755,
+          "to": 1.97956
+        },
+        "analysis.nearest.what": {
+          "from": "e[11] midpoint",
+          "to": "e[1] midpoint"
+        },
+        "analysis.pivotPosition": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            -2.081,
+            -13.93607,
+            10.84946
+          ]
+        },
+        "transform.rotatePivot": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            -1.50024,
+            1.28284,
+            4.78239
+          ]
+        },
+        "transform.rotatePivotTranslate": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            0.69118,
+            -5.71136,
+            -2.23264
+          ]
+        },
+        "transform.rotatePivotWorld": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            -2.081,
+            -13.93607,
+            10.84946
+          ]
+        },
+        "transform.scalePivot": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            0.03025,
+            1.26024,
+            3.82591
+          ]
+        },
+        "transform.scalePivotTranslate": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            -1.53049,
+            0.0226,
+            0.95648
+          ]
+        },
+        "transform.scalePivotWorld": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            -2.081,
+            -13.93607,
+            10.84946
+          ]
+        }
+      },
+      "commands": [
+        "SnapToCurvePress;",
+        "snapMode -curve 1;",
+        "move -r -0.461348 -5.000795 4.211944 pivotSubject.scalePivot pivotSubject.rotatePivot ;",
+        "SnapToCurveRelease;",
+        "snapMode -curve 0;"
+      ],
+      "instruction": "1. Взяться со смещением 8x8 от центра.\n2. С зажатым C дотащить до середины между двумя дальними вершинами и отпустить.",
+      "question": "точно ли на линии ребра и где вдоль него - середина, конец или курсор",
+      "automated": true,
+      "screenshot": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_03_pivot_drag_edge_snap_after.png",
+      "screenshots": {
+        "before": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_03_pivot_drag_edge_snap_before.png",
+        "after": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_03_pivot_drag_edge_snap_after.png",
+        "drag": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_03_pivot_drag_edge_snap_drag.png"
+      },
+      "input": [
+        "драг (1248, 789) -> (1140, 974) (214 px) hold=C"
+      ],
+      "verdict": "жест сработал"
+    },
+    {
+      "step": "pivot_drag_grid_snap",
+      "state": {
+        "transform": {
+          "translate": [
+            1.25,
+            -2.5,
+            3.75
+          ],
+          "rotate": [
+            20.0,
+            -35.0,
+            70.0
+          ],
+          "rotateOrder": 4,
+          "rotateAxis": [
+            11.0,
+            -7.0,
+            5.0
+          ],
+          "scale": [
+            2.0,
+            -0.5,
+            1.25
+          ],
+          "shear": [
+            0.2,
+            -0.3,
+            0.4
+          ],
+          "rotatePivot": [
+            2.670232735716715,
+            -1.6379715566876332,
+            -8.544265046567167
+          ],
+          "rotatePivotTranslate": [
+            -1.8169483150731283,
+            9.620026324271278,
+            4.257510300353841
+          ],
+          "scalePivot": [
+            -0.12449683532064013,
+            -3.559468923878467,
+            -6.835412037253734
+          ],
+          "scalePivotTranslate": [
+            2.794729571037355,
+            1.9214973671908337,
+            -1.7088530093134335
+          ],
+          "rotatePivotWorld": [
+            -1.9984014443252818e-15,
+            -1.7763568394002505e-15,
+            4.440892098500626e-15
+          ],
+          "scalePivotWorld": [
+            -1.9984014443252818e-15,
+            -1.7763568394002505e-15,
+            4.440892098500626e-15
+          ],
+          "offsetParentMatrix": [
+            1.0,
+            0.15,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            -0.25,
+            0.0,
+            0.1,
+            0.0,
+            1.0,
+            0.0,
+            2.0,
+            -1.0,
+            0.5,
+            1.0
+          ],
+          "matrix": [
+            0.7821673966271256,
+            1.290405869377882,
+            1.312656411986266,
+            0.0,
+            0.41064411765009645,
+            -0.12303041927453284,
+            -0.27610672677880643,
+            0.0,
+            -0.35291753424902295,
+            -1.1271863668947866,
+            0.7470107819209318,
+            0.0,
+            1.249999999999981,
+            -2.499999999999996,
+            3.7500000000000084,
+            1.0
+          ],
+          "worldMatrix": [
+            -2.516148492731161,
+            0.18412331487673883,
+            0.5410311656699804,
+            0.0,
+            -0.4726175381041189,
+            -0.010525625604435457,
+            -0.7077744859389568,
+            0.0,
+            0.05498851478131639,
+            -1.3050754371229976,
+            1.3297601077638515,
+            0.0,
+            -1.6196508084564738,
+            -8.935271219667186,
+            6.637513627390834,
+            1.0
+          ],
+          "worldBoundingBox": [
+            -7.985822546776067,
+            -13.05567209712179,
+            0.6916531665513856,
+            2.006698304826874,
+            -4.814870342212584,
+            12.583374088230281
+          ],
+          "firstVertexWorld": [
+            2.006698304826874,
+            -13.013569594704046,
+            11.50131175689032
+          ],
+          "manipPivot": {
+            "valid": false,
+            "positionValid": false,
+            "orientationValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinned": false,
+            "snapPosition": true,
+            "snapOrientation": true,
+            "resetMode": 0,
+            "bakeOrientationAutomatically": false
+          }
+        },
+        "tool": {
+          "contextMode": {
+            "move": {
+              "context": "Move",
+              "mode": 2,
+              "attempts": {}
+            },
+            "rotate": {
+              "context": "Rotate",
+              "mode": 0,
+              "attempts": {}
+            },
+            "scale": {
+              "context": "Scale",
+              "mode": 0,
+              "attempts": {}
+            }
+          },
+          "manipPivot": {
+            "valid": false,
+            "posValid": false,
+            "oriValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinPivot": false,
+            "snapPos": true,
+            "snapOri": true,
+            "resetMode": 0,
+            "bakeOri": false,
+            "moveToolOri": null,
+            "rotateToolOri": null,
+            "scaleToolOri": null
+          },
+          "currentContext": "Move",
+          "selectMode": {
+            "object": true,
+            "component": false
+          },
+          "selectType": {
+            "vertex": true,
+            "edge": false,
+            "facet": false
+          },
+          "selection": [
+            "pivotSubject"
+          ]
+        },
+        "geometry": {
+          "vertices": [
+            [
+              2.006698304826874,
+              -13.013569594704046,
+              11.50131175689032
+            ],
+            [
+              -3.025598680635448,
+              -12.64532296495057,
+              12.583374088230283
+            ],
+            [
+              0.11622815241039852,
+              -13.05567209712179,
+              8.670213813134495
+            ],
+            [
+              -4.9160688330519235,
+              -12.68742546736831,
+              9.752276144474454
+            ],
+            [
+              -0.2137029362774996,
+              -5.225219474383803,
+              0.6916531665513856
+            ],
+            [
+              -5.245999921739822,
+              -4.8569728446303255,
+              1.773715497891346
+            ],
+            [
+              1.676767216138976,
+              -5.1831169719660615,
+              3.5227511103072127
+            ],
+            [
+              -3.355529769323346,
+              -4.814870342212584,
+              4.604813441647173
+            ]
+          ],
+          "edgeMidpoints": [
+            {
+              "edge": 0,
+              "vertices": [
+                0,
+                1
+              ],
+              "midpoint": [
+                -0.50945,
+                -12.82945,
+                12.04234
+              ]
+            },
+            {
+              "edge": 1,
+              "vertices": [
+                2,
+                3
+              ],
+              "midpoint": [
+                -2.39992,
+                -12.87155,
+                9.21124
+              ]
+            },
+            {
+              "edge": 2,
+              "vertices": [
+                4,
+                5
+              ],
+              "midpoint": [
+                -2.72985,
+                -5.0411,
+                1.23268
+              ]
+            },
+            {
+              "edge": 3,
+              "vertices": [
+                6,
+                7
+              ],
+              "midpoint": [
+                -0.83938,
+                -4.99899,
+                4.06378
+              ]
+            },
+            {
+              "edge": 4,
+              "vertices": [
+                0,
+                2
+              ],
+              "midpoint": [
+                1.06146,
+                -13.03462,
+                10.08576
+              ]
+            },
+            {
+              "edge": 5,
+              "vertices": [
+                1,
+                3
+              ],
+              "midpoint": [
+                -3.97083,
+                -12.66637,
+                11.16783
+              ]
+            },
+            {
+              "edge": 6,
+              "vertices": [
+                2,
+                4
+              ],
+              "midpoint": [
+                -0.04874,
+                -9.14045,
+                4.68093
+              ]
+            },
+            {
+              "edge": 7,
+              "vertices": [
+                3,
+                5
+              ],
+              "midpoint": [
+                -5.08103,
+                -8.7722,
+                5.763
+              ]
+            },
+            {
+              "edge": 8,
+              "vertices": [
+                4,
+                6
+              ],
+              "midpoint": [
+                0.73153,
+                -5.20417,
+                2.1072
+              ]
+            },
+            {
+              "edge": 9,
+              "vertices": [
+                5,
+                7
+              ],
+              "midpoint": [
+                -4.30076,
+                -4.83592,
+                3.18926
+              ]
+            },
+            {
+              "edge": 10,
+              "vertices": [
+                6,
+                0
+              ],
+              "midpoint": [
+                1.84173,
+                -9.09834,
+                7.51203
+              ]
+            },
+            {
+              "edge": 11,
+              "vertices": [
+                7,
+                1
+              ],
+              "midpoint": [
+                -3.19056,
+                -8.7301,
+                8.59409
+              ]
+            }
+          ]
+        },
+        "analysis": {
+          "pivotPosition": [
+            -1.9984014443252818e-15,
+            -1.7763568394002505e-15,
+            4.440892098500626e-15
+          ],
+          "pivotSource": "rotatePivot world",
+          "manipPivotPosition": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "manipPivotPositionValid": false,
+          "nearest": {
+            "what": "vtx[4]",
+            "at": [
+              -0.2137029362774996,
+              -5.225219474383803,
+              0.6916531665513856
+            ],
+            "distance": 5.275128
+          }
+        }
+      },
+      "changes": {
+        "analysis.nearest.at": {
+          "from": [
+            -3.19056,
+            -8.7301,
+            8.59409
+          ],
+          "to": [
+            -0.2137,
+            -5.22522,
+            0.69165
+          ]
+        },
+        "analysis.nearest.distance": {
+          "from": 2.51755,
+          "to": 5.27513
+        },
+        "analysis.nearest.what": {
+          "from": "e[11] midpoint",
+          "to": "vtx[4]"
+        },
+        "analysis.pivotPosition": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            -0.0,
+            -0.0,
+            0.0
+          ]
+        },
+        "transform.rotatePivot": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            2.67023,
+            -1.63797,
+            -8.54427
+          ]
+        },
+        "transform.rotatePivotTranslate": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            -1.81695,
+            9.62003,
+            4.25751
+          ]
+        },
+        "transform.rotatePivotWorld": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            -0.0,
+            -0.0,
+            0.0
+          ]
+        },
+        "transform.scalePivot": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            -0.1245,
+            -3.55947,
+            -6.83541
+          ]
+        },
+        "transform.scalePivotTranslate": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            2.79473,
+            1.9215,
+            -1.70885
+          ]
+        },
+        "transform.scalePivotWorld": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            -0.0,
+            -0.0,
+            0.0
+          ]
+        }
+      },
+      "commands": [
+        "SnapToGridPress;",
+        "snapMode -grid 1;",
+        "move -rpr 0 0 0 pivotSubject.scalePivot pivotSubject.rotatePivot ;",
+        "SnapToGridRelease;",
+        "snapMode -grid 0;"
+      ],
+      "instruction": "1. С зажатым X дотащить пивот в нижний левый угол вьюпорта, на сетку.",
+      "question": "какая точка сетки выигрывает и обнуляется ли вместе с этим высота",
+      "automated": true,
+      "screenshot": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_04_pivot_drag_grid_snap_after.png",
+      "screenshots": {
+        "before": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_04_pivot_drag_grid_snap_before.png",
+        "after": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_04_pivot_drag_grid_snap_after.png",
+        "drag": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_04_pivot_drag_grid_snap_drag.png"
+      },
+      "input": [
+        "драг (1240, 781) -> (1040, 931) (250 px) hold=X"
+      ],
+      "verdict": "жест сработал"
+    },
+    {
+      "step": "pivot_drag_axis_handle_vertex_snap",
+      "state": {
+        "transform": {
+          "translate": [
+            1.25,
+            -2.5,
+            3.75
+          ],
+          "rotate": [
+            20.0,
+            -35.0,
+            70.0
+          ],
+          "rotateOrder": 4,
+          "rotateAxis": [
+            11.0,
+            -7.0,
+            5.0
+          ],
+          "scale": [
+            2.0,
+            -0.5,
+            1.25
+          ],
+          "shear": [
+            0.2,
+            -0.3,
+            0.4
+          ],
+          "rotatePivot": [
+            0.8698584501516885,
+            -0.2073088813119422,
+            0.07816583862658334
+          ],
+          "rotatePivotTranslate": [
+            -0.32796945652519555,
+            0.685269848636879,
+            0.45442239462644674
+          ],
+          "scalePivot": [
+            0.4705116225460888,
+            0.47715043352515096,
+            0.0625326709012666
+          ],
+          "scalePivotTranslate": [
+            0.3993468276055984,
+            -0.6844593148370945,
+            0.01563316772531665
+          ],
+          "rotatePivotWorld": [
+            -3.0255990028381334,
+            -8.935271219667186,
+            6.63751362739081
+          ],
+          "scalePivotWorld": [
+            -3.0255990028381334,
+            -8.935271219667186,
+            6.637513627390808
+          ],
+          "offsetParentMatrix": [
+            1.0,
+            0.15,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            -0.25,
+            0.0,
+            0.1,
+            0.0,
+            1.0,
+            0.0,
+            2.0,
+            -1.0,
+            0.5,
+            1.0
+          ],
+          "matrix": [
+            0.7821673966271256,
+            1.290405869377882,
+            1.312656411986266,
+            0.0,
+            0.41064411765009645,
+            -0.12303041927453284,
+            -0.27610672677880643,
+            0.0,
+            -0.35291753424902295,
+            -1.1271863668947866,
+            0.7470107819209318,
+            0.0,
+            1.2499999999999987,
+            -2.4999999999999973,
+            3.7500000000000013,
+            1.0
+          ],
+          "worldMatrix": [
+            -2.516148492731161,
+            0.18412331487673883,
+            0.5410311656699804,
+            0.0,
+            -0.4726175381041189,
+            -0.010525625604435457,
+            -0.7077744859389568,
+            0.0,
+            0.05498851478131639,
+            -1.3050754371229976,
+            1.3297601077638515,
+            0.0,
+            -1.6196508084564987,
+            -8.935271219667186,
+            6.637513627390808,
+            1.0
+          ],
+          "worldBoundingBox": [
+            -7.985822546776092,
+            -13.05567209712179,
+            0.6916531665513599,
+            2.006698304826849,
+            -4.814870342212584,
+            12.583374088230256
+          ],
+          "firstVertexWorld": [
+            2.006698304826849,
+            -13.013569594704046,
+            11.501311756890296
+          ],
+          "manipPivot": {
+            "valid": false,
+            "positionValid": false,
+            "orientationValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinned": false,
+            "snapPosition": true,
+            "snapOrientation": true,
+            "resetMode": 0,
+            "bakeOrientationAutomatically": false
+          }
+        },
+        "tool": {
+          "contextMode": {
+            "move": {
+              "context": "Move",
+              "mode": 2,
+              "attempts": {}
+            },
+            "rotate": {
+              "context": "Rotate",
+              "mode": 0,
+              "attempts": {}
+            },
+            "scale": {
+              "context": "Scale",
+              "mode": 0,
+              "attempts": {}
+            }
+          },
+          "manipPivot": {
+            "valid": false,
+            "posValid": false,
+            "oriValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinPivot": false,
+            "snapPos": true,
+            "snapOri": true,
+            "resetMode": 0,
+            "bakeOri": false,
+            "moveToolOri": null,
+            "rotateToolOri": null,
+            "scaleToolOri": null
+          },
+          "currentContext": "Move",
+          "selectMode": {
+            "object": true,
+            "component": false
+          },
+          "selectType": {
+            "vertex": true,
+            "edge": false,
+            "facet": false
+          },
+          "selection": [
+            "pivotSubject"
+          ]
+        },
+        "geometry": {
+          "vertices": [
+            [
+              2.006698304826849,
+              -13.013569594704046,
+              11.501311756890296
+            ],
+            [
+              -3.025598680635473,
+              -12.64532296495057,
+              12.583374088230256
+            ],
+            [
+              0.11622815241037365,
+              -13.05567209712179,
+              8.670213813134469
+            ],
+            [
+              -4.916068833051948,
+              -12.68742546736831,
+              9.752276144474429
+            ],
+            [
+              -0.21370293627752446,
+              -5.225219474383803,
+              0.6916531665513599
+            ],
+            [
+              -5.2459999217398465,
+              -4.8569728446303255,
+              1.7737154978913203
+            ],
+            [
+              1.676767216138951,
+              -5.1831169719660615,
+              3.522751110307187
+            ],
+            [
+              -3.355529769323371,
+              -4.814870342212584,
+              4.604813441647147
+            ]
+          ],
+          "edgeMidpoints": [
+            {
+              "edge": 0,
+              "vertices": [
+                0,
+                1
+              ],
+              "midpoint": [
+                -0.50945,
+                -12.82945,
+                12.04234
+              ]
+            },
+            {
+              "edge": 1,
+              "vertices": [
+                2,
+                3
+              ],
+              "midpoint": [
+                -2.39992,
+                -12.87155,
+                9.21124
+              ]
+            },
+            {
+              "edge": 2,
+              "vertices": [
+                4,
+                5
+              ],
+              "midpoint": [
+                -2.72985,
+                -5.0411,
+                1.23268
+              ]
+            },
+            {
+              "edge": 3,
+              "vertices": [
+                6,
+                7
+              ],
+              "midpoint": [
+                -0.83938,
+                -4.99899,
+                4.06378
+              ]
+            },
+            {
+              "edge": 4,
+              "vertices": [
+                0,
+                2
+              ],
+              "midpoint": [
+                1.06146,
+                -13.03462,
+                10.08576
+              ]
+            },
+            {
+              "edge": 5,
+              "vertices": [
+                1,
+                3
+              ],
+              "midpoint": [
+                -3.97083,
+                -12.66637,
+                11.16783
+              ]
+            },
+            {
+              "edge": 6,
+              "vertices": [
+                2,
+                4
+              ],
+              "midpoint": [
+                -0.04874,
+                -9.14045,
+                4.68093
+              ]
+            },
+            {
+              "edge": 7,
+              "vertices": [
+                3,
+                5
+              ],
+              "midpoint": [
+                -5.08103,
+                -8.7722,
+                5.763
+              ]
+            },
+            {
+              "edge": 8,
+              "vertices": [
+                4,
+                6
+              ],
+              "midpoint": [
+                0.73153,
+                -5.20417,
+                2.1072
+              ]
+            },
+            {
+              "edge": 9,
+              "vertices": [
+                5,
+                7
+              ],
+              "midpoint": [
+                -4.30076,
+                -4.83592,
+                3.18926
+              ]
+            },
+            {
+              "edge": 10,
+              "vertices": [
+                6,
+                0
+              ],
+              "midpoint": [
+                1.84173,
+                -9.09834,
+                7.51203
+              ]
+            },
+            {
+              "edge": 11,
+              "vertices": [
+                7,
+                1
+              ],
+              "midpoint": [
+                -3.19056,
+                -8.7301,
+                8.59409
+              ]
+            }
+          ]
+        },
+        "analysis": {
+          "pivotPosition": [
+            -3.0255990028381334,
+            -8.935271219667186,
+            6.63751362739081
+          ],
+          "pivotSource": "rotatePivot world",
+          "manipPivotPosition": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "manipPivotPositionValid": false,
+          "nearest": {
+            "what": "e[11] midpoint",
+            "at": [
+              -3.19056,
+              -8.7301,
+              8.59409
+            ],
+            "distance": 1.974208
+          }
+        }
+      },
+      "changes": {
+        "analysis.nearest.distance": {
+          "from": 2.51755,
+          "to": 1.97421
+        },
+        "analysis.pivotPosition": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            -3.0256,
+            -8.93527,
+            6.63751
+          ]
+        },
+        "transform.rotatePivot": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            0.86986,
+            -0.20731,
+            0.07817
+          ]
+        },
+        "transform.rotatePivotTranslate": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            -0.32797,
+            0.68527,
+            0.45442
+          ]
+        },
+        "transform.rotatePivotWorld": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            -3.0256,
+            -8.93527,
+            6.63751
+          ]
+        },
+        "transform.scalePivot": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            0.47051,
+            0.47715,
+            0.06253
+          ]
+        },
+        "transform.scalePivotTranslate": {
+          "from": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "to": [
+            0.39935,
+            -0.68446,
+            0.01563
+          ]
+        },
+        "transform.scalePivotWorld": {
+          "from": [
+            -1.61965,
+            -8.93527,
+            6.63751
+          ],
+          "to": [
+            -3.0256,
+            -8.93527,
+            6.63751
+          ]
+        }
+      },
+      "commands": [
+        "SnapToPointPress;",
+        "snapMode -point 1;",
+        "move -r -1.405948 0 0 pivotSubject.scalePivot pivotSubject.rotatePivot ;",
+        "SnapToPointRelease;",
+        "snapMode -point 0;"
+      ],
+      "instruction": "1. Взяться за ручку оси X в 45 пикселях от центра манипулятора.\n2. С зажатым V дотащить до дальней вершины, лежащей в стороне от этой оси.",
+      "question": "остаётся ли снап на оси драга или сходит с неё ради вершины",
+      "automated": true,
+      "screenshot": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_05_pivot_drag_axis_handle_vertex_snap_after.png",
+      "screenshots": {
+        "before": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_05_pivot_drag_axis_handle_vertex_snap_before.png",
+        "after": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_05_pivot_drag_axis_handle_vertex_snap_after.png",
+        "drag": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_05_pivot_drag_axis_handle_vertex_snap_drag.png"
+      },
+      "input": [
+        "драг (1308, 812) -> (1067, 941) (273 px) hold=V"
+      ],
+      "verdict": "жест сработал"
+    },
+    {
+      "step": "pivot_orientation_component_click",
+      "state": {
+        "transform": {
+          "translate": [
+            1.25,
+            -2.5,
+            3.75
+          ],
+          "rotate": [
+            20.0,
+            -35.0,
+            70.0
+          ],
+          "rotateOrder": 4,
+          "rotateAxis": [
+            11.0,
+            -7.0,
+            5.0
+          ],
+          "scale": [
+            2.0,
+            -0.5,
+            1.25
+          ],
+          "shear": [
+            0.2,
+            -0.3,
+            0.4
+          ],
+          "rotatePivot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotatePivotTranslate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scalePivot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scalePivotTranslate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotatePivotWorld": [
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805
+          ],
+          "scalePivotWorld": [
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805
+          ],
+          "offsetParentMatrix": [
+            1.0,
+            0.15,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            -0.25,
+            0.0,
+            0.1,
+            0.0,
+            1.0,
+            0.0,
+            2.0,
+            -1.0,
+            0.5,
+            1.0
+          ],
+          "matrix": [
+            0.7821673966271256,
+            1.290405869377882,
+            1.312656411986266,
+            0.0,
+            0.41064411765009645,
+            -0.12303041927453284,
+            -0.27610672677880643,
+            0.0,
+            -0.35291753424902295,
+            -1.1271863668947866,
+            0.7470107819209318,
+            0.0,
+            1.25,
+            -2.5,
+            3.75,
+            1.0
+          ],
+          "worldMatrix": [
+            -2.516148492731161,
+            0.18412331487673883,
+            0.5410311656699804,
+            0.0,
+            -0.4726175381041189,
+            -0.010525625604435457,
+            -0.7077744859389568,
+            0.0,
+            0.05498851478131639,
+            -1.3050754371229976,
+            1.3297601077638515,
+            0.0,
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805,
+            1.0
+          ],
+          "worldBoundingBox": [
+            -7.985822546776092,
+            -13.055672097121793,
+            0.6916531665513572,
+            2.0066983048268483,
+            -4.814870342212587,
+            12.583374088230252
+          ],
+          "firstVertexWorld": [
+            2.0066983048268483,
+            -13.01356959470405,
+            11.501311756890292
+          ],
+          "manipPivot": {
+            "valid": false,
+            "positionValid": false,
+            "orientationValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinned": false,
+            "snapPosition": true,
+            "snapOrientation": true,
+            "resetMode": 0,
+            "bakeOrientationAutomatically": false
+          }
+        },
+        "tool": {
+          "contextMode": {
+            "move": {
+              "context": "Move",
+              "mode": 2,
+              "attempts": {}
+            },
+            "rotate": {
+              "context": "Rotate",
+              "mode": 0,
+              "attempts": {}
+            },
+            "scale": {
+              "context": "Scale",
+              "mode": 0,
+              "attempts": {}
+            }
+          },
+          "manipPivot": {
+            "valid": false,
+            "posValid": false,
+            "oriValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinPivot": false,
+            "snapPos": true,
+            "snapOri": true,
+            "resetMode": 0,
+            "bakeOri": false,
+            "moveToolOri": null,
+            "rotateToolOri": null,
+            "scaleToolOri": null
+          },
+          "currentContext": "Move",
+          "selectMode": {
+            "object": true,
+            "component": false
+          },
+          "selectType": {
+            "vertex": true,
+            "edge": false,
+            "facet": false
+          },
+          "selection": [
+            "pivotSubject"
+          ]
+        },
+        "geometry": {
+          "vertices": [
+            [
+              2.0066983048268483,
+              -13.01356959470405,
+              11.501311756890292
+            ],
+            [
+              -3.0255986806354738,
+              -12.645322964950573,
+              12.583374088230254
+            ],
+            [
+              0.11622815241037276,
+              -13.055672097121793,
+              8.670213813134467
+            ],
+            [
+              -4.916068833051949,
+              -12.687425467368314,
+              9.752276144474425
+            ],
+            [
+              -0.21370293627752535,
+              -5.225219474383807,
+              0.6916531665513572
+            ],
+            [
+              -5.245999921739847,
+              -4.856972844630329,
+              1.7737154978913177
+            ],
+            [
+              1.6767672161389502,
+              -5.183116971966065,
+              3.5227511103071842
+            ],
+            [
+              -3.355529769323372,
+              -4.814870342212587,
+              4.604813441647145
+            ]
+          ],
+          "edgeMidpoints": [
+            {
+              "edge": 0,
+              "vertices": [
+                0,
+                1
+              ],
+              "midpoint": [
+                -0.50945,
+                -12.82945,
+                12.04234
+              ]
+            },
+            {
+              "edge": 1,
+              "vertices": [
+                2,
+                3
+              ],
+              "midpoint": [
+                -2.39992,
+                -12.87155,
+                9.21124
+              ]
+            },
+            {
+              "edge": 2,
+              "vertices": [
+                4,
+                5
+              ],
+              "midpoint": [
+                -2.72985,
+                -5.0411,
+                1.23268
+              ]
+            },
+            {
+              "edge": 3,
+              "vertices": [
+                6,
+                7
+              ],
+              "midpoint": [
+                -0.83938,
+                -4.99899,
+                4.06378
+              ]
+            },
+            {
+              "edge": 4,
+              "vertices": [
+                0,
+                2
+              ],
+              "midpoint": [
+                1.06146,
+                -13.03462,
+                10.08576
+              ]
+            },
+            {
+              "edge": 5,
+              "vertices": [
+                1,
+                3
+              ],
+              "midpoint": [
+                -3.97083,
+                -12.66637,
+                11.16783
+              ]
+            },
+            {
+              "edge": 6,
+              "vertices": [
+                2,
+                4
+              ],
+              "midpoint": [
+                -0.04874,
+                -9.14045,
+                4.68093
+              ]
+            },
+            {
+              "edge": 7,
+              "vertices": [
+                3,
+                5
+              ],
+              "midpoint": [
+                -5.08103,
+                -8.7722,
+                5.763
+              ]
+            },
+            {
+              "edge": 8,
+              "vertices": [
+                4,
+                6
+              ],
+              "midpoint": [
+                0.73153,
+                -5.20417,
+                2.1072
+              ]
+            },
+            {
+              "edge": 9,
+              "vertices": [
+                5,
+                7
+              ],
+              "midpoint": [
+                -4.30076,
+                -4.83592,
+                3.18926
+              ]
+            },
+            {
+              "edge": 10,
+              "vertices": [
+                6,
+                0
+              ],
+              "midpoint": [
+                1.84173,
+                -9.09834,
+                7.51203
+              ]
+            },
+            {
+              "edge": 11,
+              "vertices": [
+                7,
+                1
+              ],
+              "midpoint": [
+                -3.19056,
+                -8.7301,
+                8.59409
+              ]
+            }
+          ]
+        },
+        "analysis": {
+          "pivotPosition": [
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805
+          ],
+          "pivotSource": "rotatePivot world",
+          "manipPivotPosition": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "manipPivotPositionValid": false,
+          "nearest": {
+            "what": "e[11] midpoint",
+            "at": [
+              -3.19056,
+              -8.7301,
+              8.59409
+            ],
+            "distance": 2.517547
+          }
+        }
+      },
+      "changes": {},
+      "commands": [
+        "select -r pivotSubject ;"
+      ],
+      "instruction": "1. Кликнуть по геометрии в стороне от манипулятора.",
+      "question": "какую ориентацию оставляет клик по компоненту - против `manipPivot -o`",
+      "automated": true,
+      "screenshot": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_06_pivot_orientation_component_click_after.png",
+      "screenshots": {
+        "before": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_06_pivot_orientation_component_click_before.png",
+        "after": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_06_pivot_orientation_component_click_after.png"
+      },
+      "input": [
+        "клик (1067, 941) hold=-"
+      ],
+      "verdict": "ЖЕСТ НЕ СРАБОТАЛ: ничего не изменилось"
+    },
+    {
+      "step": "origin_with_authored_pivot",
+      "state": {
+        "transform": {
+          "translate": [
+            1.25,
+            -2.5,
+            3.75
+          ],
+          "rotate": [
+            20.0,
+            -35.0,
+            70.0
+          ],
+          "rotateOrder": 4,
+          "rotateAxis": [
+            11.0,
+            -7.0,
+            5.0
+          ],
+          "scale": [
+            2.0,
+            -0.5,
+            1.25
+          ],
+          "shear": [
+            0.2,
+            -0.3,
+            0.4
+          ],
+          "rotatePivot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotatePivotTranslate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scalePivot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scalePivotTranslate": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotatePivotWorld": [
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805
+          ],
+          "scalePivotWorld": [
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805
+          ],
+          "offsetParentMatrix": [
+            1.0,
+            0.15,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            -0.25,
+            0.0,
+            0.1,
+            0.0,
+            1.0,
+            0.0,
+            2.0,
+            -1.0,
+            0.5,
+            1.0
+          ],
+          "matrix": [
+            0.7821673966271256,
+            1.290405869377882,
+            1.312656411986266,
+            0.0,
+            0.41064411765009645,
+            -0.12303041927453284,
+            -0.27610672677880643,
+            0.0,
+            -0.35291753424902295,
+            -1.1271863668947866,
+            0.7470107819209318,
+            0.0,
+            1.25,
+            -2.5,
+            3.75,
+            1.0
+          ],
+          "worldMatrix": [
+            -2.516148492731161,
+            0.18412331487673883,
+            0.5410311656699804,
+            0.0,
+            -0.4726175381041189,
+            -0.010525625604435457,
+            -0.7077744859389568,
+            0.0,
+            0.05498851478131639,
+            -1.3050754371229976,
+            1.3297601077638515,
+            0.0,
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805,
+            1.0
+          ],
+          "worldBoundingBox": [
+            -7.985822546776092,
+            -13.055672097121793,
+            0.6916531665513572,
+            2.0066983048268483,
+            -4.814870342212587,
+            12.583374088230252
+          ],
+          "firstVertexWorld": [
+            2.0066983048268483,
+            -13.01356959470405,
+            11.501311756890292
+          ],
+          "manipPivot": {
+            "valid": false,
+            "positionValid": false,
+            "orientationValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinned": false,
+            "snapPosition": true,
+            "snapOrientation": true,
+            "resetMode": 0,
+            "bakeOrientationAutomatically": false
+          }
+        },
+        "tool": {
+          "contextMode": {
+            "move": {
+              "context": "Move",
+              "mode": 2,
+              "attempts": {}
+            },
+            "rotate": {
+              "context": "Rotate",
+              "mode": 0,
+              "attempts": {}
+            },
+            "scale": {
+              "context": "Scale",
+              "mode": 0,
+              "attempts": {}
+            }
+          },
+          "manipPivot": {
+            "valid": false,
+            "posValid": false,
+            "oriValid": false,
+            "position": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "orientation": [
+              [
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "pinPivot": false,
+            "snapPos": true,
+            "snapOri": true,
+            "resetMode": 0,
+            "bakeOri": false,
+            "moveToolOri": null,
+            "rotateToolOri": null,
+            "scaleToolOri": null
+          },
+          "currentContext": "Move",
+          "selectMode": {
+            "object": true,
+            "component": false
+          },
+          "selectType": {
+            "vertex": true,
+            "edge": false,
+            "facet": false
+          },
+          "selection": [
+            "pivotSubject"
+          ]
+        },
+        "geometry": {
+          "vertices": [
+            [
+              2.0066983048268483,
+              -13.01356959470405,
+              11.501311756890292
+            ],
+            [
+              -3.0255986806354738,
+              -12.645322964950573,
+              12.583374088230254
+            ],
+            [
+              0.11622815241037276,
+              -13.055672097121793,
+              8.670213813134467
+            ],
+            [
+              -4.916068833051949,
+              -12.687425467368314,
+              9.752276144474425
+            ],
+            [
+              -0.21370293627752535,
+              -5.225219474383807,
+              0.6916531665513572
+            ],
+            [
+              -5.245999921739847,
+              -4.856972844630329,
+              1.7737154978913177
+            ],
+            [
+              1.6767672161389502,
+              -5.183116971966065,
+              3.5227511103071842
+            ],
+            [
+              -3.355529769323372,
+              -4.814870342212587,
+              4.604813441647145
+            ]
+          ],
+          "edgeMidpoints": [
+            {
+              "edge": 0,
+              "vertices": [
+                0,
+                1
+              ],
+              "midpoint": [
+                -0.50945,
+                -12.82945,
+                12.04234
+              ]
+            },
+            {
+              "edge": 1,
+              "vertices": [
+                2,
+                3
+              ],
+              "midpoint": [
+                -2.39992,
+                -12.87155,
+                9.21124
+              ]
+            },
+            {
+              "edge": 2,
+              "vertices": [
+                4,
+                5
+              ],
+              "midpoint": [
+                -2.72985,
+                -5.0411,
+                1.23268
+              ]
+            },
+            {
+              "edge": 3,
+              "vertices": [
+                6,
+                7
+              ],
+              "midpoint": [
+                -0.83938,
+                -4.99899,
+                4.06378
+              ]
+            },
+            {
+              "edge": 4,
+              "vertices": [
+                0,
+                2
+              ],
+              "midpoint": [
+                1.06146,
+                -13.03462,
+                10.08576
+              ]
+            },
+            {
+              "edge": 5,
+              "vertices": [
+                1,
+                3
+              ],
+              "midpoint": [
+                -3.97083,
+                -12.66637,
+                11.16783
+              ]
+            },
+            {
+              "edge": 6,
+              "vertices": [
+                2,
+                4
+              ],
+              "midpoint": [
+                -0.04874,
+                -9.14045,
+                4.68093
+              ]
+            },
+            {
+              "edge": 7,
+              "vertices": [
+                3,
+                5
+              ],
+              "midpoint": [
+                -5.08103,
+                -8.7722,
+                5.763
+              ]
+            },
+            {
+              "edge": 8,
+              "vertices": [
+                4,
+                6
+              ],
+              "midpoint": [
+                0.73153,
+                -5.20417,
+                2.1072
+              ]
+            },
+            {
+              "edge": 9,
+              "vertices": [
+                5,
+                7
+              ],
+              "midpoint": [
+                -4.30076,
+                -4.83592,
+                3.18926
+              ]
+            },
+            {
+              "edge": 10,
+              "vertices": [
+                6,
+                0
+              ],
+              "midpoint": [
+                1.84173,
+                -9.09834,
+                7.51203
+              ]
+            },
+            {
+              "edge": 11,
+              "vertices": [
+                7,
+                1
+              ],
+              "midpoint": [
+                -3.19056,
+                -8.7301,
+                8.59409
+              ]
+            }
+          ]
+        },
+        "analysis": {
+          "pivotPosition": [
+            -1.6196508084564996,
+            -8.93527121966719,
+            6.637513627390805
+          ],
+          "pivotSource": "rotatePivot world",
+          "manipPivotPosition": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "manipPivotPositionValid": false,
+          "nearest": {
+            "what": "e[11] midpoint",
+            "at": [
+              -3.19056,
+              -8.7301,
+              8.59409
+            ],
+            "distance": 2.517547
+          }
+        }
+      },
+      "changes": {},
+      "commands": [
+        "ctxEditMode;"
+      ],
+      "instruction": "1. Выйти из режима редактирования пивота, сохранив авторский пивот.",
+      "question": "где сидит origin, пока задан авторский пивот - rotatePivot против manipPivot",
+      "automated": true,
+      "screenshot": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_07_origin_with_authored_pivot_after.png",
+      "screenshots": {
+        "before": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_07_origin_with_authored_pivot_before.png",
+        "after": "S:\\Clarity\\blender\\tests\\pivot_reference\\fixtures\\maya_2025_pivot_gestures_07_origin_with_authored_pivot_after.png"
+      },
+      "verdict": "наблюдение записано, изменений и не ожидалось"
+    }
+  ],
+  "remaining": []
+}

@@ -1,0 +1,406 @@
+fileCmdCallback;
+if(`exists clearPreFileSetToolState`){		clearPreFileSetToolState();};
+aiViewRegionCmd -delete;
+resetUnitsToDefault;
+resetGridToDefault;
+stopIprRendering "";
+import mtoa.utils;mtoa.utils._objectStore[2865242483712]()
+# False
+removeOldSceneUI;
+if (`exists clearPreFilePlayState`) {	clearPreFilePlayState();};
+ls -type mayaUsdProxyShapeBase -long;
+ls -type materialxStack -long;
+if(`exists "refreshModelPanelMenu"`) refreshModelPanelMenu frontShape ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+if(`exists "refreshModelPanelMenu"`) refreshModelPanelMenu topShape ;
+if(`exists "refreshModelPanelMenu"`) refreshModelPanelMenu topShape ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+if(`exists "refreshModelPanelMenu"`) refreshModelPanelMenu perspShape ;
+if(`exists "refreshModelPanelMenu"`) refreshModelPanelMenu perspShape ;
+if(`exists "refreshModelPanelMenu"`) refreshModelPanelMenu perspShape ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+proxyResetOptionVars;
+preferredRenderer -makeCurrent;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+renameTextureViewPanel;
+animationEditorFileCallback;
+if(`exists "refreshModelPanelMenu"`) refreshModelPanelMenu topShape ;
+if(`exists "refreshModelPanelMenu"`) refreshModelPanelMenu sideShape ;
+if(`exists "refreshModelPanelMenu"`) refreshModelPanelMenu frontShape ;
+if(`exists "refreshModelPanelMenu"`) refreshModelPanelMenu perspShape ;
+InitializeNewScene;
+buildNewSceneUI;
+initHyperGraphPanel hyperGraphPanel1;
+initHyperShadePanel hyperShadePanel1;
+initVisorPanel visorPanel1;
+nodeEdInitCallback nodeEditorPanel1;
+createNodeInitCallback createNodePanel1;
+initRelationshipPanel relationshipPanel1;
+dynPaintInitCallback dynPaintScriptedPanel;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+blendShapeDeleteCurveWindow;
+pluginInfo -q -l "poseInterpolator";
+// 1
+listPoseInterpolators;
+//  
+fileCmdRestoreCallback;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+Сцена пересобрана, объект 'pivotSubject'. Шагов: 0.
+
+Без чек-листа: записывайте что нужно через snapshot('метка').
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+autopilot: работаю в панели modelPanel4 (1661x1118)
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+m341_extraHUD_selectedItems_Display();
+// 1
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+findNewCurrentModelView;
+// 1
+m341_extraHUD_selectedItems_Display();
+// 1
+CBselectionChanged;
+changeToolIcon;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+SetLastUVBrushTool;
+Unfold3DContextHotkeyScriptJob;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+dR_selTypeChanged("");
+dR_updateToolSettings;
+texSelConstUpdate "uvTkSelConstTextField";
+dR_updateSelConstAngle;
+dR_updateSelConstField;
+rebuildAnimLayerEditor("AnimLayerTab");
+makeLive -registryReset;
+hikDefinitionFileNewCallback;
+layerEditorDisplayLayerManagerChange;
+layerEditorDisplayLayerChange;
+updateModelPanelBar MainPane|viewPanes|modelPanel1|modelPanel1|modelPanel1;
+dR_setModelEditorTypes;
+updateModelPanelBar MainPane|viewPanes|modelPanel2|modelPanel2|modelPanel2;
+updateModelPanelBar MainPane|viewPanes|modelPanel3|modelPanel3|modelPanel3;
+updateModelPanelBar MainPane|viewPanes|modelPanel4|modelPanel4|modelPanel4;
+timeField -edit -value `currentTime -query` TimeSlider|MainTimeSliderLayout|rowLayout1|timeField1;
+// TimeSlider|MainTimeSliderLayout|rowLayout1|timeField1
+updateHyperShadePanelState;
+autoUpdateAttrEd;
+AEdisablePin;
+layerEditorNewScene;
+rebuildAnimLayerEditor("AnimLayerTab");
+selectionMaskResetAll;
+autopilot: пивот на экране в (1240, 781), видимых вершин 8, объект шириной 424 px
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+записано setup: изменений 0
+пивот (rotatePivot world) [-1.6196508084564996, -8.93527121966719, 6.637513627390805] - 2.517547 до e[11] midpoint
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+autopilot: шаг 1/7: pivot_drag_free
+AEdisablePin;
+rebuildAnimLayerEditor("AnimLayerTab");
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+layerEditorOpenScene;
+if (!`exists resetMetadataUI`) {eval "source buildDisplayMenu";} resetMetadataUI;
+selectionMaskResetAll;
+removeRenderSequenceAlternateOutputFileLocation;
+updateModelPanelBarV2Settings;
+initDopeSheetEditor("dopeSheetPanel1DopeSheetEd", "dopeSheetPanel1OutlineEd");
+initGraphEditorOutliner("graphEditor1OutlineEd"); initializeAnimCurvEditor("graphEditor1GraphEd");
+updateBlendShapeEditHUD;
+uvTkUpdateSelectionCompInfo;
+rendererSceneOpenedCallback;
+dR_updateCounter;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+move -r 1.919963 -1.081253 -1.109023 pivotSubject.scalePivot pivotSubject.rotatePivot ;
+uvTkUpdateSelectionCompInfo;
+uvTkSelectionChanged;
+dR_updateCounter;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+dR_updateToolSettings;
+cmds.ActivateViewport20()
+{  global string $gViewport2;   string $currentPanel = `getPanel -withFocus`;   string $panelType = `getPanel -to $currentPanel`;  if ($panelType ==  "modelPanel") {      setRendererInModelPanel $gViewport2 $currentPanel;  } else if ($panelType ==  "scriptedPanel") { 	string $cmd = "setRendererInModelPanel $gViewport2 "; 
+	scriptedPanelRunTimeCmd( $cmd, $currentPanel ); 
+  }};
+if cmds.scriptJob(exists=590):cmds.scriptJob(kill=590)
+if cmds.scriptJob(exists=591):cmds.scriptJob(kill=591)
+if cmds.scriptJob(exists=592):cmds.scriptJob(kill=592)
+cmds.ActivateViewport20()
+{  global string $gViewport2;   string $currentPanel = `getPanel -withFocus`;   string $panelType = `getPanel -to $currentPanel`;  if ($panelType ==  "modelPanel") {      setRendererInModelPanel $gViewport2 $currentPanel;  } else if ($panelType ==  "scriptedPanel") { 	string $cmd = "setRendererInModelPanel $gViewport2 "; 
+	scriptedPanelRunTimeCmd( $cmd, $currentPanel ); 
+  }};
+if cmds.scriptJob(exists=591):cmds.scriptJob(kill=591)
+if cmds.scriptJob(exists=592):cmds.scriptJob(kill=592)
+if cmds.scriptJob(exists=610):cmds.scriptJob(kill=610)
+if cmds.scriptJob(exists=611):cmds.scriptJob(kill=611)
+if cmds.scriptJob(exists=612):cmds.scriptJob(kill=612)
+updateModelPanelBar MainPane|viewPanes|modelPanel4|modelPanel4|modelPanel4;
+dR_setModelEditorTypes;
+timeField -edit -value `currentTime -query` TimeSlider|MainTimeSliderLayout|rowLayout1|timeField1;
+// TimeSlider|MainTimeSliderLayout|rowLayout1|timeField1
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+записано pivot_drag_free: изменений 10
+пивот (rotatePivot world) [0.30031205109578085, -10.016524122310186, 5.528490444820765] - 1.267952 до e[6] midpoint
+autopilot:   жест сработал
+autopilot: шаг 2/7: pivot_drag_vertex_snap
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+nexCtx -upm; refresh -f;
+updateSnapMasks;
+move -rpr -3.025599 -12.645323 12.583374 pivotSubject.scalePivot pivotSubject.rotatePivot ;
+SnapToPointRelease;
+snapMode -point 0;
+nexCtx -upm; refresh -f;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+записано pivot_drag_vertex_snap: изменений 10
+пивот (rotatePivot world) [-3.0255990028381334, -12.645322799682617, 12.5833740234375] - 0.0 до vtx[1]
+autopilot:   жест сработал
+autopilot: шаг 3/7: pivot_drag_edge_snap
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+nexCtx -upm; refresh -f;
+updateSnapMasks;
+move -r -0.461348 -5.000795 4.211944 pivotSubject.scalePivot pivotSubject.rotatePivot ;
+SnapToCurveRelease;
+snapMode -curve 0;
+nexCtx -upm; refresh -f;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+записано pivot_drag_edge_snap: изменений 10
+пивот (rotatePivot world) [-2.0809991807868, -13.936065894393135, 10.84945800576556] - 1.979561 до e[1] midpoint
+autopilot:   жест сработал
+autopilot: шаг 4/7: pivot_drag_grid_snap
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+nexCtx -upm; refresh -f;
+updateSnapMasks;
+move -rpr 0 0 0 pivotSubject.scalePivot pivotSubject.rotatePivot ;
+SnapToGridRelease;
+snapMode -grid 0;
+nexCtx -upm; refresh -f;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+записано pivot_drag_grid_snap: изменений 10
+пивот (rotatePivot world) [-1.9984014443252818e-15, -1.7763568394002505e-15, 4.440892098500626e-15] - 5.275128 до vtx[4]
+autopilot:   жест сработал
+autopilot: шаг 5/7: pivot_drag_axis_handle_vertex_snap
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+nexCtx -upm; refresh -f;
+updateSnapMasks;
+move -r -1.405948 0 0 pivotSubject.scalePivot pivotSubject.rotatePivot ;
+SnapToPointRelease;
+snapMode -point 0;
+nexCtx -upm; refresh -f;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+записано pivot_drag_axis_handle_vertex_snap: изменений 8
+пивот (rotatePivot world) [-3.0255990028381334, -8.935271219667186, 6.63751362739081] - 1.974208 до e[11] midpoint
+autopilot:   жест сработал
+autopilot: шаг 6/7: pivot_orientation_component_click
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+select -r pivotSubject ;
+CBselectionChanged;
+dR_updateCommandPanel;
+dR_updateToolSettings;
+m341_extraHUD_selectedItems_Display();
+// 1
+autoUpdateAttrEd;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+uvTkSelectionChanged;
+dR_updateCounter;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+записано pivot_orientation_component_click: изменений 0
+пивот (rotatePivot world) [-1.6196508084564996, -8.93527121966719, 6.637513627390805] - 2.517547 до e[11] midpoint
+autopilot:   ЖЕСТ НЕ СРАБОТАЛ: ничего не изменилось
+autopilot: шаг 7/7: origin_with_authored_pivot
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+записано origin_with_authored_pivot: изменений 0
+пивот (rotatePivot world) [-1.6196508084564996, -8.93527121966719, 6.637513627390805] - 2.517547 до e[11] midpoint
+autopilot:   наблюдение записано, изменений и не ожидалось
+
+записано в S:\Clarity\blender\tests\pivot_reference\fixtures\maya_2025_pivot_gestures.json и S:\Clarity\blender\tests\pivot_reference\fixtures\maya_2025_pivot_gestures.log
+  записано шагов: 8, пропущено: 0, не дошли: 0

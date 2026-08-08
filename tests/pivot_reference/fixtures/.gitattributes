@@ -1,0 +1,5 @@
+# These captures belong to the fork, not to upstream Blender, and GitHub refuses new Git LFS
+# objects in a fork - a fork's LFS storage belongs to its parent repository. Stored as ordinary
+# Git blobs instead, which the root .gitattributes would otherwise route through LFS along with
+# every other PNG. They are small and they change rarely.
+*.png !filter !diff !merge -text

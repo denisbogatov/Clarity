@@ -11,8 +11,13 @@ the promotion before that call returns, so the dispatcher only ever sees the pre
 Driving the real events is therefore the only way to test the recognition - a unit test can check
 the rule, but not that the rule is reached.
 
-Requires ``BLENDER_CLARITY_SNAP_TRACE_FILE``: the click operator reports what it hit and what it
-applied there, and that trace is what the assertions read.
+The click operator reports what it hit and what it applied there into the file
+``BLENDER_CLARITY_SNAP_TRACE_FILE`` names, and that trace is what the assertions read. Setting the
+variable points the trace somewhere readable; leaving it unset is fine, see ``_trace_path``.
+
+One test per Blender: ``run_blender_setup.py`` takes several names, but ``easy_keys.run`` only
+registers a timer and returns, so a second name runs a second generator whose events interleave with
+this one's. ``run.py`` starts a process per test for that reason.
 
     blender --enable-event-simulate --factory-startup \\
         --python tests/python/ui_simulate/run_blender_setup.py -- \\
@@ -20,14 +25,25 @@ applied there, and that trace is what the assertions read.
 """
 
 import os
+import tempfile
 
 import modules.ui_test_utils as ui
 
 
 def _trace_path():
+    """
+    Where the click writes its report.
+
+    The operator reads the variable on every line it writes, so a test that was handed no
+    environment of its own - which is how `ctest` runs these - can name the file itself. The process
+    id is part of the name because those runs are parallel and each one truncates its trace.
+    """
     path = os.environ.get("BLENDER_CLARITY_SNAP_TRACE_FILE")
     if not path:
-        raise Exception("BLENDER_CLARITY_SNAP_TRACE_FILE must be set for this test")
+        path = os.path.join(
+            tempfile.gettempdir(), "clarity-uitest-trace-{:d}.log".format(os.getpid()),
+        )
+        os.environ["BLENDER_CLARITY_SNAP_TRACE_FILE"] = path
     return path
 
 
@@ -363,6 +379,14 @@ def pivot_click_does_not_change_the_selection():
     e, t, window = ui.test_window()
     _trace_reset()
 
+    # The manipulator sits on the selected edge, and a press on one of its highlighted handles is
+    # the gizmo's by design - the operator asks about the highlight and lets that press through, the
+    # same question the marquee drag asks. The reach is in pixels while the distance between two
+    # edges of the cube is in scene units, so in the 800x600 window `ctest` opens the neighbouring
+    # edge lands inside the default gizmo and in a large window it does not. Shrinking the gizmo
+    # keeps the clicks below out of its reach wherever the test runs.
+    bpy.context.preferences.view.gizmo_size = 10
+
     pick = yield from _edit_pivot_over_an_edge(e, window, select_all=False)
 
     object = bpy.data.objects["Cube"]
@@ -661,3 +685,128 @@ def pivot_frame_goes_with_the_selection():
         'WORLD',
         "the tool did not go back to its own coordinate system",
     )
+
+
+def _object_origin_pixel(object, region, region_3d):
+    """Where the manipulator sits in object mode: the object's own origin, projected."""
+    from bpy_extras.view3d_utils import location_3d_to_region_2d
+
+    position_2d = location_3d_to_region_2d(region, region_3d, object.matrix_world.translation)
+    if position_2d is None:
+        raise Exception("the manipulator is off screen")
+    return (region.x + int(round(position_2d.x)), region.y + int(round(position_2d.y)))
+
+
+def _vertex_pixels(object, region, region_3d):
+    from bpy_extras.view3d_utils import location_3d_to_region_2d
+
+    result = []
+    for vertex in object.data.vertices:
+        world = object.matrix_world @ vertex.co
+        position_2d = location_3d_to_region_2d(region, region_3d, world)
+        if position_2d is None:
+            continue
+        if not (8 < position_2d.x < region.width - 8 and 8 < position_2d.y < region.height - 8):
+            continue
+        result.append(
+            (vertex.index,
+             (region.x + int(round(position_2d.x)), region.y + int(round(position_2d.y))),
+             world.copy())
+        )
+    return result
+
+
+def pivot_snap_drag_lands_on_the_target():
+    """
+    A snapped drag puts the pivot on the target itself, and the grab offset does not come along.
+
+    This is the wiring, not the rule. `clarity_pivot_snap_decision_get` is pinned by
+    `transform_snap_test.cc`, but the fields it decides from - `has_target`, and the target it takes
+    verbatim - are filled in `recalcDataClarityPivot` from `t->tsnap.snap_target` while a real drag
+    is running, and nothing drove a real drag at them. The unit tests would keep passing if the drag
+    stopped arriving.
+
+    The reference is measured, not assumed: in `fixtures/maya_2025_pivot_gestures.json` the same
+    gesture - grabbed deliberately off centre, `V` held, dropped on a vertex - answers `move -rpr`
+    onto that vertex, with the pivot 0.0 away from it.
+
+    In object mode, as that capture was: snapping refuses the geometry being transformed, and in edit
+    mode with the whole cube selected there is nothing left for the pointer to find - the trace says
+    `target=0` for a pointer sitting exactly on a vertex.
+    """
+    import bpy
+    from mathutils import Vector
+
+    e, t, window = ui.test_window()
+    trace = _trace_reset()
+
+    bpy.context.preferences.inputs.interaction_preset = 'CLARITY'
+    yield
+
+    area, region = _view3d_area_region(window)
+    region_3d = area.spaces[0].region_3d
+    object = bpy.data.objects["Cube"]
+    with bpy.context.temp_override(window=window, area=area, region=region):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.context.view_layer.objects.active = object
+        object.select_set(True)
+    yield
+
+    handle = _object_origin_pixel(object, region, region_3d)
+    candidates = _vertex_pixels(object, region, region_3d)
+    t.assertTrue(candidates, "no vertex of the cube is on screen to snap to")
+
+    def pixel_distance(entry):
+        return ((entry[1][0] - handle[0]) ** 2 + (entry[1][1] - handle[1]) ** 2) ** 0.5
+
+    index, target_pixel, target_world = max(candidates, key=pixel_distance)
+    t.assertGreater(pixel_distance((index, target_pixel, target_world)), 40,
+                    "the cube is too small on screen for the drag to be unambiguous")
+
+    e.cursor_position_set(*handle, move=True)
+    yield
+    # `D` toggles Edit Pivot; without it the press below belongs to the object manipulator.
+    yield e.d()
+
+    # Over the handle, and only then the press: the manipulator is offered a plain press when one of
+    # its handles is highlighted, and the highlight is computed from the move.
+    e.cursor_position_set(*handle, move=True)
+    yield
+    # Off centre on purpose - that offset is what must *not* survive the snap.
+    grab = (handle[0] + 6, handle[1] + 6)
+    e.cursor_position_set(*grab, move=True)
+    yield
+
+    e.v.press()
+    yield
+    e.leftmouse.press()
+    yield
+    for step in range(1, 6):
+        x = grab[0] + (target_pixel[0] - grab[0]) * step / 5
+        y = grab[1] + (target_pixel[1] - grab[1]) * step / 5
+        e.cursor_position_set(int(round(x)), int(round(y)), move=True)
+        yield
+    e.leftmouse.release()
+    yield
+    e.v.release()
+    yield
+
+    updates = _trace_lines("pivot-snap")
+    t.assertTrue(_trace_lines("pivot-drag-begin"),
+                 "the drag never reached the pivot conversion, see " + trace)
+    t.assertTrue(updates, "the drag ran but no snap update was recorded, see " + trace)
+
+    snapped = [line for line in updates if _trace_fields(line)["target"] == "1"]
+    t.assertTrue(snapped, "the drag found nothing to snap to, see " + trace)
+
+    last = _trace_fields(snapped[-1])
+    t.assertEqual(last["from_target"], "1", "the pivot was placed by the pointer, not by the target")
+
+    result = Vector([float(value) for value in last["result"].split()])
+    target = Vector([float(value) for value in last["target_co"].split()])
+    pointer = Vector([float(value) for value in last["pointer"].split()])
+    t.assertLess((result - target).length, 1.0e-4,
+                 "the pivot did not land on the target: {!r} against {!r}".format(result, target))
+    t.assertGreater((result - pointer).length, 1.0e-6,
+                    "the target and the pointer agree, so this drag proves nothing")
