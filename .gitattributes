@@ -1,3 +1,12 @@
+# The shader generator reads source files as bytes, so Windows checkouts must not reintroduce CR
+# characters into its inputs. Keep this targeted: AGENTS.md documents three unrelated source files
+# that intentionally remain CRLF.
+*.glsl text eol=lf
+*.bsl text eol=lf
+*.bsl.hh text eol=lf
+*_shader_shared.hh text eol=lf
+clarity/mac/*.sh text eol=lf
+
 *.a filter=lfs diff=lfs merge=lfs -text
 *.whl filter=lfs diff=lfs merge=lfs -text
 *.egg filter=lfs diff=lfs merge=lfs -text

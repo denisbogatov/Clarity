@@ -43,6 +43,7 @@ LOG_DIR="${BUILD_DIR}/logs"
 BUILD_LOG="${LOG_DIR}/build-last.log"
 CONFIG_STAMP="${BUILD_DIR}/.go-config.stamp"
 LIB_DIR="${SOURCE_DIR}/lib/macos_arm64"
+NINJA_BIN=""
 
 DO_TESTS=1
 DO_LAUNCH=1
@@ -95,6 +96,8 @@ done
 #  Environment
 # ---------------------------------------------------------------------------------------------
 setup_environment() {
+  local cmake_host_processor
+
   if [ "$(uname -s)" != "Darwin" ]; then
     err "[ERROR] This script is the macOS stand. On Windows use go.bat."
     return 1
@@ -120,6 +123,18 @@ setup_environment() {
       return 1
     fi
   done
+  # Keep one Ninja executable for the entire run. Ninja 1.11 and 1.13 use incompatible build-log
+  # formats; alternating between /usr/local and /opt/homebrew makes each version discard the
+  # other's log and rebuild the whole tree.
+  NINJA_BIN="$(command -v ninja)"
+  cmake_host_processor="$(cmake --system-information 2>/dev/null |
+    awk -F '"' '/^CMAKE_HOST_SYSTEM_PROCESSOR / {print $2; exit}')"
+  if [ "${cmake_host_processor}" != "arm64" ]; then
+    err "[ERROR] cmake $(command -v cmake) reports ${cmake_host_processor:-an unknown architecture},"
+    err "        not arm64. Run clarity/mac/setup.sh after installing native Homebrew in"
+    err "        /opt/homebrew. The Intel /usr/local toolchain creates an invalid build cache."
+    return 1
+  fi
   if [ ! -d "${SOURCE_DIR}/.git" ]; then
     err "[ERROR] The Clarity repository was not found at ${SOURCE_DIR}."
     return 1
@@ -149,11 +164,33 @@ setup_environment() {
 #  same options the Windows tree is configured with, minus the ones that only exist there.
 # ---------------------------------------------------------------------------------------------
 config_hash() {
-  shasum -a 256 "${SCRIPT_PATH}" 2>/dev/null | awk '{print $1}'
+  sed -n '/^  # CONFIG_HASH_BEGIN$/,/^  # CONFIG_HASH_END$/p' "${SCRIPT_PATH}" 2>/dev/null |
+    shasum -a 256 | awk '{print $1}'
 }
 
 configure_if_needed() {
   local hash stamped expected_home
+  local -a configure_args
+
+  # CONFIG_HASH_BEGIN
+  configure_args=(
+    -C "${SOURCE_DIR}/build_files/cmake/config/blender_release.cmake"
+    -S "${SOURCE_DIR}"
+    -B "${BUILD_DIR}"
+    -G Ninja
+    -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_OSX_ARCHITECTURES=arm64
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    -DWITH_UNITY_BUILD=OFF
+    -DWITH_COMPILER_PRECOMPILED_HEADERS=ON
+    -DWITH_BUILDINFO=OFF
+    -DWITH_GTESTS=ON
+    -DWITH_UI_TESTS=ON
+    -DWITH_ASSERT_ABORT=ON
+    -DWITH_ASSERT_RELEASE=ON
+  )
+  # CONFIG_HASH_END
+
   hash="$(config_hash)"
   if [ -z "${hash}" ]; then
     err "[ERROR] Could not hash this script to check the build configuration."
@@ -181,20 +218,7 @@ configure_if_needed() {
 
   say "=== Configure ==="
   mkdir -p "${BUILD_DIR}" || return 1
-  if ! cmake -C "${SOURCE_DIR}/build_files/cmake/config/blender_release.cmake" \
-      -S "${SOURCE_DIR}" \
-      -B "${BUILD_DIR}" \
-      -G Ninja \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_OSX_ARCHITECTURES=arm64 \
-      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-      -DWITH_UNITY_BUILD=OFF \
-      -DWITH_COMPILER_PRECOMPILED_HEADERS=ON \
-      -DWITH_BUILDINFO=OFF \
-      -DWITH_GTESTS=ON \
-      -DWITH_UI_TESTS=ON \
-      -DWITH_ASSERT_ABORT=ON \
-      -DWITH_ASSERT_RELEASE=ON; then
+  if ! cmake "${configure_args[@]}"; then
     err "[ERROR] CMake configuration failed. Nothing was built."
     return 1
   fi
@@ -251,7 +275,8 @@ build() {
   close_blender || return 1
   rotate_build_log
   say "=== Build ==="
-  NINJA_STATUS='[%f/%t %es, %r running] ' ninja -C "${BUILD_DIR}" 2>&1 | tee "${BUILD_LOG}"
+  NINJA_STATUS='[%f/%t %es, %r running] ' "${NINJA_BIN}" -C "${BUILD_DIR}" 2>&1 |
+    tee "${BUILD_LOG}"
   status="${PIPESTATUS[0]}"
   if [ "${status}" -ne 0 ]; then
     say ""
@@ -269,6 +294,23 @@ build() {
     fi
     say ""
     say "Blender was NOT started: the executable would not be the code on disk."
+    return 1
+  fi
+  return 0
+}
+
+
+# ---------------------------------------------------------------------------------------------
+#  Bundle
+#
+#  Ninja links the application, while CMake's install phase copies the precompiled shared
+#  libraries and runtime data into Blender.app. Without this step the executable links
+#  successfully but cannot start because @rpath libraries such as liboslexec.dylib are absent.
+# ---------------------------------------------------------------------------------------------
+install_bundle() {
+  say "=== Install bundle ==="
+  if ! cmake --install "${BUILD_DIR}" >/dev/null; then
+    err "[ERROR] CMake could not install the runtime files into Blender.app."
     return 1
   fi
   return 0
@@ -313,7 +355,7 @@ sync_python() {
 #  Verify - the reason a stale binary cannot be launched any more
 # ---------------------------------------------------------------------------------------------
 verify_tree() {
-  local pending newer
+  local pending
   if [ ! -f "${BUILD_DIR}/build.ninja" ]; then
     err "[ERROR] The build tree is not configured."
     return 1
@@ -322,7 +364,7 @@ verify_tree() {
     err "[ERROR] The Blender binary does not exist: ${BLENDER_BIN}"
     return 1
   fi
-  if ! pending="$(ninja -C "${BUILD_DIR}" -n 2>/dev/null)"; then
+  if ! pending="$("${NINJA_BIN}" -C "${BUILD_DIR}" -n 2>/dev/null)"; then
     err "[ERROR] ninja cannot evaluate this tree; it may be damaged. Run go.sh --full."
     return 1
   fi
@@ -334,18 +376,9 @@ verify_tree() {
     err "[ERROR] Blender was not started. Run go.sh again; if this repeats, run go.sh --full."
     return 1
   fi
-  # The binary must be newer than every object it is linked from. This is what two simultaneous
-  # builds break: the losing compiler leaves a fresh timestamp on an object, and the executable
-  # linked before it keeps being served as current. Test-only objects are excluded - they are
-  # compiled after the application links, and they are not linked into it.
-  newer="$(find "${BUILD_DIR}" -name '*.o' -newer "${BLENDER_BIN}" \
-    -not -path '*_tests.dir/*' -not -path '*/tests/*' -print -quit 2>/dev/null)"
-  if [ -n "${newer}" ]; then
-    err "[ERROR] The executable is older than its own inputs, so it is stale:"
-    err "        ${newer}"
-    err "[ERROR] That is what two simultaneous builds do. Run go.sh again."
-    return 1
-  fi
+  # Ninja's dependency graph is authoritative. Comparing the executable timestamp with every
+  # object in the tree is invalid: shader and utility targets are independent of the Blender
+  # link and can legitimately finish one second later.
   say "[GO] Verified: tree up to date, the binary matches the sources and the configuration."
   return 0
 }
@@ -394,7 +427,7 @@ launch() {
 run_tests() {
   say "=== Tests ==="
   # The gtest runner is kept out of the default build so normal iteration does not pay for it.
-  if ! ninja -C "${BUILD_DIR}" blender_test; then
+  if ! "${NINJA_BIN}" -C "${BUILD_DIR}" blender_test; then
     err "[ERROR] The test runner failed to build."
     return 1
   fi
@@ -432,7 +465,7 @@ report_state() {
     say "Config:      OUT OF DATE - go.sh will reconfigure"
   fi
   if [ -f "${BUILD_DIR}/build.ninja" ]; then
-    if ninja -C "${BUILD_DIR}" -n 2>/dev/null | grep -q 'no work to do'; then
+    if "${NINJA_BIN}" -C "${BUILD_DIR}" -n 2>/dev/null | grep -q 'no work to do'; then
       say "Tree:        up to date"
     else
       say "Tree:        stale, work pending"
@@ -465,13 +498,15 @@ fi
 
 if [ "${FULL_REBUILD}" = "1" ]; then
   say "=== Full rebuild ==="
-  [ -f "${BUILD_DIR}/build.ninja" ] && ninja -C "${BUILD_DIR}" -t clean >/dev/null 2>&1
+  [ -f "${BUILD_DIR}/build.ninja" ] &&
+    "${NINJA_BIN}" -C "${BUILD_DIR}" -t clean >/dev/null 2>&1
   rm -f "${CONFIG_STAMP}"
 fi
 
 if [ "${DO_BUILD}" = "1" ]; then
   configure_if_needed || exit 1
   build || exit 1
+  install_bundle || exit 1
   sync_python || exit 1
   verify_tree || exit 1
 fi

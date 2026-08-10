@@ -164,6 +164,22 @@ if [ -n "${MISSING# }" ]; then
   fi
 fi
 
+# An Intel Homebrew installation in /usr/local can run through Rosetta on Apple Silicon. CMake
+# then reports x86_64 as the host processor even when -arch arm64 is requested, and Blender adds
+# the incompatible -march=x86-64-v2 flag. Refuse that toolchain before it can poison the cache.
+if command -v cmake >/dev/null 2>&1; then
+  CMAKE_HOST_PROCESSOR="$(cmake --system-information 2>/dev/null |
+    awk -F '"' '/^CMAKE_HOST_SYSTEM_PROCESSOR / {print $2; exit}')"
+  if [ "${CMAKE_HOST_PROCESSOR}" != "arm64" ]; then
+    bad "cmake $(command -v cmake) reports ${CMAKE_HOST_PROCESSOR:-an unknown architecture}, not arm64."
+    err ""
+    err "        Install native Apple Silicon Homebrew in /opt/homebrew, then run:"
+    err "        /opt/homebrew/bin/brew install cmake ninja git-lfs"
+  else
+    ok "cmake host architecture arm64"
+  fi
+fi
+
 
 # ---------------------------------------------------------------------------------------------
 #  Repository and precompiled libraries
@@ -299,9 +315,11 @@ else
 fi
 
 # An LFS checkout that did not resolve leaves pointer files: a few hundred bytes of text where a
-# static library should be. CMake then configures happily and the build fails much later.
+# static library should be. Some legitimate stub archives are also that small, so check the LFS
+# signature instead of treating every small archive as a pointer.
 if [ -d "${LIB_DIR}" ]; then
-  POINTERS="$(find "${LIB_DIR}" -name '*.a' -size -2k -print 2>/dev/null | head -3)"
+  POINTERS="$(find "${LIB_DIR}" -type f -name '*.a' -size -2k \
+    -exec grep -Ilx 'version https://git-lfs.github.com/spec/v1' {} + 2>/dev/null | head -3)"
   if [ -n "${POINTERS}" ]; then
     bad "Some libraries are unresolved Git LFS pointers, for example:"
     printf '         %s\n' ${POINTERS} >&2
