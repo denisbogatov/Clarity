@@ -10,6 +10,8 @@
 
 #include <cstdint>
 
+struct BMesh;
+
 namespace blender {
 
 struct bContext;
@@ -54,6 +56,12 @@ bool camera_based_selection_use_depth(ClarityCameraBasedSelection mode,
  */
 bool selection_action_is_reserved_for_marquee(const ClarityInputAction &action);
 
+/**
+ * Grow the selected component domain across connected components whose local normal changes by no
+ * more than `tolerance`. The caller owns selection flushing and editor notifications.
+ */
+bool selection_by_angle_propagate(BMesh &bm, short selectmode, float tolerance);
+
 void register_tool_operators();
 ClarityDispatchResult selection_handle_action(bContext *C,
                                             ClarityWindowRuntime &runtime,
@@ -75,6 +83,10 @@ bool middle_mouse_axis_drag_handle(bContext *C,
  * a marquee left something to constrain, so it is cheap to call for every action.
  */
 bool selection_constraint_apply_pending(bContext *C, ClarityWindowRuntime &runtime);
+/** Track a regular Blender component click and queue its standing constraint after the pick. */
+void selection_constraint_click_track(bContext *C,
+                                      ClarityWindowRuntime &runtime,
+                                      const ClarityInputAction &action);
 bool shift_transform_prepare(bContext *C, wmOperator *op, const wmEvent *event);
 void shift_transform_end(bContext *C, ClarityWindowRuntime &runtime, bool cancelled);
 

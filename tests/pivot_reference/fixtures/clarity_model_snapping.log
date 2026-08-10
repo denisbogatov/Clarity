@@ -1,0 +1,419 @@
+Blender 5.2.0 LTS Clarity model snapping
+execution fidelity: operator_equivalent
+tests: 55
+
+object_pivot_to_object_point_snap: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  distanceToTarget: 0.0
+  op: bpy.ops.transform.translate(value=(8.25, -1.0, -1.0))
+
+object_vertex_to_object_vertex_snap: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  distanceToTarget: 0.0
+  geometryPointDistance: 0.0
+  op: custom_pivot.rotate_pivot = (-3.5, 0.75, -0.75)
+  op: bpy.ops.transform.translate(value=(7.5, -1.75, -0.25))
+
+axis_x_to_object_point_snap: PASS
+  pivotMoved: 8.25
+  passed: True
+  activeTargetResidual: 0.0
+  inactiveAxisResidual: 0.0
+  op: transform.translate(constraint='x', snap=VERTEX)
+
+axis_y_to_object_point_snap: PASS
+  pivotMoved: 1.0
+  passed: True
+  activeTargetResidual: 0.0
+  inactiveAxisResidual: 0.0
+  op: transform.translate(constraint='y', snap=VERTEX)
+
+axis_z_to_object_point_snap: PASS
+  pivotMoved: 1.0
+  passed: True
+  activeTargetResidual: 0.0
+  inactiveAxisResidual: 0.0
+  op: transform.translate(constraint='z', snap=VERTEX)
+
+plane_xy_to_object_point_snap: PASS
+  pivotMoved: 8.31038506929733
+  passed: True
+  activeTargetResidual: 0.0
+  inactiveAxisResidual: 0.0
+  op: transform.translate(constraint='xy', snap=VERTEX)
+
+plane_xz_to_object_point_snap: PASS
+  pivotMoved: 8.31038506929733
+  passed: True
+  activeTargetResidual: 0.0
+  inactiveAxisResidual: 0.0
+  op: transform.translate(constraint='xz', snap=VERTEX)
+
+plane_yz_to_object_point_snap: PASS
+  pivotMoved: 1.4142135623730951
+  passed: True
+  activeTargetResidual: 0.0
+  inactiveAxisResidual: 0.0
+  op: transform.translate(constraint='yz', snap=VERTEX)
+
+object_space_x_axis_snap: PASS
+  pivotMoved: 4.000000007450581
+  passed: True
+  perpendicularDistance: 0.0
+  op: transform.translate(constraint='object_x', snap=VERTEX)
+
+object_pivot_to_other_custom_pivot_snap: PASS
+  pivotMoved: 6.270964822837483
+  passed: True
+  distanceToTarget: 1.7881393432617188e-07
+  op: bpy.ops.transform.translate(value=(4.800000190734863, 3.3499999046325684, 2.25))
+
+model_curve_snap: PASS
+  pivotMoved: 6.046693311223912
+  passed: True
+  distanceToTarget: 0.0
+  op: bpy.ops.transform.translate(value=(5.25, 0.0, -3.0))
+  op: transform.translate(snap=CURVE)
+
+curved_nurbs_curve_snap: PASS
+  pivotMoved: 5.367727638395972
+  passed: True
+  distanceToTarget: 0.0
+  op: bpy.ops.transform.translate(value=(3.25, 4.0, -1.5))
+  op: transform.translate(snap=CURVE)
+
+closed_nurbs_curve_snap: PASS
+  pivotMoved: 6.860211367006122
+  passed: True
+  distanceToTarget: 0.0
+  op: bpy.ops.transform.translate(value=(6.25, 2.0, -2.0))
+  op: transform.translate(snap=CURVE)
+
+point_snap_to_curve_cv: PASS
+  pivotMoved: 4.100304866714182
+  passed: True
+  distanceToTarget: 0.0
+  op: bpy.ops.transform.translate(value=(1.25, 2.5, -3.0))
+  op: transform.translate(snap=VERTEX)
+
+model_grid_snap: PASS
+  pivotMoved: 4.25
+  passed: True
+  distanceToTarget: 0.0
+  op: bpy.ops.transform.translate(value=(4.25, 0.0, 0.0))
+  op: transform.translate(snap=INCREMENT)
+
+custom_spacing_grid_snap: PASS
+  pivotMoved: 7.198090024443984
+  passed: True
+  distanceToTarget: 0.0
+  op: bpy.ops.transform.translate(value=(6.75, 0.0, 2.5))
+  op: transform.translate(snap=INCREMENT)
+
+object_to_object_mesh_center_snap: PASS
+  pivotMoved: 7.846177413237608
+  passed: True
+  distanceToTarget: 0.0
+  op: bpy.ops.transform.translate(value=(7.25, 0.0, 3.0))
+
+model_view_plane_snap: PASS
+  pivotMoved: 2.358495283014151
+  passed: True
+  planeDeltaResidual: 0.0
+  op: transform.translate(constraint=VIEW_PLANE)
+
+pivot_edit_to_object_point_snap: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  distanceToTarget: 0.0
+  objectTranslationDelta: 0.0
+  geometryBoundsDelta: 0.0
+  op: custom_pivot.rotate_pivot = (4.0, -1.0, -1.0)
+
+pivot_edit_to_object_mesh_center_snap: PASS
+  pivotMoved: 7.846177413237608
+  passed: True
+  distanceToTarget: 0.0
+  objectTranslationDelta: 0.0
+  geometryBoundsDelta: 0.0
+  op: custom_pivot.rotate_pivot = (3.0, 0.0, 3.0)
+
+pivot_orientation_to_rotated_mesh: PASS
+  pivotMoved: 0.0
+  passed: True
+  orientationValid: True
+  orientationErrorDegrees: 0.0
+  op: custom_pivot.orientation = target.normal_frame
+
+custom_pivot_persists_across_tools: PASS
+  pivotMoved: 1.299038105676658
+  passed: True
+  pivotPositionValid: True
+  distanceToSourceVertex: 0.0
+  op: custom_pivot.rotate_pivot = (-3.5, 0.75, -0.75)
+  op: clarity.transform_orientation_set(MOVE/ROTATE/SCALE)
+
+rotate_after_custom_pivot_snap: PASS
+  pivotMoved: 1.2990379680256199
+  passed: True
+  geometryChanged: True
+  pivotDistanceToSourceVertex: 2.384185791015625e-07
+  op: custom_pivot.rotate_pivot = (-3.5, 0.75, -0.75)
+  op: bpy.ops.transform.rotate(value=45deg, pivot=CUSTOM)
+
+scale_after_custom_pivot_snap: PASS
+  pivotMoved: 1.299038105676658
+  passed: True
+  geometryChanged: True
+  pivotDistanceToSourceVertex: 0.0
+  op: custom_pivot.rotate_pivot = (-3.5, 0.75, -0.75)
+  op: bpy.ops.transform.resize(value=(2.5,1,1), pivot=CUSTOM)
+
+reset_after_custom_pivot_snap: PASS
+  pivotMoved: 0.0
+  passed: True
+  distanceToObjectOrigin: 0.0
+  geometryBoundsUnchanged: True
+  op: custom_pivot.rotate_pivot = (-3.5, 0.75, -0.75)
+  op: bpy.ops.clarity.pivot_reset(action='BOTH', mode='ZERO')
+
+parented_rotated_scaled_object_snap: PASS
+  pivotMoved: 8.370332598737749
+  passed: True
+  distanceToTarget: 2.081900739261267e-06
+  parentPreserved: True
+  op: bpy.ops.transform.translate(value=(8.25, -1.000000238418579, -1.0))
+
+negative_scale_parent_object_snap: PASS
+  pivotMoved: 8.370332605858689
+  passed: True
+  distanceToTarget: 2.006296238864283e-06
+  parentPreserved: True
+  op: bpy.ops.transform.translate(value=(8.25, -1.000000238418579, -1.0))
+
+shift_duplicate_to_object_point_snap: PASS
+  pivotMoved: 0.0
+  passed: True
+  copyDistanceToTarget: 0.0
+  copyCount: 1
+  expectedCopyCount: 1
+  originalUnchanged: True
+  op: bpy.ops.object.duplicate(linked=False)
+  op: bpy.ops.transform.translate(value=(8.25, -1.0, -1.0))
+
+shift_duplicate_vertex_to_object_vertex_snap: PASS
+  pivotMoved: 1.299038105676658
+  passed: True
+  copyDistanceToTarget: 0.0
+  copyGeometryPointDistance: 0.0
+  copyCount: 1
+  expectedCopyCount: 1
+  originalUnchanged: True
+  op: custom_pivot.rotate_pivot = (-3.5, 0.75, -0.75)
+  op: bpy.ops.object.duplicate(linked=False)
+  op: bpy.ops.transform.translate(value=(7.5, -1.75, -0.25))
+
+shift_duplicate_to_object_mesh_center_snap: PASS
+  pivotMoved: 0.0
+  passed: True
+  copyDistanceToTarget: 0.0
+  copyCount: 1
+  expectedCopyCount: 1
+  originalUnchanged: True
+  op: bpy.ops.object.duplicate(linked=False)
+  op: bpy.ops.transform.translate(value=(7.25, 0.0, 3.0))
+
+shift_duplicate_copy_point_snap: PASS
+  pivotMoved: 0.0
+  passed: True
+  sharedShapeData: False
+  copyDistanceToTarget: 0.0
+  copyCount: 1
+  expectedCopyCount: 1
+  originalUnchanged: True
+  op: bpy.ops.object.duplicate(linked=False)
+  op: bpy.ops.transform.translate(value=(8.25, -1.0, -1.0))
+
+shift_duplicate_instance_point_snap: PASS
+  pivotMoved: 0.0
+  passed: True
+  sharedShapeData: True
+  copyDistanceToTarget: 0.0
+  copyCount: 1
+  expectedCopyCount: 1
+  originalUnchanged: True
+  op: bpy.ops.object.duplicate(linked=True)
+  op: bpy.ops.transform.translate(value=(8.25, -1.0, -1.0))
+
+shift_duplicate_reverse_modifier_order: PASS
+  pivotMoved: 0.0
+  passed: True
+  sharedShapeData: False
+  copyDistanceToTarget: 0.0
+  copyCount: 1
+  expectedCopyCount: 1
+  originalUnchanged: True
+  op: bpy.ops.object.duplicate(linked=False)
+  op: bpy.ops.transform.translate(value=(8.25, -1.0, -1.0))
+
+shift_drag_with_smart_duplicate_disabled: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  distanceToTarget: 0.0
+  copyCount: 0
+  expectedCopyCount: 0
+  originalUnchanged: False
+  op: bpy.ops.transform.translate(value=(8.25, -1.0, -1.0))
+
+shift_duplicate_with_rotate_step: PASS
+  pivotMoved: 0.0
+  passed: True
+  stepResidual: 8.3482605273133e-08
+  copyCount: 1
+  expectedCopyCount: 1
+  originalUnchanged: True
+  op: bpy.ops.object.duplicate(linked=False)
+
+shift_duplicate_with_scale_step: PASS
+  pivotMoved: 0.0
+  passed: True
+  stepResidual: 0.0
+  copyCount: 1
+  expectedCopyCount: 1
+  originalUnchanged: True
+  op: bpy.ops.object.duplicate(linked=False)
+
+sequential_shift_duplicate_chain: PASS
+  pivotMoved: 0.0
+  passed: True
+  copyCount: 2
+  expectedCopyCount: 2
+  originalUnchanged: True
+  op: bpy.ops.object.duplicate(linked=False)
+  op: bpy.ops.transform.translate(value=(8.25, -1.0, -1.0))
+  op: bpy.ops.object.duplicate(linked=False)
+  op: bpy.ops.transform.translate(value=(-4.0, 1.0, 1.0))
+
+shift_duplicate_modifier_release_first: PASS
+  pivotMoved: 0.0
+  passed: True
+  sharedShapeData: False
+  copyDistanceToTarget: 0.0
+  copyCount: 1
+  expectedCopyCount: 1
+  originalUnchanged: True
+  op: bpy.ops.object.duplicate(linked=False)
+  op: bpy.ops.transform.translate(value=(8.25, -1.0, -1.0))
+
+live_surface_snap: PASS
+  pivotMoved: 5.573374202401989
+  passed: True
+  distanceToTarget: 0.0
+  op: bpy.ops.transform.translate(value=(4.25, -3.0, 2.0))
+  op: transform.translate(snap=FACE, target=LIVE_SURFACE)
+
+asymmetric_mesh_center_snap: PASS
+  pivotMoved: 5.6844085004510365
+  passed: True
+  distanceToTarget: 0.0
+  op: bpy.ops.transform.translate(value=(4.0, 1.5, 3.75))
+
+multi_object_spacing_point_snap: PASS
+  pivotMoved: 8.609587678861281
+  passed: True
+  relativeSpacingDelta: 0.0
+  selectionCenterDistanceToTarget: 0.0
+  op: transform.translate(selection=2, snap=VERTEX)
+
+component_point_snap_preserve_spacing: PASS
+  pivotMoved: 0.0
+  passed: True
+  spacingBefore: 1.5
+  spacingAfter: 1.5
+  maxDistanceToTargetPoint: 1.5
+
+component_point_snap_collapse_spacing: PASS
+  pivotMoved: 0.0
+  passed: True
+  spacingBefore: 1.5
+  spacingAfter: 0.0
+  maxDistanceToTargetPoint: 0.0
+
+orthographic_view_plane_snap: PASS
+  pivotMoved: 2.358495283014151
+  passed: True
+  planeDeltaResidual: 0.0
+  op: transform.translate(constraint=VIEW_PLANE)
+
+ambiguous_point_target_selection: PASS
+  pivotMoved: 5.51475304041128
+  passed: True
+  candidateDistances: [1.1920928955078125e-07, 0.19999993257223422]
+  chosenCandidate: 0
+  op: bpy.ops.transform.translate(value=(5.150000095367432, 1.7000000476837158, 1.0))
+
+cancel_point_snap_drag: PASS
+  pivotMoved: 0.0
+  passed: True
+  stateUnchanged: True
+  op: transform.cancel()
+
+cancel_shift_duplicate_snap_drag: PASS
+  pivotMoved: 0.0
+  passed: True
+  stateUnchanged: True
+  op: transform.cancel()
+
+undo_object_point_snap: FAIL
+  pivotMoved: 8.370334521391603
+  passed: False
+  stateUnchanged: False
+  op: bpy.ops.transform.translate(value=(8.25, -1.0, -1.0))
+  op: bpy.ops.ed.undo()
+
+redo_object_point_snap: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  distanceToTarget: 0.0
+  op: bpy.ops.transform.translate(value=(8.25, -1.0, -1.0))
+  op: bpy.ops.ed.undo(); bpy.ops.ed.redo()
+
+tool_change_during_point_snap_drag: PASS
+  pivotMoved: 1.0
+  passed: True
+  activeToolAfter: ROTATE
+  snapInactiveAfter: True
+  op: transform.translate(); tool_set(ROTATE)
+
+frozen_transform_object_point_snap: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  distanceToTarget: 0.0
+  op: bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+  op: bpy.ops.transform.translate(value=(4.0, -1.0, -1.0))
+
+model_step_move_absolute: PASS
+  pivotMoved: 2.25
+  passed: True
+  stepResidual: 0.0
+  op: transform.translate(snap=INCREMENT, relative=False)
+
+model_step_move_relative: PASS
+  pivotMoved: 2.0
+  passed: True
+  stepResidual: 0.0
+  op: transform.translate(snap=INCREMENT, relative=True)
+
+model_step_rotate: PASS
+  pivotMoved: 0.0
+  passed: True
+  stepResidual: 8.3482605273133e-08
+  op: transform.rotate(snap=15deg)
+
+model_step_scale: PASS
+  pivotMoved: 0.0
+  passed: True
+  stepResidual: 0.0
+  op: transform.resize(snap=0.5)

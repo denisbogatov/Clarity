@@ -1,0 +1,1297 @@
+Maya 2025 snap activation
+scenarios: 96
+
+hotkey bindings:
+  grid (X): press='SnapToGridPress', release='SnapToGridRelease'
+  curve (C): press='SnapToCurvePress', release='SnapToCurveRelease'
+  point (V): press='SnapToPointPress', release='SnapToPointRelease'
+  step (J): press={'error': "hotkey J name: Flag 'keyShortcut' must be passed a boolean argument when query flag is set"}, release={'error': "hotkey J releaseName: Flag 'keyShortcut' must be passed a boolean argument when query flag is set"}
+  step_relative (Shift-J): press={'error': "hotkey Shift-J name: Flag 'keyShortcut' must be passed a boolean argument when query flag is set"}, release={'error': "hotkey Shift-J releaseName: Flag 'keyShortcut' must be passed a boolean argument when query flag is set"}
+
+[isolated_grid] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  repeat_press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+  release_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  stray_release_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+
+[isolated_curve] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  repeat_press_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+  release_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  stray_release_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+
+[isolated_point] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  repeat_press_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+  release_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  stray_release_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+
+[isolated_step_move] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  repeat_press_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: repeat_press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  stray_release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: stray_release_step: у J нет команды release в таблице hotkey Maya
+
+[isolated_step_rotate] tool=rotate
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  repeat_press_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: repeat_press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  stray_release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: stray_release_step: у J нет команды release в таблице hotkey Maya
+
+[isolated_step_scale] tool=scale
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  repeat_press_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: repeat_press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  stray_release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: stray_release_step: у J нет команды release в таблице hotkey Maya
+
+[isolated_step_relative_move] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  repeat_press_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: repeat_press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  stray_release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: stray_release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+
+[isolated_step_relative_rotate] tool=rotate
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  repeat_press_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: repeat_press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  stray_release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: stray_release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+
+[isolated_step_relative_scale] tool=scale
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  repeat_press_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: repeat_press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  stray_release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: stray_release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+
+[overlap_grid_curve_newest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  press_curve: snapMode=['grid', 'curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  release_curve: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  release_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+
+[overlap_grid_curve_oldest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  press_curve: snapMode=['grid', 'curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  release_grid: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  release_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+
+[overlap_grid_point_newest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  press_point: snapMode=['grid', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  release_point: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  release_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+
+[overlap_grid_point_oldest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  press_point: snapMode=['grid', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  release_grid: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  release_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+
+[overlap_grid_step_newest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  press_step: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  release_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+
+[overlap_grid_step_oldest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  press_step: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+
+[overlap_grid_step_relative_newest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  press_step_relative: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  release_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+
+[overlap_grid_step_relative_oldest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  press_step_relative: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+
+[overlap_curve_point_newest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  press_point: snapMode=['curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  release_point: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  release_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+
+[overlap_curve_point_oldest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  press_point: snapMode=['curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  release_curve: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  release_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+
+[overlap_curve_step_newest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  press_step: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  release_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+
+[overlap_curve_step_oldest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  press_step: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+
+[overlap_curve_step_relative_newest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  press_step_relative: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  release_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+
+[overlap_curve_step_relative_oldest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  press_step_relative: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+
+[overlap_point_step_newest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  press_step: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  release_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+
+[overlap_point_step_oldest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  press_step: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+
+[overlap_point_step_relative_newest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  press_step_relative: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  release_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+
+[overlap_point_step_relative_oldest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  press_step_relative: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+
+[overlap_step_step_relative_newest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  press_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+
+[overlap_step_step_relative_oldest_first] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  press_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+
+[all_temporary_reverse_release] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  press_curve: snapMode=['grid', 'curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  press_point: snapMode=['grid', 'curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  press_step: snapMode=['grid', 'curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  press_step_relative: snapMode=['grid', 'curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['grid', 'curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  release_step: snapMode=['grid', 'curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  release_point: snapMode=['grid', 'curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  release_curve: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  release_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+
+[all_temporary_same_order_release] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  press_curve: snapMode=['grid', 'curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  press_point: snapMode=['grid', 'curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  press_step: snapMode=['grid', 'curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  press_step_relative: snapMode=['grid', 'curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_grid: snapMode=['curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  release_curve: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  release_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+
+[persistent_grid] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  disable_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+
+[persistent_grid_temporary_grid] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+  release_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  disable_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+
+[persistent_grid_temporary_curve] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  press_curve: snapMode=['grid', 'curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  release_curve: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  disable_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+
+[persistent_grid_temporary_point] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  press_point: snapMode=['grid', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  release_point: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  disable_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+
+[persistent_grid_temporary_step] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  press_step: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  disable_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+
+[persistent_grid_temporary_step_relative] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  press_step_relative: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  disable_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+
+[persistent_curve] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  disable_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+
+[persistent_curve_temporary_grid] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  press_grid: snapMode=['grid', 'curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  release_grid: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  disable_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+
+[persistent_curve_temporary_curve] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  press_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+  release_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  disable_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+
+[persistent_curve_temporary_point] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  press_point: snapMode=['curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  release_point: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  disable_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+
+[persistent_curve_temporary_step] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  press_step: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  disable_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+
+[persistent_curve_temporary_step_relative] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  press_step_relative: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  disable_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+
+[persistent_point] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  disable_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+
+[persistent_point_temporary_grid] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  press_grid: snapMode=['grid', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  release_grid: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  disable_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+
+[persistent_point_temporary_curve] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  press_curve: snapMode=['curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  release_curve: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  disable_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+
+[persistent_point_temporary_point] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  press_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+  release_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  disable_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+
+[persistent_point_temporary_step] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  press_step: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  disable_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+
+[persistent_point_temporary_step_relative] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  press_step_relative: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  disable_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+
+[persistent_viewPlane] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_viewPlane: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  disable_viewPlane: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+
+[persistent_viewPlane_temporary_grid] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_viewPlane: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  press_grid: snapMode=['grid', 'viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  release_grid: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  disable_viewPlane: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+
+[persistent_viewPlane_temporary_curve] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_viewPlane: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  press_curve: snapMode=['curve', 'viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  release_curve: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  disable_viewPlane: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+
+[persistent_viewPlane_temporary_point] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_viewPlane: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  press_point: snapMode=['point', 'viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  release_point: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  disable_viewPlane: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+
+[persistent_viewPlane_temporary_step] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_viewPlane: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  press_step: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  disable_viewPlane: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+
+[persistent_viewPlane_temporary_step_relative] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_viewPlane: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  press_step_relative: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  disable_viewPlane: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+
+[persistent_meshCenter] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_meshCenter: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  disable_meshCenter: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+
+[persistent_meshCenter_temporary_grid] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_meshCenter: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  press_grid: snapMode=['grid', 'meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  release_grid: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  disable_meshCenter: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+
+[persistent_meshCenter_temporary_curve] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_meshCenter: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  press_curve: snapMode=['curve', 'meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  release_curve: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  disable_meshCenter: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+
+[persistent_meshCenter_temporary_point] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_meshCenter: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  press_point: snapMode=['point', 'meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  release_point: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  disable_meshCenter: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+
+[persistent_meshCenter_temporary_step] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_meshCenter: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  press_step: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  disable_meshCenter: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+
+[persistent_meshCenter_temporary_step_relative] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_meshCenter: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  press_step_relative: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  disable_meshCenter: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+
+[persistent_switch_grid_then_curve] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  enable_curve: snapMode=['grid', 'curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  disable_curve: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+  disable_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+
+[persistent_switch_curve_then_grid] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  enable_grid: snapMode=['grid', 'curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  disable_grid: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+  disable_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+
+[persistent_switch_grid_then_point] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  enable_point: snapMode=['grid', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  disable_point: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+  disable_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+
+[persistent_switch_point_then_grid] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  enable_grid: snapMode=['grid', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  disable_grid: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+  disable_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+
+[persistent_switch_grid_then_viewPlane] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  enable_viewPlane: snapMode=['grid', 'viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  disable_viewPlane: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+  disable_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+
+[persistent_switch_viewPlane_then_grid] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_viewPlane: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  enable_grid: snapMode=['grid', 'viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  disable_grid: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+  disable_viewPlane: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+
+[persistent_switch_grid_then_meshCenter] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  enable_meshCenter: snapMode=['grid', 'meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  disable_meshCenter: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+  disable_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+
+[persistent_switch_meshCenter_then_grid] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_meshCenter: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  enable_grid: snapMode=['grid', 'meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: False -> True
+  disable_grid: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.grid: True -> False
+  disable_meshCenter: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+
+[persistent_switch_curve_then_point] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  enable_point: snapMode=['curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  disable_point: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+  disable_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+
+[persistent_switch_point_then_curve] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  enable_curve: snapMode=['curve', 'point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  disable_curve: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+  disable_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+
+[persistent_switch_curve_then_viewPlane] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  enable_viewPlane: snapMode=['curve', 'viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  disable_viewPlane: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+  disable_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+
+[persistent_switch_viewPlane_then_curve] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_viewPlane: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  enable_curve: snapMode=['curve', 'viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  disable_curve: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+  disable_viewPlane: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+
+[persistent_switch_curve_then_meshCenter] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  enable_meshCenter: snapMode=['curve', 'meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  disable_meshCenter: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+  disable_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+
+[persistent_switch_meshCenter_then_curve] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_meshCenter: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  enable_curve: snapMode=['curve', 'meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: False -> True
+  disable_curve: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.curve: True -> False
+  disable_meshCenter: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+
+[persistent_switch_point_then_viewPlane] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  enable_viewPlane: snapMode=['point', 'viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  disable_viewPlane: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+  disable_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+
+[persistent_switch_viewPlane_then_point] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_viewPlane: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  enable_point: snapMode=['point', 'viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  disable_point: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+  disable_viewPlane: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+
+[persistent_switch_point_then_meshCenter] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  enable_meshCenter: snapMode=['point', 'meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  disable_meshCenter: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+  disable_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+
+[persistent_switch_meshCenter_then_point] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_meshCenter: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  enable_point: snapMode=['point', 'meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: False -> True
+  disable_point: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.point: True -> False
+  disable_meshCenter: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+
+[persistent_switch_viewPlane_then_meshCenter] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_viewPlane: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  enable_meshCenter: snapMode=['viewPlane', 'meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  disable_meshCenter: snapMode=['viewPlane'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+  disable_viewPlane: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+
+[persistent_switch_meshCenter_then_viewPlane] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_meshCenter: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: False -> True
+  enable_viewPlane: snapMode=['viewPlane', 'meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: False -> True
+  disable_viewPlane: snapMode=['meshCenter'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.viewPlane: True -> False
+  disable_meshCenter: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    snapMode.meshCenter: True -> False
+
+[persistent_step_move_temporary_grid] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.move.values.snap: False -> True
+  press_grid: snapMode=['grid'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  release_grid: snapMode=['none'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.move.values.snap: True -> False
+
+[persistent_step_move_temporary_curve] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.move.values.snap: False -> True
+  press_curve: snapMode=['curve'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  release_curve: snapMode=['none'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.move.values.snap: True -> False
+
+[persistent_step_move_temporary_point] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.move.values.snap: False -> True
+  press_point: snapMode=['point'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  release_point: snapMode=['none'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.move.values.snap: True -> False
+
+[persistent_step_move_temporary_step] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.move.values.snap: False -> True
+  press_step: snapMode=['none'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['none'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.move.values.snap: True -> False
+
+[persistent_step_move_temporary_step_relative] tool=move
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.move.values.snap: False -> True
+  press_step_relative: snapMode=['none'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['none'] contextSnap={'move': True, 'rotate': False, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.move.values.snap: True -> False
+
+[persistent_step_rotate_temporary_grid] tool=rotate
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=1 commands=0
+    contexts.rotate.values.snap: False -> True
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  release_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.rotate.values.snap: True -> False
+
+[persistent_step_rotate_temporary_curve] tool=rotate
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=1 commands=0
+    contexts.rotate.values.snap: False -> True
+  press_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  release_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.rotate.values.snap: True -> False
+
+[persistent_step_rotate_temporary_point] tool=rotate
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=1 commands=0
+    contexts.rotate.values.snap: False -> True
+  press_point: snapMode=['point'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  release_point: snapMode=['none'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.rotate.values.snap: True -> False
+
+[persistent_step_rotate_temporary_step] tool=rotate
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=1 commands=0
+    contexts.rotate.values.snap: False -> True
+  press_step: snapMode=['none'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.rotate.values.snap: True -> False
+
+[persistent_step_rotate_temporary_step_relative] tool=rotate
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=1 commands=0
+    contexts.rotate.values.snap: False -> True
+  press_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': True, 'scale': False} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.rotate.values.snap: True -> False
+
+[persistent_step_scale_temporary_grid] tool=scale
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=1 commands=0
+    contexts.scale.values.snap: False -> True
+  press_grid: snapMode=['grid'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=1 commands=2
+    cmd: SnapToGridPress;
+    cmd: snapMode -grid 1;
+    snapMode.grid: False -> True
+  release_grid: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=1 commands=2
+    cmd: SnapToGridRelease;
+    cmd: snapMode -grid 0;
+    snapMode.grid: True -> False
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.scale.values.snap: True -> False
+
+[persistent_step_scale_temporary_curve] tool=scale
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=1 commands=0
+    contexts.scale.values.snap: False -> True
+  press_curve: snapMode=['curve'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=1 commands=2
+    cmd: SnapToCurvePress;
+    cmd: snapMode -curve 1;
+    snapMode.curve: False -> True
+  release_curve: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=1 commands=2
+    cmd: SnapToCurveRelease;
+    cmd: snapMode -curve 0;
+    snapMode.curve: True -> False
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.scale.values.snap: True -> False
+
+[persistent_step_scale_temporary_point] tool=scale
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=1 commands=0
+    contexts.scale.values.snap: False -> True
+  press_point: snapMode=['point'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=1 commands=2
+    cmd: SnapToPointPress;
+    cmd: snapMode -point 1;
+    snapMode.point: False -> True
+  release_point: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=1 commands=2
+    cmd: SnapToPointRelease;
+    cmd: snapMode -point 0;
+    snapMode.point: True -> False
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.scale.values.snap: True -> False
+
+[persistent_step_scale_temporary_step] tool=scale
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=1 commands=0
+    contexts.scale.values.snap: False -> True
+  press_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=0 commands=0
+    ERROR: press_step: у J нет команды press в таблице hotkey Maya
+  release_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=0 commands=0
+    ERROR: release_step: у J нет команды release в таблице hotkey Maya
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.scale.values.snap: True -> False
+
+[persistent_step_scale_temporary_step_relative] tool=scale
+  initial: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=0 commands=0
+  enable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=1 commands=0
+    contexts.scale.values.snap: False -> True
+  press_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=0 commands=0
+    ERROR: press_step_relative: у Shift-J нет команды press в таблице hotkey Maya
+  release_step_relative: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': True} changes=0 commands=0
+    ERROR: release_step_relative: у Shift-J нет команды release в таблице hotkey Maya
+  disable_step: snapMode=['none'] contextSnap={'move': False, 'rotate': False, 'scale': False} changes=1 commands=0
+    contexts.scale.values.snap: True -> False

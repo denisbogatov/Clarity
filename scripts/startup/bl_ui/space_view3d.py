@@ -804,6 +804,12 @@ class VIEW3D_HT_header(Header):
                     # Step snapping is a mode like the others: click to hold it on, J for a moment.
                     ('STEP', 'SNAP_INCREMENT'),
                 )
+                row.popover(
+                    panel="VIEW3D_PT_snapping",
+                    icon='SNAP_ON' if effective_mode != 'NONE' else 'SNAP_OFF',
+                    text="",
+                    translate=False,
+                )
                 for mode, icon in clarity_snap_buttons:
                     sub = row.row(align=True)
                     sub.alert = temporary_mode == mode
@@ -814,23 +820,38 @@ class VIEW3D_HT_header(Header):
                         depress=persistent_mode == mode,
                     )
                     props.mode = mode
-                # Both step sizes stay editable side by side: which one a drag uses follows from the
-                # tool, so having to switch a mode to reach the other would only hide one of them.
-                # They turn red together with the increment button while J holds the mode.
+                    if mode == 'STEP' and effective_mode == 'STEP':
+                        # Step values stay next to their mode and only occupy header space while
+                        # Step Snap is active, matching Selection by Angle below.
+                        sub_size = sub.row(align=True)
+                        sub_size.ui_units_x = 3.0
+                        sub_size.prop(window_manager, "clarity_snap_step_size", text="")
+                        sub_angle = sub.row(align=True)
+                        sub_angle.ui_units_x = 3.0
+                        sub_angle.prop(window_manager, "clarity_snap_step_angle", text="")
+
+                # Selection by Angle stays visible beside the precision controls in every object
+                # mode, like snapping itself. The constraint takes effect when mesh components are
+                # selected, but keeping the control in one place avoids a jumping header.
+                angle_active = window_manager.clarity_selection_constraint_angle_active
                 sub = row.row(align=True)
-                sub.alert = temporary_mode == 'STEP'
-                sub_size = sub.row(align=True)
-                sub_size.ui_units_x = 3.0
-                sub_size.prop(window_manager, "clarity_snap_step_size", text="")
-                sub_angle = sub.row(align=True)
-                sub_angle.ui_units_x = 3.0
-                sub_angle.prop(window_manager, "clarity_snap_step_angle", text="")
-                row.popover(
-                    panel="VIEW3D_PT_snapping",
-                    icon='SNAP_ON' if effective_mode != 'NONE' else 'SNAP_OFF',
+                sub.alert = angle_active
+                props = sub.operator(
+                    "clarity.selection_constraint_set",
                     text="",
-                    translate=False,
+                    icon='DRIVER_ROTATIONAL_DIFFERENCE',
+                    depress=angle_active,
                 )
+                props.constraint = 'OFF' if angle_active else 'ANGLE'
+                if angle_active:
+                    sub_angle = sub.row(align=True)
+                    sub_angle.ui_units_x = 3.0
+                    sub_angle.prop(
+                        window_manager,
+                        "clarity_selection_constraint_angle",
+                        text="",
+                        slider=True,
+                    )
             else:
                 snap_items = bpy.types.ToolSettings.bl_rna.properties["snap_elements"].enum_items
                 snap_elements = tool_settings.snap_elements
@@ -8296,6 +8317,16 @@ class VIEW3D_PT_snapping(Panel):
             sub = col.column()
             sub.active = window_manager.clarity_snap_use_tolerance
             sub.prop(window_manager, "clarity_snap_tolerance", text="Tolerance")
+
+            col.separator()
+
+            col.label(text="Selection")
+            col.prop(
+                window_manager,
+                "clarity_selection_constraint_angle",
+                text="Angle",
+                slider=True,
+            )
 
             layout.separator()
 

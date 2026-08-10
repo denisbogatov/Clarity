@@ -124,8 +124,8 @@ TEST(clarity_snap_override, OnlyWindowTrackedKeysAreReleasedByReconcile)
 }
 
 /**
- * Clarity's documented tolerance: on, the target has to be inside the region around the pointer; off,
- * "the snap region is unlimited; you can snap to anything viewable".
+ * Clarity's documented tolerance: on, the target has to be inside the region around the pointer;
+ * off, "the snap region is unlimited; you can snap to anything viewable".
  */
 TEST(clarity_snap_tolerance, LimitedToleranceScalesWithTheInterfaceAndOffMeansTheWholeRegion)
 {
@@ -193,14 +193,17 @@ TEST(clarity_snap_keys, ReleaseResolvesWhateverModifiersCameWithIt)
   EXPECT_EQ(snap_key_event_mode_get(EVT_XKEY, KM_PRESS, 0), ClaritySnapMode::Grid);
   EXPECT_EQ(snap_key_event_mode_get(EVT_CKEY, KM_PRESS, 0), ClaritySnapMode::Curve);
 
-  /* Whether the steps are relative or absolute is a setting, not a second binding of the key, so
-   * `Shift` stays available to the drag `J` is held during. */
+  /* Shift belongs to the drag. Both modifier orders must work for smart duplication, and the same
+   * rule lets J step a duplicated rotation or scale. */
+  EXPECT_EQ(snap_key_event_mode_get(EVT_VKEY, KM_PRESS, KM_SHIFT), ClaritySnapMode::Point);
+  EXPECT_EQ(snap_key_event_mode_get(EVT_XKEY, KM_PRESS, KM_SHIFT), ClaritySnapMode::Grid);
+  EXPECT_EQ(snap_key_event_mode_get(EVT_CKEY, KM_PRESS, KM_SHIFT), ClaritySnapMode::Curve);
   EXPECT_EQ(snap_key_event_mode_get(EVT_JKEY, KM_PRESS, 0), ClaritySnapMode::Step);
   EXPECT_EQ(snap_key_event_mode_get(EVT_JKEY, KM_PRESS, KM_SHIFT), ClaritySnapMode::Step);
 
   /* A press must not steal a binding that belongs to a modifier combination. */
   EXPECT_EQ(snap_key_event_mode_get(EVT_VKEY, KM_PRESS, KM_CTRL), ClaritySnapMode::None);
-  EXPECT_EQ(snap_key_event_mode_get(EVT_XKEY, KM_PRESS, KM_SHIFT), ClaritySnapMode::None);
+  EXPECT_EQ(snap_key_event_mode_get(EVT_XKEY, KM_PRESS, KM_OSKEY), ClaritySnapMode::None);
   EXPECT_EQ(snap_key_event_mode_get(EVT_JKEY, KM_PRESS, KM_ALT), ClaritySnapMode::None);
 
   /* The release is the only way out of the mode, so no modifier may swallow it. */
@@ -240,9 +243,9 @@ TEST(clarity_input, CtrlEMapsExclusivelyToExtrude)
 /**
  * The left button click Edit Pivot acts on, recognized from the press and release pair.
  *
- * A #KM_CLICK never reaches the dispatcher, so the gesture has to be read off the release. What the
- * release alone can prove is checked here; whether a press was still pending is the handler's half
- * of the question and lives in #ClarityPivotEditState::click_press_pending.
+ * A #KM_CLICK never reaches the dispatcher, so the gesture has to be read off the release. What
+ * the release alone can prove is checked here; whether a press was still pending is the handler's
+ * half of the question and lives in #ClarityPivotEditState::click_press_pending.
  */
 TEST(clarity_input, TheClickIsTheReleaseThatStayedWhereThePressWas)
 {
@@ -262,9 +265,9 @@ TEST(clarity_input, TheClickIsTheReleaseThatStayedWhereThePressWas)
   EXPECT_FALSE(left_mouse_click_release_is(event));
   event.xy[0] = 400;
 
-  /* The second press of a double click is the topology gesture. Its release keeps `prev_val` at the
-   * #KM_PRESS the double click was promoted from, so only the pending press can tell them apart -
-   * but a release whose press never happened must not pass here either. */
+  /* The second press of a double click is the topology gesture. Its release keeps `prev_val` at
+   * the #KM_PRESS the double click was promoted from, so only the pending press can tell them
+   * apart - but a release whose press never happened must not pass here either. */
   event.prev_val = KM_RELEASE;
   EXPECT_FALSE(left_mouse_click_release_is(event));
   event.prev_val = KM_PRESS;
@@ -293,8 +296,8 @@ TEST(clarity_input, TheClickIsTheReleaseThatStayedWhereThePressWas)
  *
  * Only the press half can tell a click from a double click: the release that follows a
  * #KM_DBL_CLICK keeps `prev_val` at the #KM_PRESS the double click was promoted from, so it looks
- * exactly like the release of a plain click. This is also the one rule the event-driven test cannot
- * reach - #WM_event_add_simulate never promotes a simulated press to a double click.
+ * exactly like the release of a plain click. This is also the one rule the event-driven test
+ * cannot reach - #WM_event_add_simulate never promotes a simulated press to a double click.
  */
 TEST(clarity_input, ADoubleClickPressIsNotAClickPress)
 {
@@ -327,9 +330,9 @@ TEST(clarity_input, ADoubleClickPressIsNotAClickPress)
 /**
  * `Shift + click` with an axis handle selected.
  *
- * "To snap the custom pivot's position along a single axis, select one of the axis handles (X, Y, Z)
- * on the custom pivot manipulator and Shift-click a component" - the axis is the manipulator's own,
- * not a world axis, so a turned pivot constrains along its own handle.
+ * "To snap the custom pivot's position along a single axis, select one of the axis handles (X, Y,
+ * Z) on the custom pivot manipulator and Shift-click a component" - the axis is the manipulator's
+ * own, not a world axis, so a turned pivot constrains along its own handle.
  */
 TEST(clarity_pivot, ASingleAxisSnapKeepsTheOtherTwoComponents)
 {
@@ -461,22 +464,26 @@ TEST_F(ClarityRuntimeTest, TransformMarkingMenusKeepOrientationsIndependent)
 
   EXPECT_TRUE(
       transform_orientation_set(context, ClarityToolID::Move, ClarityMoveOrientation::Object));
-  EXPECT_TRUE(
-      transform_orientation_set(context, ClarityToolID::Rotate, ClarityMoveOrientation::Component));
+  EXPECT_TRUE(transform_orientation_set(
+      context, ClarityToolID::Rotate, ClarityMoveOrientation::Component));
   EXPECT_TRUE(
       transform_orientation_set(context, ClarityToolID::Scale, ClarityMoveOrientation::World));
 
-  EXPECT_EQ(transform_orientation_get(context, ClarityToolID::Move), ClarityMoveOrientation::Object);
+  EXPECT_EQ(transform_orientation_get(context, ClarityToolID::Move),
+            ClarityMoveOrientation::Object);
   EXPECT_EQ(transform_orientation_get(context, ClarityToolID::Rotate),
             ClarityMoveOrientation::Component);
-  EXPECT_EQ(transform_orientation_get(context, ClarityToolID::Scale), ClarityMoveOrientation::World);
+  EXPECT_EQ(transform_orientation_get(context, ClarityToolID::Scale),
+            ClarityMoveOrientation::World);
 
   EXPECT_TRUE(
       transform_orientation_set(context, ClarityToolID::Rotate, ClarityMoveOrientation::Gimbal));
-  EXPECT_EQ(transform_orientation_get(context, ClarityToolID::Move), ClarityMoveOrientation::Object);
-  EXPECT_EQ(transform_orientation_get(context, ClarityToolID::Rotate), ClarityMoveOrientation::Gimbal);
-  EXPECT_FALSE(
-      transform_orientation_set(context, ClarityToolID::Select, ClarityMoveOrientation::Component));
+  EXPECT_EQ(transform_orientation_get(context, ClarityToolID::Move),
+            ClarityMoveOrientation::Object);
+  EXPECT_EQ(transform_orientation_get(context, ClarityToolID::Rotate),
+            ClarityMoveOrientation::Gimbal);
+  EXPECT_FALSE(transform_orientation_set(
+      context, ClarityToolID::Select, ClarityMoveOrientation::Component));
   EXPECT_FALSE(
       transform_orientation_set(context, ClarityToolID::Scale, ClarityMoveOrientation::Gimbal));
 

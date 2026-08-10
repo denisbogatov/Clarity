@@ -1,0 +1,1704 @@
+{
+  "schema": 1,
+  "mayaSchema": 7,
+  "blenderSchema": 7,
+  "counts": {
+    "maya": 55,
+    "blender": 55,
+    "shared": 55,
+    "agreements": 36,
+    "divergences": 19,
+    "mayaPassed": 37,
+    "blenderPassed": 54
+  },
+  "allScenarioNamesMatch": true,
+  "allResultsAgree": false,
+  "nativeInputComparable": false,
+  "fidelityWarning": "Blender used operator-equivalent execution; outcome parity is comparable, native input routing is not.",
+  "divergences": [
+    "plane_xy_to_object_point_snap",
+    "plane_yz_to_object_point_snap",
+    "object_space_x_axis_snap",
+    "object_pivot_to_other_custom_pivot_snap",
+    "model_curve_snap",
+    "curved_nurbs_curve_snap",
+    "closed_nurbs_curve_snap",
+    "point_snap_to_curve_cv",
+    "object_to_object_mesh_center_snap",
+    "pivot_edit_to_object_mesh_center_snap",
+    "pivot_orientation_to_rotated_mesh",
+    "shift_duplicate_to_object_mesh_center_snap",
+    "shift_duplicate_with_rotate_step",
+    "shift_duplicate_with_scale_step",
+    "multi_object_spacing_point_snap",
+    "orthographic_view_plane_snap",
+    "cancel_point_snap_drag",
+    "cancel_shift_duplicate_snap_drag",
+    "undo_object_point_snap"
+  ],
+  "rows": [
+    {
+      "name": "object_pivot_to_object_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "point",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "distanceToNearestPoint": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "distanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "object_vertex_to_object_vertex_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "geometry_point",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "geometryPointDistance": 0.0,
+        "pivotDistanceToTargetPoint": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "distanceToTarget": 0.0,
+        "geometryPointDistance": 0.0
+      }
+    },
+    {
+      "name": "axis_x_to_object_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "handle_x",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 8.25,
+        "passed": true,
+        "activeAxes": [
+          "X"
+        ],
+        "activeTargetResidual": 0.0,
+        "inactiveAxisResidual": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.25,
+        "passed": true,
+        "activeTargetResidual": 0.0,
+        "inactiveAxisResidual": 0.0
+      }
+    },
+    {
+      "name": "axis_y_to_object_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "handle_y",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 1.0,
+        "passed": true,
+        "activeAxes": [
+          "Y"
+        ],
+        "activeTargetResidual": 0.0,
+        "inactiveAxisResidual": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 1.0,
+        "passed": true,
+        "activeTargetResidual": 0.0,
+        "inactiveAxisResidual": 0.0
+      }
+    },
+    {
+      "name": "axis_z_to_object_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "handle_z",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 1.0,
+        "passed": true,
+        "activeAxes": [
+          "Z"
+        ],
+        "activeTargetResidual": 0.0,
+        "inactiveAxisResidual": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 1.0,
+        "passed": true,
+        "activeTargetResidual": 0.0,
+        "inactiveAxisResidual": 0.0
+      }
+    },
+    {
+      "name": "plane_xy_to_object_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "handle_xy",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": false,
+        "activeAxes": [
+          "X",
+          "Y"
+        ],
+        "activeTargetResidual": 6.329494450586082,
+        "inactiveAxisResidual": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.31038506929733,
+        "passed": true,
+        "activeTargetResidual": 0.0,
+        "inactiveAxisResidual": 0.0
+      }
+    },
+    {
+      "name": "plane_xz_to_object_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "handle_xz",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 8.31038506929733,
+        "passed": true,
+        "activeAxes": [
+          "X",
+          "Z"
+        ],
+        "activeTargetResidual": 0.0,
+        "inactiveAxisResidual": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.31038506929733,
+        "passed": true,
+        "activeTargetResidual": 0.0,
+        "inactiveAxisResidual": 0.0
+      }
+    },
+    {
+      "name": "plane_yz_to_object_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "handle_yz",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": false,
+        "activeAxes": [
+          "Y",
+          "Z"
+        ],
+        "activeTargetResidual": 1.4142135623730951,
+        "inactiveAxisResidual": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 1.4142135623730951,
+        "passed": true,
+        "activeTargetResidual": 0.0,
+        "inactiveAxisResidual": 0.0
+      }
+    },
+    {
+      "name": "object_space_x_axis_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "handle_object_x",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 7.086667270548812,
+        "passed": false,
+        "localAxisDirection": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "distanceAlongAxis": 5.7168661072269895,
+        "perpendicularDistance": 4.187874749262098
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 4.000000007450581,
+        "passed": true,
+        "perpendicularDistance": 0.0
+      }
+    },
+    {
+      "name": "object_pivot_to_other_custom_pivot_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "target_pivot",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 7.300171309414142,
+        "passed": false,
+        "distanceToTargetPivot": 1.3219305229700937
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 6.270964822837483,
+        "passed": true,
+        "distanceToTarget": 1.7881393432617188e-07
+      }
+    },
+    {
+      "name": "model_curve_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "curve",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 6.131678870218072,
+        "passed": false,
+        "distanceToCurve": 1.2389001736863055
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 6.046693311223912,
+        "passed": true,
+        "distanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "curved_nurbs_curve_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "curved_curve",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 6.134015192981539,
+        "passed": false,
+        "distanceToNurbsCurve": 2.3968729817548313
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 5.367727638395972,
+        "passed": true,
+        "distanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "closed_nurbs_curve_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "closed_curve",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 4.55757222890891,
+        "passed": false,
+        "distanceToNurbsCurve": 0.6098802821364542
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 6.860211367006122,
+        "passed": true,
+        "distanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "point_snap_to_curve_cv",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "curve_cv_point",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 6.425145863387584,
+        "passed": false,
+        "distanceToCurveCV": 6.911584403050794
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 4.100304866714182,
+        "passed": true,
+        "distanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "model_grid_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "grid",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 4.25,
+        "passed": true,
+        "nearestGridPoint": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "distanceToGrid": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 4.25,
+        "passed": true,
+        "distanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "custom_spacing_grid_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "custom_grid",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 7.198090024443984,
+        "passed": true,
+        "nearestGridPoint": [
+          2.5,
+          0.0,
+          2.5
+        ],
+        "distanceToGrid": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 7.198090024443984,
+        "passed": true,
+        "distanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "object_to_object_mesh_center_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "mesh_center",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 7.851445950863304,
+        "passed": false,
+        "distanceToMeshCenter": 0.060258912602629555
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 7.846177413237608,
+        "passed": true,
+        "distanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "model_view_plane_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "view_plane",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 2.823449254333395,
+        "passed": true,
+        "cameraDirection": [
+          -0.6246950475544245,
+          -0.46852128566581774,
+          -0.6246950475544244
+        ],
+        "depthDelta": -2.6645352591003757e-15
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 2.358495283014151,
+        "passed": true,
+        "planeDeltaResidual": 0.0
+      }
+    },
+    {
+      "name": "pivot_edit_to_object_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "pivot_edit_point",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "distanceToNearestPoint": 0.0,
+        "objectTranslationDelta": 0.0,
+        "geometryBoundsDelta": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "distanceToTarget": 0.0,
+        "objectTranslationDelta": 0.0,
+        "geometryBoundsDelta": 0.0
+      }
+    },
+    {
+      "name": "pivot_edit_to_object_mesh_center_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "pivot_edit_mesh_center",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 7.851445950863304,
+        "passed": false,
+        "distanceToMeshCenter": 0.060258912602629555,
+        "objectTranslationDelta": 0.0,
+        "geometryBoundsDelta": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 7.846177413237608,
+        "passed": true,
+        "distanceToTarget": 0.0,
+        "objectTranslationDelta": 0.0,
+        "geometryBoundsDelta": 0.0
+      }
+    },
+    {
+      "name": "pivot_orientation_to_rotated_mesh",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "pivot_orientation",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": false,
+        "manipOrientationDelta": 0.0,
+        "rotateAxisDelta": 0.0,
+        "geometryBoundsDelta": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "orientationValid": true,
+        "orientationErrorDegrees": 0.0
+      }
+    },
+    {
+      "name": "custom_pivot_persists_across_tools",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "pivot_persistence",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 1.299038105676658,
+        "passed": true,
+        "vertexDistanceToPivot": 0.0,
+        "objectTranslationDelta": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 1.299038105676658,
+        "passed": true,
+        "pivotPositionValid": true,
+        "distanceToSourceVertex": 0.0
+      }
+    },
+    {
+      "name": "rotate_after_custom_pivot_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "pivot_post_rotate",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 1.2990381056766567,
+        "passed": true,
+        "vertexDistanceToCustomPivot": 0.0,
+        "stepResidual": 8.881784197001252e-16
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 1.2990379680256199,
+        "passed": true,
+        "geometryChanged": true,
+        "pivotDistanceToSourceVertex": 2.384185791015625e-07
+      }
+    },
+    {
+      "name": "scale_after_custom_pivot_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "pivot_post_scale",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 1.299038105676658,
+        "passed": true,
+        "geometryScaleRatios": [
+          2.5,
+          1.0,
+          1.0
+        ],
+        "vertexDistanceToCustomPivot": 0.0,
+        "stepResidual": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 1.299038105676658,
+        "passed": true,
+        "geometryChanged": true,
+        "pivotDistanceToSourceVertex": 0.0
+      }
+    },
+    {
+      "name": "reset_after_custom_pivot_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "pivot_reset",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "distanceToObjectOrigin": 0.0,
+        "geometryBoundsDelta": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "distanceToObjectOrigin": 0.0,
+        "geometryBoundsUnchanged": true
+      }
+    },
+    {
+      "name": "parented_rotated_scaled_object_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "hierarchy_parent",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "parentAfter": [
+          "|snapHierarchyParent"
+        ],
+        "distanceToNearestPoint": 4.965068306494546e-16
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.370332598737749,
+        "passed": true,
+        "distanceToTarget": 2.081900739261267e-06,
+        "parentPreserved": true
+      }
+    },
+    {
+      "name": "negative_scale_parent_object_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "hierarchy_negative",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "parentAfter": [
+          "|snapHierarchyParent"
+        ],
+        "distanceToNearestPoint": 2.220446049250313e-16
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.370332605858689,
+        "passed": true,
+        "distanceToTarget": 2.006296238864283e-06,
+        "parentPreserved": true
+      }
+    },
+    {
+      "name": "shift_duplicate_to_object_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "duplicate_point",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "objectCountBefore": 1,
+        "objectCountAfter": 2,
+        "newObjects": [
+          "|snapSubject1"
+        ],
+        "originalTranslationDelta": 0.0,
+        "originalBoundsDelta": 0.0,
+        "copyDistanceToTarget": 0.0,
+        "copyGeometryPointDistance": 1.299038105676658,
+        "sharedShapeUuids": [],
+        "selectedAfter": [
+          "|snapSubject1"
+        ]
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "copyDistanceToTarget": 0.0,
+        "copyCount": 1,
+        "expectedCopyCount": 1,
+        "originalUnchanged": true
+      }
+    },
+    {
+      "name": "shift_duplicate_vertex_to_object_vertex_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "duplicate_vertex_point",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 1.299038105676658,
+        "passed": true,
+        "objectCountBefore": 1,
+        "objectCountAfter": 2,
+        "newObjects": [
+          "|snapSubject1"
+        ],
+        "originalTranslationDelta": 0.0,
+        "originalBoundsDelta": 0.0,
+        "copyDistanceToTarget": 0.0,
+        "copyGeometryPointDistance": 0.0,
+        "sharedShapeUuids": [],
+        "selectedAfter": [
+          "|snapSubject1"
+        ]
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 1.299038105676658,
+        "passed": true,
+        "copyDistanceToTarget": 0.0,
+        "copyGeometryPointDistance": 0.0,
+        "copyCount": 1,
+        "expectedCopyCount": 1,
+        "originalUnchanged": true
+      }
+    },
+    {
+      "name": "shift_duplicate_to_object_mesh_center_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "duplicate_mesh_center",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": false,
+        "objectCountBefore": 1,
+        "objectCountAfter": 2,
+        "newObjects": [
+          "|snapSubject1"
+        ],
+        "originalTranslationDelta": 0.0,
+        "originalBoundsDelta": 0.0,
+        "copyDistanceToTarget": 0.060258912602629555,
+        "copyGeometryPointDistance": null,
+        "sharedShapeUuids": [],
+        "selectedAfter": [
+          "|snapSubject1"
+        ]
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "copyDistanceToTarget": 0.0,
+        "copyCount": 1,
+        "expectedCopyCount": 1,
+        "originalUnchanged": true
+      }
+    },
+    {
+      "name": "shift_duplicate_copy_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "duplicate_copy_point",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "objectCountBefore": 1,
+        "objectCountAfter": 2,
+        "newObjects": [
+          "|snapSubject1"
+        ],
+        "originalTranslationDelta": 0.0,
+        "originalBoundsDelta": 0.0,
+        "copyDistanceToTarget": 0.0,
+        "copyGeometryPointDistance": 1.299038105676658,
+        "sharedShapeUuids": [],
+        "selectedAfter": [
+          "|snapSubject1"
+        ]
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "sharedShapeData": false,
+        "copyDistanceToTarget": 0.0,
+        "copyCount": 1,
+        "expectedCopyCount": 1,
+        "originalUnchanged": true
+      }
+    },
+    {
+      "name": "shift_duplicate_instance_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "duplicate_instance_point",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "objectCountBefore": 1,
+        "objectCountAfter": 2,
+        "newObjects": [
+          "|snapSubject1"
+        ],
+        "originalTranslationDelta": 0.0,
+        "originalBoundsDelta": 0.0,
+        "copyDistanceToTarget": 0.0,
+        "copyGeometryPointDistance": 1.299038105676658,
+        "sharedShapeUuids": [
+          "A8AB317C-C447-A527-505C-8AB656763592"
+        ],
+        "selectedAfter": [
+          "|snapSubject1"
+        ]
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "sharedShapeData": true,
+        "copyDistanceToTarget": 0.0,
+        "copyCount": 1,
+        "expectedCopyCount": 1,
+        "originalUnchanged": true
+      }
+    },
+    {
+      "name": "shift_duplicate_reverse_modifier_order",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "duplicate_copy_point_reverse",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "objectCountBefore": 1,
+        "objectCountAfter": 2,
+        "newObjects": [
+          "|snapSubject1"
+        ],
+        "originalTranslationDelta": 0.0,
+        "originalBoundsDelta": 0.0,
+        "copyDistanceToTarget": 0.0,
+        "copyGeometryPointDistance": 1.299038105676658,
+        "sharedShapeUuids": [],
+        "selectedAfter": [
+          "|snapSubject1"
+        ]
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "sharedShapeData": false,
+        "copyDistanceToTarget": 0.0,
+        "copyCount": 1,
+        "expectedCopyCount": 1,
+        "originalUnchanged": true
+      }
+    },
+    {
+      "name": "shift_drag_with_smart_duplicate_disabled",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "duplicate_disabled",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "objectCountAfter": 1,
+        "distanceToTarget": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "distanceToTarget": 0.0,
+        "copyCount": 0,
+        "expectedCopyCount": 0,
+        "originalUnchanged": false
+      }
+    },
+    {
+      "name": "shift_duplicate_with_rotate_step",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "duplicate_rotate",
+      "tool": "rotate",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": false,
+        "newObjects": [],
+        "stepResidual": 1.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "stepResidual": 8.3482605273133e-08,
+        "copyCount": 1,
+        "expectedCopyCount": 1,
+        "originalUnchanged": true
+      }
+    },
+    {
+      "name": "shift_duplicate_with_scale_step",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "duplicate_scale",
+      "tool": "scale",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": false,
+        "newObjects": [
+          "|snapSubject1"
+        ],
+        "stepResidual": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "stepResidual": 0.0,
+        "copyCount": 1,
+        "expectedCopyCount": 1,
+        "originalUnchanged": true
+      }
+    },
+    {
+      "name": "sequential_shift_duplicate_chain",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "duplicate_chain",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "objectCountAfter": 3,
+        "newObjects": [
+          "|snapSubject1",
+          "|snapSubject2"
+        ],
+        "selectedAfter": [
+          "|snapSubject2"
+        ]
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "copyCount": 2,
+        "expectedCopyCount": 2,
+        "originalUnchanged": true
+      }
+    },
+    {
+      "name": "shift_duplicate_modifier_release_first",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "duplicate_copy_point_release",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "objectCountBefore": 1,
+        "objectCountAfter": 2,
+        "newObjects": [
+          "|snapSubject1"
+        ],
+        "originalTranslationDelta": 0.0,
+        "originalBoundsDelta": 0.0,
+        "copyDistanceToTarget": 0.0,
+        "copyGeometryPointDistance": 1.299038105676658,
+        "sharedShapeUuids": [],
+        "selectedAfter": [
+          "|snapSubject1"
+        ]
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "sharedShapeData": false,
+        "copyDistanceToTarget": 0.0,
+        "copyCount": 1,
+        "expectedCopyCount": 1,
+        "originalUnchanged": true
+      }
+    },
+    {
+      "name": "live_surface_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "live_surface",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 8.00390529679106,
+        "passed": true,
+        "distanceToSurfacePlane": 4.440892098500626e-16,
+        "insideSurfaceBounds": true
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 5.573374202401989,
+        "passed": true,
+        "distanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "asymmetric_mesh_center_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "asymmetric_center",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 6.026221514847387,
+        "passed": true,
+        "insideAsymmetricMeshBounds": true,
+        "distanceToTransformCenter": 1.1583088925617555
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 5.6844085004510365,
+        "passed": true,
+        "distanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "multi_object_spacing_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "multi_object",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 1.0,
+        "passed": false,
+        "relativeSpacingDelta": 2.5,
+        "companionMoved": 3.5,
+        "selectionCenterDistanceToTarget": 6.329494450586082
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.609587678861281,
+        "passed": true,
+        "relativeSpacingDelta": 0.0,
+        "selectionCenterDistanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "component_point_snap_preserve_spacing",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "component_relative",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "spacingBefore": 1.5,
+        "spacingAfter": 1.5,
+        "maxDistanceToTargetPoint": 0.75
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "spacingBefore": 1.5,
+        "spacingAfter": 1.5,
+        "maxDistanceToTargetPoint": 1.5
+      }
+    },
+    {
+      "name": "component_point_snap_collapse_spacing",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "component_collapse",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "spacingBefore": 1.5,
+        "spacingAfter": 0.0,
+        "maxDistanceToTargetPoint": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "spacingBefore": 1.5,
+        "spacingAfter": 0.0,
+        "maxDistanceToTargetPoint": 0.0
+      }
+    },
+    {
+      "name": "orthographic_view_plane_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "view_plane_ortho",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": false,
+        "cameraDirection": [
+          -0.6246950475544245,
+          -0.46852128566581774,
+          -0.6246950475544244
+        ],
+        "depthDelta": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 2.358495283014151,
+        "passed": true,
+        "planeDeltaResidual": 0.0
+      }
+    },
+    {
+      "name": "ambiguous_point_target_selection",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "ambiguous_point",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 5.7019733792111404,
+        "passed": true,
+        "candidateDistances": [
+          0.20000002384186358,
+          5.331201499700045e-08
+        ],
+        "chosenCandidate": 1
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 5.51475304041128,
+        "passed": true,
+        "candidateDistances": [
+          1.1920928955078125e-07,
+          0.19999993257223422
+        ],
+        "chosenCandidate": 0
+      }
+    },
+    {
+      "name": "cancel_point_snap_drag",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "cancel_move",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 6.425145863387584,
+        "passed": false,
+        "objectCountUnchanged": true,
+        "geometryBoundsDelta": 6.049999952316284,
+        "activeSnapModesAfter": []
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "stateUnchanged": true
+      }
+    },
+    {
+      "name": "cancel_shift_duplicate_snap_drag",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "cancel_duplicate",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": false,
+      "blenderPassed": true,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": false,
+        "objectCountUnchanged": false,
+        "geometryBoundsDelta": 0.0,
+        "activeSnapModesAfter": []
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "stateUnchanged": true
+      }
+    },
+    {
+      "name": "undo_object_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "undo_move",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": false,
+      "agreement": false,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "objectCountUnchanged": true,
+        "geometryBoundsDelta": 0.0,
+        "activeSnapModesAfter": []
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": false,
+        "stateUnchanged": false
+      }
+    },
+    {
+      "name": "redo_object_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "redo_move",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "distanceAfterRedo": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "distanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "tool_change_during_point_snap_drag",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "tool_change_cleanup",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 6.425145863387584,
+        "passed": true,
+        "activeSnapModesAfter": [],
+        "currentContextAfter": "Rotate"
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 1.0,
+        "passed": true,
+        "activeToolAfter": "ROTATE",
+        "snapInactiveAfter": true
+      }
+    },
+    {
+      "name": "frozen_transform_object_point_snap",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "frozen_point",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "distanceToNearestPoint": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 8.370334521391603,
+        "passed": true,
+        "distanceToTarget": 0.0
+      }
+    },
+    {
+      "name": "model_step_move_absolute",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "step_move_absolute",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 2.25,
+        "passed": true,
+        "axis": "X",
+        "stepSize": 1.0,
+        "stepResidual": 0.0,
+        "orthogonalResidual": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 2.25,
+        "passed": true,
+        "stepResidual": 0.0
+      }
+    },
+    {
+      "name": "model_step_move_relative",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "step_move_relative",
+      "tool": "move",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 2.0,
+        "passed": true,
+        "axis": "X",
+        "stepSize": 1.0,
+        "stepResidual": 0.0,
+        "orthogonalResidual": 0.0
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 2.0,
+        "passed": true,
+        "stepResidual": 0.0
+      }
+    },
+    {
+      "name": "model_step_rotate",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "step_rotate",
+      "tool": "rotate",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "stepDegrees": 15.0,
+        "stepResidual": 8.881784197001252e-16
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "stepResidual": 8.3482605273133e-08
+      }
+    },
+    {
+      "name": "model_step_scale",
+      "presentInMaya": true,
+      "presentInBlender": true,
+      "comparable": true,
+      "mode": "step_scale",
+      "tool": "scale",
+      "modeMatches": true,
+      "toolMatches": true,
+      "mayaPassed": true,
+      "blenderPassed": true,
+      "agreement": true,
+      "blenderExecutionFidelity": "operator_equivalent",
+      "nativeInputComparable": false,
+      "mayaAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "stepSize": 0.5,
+        "boundingBoxBefore": [
+          1.5,
+          1.5,
+          1.5
+        ],
+        "boundingBoxAfter": [
+          3.75,
+          1.5,
+          1.5
+        ],
+        "geometryScaleRatios": [
+          2.5,
+          1.0,
+          1.0
+        ],
+        "changedAxes": [
+          "X"
+        ],
+        "stepResidual": 0.0,
+        "transformScale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "blenderAnalysis": {
+        "pivotMoved": 0.0,
+        "passed": true,
+        "stepResidual": 0.0
+      }
+    }
+  ]
+}

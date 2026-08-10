@@ -87,11 +87,11 @@ if [ "$(uname -m)" != "arm64" ]; then
 fi
 ok "Apple Silicon (arm64)"
 
-# The tree, the object files and the libraries together want well over 50 GB.
+# The tree, libraries and the persistent compiler cache together can use close to 90 GB.
 FREE_GB="$(df -g "${HOME}" 2>/dev/null | awk 'NR==2 {print $4}')"
 if [ -n "${FREE_GB:-}" ]; then
-  if [ "${FREE_GB}" -lt 60 ]; then
-    warn "${FREE_GB} GB free on ${HOME}; the build tree and libraries want about 60 GB."
+  if [ "${FREE_GB}" -lt 90 ]; then
+    warn "${FREE_GB} GB free on ${HOME}; build, libraries and ccache can use about 90 GB."
   else
     ok "${FREE_GB} GB free on ${HOME}"
   fi
@@ -122,7 +122,7 @@ fi
 export PATH
 
 MISSING=""
-for tool in cmake ninja git-lfs; do
+for tool in cmake ninja ccache git-lfs; do
   case "${tool}" in
     git-lfs) command -v git-lfs >/dev/null 2>&1 && { ok "git-lfs $(git lfs version 2>/dev/null | awk '{print $1}')"; continue ;} ;;
     *) command -v "${tool}" >/dev/null 2>&1 && { ok "${tool} $("${tool}" --version 2>/dev/null | head -1)"; continue ;} ;;
@@ -145,7 +145,7 @@ if [ -n "${MISSING# }" ]; then
     bad "Missing build tools:${MISSING} - and Homebrew was not found."
     err ""
     err "        Install Homebrew from https://brew.sh and run this script again, or install"
-    err "        cmake, ninja and git-lfs some other way."
+    err "        cmake, ninja, ccache and git-lfs some other way."
     exit 1
   else
     say "  Missing build tools:${MISSING}"
@@ -174,11 +174,28 @@ if command -v cmake >/dev/null 2>&1; then
     bad "cmake $(command -v cmake) reports ${CMAKE_HOST_PROCESSOR:-an unknown architecture}, not arm64."
     err ""
     err "        Install native Apple Silicon Homebrew in /opt/homebrew, then run:"
-    err "        /opt/homebrew/bin/brew install cmake ninja git-lfs"
+    err "        /opt/homebrew/bin/brew install cmake ninja ccache git-lfs"
   else
     ok "cmake host architecture arm64"
   fi
 fi
+
+# Ninja is copied into the build tree by go.sh so Homebrew upgrades cannot silently change its
+# .ninja_log format. Ccache is the second line of defense if a deliberate toolchain migration ever
+# makes a broad rebuild unavoidable. Both must be native; Rosetta tools can come from /usr/local
+# even in an otherwise arm64 shell.
+for tool in ninja ccache; do
+  if command -v "${tool}" >/dev/null 2>&1; then
+    TOOL_PATH="$(command -v "${tool}")"
+    if file "${TOOL_PATH}" 2>/dev/null | grep -q 'arm64'; then
+      ok "${tool} is native arm64 (${TOOL_PATH})"
+    else
+      bad "${tool} ${TOOL_PATH} is not a native arm64 executable."
+      err ""
+      err "        Install it with native Homebrew: /opt/homebrew/bin/brew install ${tool}"
+    fi
+  fi
+done
 
 
 # ---------------------------------------------------------------------------------------------
@@ -345,6 +362,7 @@ say ""
 say "  Build tree:  ${BUILD_DIR}   (created by the first build)"
 say "  Next:        clarity/mac/go.sh --no-tests"
 say ""
-say "The first build compiles the whole tree and takes a long time; every build after it only"
-say "compiles what changed. go.sh --help lists the rest."
+say "The first build compiles the whole tree and warms ccache. Every build after it only compiles"
+say "what changed; even an intentional toolchain migration can reuse cached compiler results."
+say "go.sh --help lists the rest."
 exit 0

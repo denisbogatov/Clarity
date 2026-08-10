@@ -6,6 +6,7 @@
  * \ingroup RNA
  */
 
+#include <algorithm>
 #include <cstdlib>
 
 #include "DNA_scene_types.h"
@@ -1675,6 +1676,12 @@ static void rna_WindowManager_clarity_snap_tolerance_set(PointerRNA *ptr, const 
   wm->runtime->clarity_snap_tolerance = value < 1 ? 1 : value;
 }
 
+static bool rna_WindowManager_clarity_selection_constraint_angle_active_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->clarity_selection_constraint_angle_active;
+}
+
 static float rna_WindowManager_clarity_selection_constraint_angle_get(PointerRNA *ptr)
 {
   const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
@@ -1685,7 +1692,8 @@ static void rna_WindowManager_clarity_selection_constraint_angle_set(PointerRNA 
                                                                   const float value)
 {
   wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
-  wm->runtime->clarity_selection_constraint_angle = value;
+  wm->runtime->clarity_selection_constraint_angle = std::clamp(
+      value, DEG2RADF(1.0f), DEG2RADF(180.0f));
 }
 
 struct ClarityPivotStateSnapshot {
@@ -3369,13 +3377,22 @@ static void rna_def_windowmanager(BlenderRNA *brna)
       prop, "Snap Tolerance", "Size of the snapping region around the pointer, in pixels");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
 
+  prop = RNA_def_property(
+      srna, "clarity_selection_constraint_angle_active", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_boolean_funcs(
+      prop, "rna_WindowManager_clarity_selection_constraint_angle_active_get", nullptr);
+  RNA_def_property_ui_text(prop,
+                           "Selection by Angle Active",
+                           "The Angle selection constraint is active in the Clarity viewport");
+
   prop = RNA_def_property(srna, "clarity_selection_constraint_angle", PROP_FLOAT, PROP_ANGLE);
   RNA_def_property_float_funcs(prop,
                                "rna_WindowManager_clarity_selection_constraint_angle_get",
                                "rna_WindowManager_clarity_selection_constraint_angle_set",
                                nullptr);
-  RNA_def_property_range(prop, 0.0f, DEG2RADF(180.0f));
-  RNA_def_property_ui_range(prop, 0.0f, DEG2RADF(180.0f), 100.0f, 1);
+  RNA_def_property_range(prop, DEG2RADF(1.0f), DEG2RADF(180.0f));
+  RNA_def_property_ui_range(prop, DEG2RADF(1.0f), DEG2RADF(180.0f), 100.0f, 1);
   RNA_def_property_ui_text(prop,
                            "Selection Constraint Angle",
                            "Angle tolerance the Angle selection constraint grows a component "

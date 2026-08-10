@@ -2,19 +2,31 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later */
 
+#include "MEM_guardedalloc.h"
+
+#include <array>
+
 #include "testing/testing.h"
 
+#include "DNA_object_types.h"
+
+#include "BLI_math_matrix.hh"
 #include "BLI_math_vector.h"
+#include "BLI_math_vector.hh"
+
+#include "BKE_object_custom_pivot.hh"
+#include "BKE_object_types.hh"
 
 #include "transform.hh"
 #include "transform_snap.hh"
 #include "transform_snap_clarity.hh"
+#include "transform_snap_object.hh"
 
 namespace blender::ed::transform::tests {
 
 static TransSnap clarity_snap_state(const bool clarity_mode_active,
-                                 const bool pivot_valid,
-                                 const float pivot[3])
+                                    const bool pivot_valid,
+                                    const float pivot[3])
 {
   TransSnap tsnap = {};
   tsnap.clarity_mode_active = clarity_mode_active;
@@ -229,6 +241,307 @@ TEST(transform_snap_clarity_plan, ViewPlaneConstrainsWithoutSnapping)
   EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_NONE);
 }
 
+/**
+ * The first twenty model scenarios are the compatibility boundary currently implemented from the
+ * Maya capture. Handle names are kept in this table because X/Y/Z and the three planes all use the
+ * same point target rule; the handle's transform constraint projects that target afterwards.
+ *
+ * Live Surface is intentionally absent: it is scenario 39 and is not implemented by the fork yet.
+ */
+TEST(transform_snap_clarity_plan, FirstTwentyMayaModelScenariosUseTheCanonicalTargetRules)
+{
+  struct Case {
+    const char *name;
+    clarity::ClaritySnapMode mode;
+    eSnapMode snap_to;
+    bool curve_only;
+    bool include_pivots;
+    bool view_plane;
+    bool mesh_center;
+  };
+  const std::array cases = {
+      Case{"01 object pivot to object point",
+           clarity::ClaritySnapMode::Point,
+           SCE_SNAP_TO_VERTEX,
+           false,
+           true,
+           false,
+           false},
+      Case{"02 object vertex to object vertex",
+           clarity::ClaritySnapMode::Point,
+           SCE_SNAP_TO_VERTEX,
+           false,
+           true,
+           false,
+           false},
+      Case{"03 X handle to object point",
+           clarity::ClaritySnapMode::Point,
+           SCE_SNAP_TO_VERTEX,
+           false,
+           true,
+           false,
+           false},
+      Case{"04 Y handle to object point",
+           clarity::ClaritySnapMode::Point,
+           SCE_SNAP_TO_VERTEX,
+           false,
+           true,
+           false,
+           false},
+      Case{"05 Z handle to object point",
+           clarity::ClaritySnapMode::Point,
+           SCE_SNAP_TO_VERTEX,
+           false,
+           true,
+           false,
+           false},
+      Case{"06 XY handle to object point",
+           clarity::ClaritySnapMode::Point,
+           SCE_SNAP_TO_VERTEX,
+           false,
+           true,
+           false,
+           false},
+      Case{"07 XZ handle to object point",
+           clarity::ClaritySnapMode::Point,
+           SCE_SNAP_TO_VERTEX,
+           false,
+           true,
+           false,
+           false},
+      Case{"08 YZ handle to object point",
+           clarity::ClaritySnapMode::Point,
+           SCE_SNAP_TO_VERTEX,
+           false,
+           true,
+           false,
+           false},
+      Case{"09 object X handle to object point",
+           clarity::ClaritySnapMode::Point,
+           SCE_SNAP_TO_VERTEX,
+           false,
+           true,
+           false,
+           false},
+      Case{"10 object pivot to authored pivot",
+           clarity::ClaritySnapMode::Point,
+           SCE_SNAP_TO_VERTEX,
+           false,
+           true,
+           false,
+           false},
+      Case{"11 model curve",
+           clarity::ClaritySnapMode::Curve,
+           SCE_SNAP_TO_EDGE,
+           true,
+           false,
+           false,
+           false},
+      Case{"12 curved NURBS",
+           clarity::ClaritySnapMode::Curve,
+           SCE_SNAP_TO_EDGE,
+           true,
+           false,
+           false,
+           false},
+      Case{"13 closed NURBS",
+           clarity::ClaritySnapMode::Curve,
+           SCE_SNAP_TO_EDGE,
+           true,
+           false,
+           false,
+           false},
+      Case{"14 point to curve CV",
+           clarity::ClaritySnapMode::Point,
+           SCE_SNAP_TO_VERTEX,
+           false,
+           true,
+           false,
+           false},
+      Case{"15 model grid",
+           clarity::ClaritySnapMode::Grid,
+           SCE_SNAP_TO_GRID,
+           false,
+           false,
+           false,
+           false},
+      Case{"16 custom spacing grid",
+           clarity::ClaritySnapMode::Grid,
+           SCE_SNAP_TO_GRID,
+           false,
+           false,
+           false,
+           false},
+      Case{"17 object to ray mesh center",
+           clarity::ClaritySnapMode::MeshCenter,
+           SCE_SNAP_TO_VOLUME,
+           false,
+           false,
+           false,
+           true},
+      Case{"18 model view plane",
+           clarity::ClaritySnapMode::ViewPlane,
+           SCE_SNAP_TO_NONE,
+           false,
+           false,
+           true,
+           false},
+      Case{"19 pivot edit to point",
+           clarity::ClaritySnapMode::Point,
+           SCE_SNAP_TO_VERTEX,
+           false,
+           true,
+           false,
+           false},
+      Case{"20 pivot edit to ray mesh center",
+           clarity::ClaritySnapMode::MeshCenter,
+           SCE_SNAP_TO_VOLUME,
+           false,
+           false,
+           false,
+           true},
+  };
+
+  for (const Case &test : cases) {
+    SCOPED_TRACE(test.name);
+    const ClaritySnapPlan plan = transform_snap_clarity_plan_get(
+        clarity_translate_input(test.mode));
+    EXPECT_EQ(plan.snap_to, test.snap_to);
+    EXPECT_EQ(plan.curve_targets_only, test.curve_only);
+    EXPECT_EQ(plan.include_object_pivots, test.include_pivots);
+    EXPECT_EQ(plan.view_plane, test.view_plane);
+    EXPECT_EQ(plan.mesh_center, test.mesh_center);
+    EXPECT_EQ(plan.use_snap, !test.view_plane);
+    EXPECT_EQ(plan.source_is_center, !test.view_plane);
+  }
+}
+
+/** Scenario 10: Point mode must target the authored pivot, not merely the object origin. */
+TEST(transform_snap_object, PointModeResolvesTheOtherObjectsAuthoredPivot)
+{
+  Object object{};
+  object.runtime = MEM_new<ObjectRuntime>(__func__);
+  const float4x4 evaluated_matrix = math::from_location<float4x4>(float3(1.0f, 2.0f, 3.0f));
+  object.runtime->object_to_world = evaluated_matrix;
+
+  EXPECT_EQ(snap_object_pivot_world_get(object, evaluated_matrix), evaluated_matrix.location());
+
+  const double3 authored_world(-5.0, 0.5, 7.0);
+  ASSERT_TRUE(BKE_object_custom_pivot_position_world_set(object, false, authored_world));
+  const float3 resolved = snap_object_pivot_world_get(object, evaluated_matrix);
+  EXPECT_NEAR(math::distance(resolved, float3(authored_world)), 0.0f, 1.0e-6f);
+
+  float4x4 instance_matrix = evaluated_matrix;
+  instance_matrix.location() = float3(10.0f, 2.0f, 3.0f);
+  const float3 authored_local = math::transform_point(math::invert(evaluated_matrix),
+                                                      float3(authored_world));
+  const float3 expected_instance = math::transform_point(instance_matrix, authored_local);
+  EXPECT_NEAR(
+      math::distance(snap_object_pivot_world_get(object, instance_matrix), expected_instance),
+      0.0f,
+      1.0e-6f);
+
+  BKE_object_custom_pivot_reset(object);
+  MEM_delete(object.runtime);
+}
+
+/** Scenarios 41-43: spacing is an edit-component rule; object selections always stay rigid. */
+TEST(transform_snap_clarity_plan, ComponentPointSnapEitherPreservesOrCollapsesSpacing)
+{
+  ClaritySnapPlanInput input = clarity_translate_input(clarity::ClaritySnapMode::Point);
+  input.is_component_edit = true;
+  input.keep_spacing = true;
+
+  ClaritySnapPlan plan = transform_snap_clarity_plan_get(input);
+  EXPECT_TRUE(plan.source_is_center);
+  EXPECT_FALSE(plan.collapse_components);
+
+  input.keep_spacing = false;
+  plan = transform_snap_clarity_plan_get(input);
+  EXPECT_FALSE(plan.source_is_center);
+  EXPECT_TRUE(plan.collapse_components);
+
+  /* `snapComponentsRelative` does not collapse several selected objects. */
+  input.is_component_edit = false;
+  plan = transform_snap_clarity_plan_get(input);
+  EXPECT_TRUE(plan.source_is_center);
+  EXPECT_FALSE(plan.collapse_components);
+
+  const float4x4 object_to_world = math::from_location<float4x4>(float3(3.0f, -2.0f, 1.0f));
+  const float3 target_world(8.0f, 4.0f, -3.0f);
+  const float3 first_local(-1.0f, 0.0f, 0.0f);
+  const float3 second_local(2.0f, 1.0f, 0.5f);
+  const float3 first_delta = clarity_component_collapse_translation_get(
+      first_local, object_to_world, true, target_world);
+  const float3 second_delta = clarity_component_collapse_translation_get(
+      second_local, object_to_world, true, target_world);
+  EXPECT_EQ(math::transform_point(object_to_world, first_local) + first_delta, target_world);
+  EXPECT_EQ(math::transform_point(object_to_world, second_local) + second_delta, target_world);
+}
+
+/** The remaining model suite reuses the same target backends, including chained duplicates. */
+TEST(transform_snap_clarity_plan, RemainingMayaModelScenariosUseTheCanonicalTargetRules)
+{
+  const std::array point_scenarios = {
+      "26 parented object",
+      "27 negative-scale parent",
+      "28 shift duplicate point",
+      "29 shift duplicate vertex point",
+      "31 duplicate copy point",
+      "32 duplicate instance point",
+      "33 reverse modifier order",
+      "34 smart duplicate disabled",
+      "37a duplicate chain point",
+      "38 modifier released first",
+      "41 multi-object spacing",
+      "42 component spacing preserved",
+      "43 component spacing collapsed",
+      "45 ambiguous point",
+      "46 cancel point",
+      "47 cancel duplicated point",
+      "48 undo point",
+      "49 redo point",
+      "50 tool change during point",
+      "51 frozen-transform point",
+  };
+  for (const char *name : point_scenarios) {
+    SCOPED_TRACE(name);
+    const ClaritySnapPlan plan = transform_snap_clarity_plan_get(
+        clarity_translate_input(clarity::ClaritySnapMode::Point));
+    EXPECT_TRUE(plan.use_snap);
+    EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_VERTEX);
+    EXPECT_TRUE(plan.include_object_pivots);
+  }
+
+  const std::array mesh_center_scenarios = {"30 duplicated object to mesh center",
+                                            "40 asymmetric ray mesh center"};
+  for (const char *name : mesh_center_scenarios) {
+    SCOPED_TRACE(name);
+    const ClaritySnapPlan plan = transform_snap_clarity_plan_get(
+        clarity_translate_input(clarity::ClaritySnapMode::MeshCenter));
+    EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_VOLUME);
+    EXPECT_TRUE(plan.mesh_center);
+  }
+
+  SCOPED_TRACE("37b duplicate chain grid");
+  EXPECT_EQ(
+      transform_snap_clarity_plan_get(clarity_translate_input(clarity::ClaritySnapMode::Grid))
+          .snap_to,
+      SCE_SNAP_TO_GRID);
+
+  SCOPED_TRACE("44 orthographic view plane");
+  EXPECT_TRUE(
+      transform_snap_clarity_plan_get(clarity_translate_input(clarity::ClaritySnapMode::ViewPlane))
+          .view_plane);
+
+  /* 35/36 and 52-55 all use the Step backend; transform-specific units are tested below. */
+  SCOPED_TRACE("35/36/52-55 step transforms");
+  EXPECT_EQ(
+      transform_snap_clarity_plan_get(clarity_translate_input(clarity::ClaritySnapMode::Step))
+          .snap_to,
+      SCE_SNAP_TO_INCREMENT);
+}
+
 /** Step snapping uses the size from the Step Snap widget, not the grid of the scene. */
 TEST(transform_snap_clarity_plan, StepSnapUsesTheConfiguredSize)
 {
@@ -315,8 +628,8 @@ TEST(transform_snap_clarity_plan, StepSizeOnlyReplacesTheIncrementInTheViewport)
 /* -------------------------------------------------------------------- */
 /** \name Pivot Snapping
  *
- * Where a drag of the Edit Pivot manipulator leaves the pivot. These are the rules the Clarity capture
- * shows, pinned here so the behavior stops being re-derived from a video.
+ * Where a drag of the Edit Pivot manipulator leaves the pivot. These are the rules the Clarity
+ * capture shows, pinned here so the behavior stops being re-derived from a video.
  * \{ */
 
 static ClarityPivotSnapInput clarity_pivot_input()
@@ -329,8 +642,9 @@ static ClarityPivotSnapInput clarity_pivot_input()
 }
 
 /**
- * Outside the snap tolerance there is no target, and Clarity keeps the pivot on the pointer. Holding it
- * on the last target instead is what looked like a pivot magnetized to a vertex it had left.
+ * Outside the snap tolerance there is no target, and Clarity keeps the pivot on the pointer.
+ * Holding it on the last target instead is what looked like a pivot magnetized to a vertex it had
+ * left.
  */
 TEST(transform_snap_clarity_pivot, PivotFollowsThePointerWithoutATarget)
 {
@@ -342,7 +656,8 @@ TEST(transform_snap_clarity_pivot, PivotFollowsThePointerWithoutATarget)
   EXPECT_FALSE(decision.from_target);
 }
 
-/** The magnet: the pivot lands on the target itself, never offset by the drag that took it there. */
+/** The magnet: the pivot lands on the target itself, never offset by the drag that took it there.
+ */
 TEST(transform_snap_clarity_pivot, PivotLandsExactlyOnTheTarget)
 {
   ClarityPivotSnapInput input = clarity_pivot_input();
@@ -355,8 +670,8 @@ TEST(transform_snap_clarity_pivot, PivotLandsExactlyOnTheTarget)
 
 /**
  * A dragged axis or plane handle owns the direction: the pivot slides along it up to the target
- * instead of leaving it. Taking the target verbatim is what moved a pivot dragged by the Z arrow to
- * a vertex beside the axis, which the manipulator trace showed as `applied=(0 0 1)` while the
+ * instead of leaving it. Taking the target verbatim is what moved a pivot dragged by the Z arrow
+ * to a vertex beside the axis, which the manipulator trace showed as `applied=(0 0 1)` while the
  * decision returned `(1 1 1)`.
  */
 TEST(transform_snap_clarity_pivot, AConstrainedDragKeepsThePivotOnItsConstraint)
@@ -374,6 +689,36 @@ TEST(transform_snap_clarity_pivot, AConstrainedDragKeepsThePivotOnItsConstraint)
   /* Without a constraint the whole target still wins. */
   input.has_constraint = false;
   EXPECT_EQ(clarity_pivot_snap_decision_get(input).position, input.target_position);
+}
+
+/** Scenarios 03-09: every axis/plane handle consumes the target projected by its constraint. */
+TEST(transform_snap_clarity_pivot, FirstTwentyHandleScenariosKeepEveryAxisAndPlaneConstraint)
+{
+  struct Case {
+    const char *name;
+    double3 projected_target;
+  };
+  const std::array cases = {
+      Case{"03 X", double3(5.0, 1.0, 1.0)},
+      Case{"04 Y", double3(1.0, 6.0, 1.0)},
+      Case{"05 Z", double3(1.0, 1.0, 7.0)},
+      Case{"06 XY", double3(5.0, 6.0, 1.0)},
+      Case{"07 XZ", double3(5.0, 1.0, 7.0)},
+      Case{"08 YZ", double3(1.0, 6.0, 7.0)},
+      /* Scenario 09 uses a rotated object axis, so the projection is not world-axis aligned. */
+      Case{"09 object X", double3(3.25, 2.5, -0.75)},
+  };
+
+  for (const Case &test : cases) {
+    SCOPED_TRACE(test.name);
+    ClarityPivotSnapInput input = clarity_pivot_input();
+    input.has_target = true;
+    input.has_constraint = true;
+    input.constrained_target_position = test.projected_target;
+    const ClarityPivotSnapDecision decision = clarity_pivot_snap_decision_get(input);
+    EXPECT_EQ(decision.position, test.projected_target);
+    EXPECT_TRUE(decision.from_target);
+  }
 }
 
 /** Position snapping off keeps the pointer in charge of the move. */
@@ -395,8 +740,8 @@ TEST(transform_snap_clarity_pivot, PositionSnapOffLeavesThePointerInChargeOfTheM
  * every snapped update gave it a new frame each time the element under the pointer changed, so a
  * drag that crossed a corner left the axes turned and the drag could not turn them back.
  *
- * The decision therefore carries a position and the flag saying where it came from, and the drag has
- * nothing else to apply.
+ * The decision therefore carries a position and the flag saying where it came from, and the drag
+ * has nothing else to apply.
  */
 TEST(transform_snap_clarity_pivot, ADragPlacesThePivotWithoutTurningIt)
 {
@@ -415,12 +760,12 @@ TEST(transform_snap_clarity_pivot, ADragPlacesThePivotWithoutTurningIt)
 }
 
 /**
- * The click that aligns the pivot with a component reads one vector per hit, and it means something
- * different for each element: a face and a vertex return a normal, an edge returns the direction
- * between its two vertices, a grid intersection returns nothing. Clarity aligns all of them with the
- * pivot's X axis - "the manipulator's X-axis aims at the selected vertex, aligns along the selected
- * edge, and aligns along the face normal of the selected face" - but the kinds still have to be told
- * apart, because only an edge may be reported from either end.
+ * The click that aligns the pivot with a component reads one vector per hit, and it means
+ * something different for each element: a face and a vertex return a normal, an edge returns the
+ * direction between its two vertices, a grid intersection returns nothing. Clarity aligns all of
+ * them with the pivot's X axis - "the manipulator's X-axis aims at the selected vertex, aligns
+ * along the selected edge, and aligns along the face normal of the selected face" - but the kinds
+ * still have to be told apart, because only an edge may be reported from either end.
  */
 TEST(transform_snap_clarity_pivot, EachElementAimsTheAxisItsVectorBelongsTo)
 {
@@ -430,7 +775,8 @@ TEST(transform_snap_clarity_pivot, EachElementAimsTheAxisItsVectorBelongsTo)
             ClarityPivotSnapVector::SurfaceNormal);
   EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_VOLUME),
             ClarityPivotSnapVector::SurfaceNormal);
-  /* `cb_snap_edge` stores `v1 - v0`, and the endpoint case deliberately keeps the vertex normal. */
+  /* `cb_snap_edge` stores `v1 - v0`, and the endpoint case deliberately keeps the vertex normal.
+   */
   EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_EDGE),
             ClarityPivotSnapVector::EdgeDirection);
   EXPECT_EQ(clarity_pivot_snap_vector_get(SCE_SNAP_TO_EDGE_MIDPOINT),

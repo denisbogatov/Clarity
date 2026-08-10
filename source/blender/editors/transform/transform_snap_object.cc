@@ -22,6 +22,7 @@
 #include "BKE_mesh.hh"
 #include "BKE_mesh_wrapper.hh"
 #include "BKE_object.hh"
+#include "BKE_object_custom_pivot.hh"
 
 #include "DEG_depsgraph_query.hh"
 
@@ -913,10 +914,11 @@ static eSnapMode snap_edge_points(SnapObjectContext *sctx, const float dist_px_s
       sctx, sctx->ret.ob, sctx->ret.data, sctx->ret.obmat, dist_px_sq_orig, sctx->ret.index);
 }
 
-eSnapMode snap_object_center(SnapObjectContext *sctx,
-                             const Object *ob_eval,
-                             const float4x4 &obmat,
-                             eSnapMode snap_to_flag)
+static eSnapMode snap_object_local_point(SnapObjectContext *sctx,
+                                         const Object *ob_eval,
+                                         const float4x4 &obmat,
+                                         const eSnapMode snap_to_flag,
+                                         const float3 &point_local)
 {
   if (ob_eval->transflag & OB_DUPLI) {
     return SCE_SNAP_TO_NONE;
@@ -931,12 +933,47 @@ eSnapMode snap_object_center(SnapObjectContext *sctx,
 
   nearest2d.clip_planes_enable(sctx, ob_eval);
 
-  if (nearest2d.snap_point(float3(0.0f))) {
+  if (nearest2d.snap_point(point_local)) {
     nearest2d.register_result(sctx, ob_eval, static_cast<const ID *>(ob_eval->data));
     return SCE_SNAP_TO_POINT;
   }
 
   return SCE_SNAP_TO_NONE;
+}
+
+eSnapMode snap_object_center(SnapObjectContext *sctx,
+                             const Object *ob_eval,
+                             const float4x4 &obmat,
+                             const eSnapMode snap_to_flag)
+{
+  return snap_object_local_point(sctx, ob_eval, obmat, snap_to_flag, float3(0.0f));
+}
+
+float3 snap_object_pivot_world_get(const Object &object, const float4x4 &obmat)
+{
+  double3 pivot_world;
+  if (BKE_object_pivot_world_get(object, false, pivot_world) ||
+      BKE_object_pivot_world_get(object, true, pivot_world))
+  {
+    /* The resolver returns the pivot on the evaluated object. Convert through local space so an
+     * instance supplied through `obmat` exposes the corresponding pivot on that instance. */
+    const float3 pivot_local = math::transform_point(math::invert(object.object_to_world()),
+                                                     float3(pivot_world));
+    return math::transform_point(obmat, pivot_local);
+  }
+  /* `obmat` is deliberately the fallback instead of `object.object_to_world()`: for an
+   * instanced object it is the matrix of the instance currently being searched. */
+  return obmat.location();
+}
+
+static eSnapMode snap_object_pivot(SnapObjectContext *sctx,
+                                   const Object *ob_eval,
+                                   const float4x4 &obmat,
+                                   const eSnapMode snap_to_flag,
+                                   const float3 &pivot_world)
+{
+  const float3 pivot_local = math::transform_point(math::invert(obmat), pivot_world);
+  return snap_object_local_point(sctx, ob_eval, obmat, snap_to_flag, pivot_local);
 }
 
 static eSnapMode snap_object_center_if_enabled(SnapObjectContext *sctx,
@@ -947,15 +984,16 @@ static eSnapMode snap_object_center_if_enabled(SnapObjectContext *sctx,
   if (!sctx->runtime.params.include_object_pivots) {
     return fallback;
   }
+  const float3 pivot_world = snap_object_pivot_world_get(*ob_eval, obmat);
   const float *excluded_location = sctx->runtime.params.excluded_object_pivot_location;
   if (excluded_location != nullptr &&
-      len_squared_v3v3(obmat.location(), excluded_location) <= square_f(1.0e-7f))
+      len_squared_v3v3(pivot_world, excluded_location) <= square_f(1.0e-7f))
   {
     return fallback;
   }
-  const eSnapMode center = snap_object_center(
-      sctx, ob_eval, obmat, sctx->runtime.snap_to_flag);
-  return center == SCE_SNAP_TO_NONE ? fallback : center;
+  const eSnapMode pivot = snap_object_pivot(
+      sctx, ob_eval, obmat, sctx->runtime.snap_to_flag, pivot_world);
+  return pivot == SCE_SNAP_TO_NONE ? fallback : pivot;
 }
 
 /**
@@ -968,9 +1006,7 @@ static eSnapMode snap_obj_fn(SnapObjectContext *sctx,
                              bool is_object_active,
                              bool use_hide)
 {
-  if (sctx->runtime.params.curve_targets_only &&
-      ob_eval->type != OB_CURVES_LEGACY)
-  {
+  if (sctx->runtime.params.curve_targets_only && ob_eval->type != OB_CURVES_LEGACY) {
     return SCE_SNAP_TO_NONE;
   }
 
@@ -981,6 +1017,9 @@ static eSnapMode snap_obj_fn(SnapObjectContext *sctx,
   }
 
   if (ob_data == nullptr) {
+    if (sctx->runtime.params.include_object_pivots) {
+      return snap_object_center_if_enabled(sctx, ob_eval, obmat, SCE_SNAP_TO_NONE);
+    }
     return snap_object_center(sctx, ob_eval, obmat, sctx->runtime.snap_to_flag);
   }
 

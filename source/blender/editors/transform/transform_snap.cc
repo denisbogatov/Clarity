@@ -30,8 +30,8 @@
 
 #include "WM_api.hh"
 
-#include "ED_image.hh"
 #include "ED_clarity.hh"
+#include "ED_image.hh"
 #include "ED_node.hh"
 #include "ED_transform_snap_object_context.hh"
 #include "ED_uvedit.hh"
@@ -643,8 +643,8 @@ ClaritySnapPlan transform_snap_clarity_plan_get(const ClaritySnapPlanInput &inpu
         case ed::clarity::ClarityTransformConstraint::Off:
           break;
       }
-      /* The component itself is what has to end up on the edge or the surface, so the pivot is left
-       * out of the decision even when Keep Spacing is on: it governs where a snap *target* is
+      /* The component itself is what has to end up on the edge or the surface, so the pivot is
+       * left out of the decision even when Keep Spacing is on: it governs where a snap *target* is
        * aimed at, and a constraint has no target of its own. */
     }
     return plan;
@@ -690,7 +690,8 @@ ClaritySnapPlan transform_snap_clarity_plan_get(const ClaritySnapPlanInput &inpu
        * translation itself runs in global space. */
       plan.absolute_grid = input.step.mode == ed::clarity::CLARITY_STEP_SNAP_ABSOLUTE &&
                            (!input.is_translation || input.orientation_is_global);
-      /* Outside the 3D View the increment carries the aspect of that editor, so it is left alone. */
+      /* Outside the 3D View the increment carries the aspect of that editor, so it is left alone.
+       */
       if (input.space_is_view3d) {
         if (input.is_translation && input.step.size > 0.0f) {
           plan.increment = input.step.size;
@@ -705,9 +706,24 @@ ClaritySnapPlan transform_snap_clarity_plan_get(const ClaritySnapPlanInput &inpu
       break;
   }
   /* Keep Spacing off takes the pivot out of the decision, which is what leaves the selection to
-   * reach the target with the part of it that is nearest. */
-  plan.source_is_center = plan.source_is_center && input.keep_spacing;
+   * reach the target with the part of it that is nearest. In component Point Snap Maya goes one
+   * step further: every selected component receives that absolute target and collapses there. */
+  if (input.is_component_edit && !input.keep_spacing) {
+    plan.collapse_components = input.mode == ed::clarity::ClaritySnapMode::Point;
+    plan.source_is_center = false;
+  }
   return plan;
+}
+
+float3 clarity_component_collapse_translation_get(const float3 &initial_local,
+                                                  const float4x4 &local_to_world,
+                                                  const bool use_local_matrix,
+                                                  const float3 &target_world)
+{
+  const float3 initial_world = use_local_matrix ?
+                                   math::transform_point(local_to_world, initial_local) :
+                                   initial_local;
+  return target_world - initial_world;
 }
 
 ClarityPivotSnapVector clarity_pivot_snap_vector_get(const eSnapMode target_type)
@@ -715,7 +731,8 @@ ClarityPivotSnapVector clarity_pivot_snap_vector_get(const eSnapMode target_type
   /* `cb_snap_edge` and the edge midpoint/perpendicular paths store `v1 - v0`, the raycast and the
    * face midpoint store the face normal, a point and an edge endpoint store the vertex normal. The
    * element that won the search is the only thing that says which of the three came back. */
-  if (target_type & (SCE_SNAP_TO_EDGE | SCE_SNAP_TO_EDGE_MIDPOINT | SCE_SNAP_TO_EDGE_PERPENDICULAR))
+  if (target_type &
+      (SCE_SNAP_TO_EDGE | SCE_SNAP_TO_EDGE_MIDPOINT | SCE_SNAP_TO_EDGE_PERPENDICULAR))
   {
     return ClarityPivotSnapVector::EdgeDirection;
   }
@@ -733,10 +750,11 @@ int clarity_pivot_snap_aim_axis_get(const ClarityPivotSnapVector target_vector)
   switch (target_vector) {
     case ClarityPivotSnapVector::SurfaceNormal:
     case ClarityPivotSnapVector::EdgeDirection:
-      /* X is the axis a component aligns in Clarity: "the manipulator's X-axis aims at the selected
-       * vertex, aligns along the selected edge, and aligns along the face normal of the selected
-       * face". The same axis its `Ctrl + Shift` aim uses by default, so a snapped and an aimed pivot
-       * agree. The other two axes stay as close to the previous frame as the aim allows. */
+      /* X is the axis a component aligns in Clarity: "the manipulator's X-axis aims at the
+       * selected vertex, aligns along the selected edge, and aligns along the face normal of the
+       * selected face". The same axis its `Ctrl + Shift` aim uses by default, so a snapped and an
+       * aimed pivot agree. The other two axes stay as close to the previous frame as the aim
+       * allows. */
       return 0;
     case ClarityPivotSnapVector::None:
       break;
@@ -757,8 +775,9 @@ ClarityPivotSnapDecision clarity_pivot_snap_decision_get(const ClarityPivotSnapI
     /* The magnet: exactly on the target. Deriving it from the drag would offset it by the distance
      * between the pivot and the transform center.
      *
-     * A dragged axis or plane handle still owns the direction: Clarity slides the pivot along it up to
-     * the target instead of pulling the pivot off it, which is what taking the target verbatim did.
+     * A dragged axis or plane handle still owns the direction: Clarity slides the pivot along it
+     * up to the target instead of pulling the pivot off it, which is what taking the target
+     * verbatim did.
      */
     decision.position = input.has_constraint ? input.constrained_target_position :
                                                input.target_position;
@@ -784,6 +803,8 @@ void resetSnapping(TransInfo *t)
   t->tsnap.clarity_include_object_pivots = false;
   t->tsnap.clarity_view_plane = false;
   t->tsnap.clarity_mesh_center = false;
+  t->tsnap.clarity_collapse_components = false;
+  t->tsnap.clarity_keep_applied_until_motion = false;
   t->tsnap.clarity_snap_dist_px = 0.0f;
   t->tsnap.target_operation = SCE_SNAP_TARGET_ALL;
   t->tsnap.source_operation = SCE_SNAP_SOURCE_CLOSEST;
@@ -1533,10 +1554,10 @@ static void snap_target_view3d_fn(TransInfo *t, float * /*vec*/)
   float no[3];
   bool found = false;
   eSnapMode snap_elem = SCE_SNAP_TO_NONE;
-  /* Clarity restricts the search to its own snap tolerance around the pointer, so a target only wins
-   * while the pointer is actually near it. */
+  /* Clarity restricts the search to its own snap tolerance around the pointer, so a target only
+   * wins while the pointer is actually near it. */
   float dist_px = t->tsnap.clarity_snap_dist_px > 0.0f ? t->tsnap.clarity_snap_dist_px :
-                                                      SNAP_MIN_DISTANCE;
+                                                         SNAP_MIN_DISTANCE;
 
   if (t->tsnap.mode & (SCE_SNAP_TO_GEOM | SCE_SNAP_TO_GRID)) {
     zero_v3(no); /* objects won't set this */
@@ -1850,8 +1871,8 @@ static eSnapMode snapObjectsTransform(
   snap_object_params.use_backface_culling = (t->tsnap.flag & SCE_SNAP_BACKFACE_CULLING) != 0;
   snap_object_params.curve_targets_only = t->tsnap.clarity_curve_targets_only;
   snap_object_params.include_object_pivots = t->tsnap.clarity_include_object_pivots;
-  /* Clarity never snaps the moved data onto the pivot it is being moved by, so the pivot that acts as
-   * the snap source is excluded from the pivot targets in every mode, not only while the pivot
+  /* Clarity never snaps the moved data onto the pivot it is being moved by, so the pivot that acts
+   * as the snap source is excluded from the pivot targets in every mode, not only while the pivot
    * itself is edited. */
   snap_object_params.excluded_object_pivot_location = transform_snap_excluded_pivot_get(
       t->tsnap, t->center_global);
@@ -1867,18 +1888,19 @@ static eSnapMode snapObjectsTransform(
     add_v3_v3(grid_co, t->center_global);
   }
 
-  eSnapMode result = ed::transform::snap_object_project_view3d(t->tsnap.object_context,
-                                                               t->depsgraph,
-                                                               t->region,
-                                                               static_cast<const View3D *>(t->view),
-                                                               t->tsnap.mode,
-                                                               &snap_object_params,
-                                                               grid_co,
-                                                               mval,
-                                                               prev_co,
-                                                               dist_px,
-                                                               r_loc,
-                                                               r_no);
+  eSnapMode result = ed::transform::snap_object_project_view3d(
+      t->tsnap.object_context,
+      t->depsgraph,
+      t->region,
+      static_cast<const View3D *>(t->view),
+      t->tsnap.mode,
+      &snap_object_params,
+      grid_co,
+      mval,
+      prev_co,
+      dist_px,
+      r_loc,
+      r_no);
   /* The visible pivot of the moved selection is deliberately not added as a target here: it is the
    * snap source, so offering it created a dead zone around the manipulator in which the selection
    * snapped onto itself. Pivots of other objects still come from #include_object_pivots. */

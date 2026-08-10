@@ -7,12 +7,14 @@
  *
  * What the Clarity snapping state asks of a transform.
  *
- * Deliberately not part of #transform_snap.hh: almost every translation unit of the module includes
- * that header, so the Clarity rule set would drag them all into a rebuild on every edit. Only the
- * three files that decide, apply or test the rules include this one.
+ * Deliberately not part of #transform_snap.hh: almost every translation unit of the module
+ * includes that header, so the Clarity rule set would drag them all into a rebuild on every edit.
+ * Only the three files that decide, apply or test the rules include this one.
  */
 
 #pragma once
+
+#include "BLI_math_matrix_types.hh"
 
 #include "DNA_scene_types.h"
 
@@ -21,10 +23,10 @@
 namespace blender::ed::transform {
 
 /**
- * Everything defaults to off: in the Clarity interaction model nothing snaps unless a Clarity mode asks
- * for it, so Blender's own magnet and its `Ctrl` invert never get a say. Leaving them in charge is
- * what quantized every transform to the increment grid with no key held, and what kept Clarity's own
- * modes from snapping at all while the magnet was off.
+ * Everything defaults to off: in the Clarity interaction model nothing snaps unless a Clarity mode
+ * asks for it, so Blender's own magnet and its `Ctrl` invert never get a say. Leaving them in
+ * charge is what quantized every transform to the increment grid with no key held, and what kept
+ * Clarity's own modes from snapping at all while the magnet was off.
  *
  * Pure data, so the rules are unit tested without a context.
  */
@@ -39,6 +41,8 @@ struct ClaritySnapPlan {
   /** Not a snap but a constraint: translation is projected onto the frozen view plane. */
   bool view_plane = false;
   bool mesh_center = false;
+  /** Put every selected component on the target instead of preserving their relative spacing. */
+  bool collapse_components = false;
   /** Clarity moves the pivot onto the target, never the closest part of the selection. */
   bool source_is_center = false;
   /**
@@ -56,23 +60,32 @@ struct ClaritySnapPlanInput {
   bool orientation_is_global = true;
   bool space_is_view3d = true;
   /**
-   * Clarity's `snapComponentsRelative`, from the Move Tool marking menu. On, the pivot is what lands
-   * on the target and the selection keeps its internal spacing; off, the snap aims at the selection
-   * itself, so the part of it nearest the target is what reaches it.
+   * Clarity's `snapComponentsRelative`, from the Move Tool marking menu. On, the pivot is what
+   * lands on the target and the selected components keep their internal spacing; off, Point Snap
+   * assigns the same absolute target to every selected component, collapsing them there. It has no
+   * effect on whole-object selections.
    */
   bool keep_spacing = true;
   /**
-   * Clarity's `manipMoveContext -xformConstraint`. Unlike a snap mode it is not held down: it stays on
-   * until it is turned off, and it only governs components, so it is read separately.
+   * Clarity's `manipMoveContext -xformConstraint`. Unlike a snap mode it is not held down: it
+   * stays on until it is turned off, and it only governs components, so it is read separately.
    */
   ed::clarity::ClarityTransformConstraint transform_constraint =
       ed::clarity::ClarityTransformConstraint::Off;
-  /** Components are what a transform constraint applies to; whole objects are never constrained. */
+  /** Components are what a transform constraint applies to; whole objects are never constrained.
+   */
   bool is_component_edit = false;
   ed::clarity::ClarityStepSnapSettings step;
 };
 
 ClaritySnapPlan transform_snap_clarity_plan_get(const ClaritySnapPlanInput &input);
+
+/** Per-element world translation used when non-relative component Point Snap collapses selection.
+ */
+float3 clarity_component_collapse_translation_get(const float3 &initial_local,
+                                                  const float4x4 &local_to_world,
+                                                  bool use_local_matrix,
+                                                  const float3 &target_world);
 
 /* -------------------------------------------------------------------- */
 /** \name Pivot Snapping
@@ -85,9 +98,9 @@ ClaritySnapPlan transform_snap_clarity_plan_get(const ClaritySnapPlanInput &inpu
  * A drag moves the pivot and nothing else. Clarity splits the two halves across two interactions:
  * "hold C or V and middle-drag ... to snap the pivot to that object's edges or vertices" is
  * positional, while "click a component to snap and align the pivot to the selected component" is
- * what turns it, with `Ctrl + click` for the orientation alone. Turning the pivot mid-drag put it in
- * a new frame every time the element under the pointer changed, which is not a thing Clarity does and
- * not a thing a drag can undo.
+ * what turns it, with `Ctrl + click` for the orientation alone. Turning the pivot mid-drag put it
+ * in a new frame every time the element under the pointer changed, which is not a thing Clarity
+ * does and not a thing a drag can undo.
  * \{ */
 
 /**
@@ -97,8 +110,8 @@ ClaritySnapPlan transform_snap_clarity_plan_get(const ClaritySnapPlanInput &inpu
  * A click always puts the component's *normal* on the pivot's X axis - a capture of Clarity 2025
  * shows a clicked face leaving X on the face normal, a clicked corner on the vertex normal, and a
  * clicked edge on the bisector of the two faces beside it, never along the edge. The snap backend
- * however keeps one field for all element types and fills it with `v1 - v0` for an edge, so an edge
- * hit is the one case whose normal has to be rebuilt from the mesh before it can be used.
+ * however keeps one field for all element types and fills it with `v1 - v0` for an edge, so an
+ * edge hit is the one case whose normal has to be rebuilt from the mesh before it can be used.
  */
 enum class ClarityPivotSnapVector : uint8_t {
   /** The target says nothing about direction, so the pivot keeps the orientation it had. */
@@ -117,8 +130,8 @@ struct ClarityPivotSnapInput {
   /** The element under the pointer; only read when #has_target. */
   double3 target_position = double3(0.0);
   /**
-   * The same target reached through the active constraint: the pivot slides along the axis or plane
-   * of the handle being dragged instead of leaving it. Only read when #has_constraint.
+   * The same target reached through the active constraint: the pivot slides along the axis or
+   * plane of the handle being dragged instead of leaving it. Only read when #has_constraint.
    */
   double3 constrained_target_position = double3(0.0);
   /** A target was found inside the snap tolerance. */

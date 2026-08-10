@@ -42,6 +42,7 @@ WindowManagerRuntime::WindowManagerRuntime()
   this->clarity_snap_use_tolerance = true;
   this->clarity_snap_tolerance = 10;
   /* Clarity's own default angle tolerance for the Angle selection constraint. */
+  this->clarity_selection_constraint_angle_active = false;
   this->clarity_selection_constraint_angle = DEG2RADF(45.0f);
   this->clarity_interaction_revision = 0;
   BKE_reports_init(&this->reports, RPT_STORE);

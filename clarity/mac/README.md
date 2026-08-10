@@ -32,10 +32,10 @@ chmod +x clarity/mac/*.sh      # only if git did not preserve the executable bit
 clarity/mac/setup.sh
 ```
 
-It checks the machine (architecture, disk, Xcode command line tools), installs `cmake`, `ninja`
-and `git-lfs` through Homebrew when they are missing, completes the checkout - adding the LFS
-fallback remote, pulling the objects and restoring files a failed clone left missing - and fetches
-the precompiled libraries into `lib/macos_arm64` with `make_update.py --no-blender`.
+It checks the machine (architecture, disk, Xcode command line tools), installs `cmake`, `ninja`,
+`ccache` and `git-lfs` through Homebrew when they are missing, completes the checkout - adding the
+LFS fallback remote, pulling the objects and restoring files a failed clone left missing - and
+fetches the precompiled libraries into `lib/macos_arm64` with `make_update.py --no-blender`.
 
 It never touches the checked-out branch, and it restores only files missing from the working tree,
 never modified ones, so it stays safe to run again on a machine with work in progress. `--check`
@@ -64,8 +64,11 @@ and runs the editor and Clarity suites.
 | `go.sh --check` | report whether anything is stale; build nothing |
 | `go.sh --full` | reconfigure and rebuild from scratch |
 
-The first build compiles the whole tree and takes a long time. Everything after it is
-incremental.
+The first build compiles the whole tree, takes a long time and warms the compiler cache. Everything
+after it is incremental. `go.sh` also pins a private native-arm64 copy of Ninja inside the build
+tree. Homebrew can then upgrade its global Ninja without changing the `.ninja_log` format used by
+this tree. Before every build the script checks the pinned binary checksum and log format; a
+mismatch stops before Ninja can discard the incremental state.
 
 ## Where things are
 
@@ -74,6 +77,8 @@ incremental.
 | Build tree | `~/ClarityBuild52` |
 | Blender | `~/ClarityBuild52/bin/Blender.app` |
 | Build log | `~/ClarityBuild52/logs/build-last.log` (plus `.1`, `.2`) |
+| Pinned Ninja and last-known-good Ninja state | `~/ClarityBuild52/.clarity-tools/` |
+| Compiler cache | `~/Library/Caches/Clarity/ccache` |
 | Trace logs | `~/ClarityBuild52/logs/` |
 | Libraries | `lib/macos_arm64` in the repository |
 
@@ -87,6 +92,12 @@ script, so editing that section is enough to make the next run reconfigure. And 
 launched that was not verified: after building, ninja is asked what work is left, and the binary
 is compared against its own objects. A tree that is not provably current refuses to start rather
 than showing you a program that is not the code on disk.
+
+Only the pinned Ninja may operate on the tree. `go.sh` serializes access with a lock, snapshots
+`.ninja_log` and `.ninja_deps` before compilation, and restores that snapshot if Ninja ever reports
+that it wants to replace an incompatible build log. `ccache` is mandatory and capped at 30 GB, so
+an explicitly requested full rebuild can reuse compiler results instead of recompiling every
+unchanged translation unit.
 
 `go.bat` in the workspace root explains why, at length. Short version: two trees and a dozen
 launchers once cost a full day of debugging a viewport whose manipulator could not be clicked,

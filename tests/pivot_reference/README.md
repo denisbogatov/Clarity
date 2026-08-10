@@ -110,6 +110,136 @@ The two halves meet at `Доснять неудавшиеся вручную`: a
 as `ЖЕСТ НЕ СРАБОТАЛ` become a hand-driven checklist of exactly those steps, written to a file of
 its own so the automated artifact stays as it was recorded.
 
+### Snap mode activation
+
+The same window has a separate `Записать активацию снаппинга (X / C / V / J / Shift-J)` button.
+It does not start a gesture session or replace the scene. It records the state machine that runs
+*before* a snapped drag: each temporary key on its own (including repeats and stray releases), every
+pair of overlapping keys in both release orders, all keys held together, and each temporary mode
+over every persistent Status Line mode. Because J and Shift-J change a transform context rather
+than a global `snapMode` flag, Move, Rotate and Scale are captured separately.
+
+The entered output path gets `_snap_activation` appended. Three files are written:
+
+- `.json` contains every state and the exact difference after each transition;
+- `.log` is the readable transition-by-transition summary;
+- `_history.mel` is Maya's complete command echo.
+
+Every snapshot queries all flags of Maya's `snapMode` command, the discrete snap settings of all
+three transform contexts, the current context, and the pivot snap flags. Hotkey command names are
+read from Maya's active hotkey table, so a customized binding is visible in the artifact. The
+capture restores global snap modes, per-tool discrete snap settings, and the active tool even if a
+scenario raises an error.
+
+The same capture can be run without the window from Maya's Script Editor:
+
+```python
+import capture_reference_snapping as snapping
+snapping.run(
+    r"S:\Clarity\blender\tests\pivot_reference\fixtures\maya_2025_snap_activation"
+)
+```
+
+### Snapping real models
+
+`Записать снаппинг на моделях (заменит текущую сцену)` is the geometry half of the capture. Save
+the open Maya scene first: the run creates `snapSubject`, a point-target cube, a mesh-center cube
+and a NURBS curve, frames them in the active viewport, and moves the subject through native mouse
+events. It covers point, curve, grid, mesh center, view plane, absolute/relative move steps, rotate
+steps and scale steps.
+
+The object-to-object section moves the `snapSubject` pivot onto a vertex and onto the ray center of
+a second mesh. A separate vertex-to-vertex case first snaps the subject pivot to its own vertex,
+then uses that geometry anchor to align it with a vertex of the target object. The capture also
+repeats both targets while editing only the pivot: it must reach the other object while the subject
+translation and world bounds remain unchanged. Finally, Shift-drag cases duplicate the subject
+with point and mesh-center snapping, including a custom-pivot vertex-to-vertex copy. Those pass only
+when the original stays in place, exactly one new transform appears, and the duplicate reaches the
+target.
+
+The extended suite contains 55 isolated interactions. Besides the core cases above it covers all
+X/Y/Z and XY/XZ/YZ move handles, Object space, transformed and negative-scale parents, target
+pivots, pivot orientation, rotate/scale/reset after a custom pivot, Copy versus Instance smart
+duplicates, reversed modifier order, modifier-first release, sequential duplicates, curved and
+closed NURBS curves, curve CVs, custom grid spacing, a live surface, an asymmetric mesh center,
+multiple objects, component spacing, orthographic view-plane movement, ambiguous targets, frozen
+transforms, Escape cancellation, tool changes during a drag, and Undo/Redo. Every case starts from
+a restored transform, pivot, topology, camera, grid and selection state so a component-baked scale
+or a changed tool preference cannot leak into the next result.
+
+The curve case uses Maya's conventional middle-mouse drag with C. Discrete move uses the X-axis
+handle, so absolute and relative stepping are measured independently from a deliberately
+non-integral starting position. Scale is judged from the model's world bounding box as well as its
+transform channels, because Maya may bake a world-space axis scale into mesh components.
+
+Each test records the subject transform before and after, all target geometry, the numeric distance
+to the target, Maya's commands, and before/drag/after viewport screenshots. View-plane movement is
+also checked against the active camera direction. Outputs use the
+`_model_snapping` suffix. `PASS` means the model actually moved and landed on the measured target;
+merely enabling a flag cannot pass a model test.
+
+On macOS Maya needs permission under **System Settings → Privacy & Security → Accessibility**. Add
+Maya, restart it, and then run the button. The capture checks this before replacing the scene. On
+Windows it continues to use native `SendInput`.
+
+Direct Script Editor entry point:
+
+```python
+import capture_reference_model_snapping as model_snapping
+model_snapping.run(
+    "/Users/denisbogatov/Documents/DCC/Clarity/tests/pivot_reference/fixtures/"
+    "maya_2025_model_snapping"
+)
+```
+
+### The same model scenarios in Clarity/Blender
+
+`capture_clarity_model_snapping.py` uses the exact same ordered `(name, mode, tool)` contract and
+schema 7 as the Maya model suite. The current parity boundary is all 54 implemented scenarios. It
+recreates every scene for every case, writes before/after
+state, changed fields, numeric assertions and viewport screenshots, and automatically writes a
+Maya comparison beside the Blender result when the Maya fixture is present.
+
+`live_surface_snap` stays in the canonical 55-name schema but is explicitly excluded from execution
+until Live Surface exists in this fork.
+
+On this Mac the current Clarity executable and repository paths are:
+
+```bash
+cd "/Users/denisbogatov/Documents/DCC/Clarity"
+"/Users/denisbogatov/ClarityBuild52/bin/Blender.app/Contents/MacOS/Blender" \
+  --factory-startup \
+  --python tests/pivot_reference/capture_clarity_model_snapping.py -- \
+  --output tests/pivot_reference/fixtures/clarity_model_snapping.json --count 55 --quit
+```
+
+Do not add `--background`: screenshots and the View3D context need a real window. To run it from
+the UI instead, open `capture_clarity_model_snapping.py` in Blender's Text Editor and press **Run
+Script**, then open **3D Viewport → Sidebar (`N`) → Clarity → Clarity Snap Tests** and press **Run
+Run All 54 Supported Tests**. **Run First 20 Maya Tests** remains available for the shorter core
+pass; Live Surface is skipped by both buttons. The buttons replace the current scene, so save work
+first.
+
+The button writes these four primary reports:
+
+- `fixtures/clarity_model_snapping.json` and `.log` — Blender outcomes;
+- `fixtures/clarity_model_snapping_vs_maya.json` and `.log` — aligned Maya/Blender rows.
+
+The Blender capture currently labels every row `executionFidelity: operator_equivalent`. This is
+deliberate: the 55 names, scenes and outcome assertions are one-to-one, while physical mouse/key
+routing is not claimed by a scripted placement. Native Clarity events remain covered by
+`tests/python/ui_simulate/test_clarity_pivot.py`; the comparison report warns about this distinction
+instead of presenting operator equivalence as native-input parity.
+
+The comparison can also be regenerated without either DCC application:
+
+```bash
+python3 tests/pivot_reference/compare_model_snapping.py \
+  --maya tests/pivot_reference/fixtures/maya_2025_pivot_gestures_model_snapping.json \
+  --blender tests/pivot_reference/fixtures/clarity_model_snapping.json \
+  --output tests/pivot_reference/fixtures/clarity_model_snapping_vs_maya.json
+```
+
 The instruction is on screen as a numbered list of the actions the gesture is made of - a gesture is
 a sequence, and a hand halfway through one has to see where it is - `Записать` / `Пропустить` /
 `Переснять` / `Завершить` are buttons, the note field feeds the next record, and the log grows

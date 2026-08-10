@@ -397,6 +397,10 @@ bool selection_constraint_set(bContext *C, const ClaritySelectionConstraint cons
     return false;
   }
   runtime->selection_settings.selection_constraint = constraint;
+  if (wmWindowManager *wm = CTX_wm_manager(C); wm != nullptr && wm->runtime != nullptr) {
+    wm->runtime->clarity_selection_constraint_angle_active =
+        constraint == ClaritySelectionConstraint::Angle;
+  }
   move_menu_state_changed(C, false);
   return true;
 }

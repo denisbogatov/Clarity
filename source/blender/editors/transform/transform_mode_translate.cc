@@ -33,6 +33,7 @@
 #include "transform_convert.hh"
 #include "transform_mode.hh"
 #include "transform_snap.hh"
+#include "transform_snap_clarity.hh"
 
 namespace blender::ed::transform {
 
@@ -433,6 +434,7 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
       }
     }
 
+    const bool collapse_components = t->tsnap.clarity_collapse_components && validSnap(t);
     threading::parallel_for(IndexRange(tc->data_len), 1024, [&](const IndexRange range) {
       for (const int i : range) {
         TransData *td = &tc->data[i];
@@ -440,7 +442,18 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
         if (td->flag & TD_SKIP) {
           continue;
         }
-        transdata_elem_translate(t, tc, td, td_ext, snap_source_local, vec, rotate_mode);
+        float3 element_vec(vec);
+        if (collapse_components && td->loc != nullptr) {
+          /* Maya's non-relative component snap is an absolute placement, not the usual common
+           * translation of the selection. Build the per-element world delta and let the ordinary
+           * translation path apply handle constraints, local-space conversion, proportional
+           * falloff and transform locks. */
+          element_vec = clarity_component_collapse_translation_get(float3(td->iloc),
+                                                                   float4x4(tc->mat),
+                                                                   tc->use_local_mat,
+                                                                   float3(t->tsnap.snap_target));
+        }
+        transdata_elem_translate(t, tc, td, td_ext, snap_source_local, element_vec, rotate_mode);
       }
     });
   }
@@ -549,8 +562,7 @@ static void applyTranslation(TransInfo *t)
   }
 
   if (t->tsnap.clarity_view_plane && (t->con.mode & CON_APPLY) == 0) {
-    project_plane_normalized_v3_v3v3(
-        global_dir, global_dir, t->tsnap.clarity_view_plane_normal);
+    project_plane_normalized_v3_v3v3(global_dir, global_dir, t->tsnap.clarity_view_plane_normal);
   }
 
   applyTranslationValue(t, global_dir);

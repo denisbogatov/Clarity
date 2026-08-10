@@ -1,0 +1,62 @@
+Maya <-> Clarity model snapping
+Maya: 55 tests, 37 passed
+Blender: 55 tests, 54 passed
+Shared: 55; agreements: 36; divergences: 19
+
+WARNING: Blender used operator-equivalent execution; outcome parity is comparable, native input routing is not.
+
+MATCH Maya=True Blender=True  object_pivot_to_object_point_snap
+MATCH Maya=True Blender=True  object_vertex_to_object_vertex_snap
+MATCH Maya=True Blender=True  axis_x_to_object_point_snap
+MATCH Maya=True Blender=True  axis_y_to_object_point_snap
+MATCH Maya=True Blender=True  axis_z_to_object_point_snap
+DIFF  Maya=False Blender=True  plane_xy_to_object_point_snap
+MATCH Maya=True Blender=True  plane_xz_to_object_point_snap
+DIFF  Maya=False Blender=True  plane_yz_to_object_point_snap
+DIFF  Maya=False Blender=True  object_space_x_axis_snap
+DIFF  Maya=False Blender=True  object_pivot_to_other_custom_pivot_snap
+DIFF  Maya=False Blender=True  model_curve_snap
+DIFF  Maya=False Blender=True  curved_nurbs_curve_snap
+DIFF  Maya=False Blender=True  closed_nurbs_curve_snap
+DIFF  Maya=False Blender=True  point_snap_to_curve_cv
+MATCH Maya=True Blender=True  model_grid_snap
+MATCH Maya=True Blender=True  custom_spacing_grid_snap
+DIFF  Maya=False Blender=True  object_to_object_mesh_center_snap
+MATCH Maya=True Blender=True  model_view_plane_snap
+MATCH Maya=True Blender=True  pivot_edit_to_object_point_snap
+DIFF  Maya=False Blender=True  pivot_edit_to_object_mesh_center_snap
+DIFF  Maya=False Blender=True  pivot_orientation_to_rotated_mesh
+MATCH Maya=True Blender=True  custom_pivot_persists_across_tools
+MATCH Maya=True Blender=True  rotate_after_custom_pivot_snap
+MATCH Maya=True Blender=True  scale_after_custom_pivot_snap
+MATCH Maya=True Blender=True  reset_after_custom_pivot_snap
+MATCH Maya=True Blender=True  parented_rotated_scaled_object_snap
+MATCH Maya=True Blender=True  negative_scale_parent_object_snap
+MATCH Maya=True Blender=True  shift_duplicate_to_object_point_snap
+MATCH Maya=True Blender=True  shift_duplicate_vertex_to_object_vertex_snap
+DIFF  Maya=False Blender=True  shift_duplicate_to_object_mesh_center_snap
+MATCH Maya=True Blender=True  shift_duplicate_copy_point_snap
+MATCH Maya=True Blender=True  shift_duplicate_instance_point_snap
+MATCH Maya=True Blender=True  shift_duplicate_reverse_modifier_order
+MATCH Maya=True Blender=True  shift_drag_with_smart_duplicate_disabled
+DIFF  Maya=False Blender=True  shift_duplicate_with_rotate_step
+DIFF  Maya=False Blender=True  shift_duplicate_with_scale_step
+MATCH Maya=True Blender=True  sequential_shift_duplicate_chain
+MATCH Maya=True Blender=True  shift_duplicate_modifier_release_first
+MATCH Maya=True Blender=True  live_surface_snap
+MATCH Maya=True Blender=True  asymmetric_mesh_center_snap
+DIFF  Maya=False Blender=True  multi_object_spacing_point_snap
+MATCH Maya=True Blender=True  component_point_snap_preserve_spacing
+MATCH Maya=True Blender=True  component_point_snap_collapse_spacing
+DIFF  Maya=False Blender=True  orthographic_view_plane_snap
+MATCH Maya=True Blender=True  ambiguous_point_target_selection
+DIFF  Maya=False Blender=True  cancel_point_snap_drag
+DIFF  Maya=False Blender=True  cancel_shift_duplicate_snap_drag
+DIFF  Maya=True Blender=False  undo_object_point_snap
+MATCH Maya=True Blender=True  redo_object_point_snap
+MATCH Maya=True Blender=True  tool_change_during_point_snap_drag
+MATCH Maya=True Blender=True  frozen_transform_object_point_snap
+MATCH Maya=True Blender=True  model_step_move_absolute
+MATCH Maya=True Blender=True  model_step_move_relative
+MATCH Maya=True Blender=True  model_step_rotate
+MATCH Maya=True Blender=True  model_step_scale

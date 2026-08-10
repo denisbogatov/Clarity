@@ -1,0 +1,4571 @@
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+AEdisablePin;
+layerEditorNewScene;
+rebuildAnimLayerEditor("AnimLayerTab");
+selectionMaskResetAll;
+onTEMutedChanged();
+teClipEditModeChanged();
+teClearGlobalVariables();
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+AEdisablePin;
+initDopeSheetEditor("dopeSheetPanel1DopeSheetEd", "dopeSheetPanel1OutlineEd");
+SnapToPointPress;
+snapMode -point 1;
+initGraphEditorOutliner("graphEditor1OutlineEd"); initializeAnimCurvEditor("graphEditor1GraphEd");
+layerEditorOpenScene;
+rebuildAnimLayerEditor("AnimLayerTab");
+removeRenderSequenceAlternateOutputFileLocation;
+move -rpr 4 -1 -1 ;
+SnapToPointRelease;
+snapMode -point 0;
+selectionMaskResetAll;
+if (!`exists resetMetadataUI`) {eval "source buildDisplayMenu";} resetMetadataUI;
+updateModelPanelBarV2Settings;
+updateBlendShapeEditHUD;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+rendererSceneOpenedCallback;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateAnimLayerEditor("AnimLayerTab");
+SnapToPointPress;
+snapMode -point 1;
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+move -rpr -5 0.75 0.75 snapSubject.scalePivot snapSubject.rotatePivot ;
+SnapToPointRelease;
+snapMode -point 0;
+dR_updateCounter;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+if(`exists dR_updateCommandPanel`) dR_updateCommandPanel;
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+changeToolIcon;
+cmds.ActivateViewport20()
+{  global string $gViewport2;   string $currentPanel = `getPanel -withFocus`;   string $panelType = `getPanel -to $currentPanel`;  if ($panelType ==  "modelPanel") {      setRendererInModelPanel $gViewport2 $currentPanel;  } else if ($panelType ==  "scriptedPanel") { 	string $cmd = "setRendererInModelPanel $gViewport2 "; 
+	scriptedPanelRunTimeCmd( $cmd, $currentPanel ); 
+  }};
+SnapToPointPress;
+snapMode -point 1;
+if cmds.scriptJob(exists=635):cmds.scriptJob(kill=635)
+if cmds.scriptJob(exists=707):cmds.scriptJob(kill=707)
+if cmds.scriptJob(exists=708):cmds.scriptJob(kill=708)
+if cmds.scriptJob(exists=709):cmds.scriptJob(kill=709)
+cmds.ActivateViewport20()
+{  global string $gViewport2;   string $currentPanel = `getPanel -withFocus`;   string $panelType = `getPanel -to $currentPanel`;  if ($panelType ==  "modelPanel") {      setRendererInModelPanel $gViewport2 $currentPanel;  } else if ($panelType ==  "scriptedPanel") { 	string $cmd = "setRendererInModelPanel $gViewport2 "; 
+	scriptedPanelRunTimeCmd( $cmd, $currentPanel ); 
+  }};
+move -rpr 4 -1 -1 ;
+SnapToPointRelease;
+snapMode -point 0;
+if cmds.scriptJob(exists=635):cmds.scriptJob(kill=635)
+if cmds.scriptJob(exists=708):cmds.scriptJob(kill=708)
+if cmds.scriptJob(exists=709):cmds.scriptJob(kill=709)
+if cmds.scriptJob(exists=745):cmds.scriptJob(kill=745)
+if cmds.scriptJob(exists=746):cmds.scriptJob(kill=746)
+if cmds.scriptJob(exists=747):cmds.scriptJob(kill=747)
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+updateSnapMasks;
+autoUpdateAttrEd;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateModelPanelBar MainPane|viewPanes|modelPanel4|modelPanel4|modelPanel4;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+dR_setModelEditorTypes;
+SnapToPointPress;
+snapMode -point 1;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+updateSnapMasks;
+autoUpdateAttrEd;
+move -rpr -x 4 ;
+SnapToPointRelease;
+snapMode -point 0;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+updateSnapMasks;
+statusLineUpdateMakeLive;
+SnapToPointPress;
+snapMode -point 1;
+dR_updateSlideField;
+autoUpdateAttrEd;
+move -rpr -y -1 ;
+SnapToPointRelease;
+snapMode -point 0;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+autoUpdateAttrEd;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+SnapToPointPress;
+snapMode -point 1;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+move -rpr -z -1 ;
+SnapToPointRelease;
+snapMode -point 0;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+autoUpdateAttrEd;
+SnapToPointPress;
+snapMode -point 1;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+select -r snapCurveTarget snapCenterTarget snapPointTarget snapSubject ;
+SnapToPointRelease;
+snapMode -point 0;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+CBselectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+updateSnapMasks;
+SnapToPointPress;
+snapMode -point 1;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+move -rpr 4 0 -1 ;
+SnapToPointRelease;
+snapMode -point 0;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateSnapMasks;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+SnapToPointPress;
+snapMode -point 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+select -r snapCurveTarget snapCenterTarget snapPointTarget snapSubject ;
+SnapToPointRelease;
+snapMode -point 0;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+CBselectionChanged;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateSnapMasks;
+SnapToPointPress;
+snapMode -point 1;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+move -r -os -wd 7.086667 0 0 ;
+SnapToPointRelease;
+snapMode -point 0;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+statusLineUpdateMakeLive;
+SnapToPointPress;
+snapMode -point 1;
+dR_updateSlideField;
+autoUpdateAttrEd;
+move -rpr 0.9 3.9 3.4 ;
+SnapToPointRelease;
+snapMode -point 0;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+Unfold3DContextHotkeyScriptJob;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+statusLineUpdateMakeLive;
+SnapToCurvePress;
+snapMode -curve 1;
+dR_updateSlideField;
+autoUpdateAttrEd;
+move -r 4.533563 -0.598213 -4.084903 ;
+SnapToCurveRelease;
+snapMode -curve 0;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+SnapToCurvePress;
+snapMode -curve 1;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+move -r 2.877028 2.542403 -4.783831 ;
+SnapToCurveRelease;
+snapMode -curve 0;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+CBselectionChanged;
+uvTkUpdateSelectionCompInfo;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+SnapToCurvePress;
+snapMode -curve 1;
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+move -r 2.188616 1.824548 -3.557028 ;
+SnapToCurveRelease;
+snapMode -curve 0;
+updateSnapMasks;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+CBselectionChanged;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+uvTkResolveAndUpdateTrees;
+statusLineUpdateMakeLive;
+SnapToPointPress;
+snapMode -point 1;
+dR_updateSlideField;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+move -rpr 1.8 1.2 1.8 ;
+SnapToPointRelease;
+snapMode -point 0;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateSnapMasks;
+uvTkUpdateSelectionStyleInfo;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+SnapToGridPress;
+snapMode -grid 1;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+move -rpr 0 0 0 ;
+SnapToGridRelease;
+snapMode -grid 0;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+statusLineUpdateMakeLive;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+dR_updateSlideField;
+autoUpdateAttrEd;
+SnapToGridPress;
+snapMode -grid 1;
+move -rpr 2.5 0 2.5 ;
+SnapToGridRelease;
+snapMode -grid 0;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+updateSnapMasks;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+move -r 7.239175 -0.0443442 3.039339 ;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+move -r 1.210207 -2.468954 0.641508 ;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateSnapMasks;
+SnapToPointPress;
+snapMode -point 1;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+autoUpdateAttrEd;
+move -rpr 4 -1 -1 snapSubject.scalePivot snapSubject.rotatePivot ;
+SnapToPointRelease;
+snapMode -point 0;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+statusLineUpdateMakeLive;
+move -r 7.239175 -0.0443442 3.039339 snapSubject.scalePivot snapSubject.rotatePivot ;
+dR_updateSlideField;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+manipPivot -o -142.310558 -20.25437 85.025989 ;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateSnapMasks;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkResolveAndUpdateTrees;
+SnapToPointPress;
+snapMode -point 1;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+move -rpr -5 0.75 0.75 snapSubject.scalePivot snapSubject.rotatePivot ;
+SnapToPointRelease;
+snapMode -point 0;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+updateSnapMasks;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_contextChanged;
+currentCtx;
+// Rotate
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+changeToolIcon;
+dR_contextChanged;
+currentCtx;
+// Scale
+dR_updateToolSettings;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+SetLastUVBrushTool;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+Unfold3DContextHotkeyScriptJob;
+SnapToPointPress;
+snapMode -point 1;
+changeToolIcon;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+updateSnapMasks;
+move -rpr -5 0.75 0.75 snapSubject.scalePivot snapSubject.rotatePivot ;
+SnapToPointRelease;
+snapMode -point 0;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+rotate -r -os -fo 0 45 0 ;
+dR_contextChanged;
+currentCtx;
+// Rotate
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+timeField -edit -value `currentTime -query` TimeSlider|MainTimeSliderLayout|rowLayout1|timeField1;
+// TimeSlider|MainTimeSliderLayout|rowLayout1|timeField1
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+statusLineUpdateMakeLive;
+SnapToPointPress;
+snapMode -point 1;
+dR_updateSlideField;
+updateSnapMasks;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+move -rpr -5 0.75 0.75 snapSubject.scalePivot snapSubject.rotatePivot ;
+SnapToPointRelease;
+snapMode -point 0;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+scale -ws -r 2.5 1 1 ;
+# Warning: Non object-space scale baked onto components.
+SetLastUVBrushTool;
+changeToolIcon;
+dR_contextChanged;
+currentCtx;
+// Scale
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+uvTkUpdateSelectionStyleInfo;
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+updateSnapMasks;
+autoUpdateAttrEd;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+SnapToPointPress;
+snapMode -point 1;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+move -rpr -5 0.75 0.75 snapSubject.scalePivot snapSubject.rotatePivot ;
+SnapToPointRelease;
+snapMode -point 0;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+manipPivotReset true true;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+SnapToPointPress;
+snapMode -point 1;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+CBselectionChanged;
+statusLineUpdateMakeLive;
+move -rpr 4 -1 -1 ;
+SnapToPointRelease;
+snapMode -point 0;
+dR_updateSlideField;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+SnapToPointPress;
+snapMode -point 1;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+CBselectionChanged;
+uvTkUpdateSelectionStyleInfo;
+move -rpr 4 -1 -1 ;
+SnapToPointRelease;
+snapMode -point 0;
+updateEditPivot;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+autoUpdateAttrEd;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+SnapToPointPress;
+snapMode -point 1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+ShiftClickSmartDupe 1;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+move -rpr 4 -1 -1 ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+SnapToPointRelease;
+snapMode -point 0;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+SnapToPointPress;
+snapMode -point 1;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+autoUpdateAttrEd;
+updateSnapMasks;
+move -rpr -5 0.75 0.75 snapSubject.scalePivot snapSubject.rotatePivot ;
+SnapToPointRelease;
+snapMode -point 0;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+ctxEditMode;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+SnapToPointPress;
+snapMode -point 1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+changeToolIcon;
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+ShiftClickSmartDupe 1;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+move -rpr 4 -1 -1 ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+SnapToPointRelease;
+snapMode -point 0;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateCommandPanel;
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+autoUpdateAttrEd;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+ShiftClickSmartDupe 1;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+move -r 7.239175 -0.0443442 3.039339 ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+SnapToPointPress;
+snapMode -point 1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+ShiftClickSmartDupe 1;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+move -rpr 4 -1 -1 ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+SnapToPointRelease;
+snapMode -point 0;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+autoUpdateAttrEd;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+SnapToPointPress;
+snapMode -point 1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+ShiftClickSmartDupe 2;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+move -rpr 4 -1 -1 ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+SnapToPointRelease;
+snapMode -point 0;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+SnapToPointPress;
+snapMode -point 1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateSnapMasks;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+ShiftClickSmartDupe 1;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+move -rpr 4 -1 -1 ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+SnapToPointRelease;
+snapMode -point 0;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+Unfold3DContextHotkeyScriptJob;
+SnapToPointPress;
+snapMode -point 1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+SetLastUVBrushTool;
+changeToolIcon;
+autoUpdateAttrEd;
+move -rpr 4 -1 -1 ;
+SnapToPointRelease;
+snapMode -point 0;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Rotate
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateSnapMasks;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+rotate -r -os -fo 0 45 0 ;
+ls -type materialxStack -long;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateAnimLayerEditor("AnimLayerTab");
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Scale
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+ShiftClickSmartDupe 1;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+scale -ws -r 2.5 1 1 ;
+# Warning: Non object-space scale baked onto components.
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateSnapMasks;
+autoUpdateAttrEd;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+ShiftClickSmartDupe 1;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+move -rpr 4 -1 -1 ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+SnapToPointRelease;
+snapMode -point 0;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkSelectionChanged;
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+SnapToGridPress;
+snapMode -grid 1;
+uvTkUpdateSelectionStyleInfo;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+ShiftClickSmartDupe 1;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+move -rpr 0 0 0 ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+SnapToGridRelease;
+snapMode -grid 0;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+SetLastUVBrushTool;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateMakeLive;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+dR_updateSlideField;
+SnapToPointPress;
+snapMode -point 1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+changeToolIcon;
+updateSnapMasks;
+ShiftClickSmartDupe 1;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+SnapToPointRelease;
+snapMode -point 0;
+move -rpr 4 -1 -1 ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+autoUpdateAttrEd;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+move -r 6.25 -3 4 ;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+updateAnimLayerEditor("AnimLayerTab");
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+move -r 3.644818 1.464849 4.569996 ;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+SnapToPointPress;
+snapMode -point 1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+CBselectionChanged;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+move -rpr -z -1 ;
+SnapToPointRelease;
+snapMode -point 0;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+statusLineUpdateInputField;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+hilite snapSubject.vtx[0:1] ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+SnapToPointPress;
+snapMode -point 1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+CBselectionChanged;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+move -r 8.25 -0.25 -1.75 ;
+uvTkUpdateSelectionCompInfo;
+SnapToPointRelease;
+snapMode -point 0;
+dR_updateCounter;
+updateSnapMasks;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+dR_selTypeChanged("");
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+autoUpdateAttrEd;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+select -cl  ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+hilite snapSubject.vtx[0:1] ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+SnapToPointPress;
+snapMode -point 1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+CBselectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+move 4 -1 -1 ;
+updateSelectionModeIcons;
+SnapToPointRelease;
+snapMode -point 0;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+dR_selTypeChanged("");
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+select -cl  ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+autoUpdateAttrEd;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+updateSnapMasks;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+dR_selTypeChanged("");
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateSelectionModeIcons;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+changeToolIcon;
+SnapToPointPress;
+snapMode -point 1;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+move -rpr 1.1 1.7 1 ;
+SnapToPointRelease;
+snapMode -point 0;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+statusLineUpdateMakeLive;
+SnapToPointPress;
+snapMode -point 1;
+dR_updateSlideField;
+autoUpdateAttrEd;
+SnapToPointRelease;
+snapMode -point 0;
+move -rpr 1.8 1.2 1.8 ;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+updateSnapMasks;
+SnapToPointPress;
+snapMode -point 1;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+autoUpdateAttrEd;
+ShiftClickSmartDupe 1;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+SnapToPointRelease;
+snapMode -point 0;
+move -rpr 1.8 1.2 1.8 ;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+SnapToPointPress;
+snapMode -point 1;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+move -rpr 4 -1 -1 ;
+SnapToPointRelease;
+snapMode -point 0;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+autoUpdateAttrEd;
+uvTkResolveAndUpdateTrees;
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+# Undo: 
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+uvTkSelectionChanged;
+SnapToPointPress;
+snapMode -point 1;
+eval( "hikCustomRigUndoRedo" );
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+updateSnapMasks;
+autoUpdateAttrEd;
+move -rpr 4 -1 -1 ;
+SnapToPointRelease;
+snapMode -point 0;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+# Undo: 
+# Redo: 
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+uvTkSelectionChanged;
+SnapToPointPress;
+snapMode -point 1;
+eval( "hikCustomRigUndoRedo" );
+uvTkSelectionChanged;
+eval( "hikCustomRigUndoRedo" );
+statusLineUpdateMakeLive;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+SnapToPointPress;
+snapMode -point 1;
+move -rpr 4 -1 -1 ;
+setFilterScript "initialShadingGroup";
+// 0
+setFilterScript "initialParticleSE";
+// 0
+setFilterScript "defaultLightSet";
+// 1
+setFilterScript "defaultObjectSet";
+// 1
+SnapToPointRelease;
+snapMode -point 0;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateSlideField;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+move -r 2.25 0 0 ;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+updateSnapMasks;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+statusLineUpdateMakeLive;
+uvTkUpdateSelectionCompInfo;
+dR_updateCounter;
+dR_updateSlideField;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Move
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+updateSnapMasks;
+autoUpdateAttrEd;
+move -r 2 0 0 ;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+Unfold3DContextHotkeyScriptJob;
+SetLastUVBrushTool;
+changeToolIcon;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Rotate
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+updateSnapMasks;
+rotate -r -os -fo 0 45 0 ;
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+uvTkResolveAndUpdateTrees;
+uvTkUpdateSelectionCompInfo;
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+$tmp = $gMove;
+// moveSuperContext
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+ls -type materialxStack -long;
+CBselectionChanged;
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+dR_updateCounter;
+uvTkUpdateSelectionStyleInfo;
+updateEditPivot;
+dR_updateCommandPanel;
+dR_contextChanged;
+currentCtx;
+// Scale
+nexCtx -upm; refresh -f;
+dR_updateToolSettings;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+getUIComponentDockControl("Tool Settings", false);
+// ToolSettings
+statusLineUpdateMakeLive;
+dR_updateSlideField;
+updateSnapMasks;
+scale -ws -r 2.5 1 1 ;
+# Warning: Non object-space scale baked onto components.
+autoUpdateAttrEd;
+textureWindowUpdateTextures polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1TexturesMenu polyTexturePlacementPanel1 textureWindow 1;
+textureWindowUpdateUVSets polyTexturePlacementPanel1Window|polyTexturePlacementPanel1|polyTexturePlacementPanel1UVSetsMenu polyTexturePlacementPanel1 1;
+uvTbUpdateTextureItems polyTexturePlacementPanel1;
+uvTkSelectionChanged;
+updateAnimLayerEditor("AnimLayerTab");
+statusLineUpdateInputField;
+if (!`exists polyNormalSizeMenuUpdate`) {eval "source buildDisplayMenu";} polyNormalSizeMenuUpdate;
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext

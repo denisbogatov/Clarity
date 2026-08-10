@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import ctypes
 import importlib
+import sys
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -265,16 +266,116 @@ def _far_vertex(from_pixel: tuple[int, int], minimum: int = 90):
 
 
 # ---------------------------------------------------------------------------------------------
-# Input. `SendInput` and nothing above it: Maya has no command that moves its own mouse, and a Qt
-# event posted straight at a widget takes a different path through Maya than a real click does.
+# Input. Native OS events and nothing above them: Maya has no command that moves its own mouse, and
+# a Qt event posted straight at a widget takes a different path through Maya than a real click does.
 # ---------------------------------------------------------------------------------------------
+
+_IS_WINDOWS = sys.platform == "win32"
+_IS_MACOS = sys.platform == "darwin"
 
 _MOUSEEVENTF_MOVE_ABSOLUTE = 0x8001  # MOVE | ABSOLUTE
 _MOUSEEVENTF_LEFTDOWN = 0x0002
 _MOUSEEVENTF_LEFTUP = 0x0004
+_MOUSEEVENTF_MIDDLEDOWN = 0x0020
+_MOUSEEVENTF_MIDDLEUP = 0x0040
 _KEYEVENTF_KEYUP = 0x0002
 
-_VK = {"V": 0x56, "C": 0x43, "X": 0x58, "D": 0x44, "CTRL": 0x11, "SHIFT": 0x10}
+_VK = {
+    "V": 0x56,
+    "C": 0x43,
+    "X": 0x58,
+    "D": 0x44,
+    "ESC": 0x1B,
+    "CTRL": 0x11,
+    "SHIFT": 0x10,
+}
+_MAC_KEY = {
+    "V": 9,
+    "C": 8,
+    "X": 7,
+    "D": 2,
+    "J": 38,
+    "ESC": 53,
+    "CTRL": 59,
+    "SHIFT": 56,
+}
+
+_CG_LEFT_DOWN = 1
+_CG_LEFT_UP = 2
+_CG_MOUSE_MOVED = 5
+_CG_LEFT_DRAGGED = 6
+_CG_OTHER_DOWN = 25
+_CG_OTHER_UP = 26
+_CG_OTHER_DRAGGED = 27
+_CG_HID_EVENT_TAP = 0
+_CG_LEFT_BUTTON = 0
+_CG_CENTER_BUTTON = 2
+
+
+class _CGPoint(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_double), ("y", ctypes.c_double)]
+
+
+_MAC_API = None
+_MAC_MOUSE_BUTTON: str | None = None
+_MAC_MOUSE_POSITION = (0, 0)
+
+
+def _mac_api():
+    """ApplicationServices with pointer-sized signatures; ctypes' defaults truncate CGEventRef."""
+    global _MAC_API
+    if _MAC_API is not None:
+        return _MAC_API
+    path = "/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices"
+    core_path = "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
+    api = ctypes.cdll.LoadLibrary(path)
+    core = ctypes.cdll.LoadLibrary(core_path)
+    api.AXIsProcessTrusted.argtypes = []
+    api.AXIsProcessTrusted.restype = ctypes.c_bool
+    api.CGEventCreateMouseEvent.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_uint32,
+        _CGPoint,
+        ctypes.c_uint32,
+    ]
+    api.CGEventCreateMouseEvent.restype = ctypes.c_void_p
+    api.CGEventCreateKeyboardEvent.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_uint16,
+        ctypes.c_bool,
+    ]
+    api.CGEventCreateKeyboardEvent.restype = ctypes.c_void_p
+    api.CGEventPost.argtypes = [ctypes.c_uint32, ctypes.c_void_p]
+    api.CGEventPost.restype = None
+    core.CFRelease.argtypes = [ctypes.c_void_p]
+    core.CFRelease.restype = None
+    api._clarity_core_foundation = core
+    _MAC_API = api
+    return api
+
+
+def input_ready() -> str:
+    """Name of the native backend, or a useful failure before a capture has replaced the scene."""
+    if _IS_WINDOWS:
+        return "Windows SendInput"
+    if _IS_MACOS:
+        if not _mac_api().AXIsProcessTrusted():
+            raise RuntimeError(
+                "Maya не разрешено управлять мышью. Добавьте Maya в System Settings > Privacy & "
+                "Security > Accessibility, перезапустите Maya и повторите прогон."
+            )
+        return "macOS CoreGraphics"
+    raise RuntimeError("автопилот поддерживает только Windows и macOS: " + sys.platform)
+
+
+def _mac_post(event: int) -> None:
+    if not event:
+        raise RuntimeError("CoreGraphics не создал событие ввода")
+    api = _mac_api()
+    try:
+        api.CGEventPost(_CG_HID_EVENT_TAP, event)
+    finally:
+        api._clarity_core_foundation.CFRelease(event)
 
 # What the snap keys are bound to. Maya's own runtime commands, and the same ones a real key press
 # runs - the echo of a hand-held `V` is `SnapToPointPress; dR_exitForSnap;` and nothing else.
@@ -294,23 +395,28 @@ _SNAP_COMMANDS = {
 def _hold_begin(hold: str | None) -> None:
     if not hold:
         return
-    if hold in _SNAP_COMMANDS:
-        reference._safe(_SNAP_COMMANDS[hold][0],
-                        lambda: mel.eval(_SNAP_COMMANDS[hold][0]))
-        _settle(0.05)
-        return
-    _key(hold, True)
+    for token in hold.split("+"):
+        if token in _SNAP_COMMANDS:
+            reference._safe(
+                _SNAP_COMMANDS[token][0],
+                lambda token=token: mel.eval(_SNAP_COMMANDS[token][0]),
+            )
+        else:
+            _key(token, True)
     _settle(0.05)
 
 
 def _hold_end(hold: str | None) -> None:
     if not hold:
         return
-    if hold in _SNAP_COMMANDS:
-        reference._safe(_SNAP_COMMANDS[hold][1],
-                        lambda: mel.eval(_SNAP_COMMANDS[hold][1]))
-        return
-    _key(hold, False)
+    for token in reversed(hold.split("+")):
+        if token in _SNAP_COMMANDS:
+            reference._safe(
+                _SNAP_COMMANDS[token][1],
+                lambda token=token: mel.eval(_SNAP_COMMANDS[token][1]),
+            )
+        else:
+            _key(token, False)
 
 
 class _MouseInput(ctypes.Structure):
@@ -333,26 +439,71 @@ class _Input(ctypes.Structure):
 
 
 def _send(structure: _Input) -> None:
+    if not _IS_WINDOWS:
+        raise RuntimeError("SendInput доступен только на Windows")
     ctypes.windll.user32.SendInput(1, ctypes.byref(structure), ctypes.sizeof(_Input))
 
 
 def _mouse_to(x: int, y: int) -> None:
-    """Absolute move, in the 0..65535 space `SendInput` insists on, over the whole desktop."""
+    """Move the system cursor in desktop coordinates, dragging while the button is down."""
+    global _MAC_MOUSE_POSITION
+    if _IS_MACOS:
+        _MAC_MOUSE_POSITION = (x, y)
+        event_type = {
+            "left": _CG_LEFT_DRAGGED,
+            "middle": _CG_OTHER_DRAGGED,
+        }.get(_MAC_MOUSE_BUTTON, _CG_MOUSE_MOVED)
+        button = _CG_CENTER_BUTTON if _MAC_MOUSE_BUTTON == "middle" else _CG_LEFT_BUTTON
+        event = _mac_api().CGEventCreateMouseEvent(
+            None, event_type, _CGPoint(float(x), float(y)), button
+        )
+        _mac_post(event)
+        return
     metrics = ctypes.windll.user32.GetSystemMetrics
     width, height = metrics(0), metrics(1)
     absolute_x = int(x * 65535 / max(width - 1, 1))
     absolute_y = int(y * 65535 / max(height - 1, 1))
-    event = _Input(type=0, union=_InputUnion(
-        mouse=_MouseInput(absolute_x, absolute_y, 0, _MOUSEEVENTF_MOVE_ABSOLUTE, 0, None)))
+    event = _Input(
+        type=0,
+        union=_InputUnion(
+            mouse=_MouseInput(
+                absolute_x, absolute_y, 0, _MOUSEEVENTF_MOVE_ABSOLUTE, 0, None
+            )
+        ),
+    )
     _send(event)
 
 
-def _mouse_button(down: bool) -> None:
-    flag = _MOUSEEVENTF_LEFTDOWN if down else _MOUSEEVENTF_LEFTUP
+def _mouse_button(down: bool, button: str = "left") -> None:
+    global _MAC_MOUSE_BUTTON
+    if button not in {"left", "middle"}:
+        raise ValueError("неподдерживаемая кнопка мыши: " + button)
+    if _IS_MACOS:
+        if button == "middle":
+            event_type = _CG_OTHER_DOWN if down else _CG_OTHER_UP
+            cg_button = _CG_CENTER_BUTTON
+        else:
+            event_type = _CG_LEFT_DOWN if down else _CG_LEFT_UP
+            cg_button = _CG_LEFT_BUTTON
+        x, y = _MAC_MOUSE_POSITION
+        event = _mac_api().CGEventCreateMouseEvent(
+            None, event_type, _CGPoint(float(x), float(y)), cg_button
+        )
+        _mac_post(event)
+        _MAC_MOUSE_BUTTON = button if down else None
+        return
+    if button == "middle":
+        flag = _MOUSEEVENTF_MIDDLEDOWN if down else _MOUSEEVENTF_MIDDLEUP
+    else:
+        flag = _MOUSEEVENTF_LEFTDOWN if down else _MOUSEEVENTF_LEFTUP
     _send(_Input(type=0, union=_InputUnion(mouse=_MouseInput(0, 0, 0, flag, 0, None))))
 
 
 def _key(name: str, down: bool) -> None:
+    if _IS_MACOS:
+        event = _mac_api().CGEventCreateKeyboardEvent(None, _MAC_KEY[name], down)
+        _mac_post(event)
+        return
     flags = 0 if down else _KEYEVENTF_KEYUP
     _send(_Input(type=1, union=_InputUnion(
         keyboard=_KeyboardInput(_VK[name], 0, flags, 0, None))))
@@ -386,20 +537,28 @@ def click(at: tuple[int, int], hold: str | None = None) -> None:
     _settle()
 
 
-def drag(start: tuple[int, int], end: tuple[int, int], hold: str | None = None) -> None:
+def drag(
+    start: tuple[int, int],
+    end: tuple[int, int],
+    hold: str | None = None,
+    button: str = "left",
+    release_hold_before_mouse: bool = False,
+) -> None:
     """Press at one pixel, walk to another, release - with a modifier held for the whole walk.
 
     The walk is in steps rather than one jump because a snap follows the pointer: Maya decides what
     is under it while it moves, and a single jump gives it one sample to decide from.
     """
-    _INPUT.append("драг {} -> {} ({} px) hold={}".format(
+    _INPUT.append("драг {} -> {} ({} px) hold={} button={} release={}".format(
         start, end,
-        int(((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2) ** 0.5), hold or "-"))
-    _STATE["last_drag"] = (start, end, hold)
+        int(((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2) ** 0.5),
+        hold or "-", button,
+        "modifier-first" if release_hold_before_mouse else "mouse-first"))
+    _STATE["last_drag"] = (start, end, hold, button)
     _mouse_to(*start)
     _settle(0.05)
     _hold_begin(hold)
-    _mouse_button(True)
+    _mouse_button(True, button)
     _settle(0.05)
     for step in range(1, _DRAG_STEPS + 1):
         x = start[0] + (end[0] - start[0]) * step / _DRAG_STEPS
@@ -411,8 +570,76 @@ def drag(start: tuple[int, int], end: tuple[int, int], hold: str | None = None) 
         if step == _DRAG_STEPS // 2:
             _shot("drag")
     _settle(0.05)
-    _mouse_button(False)
+    if release_hold_before_mouse:
+        _hold_end(hold)
+        _settle(0.05)
+        _mouse_button(False, button)
+    else:
+        _mouse_button(False, button)
+        _settle(0.05)
+        _hold_end(hold)
+    _settle()
+
+
+def drag_tool_change(
+    start: tuple[int, int],
+    end: tuple[int, int],
+    tool: str,
+    hold: str | None = None,
+) -> None:
+    """Change Maya's active tool while a real drag is in flight, then release cleanly."""
+    _INPUT.append("драг со сменой инструмента {} -> {} tool={} hold={}".format(
+        start, end, tool, hold or "-"
+    ))
+    _STATE["last_drag"] = (start, end, hold, "left")
+    _mouse_to(*start)
     _settle(0.05)
+    _hold_begin(hold)
+    _mouse_button(True)
+    for step in range(1, _DRAG_STEPS // 2 + 1):
+        factor = step / _DRAG_STEPS
+        _mouse_to(
+            int(round(start[0] + (end[0] - start[0]) * factor)),
+            int(round(start[1] + (end[1] - start[1]) * factor)),
+        )
+        _settle(0.02)
+    _shot("tool_change_drag")
+    cmds.setToolTo(tool)
+    _settle(0.05)
+    _mouse_button(False)
+    _hold_end(hold)
+    _settle()
+
+
+def drag_cancel(
+    start: tuple[int, int],
+    end: tuple[int, int],
+    hold: str | None = None,
+    button: str = "left",
+) -> None:
+    """Begin a real drag, move halfway, press Escape, and release every held input."""
+    _INPUT.append("отменённый драг {} -> {} hold={} button={}".format(
+        start, end, hold or "-", button
+    ))
+    _STATE["last_drag"] = (start, end, hold, button)
+    _mouse_to(*start)
+    _settle(0.05)
+    _hold_begin(hold)
+    _mouse_button(True, button)
+    _settle(0.05)
+    for step in range(1, _DRAG_STEPS // 2 + 1):
+        factor = step / _DRAG_STEPS
+        _mouse_to(
+            int(round(start[0] + (end[0] - start[0]) * factor)),
+            int(round(start[1] + (end[1] - start[1]) * factor)),
+        )
+        _settle(0.02)
+    _shot("cancel_drag")
+    _key("ESC", True)
+    _settle(0.03)
+    _key("ESC", False)
+    _settle(0.05)
+    _mouse_button(False, button)
     _hold_end(hold)
     _settle()
 
@@ -465,7 +692,7 @@ def _grab_viewport(path: Path) -> bool:
     # held. Without it every screenshot of a drag looks like a screenshot of a viewport.
     drag_marks = _STATE.get("last_drag")
     if drag_marks:
-        start, end, hold = drag_marks
+        start, end, hold, button = drag_marks
         painter = QtGui.QPainter(pixmap)
         local_start = (start[0] - origin.x(), start[1] - origin.y())
         local_end = (end[0] - origin.x(), end[1] - origin.y())
@@ -480,7 +707,9 @@ def _grab_viewport(path: Path) -> bool:
         painter.setPen(QtGui.QColor(255, 255, 255))
         painter.drawText(
             local_start[0] + 12, local_start[1] - 10,
-            "{} -> {}{}".format(start, end, "  hold=" + hold if hold else ""),
+            "{} -> {}{}  button={}".format(
+                start, end, "  hold=" + hold if hold else "", button
+            ),
         )
         painter.end()
     return bool(pixmap.save(str(path), "PNG"))

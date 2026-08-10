@@ -151,6 +151,8 @@ struct WindowManagerRuntime {
   /** Clarity's "Use snap tolerance" and "Snap tolerance" in pixels. */
   bool clarity_snap_use_tolerance;
   int clarity_snap_tolerance;
+  /** Whether the Angle selection constraint is active, mirrored for the viewport header. */
+  bool clarity_selection_constraint_angle_active;
   /**
    * Angle tolerance of Clarity's `polySelectConstraint -a`, in radians.
    *

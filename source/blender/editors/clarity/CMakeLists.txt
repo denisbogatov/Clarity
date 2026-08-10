@@ -62,6 +62,7 @@ add_dependencies(bf_editor_clarity bf_rna)
 if(WITH_GTESTS)
   set(TEST_SRC
     clarity_runtime_test.cc
+    clarity_selection_angle_test.cc
     clarity_selection_menu_test.cc
     clarity_topology_select_test.cc
   )

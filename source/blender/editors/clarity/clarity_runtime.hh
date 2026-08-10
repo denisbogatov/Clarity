@@ -324,6 +324,17 @@ struct ClarityWindowRuntime {
    * the gesture is over.
    */
   bool selection_constraint_pending = false;
+  /** Growth constraints must not immediately restore components removed by subtract/toggle. */
+  bool selection_constraint_pending_allow_growth = true;
+  bool selection_constraint_pending_toggle = false;
+  int selection_constraint_selected_before = 0;
+  /**
+   * A regular Blender component pick is still in progress. The dispatcher runs before keymaps, so
+   * the constraint is queued on release and applied by a synthetic follow-up mouse move after the
+   * keymap has changed the selection.
+   */
+  bool selection_constraint_click_press_pending = false;
+  uint8_t selection_constraint_click_modifier = 0;
   /**
    * The component that was active before the last component pick.
    *

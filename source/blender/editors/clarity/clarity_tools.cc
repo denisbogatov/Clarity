@@ -8,9 +8,12 @@
 
 #include "clarity_tools.hh"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 #include "DNA_layer_types.h"
 #include "DNA_mesh_types.h"
@@ -20,11 +23,13 @@
 #include "DNA_view3d_types.h"
 #include "DNA_windowmanager_types.h"
 
+#include "BLI_index_range.hh"
 #include "BLI_listbase_iterator.hh"
 #include "BLI_map.hh"
-#include "BLI_index_range.hh"
 #include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
+#include "BLI_math_vector.hh"
+#include "BLI_set.hh"
 #include "BLI_string.h"
 #include "BLI_time.h"
 #include "BLI_utildefines.h"
@@ -1314,9 +1319,9 @@ static int edit_mesh_selected_count(bContext *C)
  * Every constraint runs after the selection was made rather than instead of it, which is what lets
  * one rule serve a click, a marquee and a topology gesture alike.
  *
- * Border and Angle narrow a selection down; Edge Loop, Edge Ring and Shell grow it. Clarity draws the
- * same line: the first two are properties a component either has or does not, the last three are
- * ways of walking outwards from what was picked.
+ * Border narrows a selection down; Angle, Edge Loop, Edge Ring and Shell grow it. Angle follows
+ * the surface while the local component-normal change stays inside its tolerance; the topology
+ * modes walk the corresponding mesh structure.
  * \{ */
 
 /** An edge on the border of the surface: exactly one face uses it. */
@@ -1325,24 +1330,12 @@ static bool edge_passes_border(const BMEdge *edge, float /*tolerance*/)
   return BM_edge_is_boundary(const_cast<BMEdge *>(edge));
 }
 
-/** An edge creased enough to count, measured the way Clarity measures it: between its two faces. */
-static bool edge_passes_angle(const BMEdge *edge, const float tolerance)
-{
-  BMEdge *edge_mut = const_cast<BMEdge *>(edge);
-  if (!BM_edge_is_manifold(edge_mut)) {
-    /* A border or a wire edge has no second face to make an angle with. Clarity keeps those out of an
-     * angle constraint rather than treating the missing face as a flat one. */
-    return false;
-  }
-  return BM_edge_calc_face_angle(edge_mut) >= tolerance;
-}
-
 using ClarityEdgePredicate = bool (*)(const BMEdge *edge, float tolerance);
 
 /**
  * Drop everything the predicate rejects.
  *
- * The predicate is about edges, because that is what both narrowing constraints are really about.
+ * The predicate is about edges, because that is what the Border narrowing constraint is about.
  * A vertex survives while any edge at it survives, and a face while any of its edges does, which
  * is how the same rule reaches the other two component modes.
  */
@@ -1417,6 +1410,195 @@ static bool selection_filter_by_edge(bContext *C,
   return changed_any;
 }
 
+static std::optional<float3> normalized_component_normal(const BMVert &vert)
+{
+  float length;
+  const float3 normal = math::normalize_and_get_length(float3(vert.no), length);
+  return length > 1e-6f ? std::optional<float3>(normal) : std::nullopt;
+}
+
+static std::optional<float3> normalized_component_normal(const BMEdge &edge)
+{
+  float3 normal(0.0f);
+  BMIter iter;
+  BMFace *face;
+  BM_ITER_ELEM (face, &iter, const_cast<BMEdge *>(&edge), BM_FACES_OF_EDGE) {
+    normal += float3(face->no);
+  }
+  float length;
+  normal = math::normalize_and_get_length(normal, length);
+  return length > 1e-6f ? std::optional<float3>(normal) : std::nullopt;
+}
+
+static std::optional<float3> normalized_component_normal(const BMFace &face)
+{
+  float length;
+  const float3 normal = math::normalize_and_get_length(float3(face.no), length);
+  return length > 1e-6f ? std::optional<float3>(normal) : std::nullopt;
+}
+
+template<typename Component>
+static bool component_normals_within_angle(const Component &source,
+                                           const Component &candidate,
+                                           const float angle_cos)
+{
+  const std::optional<float3> source_normal = normalized_component_normal(source);
+  const std::optional<float3> candidate_normal = normalized_component_normal(candidate);
+  return source_normal.has_value() && candidate_normal.has_value() &&
+         math::dot(*source_normal, *candidate_normal) >= angle_cos - 1e-6f;
+}
+
+static bool selection_by_angle_propagate_faces(BMesh &bm, const float angle_cos)
+{
+  Vector<BMFace *> queue;
+  Set<BMFace *> reached;
+  BMIter iter;
+  BMFace *face;
+  BM_ITER_MESH (face, &iter, &bm, BM_FACES_OF_MESH) {
+    if (BM_elem_flag_test(face, BM_ELEM_SELECT) && !BM_elem_flag_test(face, BM_ELEM_HIDDEN)) {
+      queue.append(face);
+      reached.add(face);
+    }
+  }
+
+  bool changed = false;
+  for (int index = 0; index < queue.size(); index++) {
+    BMFace *source = queue[index];
+    BMIter edge_iter;
+    BMEdge *edge;
+    BM_ITER_ELEM (edge, &edge_iter, source, BM_EDGES_OF_FACE) {
+      BMIter face_iter;
+      BMFace *candidate;
+      BM_ITER_ELEM (candidate, &face_iter, edge, BM_FACES_OF_EDGE) {
+        if (candidate == source || reached.contains(candidate) ||
+            BM_elem_flag_test(candidate, BM_ELEM_HIDDEN) ||
+            !component_normals_within_angle(*source, *candidate, angle_cos))
+        {
+          continue;
+        }
+        reached.add(candidate);
+        queue.append(candidate);
+        if (!BM_elem_flag_test(candidate, BM_ELEM_SELECT)) {
+          BM_face_select_set(&bm, candidate, true);
+          changed = true;
+        }
+      }
+    }
+  }
+  return changed;
+}
+
+static bool selection_by_angle_propagate_edges(BMesh &bm, const float angle_cos)
+{
+  Vector<BMEdge *> queue;
+  Set<BMEdge *> reached;
+  BMIter iter;
+  BMEdge *edge;
+  BM_ITER_MESH (edge, &iter, &bm, BM_EDGES_OF_MESH) {
+    if (BM_elem_flag_test(edge, BM_ELEM_SELECT) && !BM_elem_flag_test(edge, BM_ELEM_HIDDEN)) {
+      queue.append(edge);
+      reached.add(edge);
+    }
+  }
+
+  bool changed = false;
+  for (int index = 0; index < queue.size(); index++) {
+    BMEdge *source = queue[index];
+    BMVert *vertices[2] = {source->v1, source->v2};
+    for (BMVert *vert : vertices) {
+      BMIter edge_iter;
+      BMEdge *candidate;
+      BM_ITER_ELEM (candidate, &edge_iter, vert, BM_EDGES_OF_VERT) {
+        if (candidate == source || reached.contains(candidate) ||
+            BM_elem_flag_test(candidate, BM_ELEM_HIDDEN) ||
+            !component_normals_within_angle(*source, *candidate, angle_cos))
+        {
+          continue;
+        }
+        reached.add(candidate);
+        queue.append(candidate);
+        if (!BM_elem_flag_test(candidate, BM_ELEM_SELECT)) {
+          BM_edge_select_set(&bm, candidate, true);
+          changed = true;
+        }
+      }
+    }
+  }
+  return changed;
+}
+
+static bool selection_by_angle_propagate_verts(BMesh &bm, const float angle_cos)
+{
+  Vector<BMVert *> queue;
+  Set<BMVert *> reached;
+  BMIter iter;
+  BMVert *vert;
+  BM_ITER_MESH (vert, &iter, &bm, BM_VERTS_OF_MESH) {
+    if (BM_elem_flag_test(vert, BM_ELEM_SELECT) && !BM_elem_flag_test(vert, BM_ELEM_HIDDEN)) {
+      queue.append(vert);
+      reached.add(vert);
+    }
+  }
+
+  bool changed = false;
+  for (int index = 0; index < queue.size(); index++) {
+    BMVert *source = queue[index];
+    BMIter edge_iter;
+    BMEdge *edge;
+    BM_ITER_ELEM (edge, &edge_iter, source, BM_EDGES_OF_VERT) {
+      BMVert *candidate = BM_edge_other_vert(edge, source);
+      if (reached.contains(candidate) || BM_elem_flag_test(candidate, BM_ELEM_HIDDEN) ||
+          !component_normals_within_angle(*source, *candidate, angle_cos))
+      {
+        continue;
+      }
+      reached.add(candidate);
+      queue.append(candidate);
+      if (!BM_elem_flag_test(candidate, BM_ELEM_SELECT)) {
+        BM_vert_select_set(&bm, candidate, true);
+        changed = true;
+      }
+    }
+  }
+  return changed;
+}
+
+bool selection_by_angle_propagate(BMesh &bm, const short selectmode, const float tolerance)
+{
+  const float angle_cos = std::cos(std::clamp(tolerance, 0.0f, float(M_PI)));
+  /* Multi-component mode produces the lower-domain selection implied by the picked component.
+   * Start from the highest selected domain so a picked face does not also launch an unrelated
+   * vertex and edge flood. */
+  if ((selectmode & SCE_SELECT_FACE) && bm.totfacesel > 0) {
+    return selection_by_angle_propagate_faces(bm, angle_cos);
+  }
+  if ((selectmode & SCE_SELECT_EDGE) && bm.totedgesel > 0) {
+    return selection_by_angle_propagate_edges(bm, angle_cos);
+  }
+  if ((selectmode & SCE_SELECT_VERTEX) && bm.totvertsel > 0) {
+    return selection_by_angle_propagate_verts(bm, angle_cos);
+  }
+  return false;
+}
+
+static bool selection_propagate_by_angle(bContext *C, const float tolerance)
+{
+  bool changed_any = false;
+  for (Object *object : edit_mesh_objects_get(C)) {
+    BMEditMesh *em = BKE_editmesh_from_object(object);
+    if (em == nullptr || em->bm == nullptr ||
+        !selection_by_angle_propagate(*em->bm, em->selectmode, tolerance))
+    {
+      continue;
+    }
+    EDBM_selectmode_flush(em);
+    DEG_id_tag_update(static_cast<ID *>(object->data), ID_RECALC_SELECT);
+    WM_event_add_notifier(C, NC_GEOM | ND_SELECT, object->data);
+    changed_any = true;
+  }
+  return changed_any;
+}
+
 /** Grow the selection outwards, which the mesh operators already know how to do. */
 static bool selection_grow_by_operator(bContext *C, const ClaritySelectionConstraint constraint)
 {
@@ -1453,7 +1635,7 @@ static bool selection_grow_by_operator(bContext *C, const ClaritySelectionConstr
  * Safe to call after any selection: it returns immediately unless a constraint is on and a mesh is
  * being edited, so callers do not have to ask first.
  */
-static bool selection_constraint_apply(bContext *C)
+static bool selection_constraint_apply(bContext *C, const bool allow_growth = true)
 {
   const ClarityWindowRuntime *runtime = runtime_get(C);
   if (runtime == nullptr) {
@@ -1468,16 +1650,19 @@ static bool selection_constraint_apply(bContext *C)
     case ClaritySelectionConstraint::Border:
       return selection_filter_by_edge(C, edge_passes_border, 0.0f);
     case ClaritySelectionConstraint::Angle: {
+      if (!allow_growth) {
+        return false;
+      }
       const wmWindowManager *wm = CTX_wm_manager(C);
       const float tolerance = wm != nullptr && wm->runtime != nullptr ?
                                   wm->runtime->clarity_selection_constraint_angle :
                                   DEG2RADF(45.0f);
-      return selection_filter_by_edge(C, edge_passes_angle, tolerance);
+      return selection_propagate_by_angle(C, tolerance);
     }
     case ClaritySelectionConstraint::EdgeLoop:
     case ClaritySelectionConstraint::EdgeRing:
     case ClaritySelectionConstraint::Shell:
-      return selection_grow_by_operator(C, constraint);
+      return allow_growth ? selection_grow_by_operator(C, constraint) : false;
     case ClaritySelectionConstraint::Off:
       break;
   }
@@ -1781,9 +1966,12 @@ ClarityDispatchResult selection_handle_action(bContext *C,
     /* Taken before the pick, which is about to move the active face onto whatever is clicked: the
      * double click that may follow needs to know where the selection was standing. */
     topology_anchor_store(C, runtime);
+    const int selected_before = select_op == SEL_OP_XOR ? edit_mesh_selected_count(C) : 0;
     select_pick_call(C, action, select_op);
-    /* A click selects immediately, so the constraint can narrow or grow the result right here. */
-    selection_constraint_apply(C);
+    const bool allow_growth = ELEM(select_op, SEL_OP_SET, SEL_OP_ADD) ||
+                              (select_op == SEL_OP_XOR &&
+                               edit_mesh_selected_count(C) > selected_before);
+    selection_constraint_apply(C, allow_growth);
     return ClarityDispatchResult::Handled;
   }
 
@@ -1911,9 +2099,12 @@ bool left_mouse_marquee_drag_handle(bContext *C,
 
   /* The drag is consumed whatever the marquee answers: otherwise the tool keymap of Move, Rotate or
    * Scale inherits it and starts a transform where Clarity draws a selection rectangle. */
+  runtime.selection_constraint_selected_before = edit_mesh_selected_count(C);
   select_marquee_call(C, drag);
   /* The marquee is modal, so there is nothing to constrain yet. */
   runtime.selection_constraint_pending = true;
+  runtime.selection_constraint_pending_allow_growth = !drag.ctrl || drag.shift;
+  runtime.selection_constraint_pending_toggle = drag.shift && !drag.ctrl;
   return true;
 }
 
@@ -1923,7 +2114,70 @@ bool selection_constraint_apply_pending(bContext *C, ClarityWindowRuntime &runti
     return false;
   }
   runtime.selection_constraint_pending = false;
-  return selection_constraint_apply(C);
+  bool allow_growth = runtime.selection_constraint_pending_allow_growth;
+  if (runtime.selection_constraint_pending_toggle) {
+    allow_growth = edit_mesh_selected_count(C) > runtime.selection_constraint_selected_before;
+  }
+  runtime.selection_constraint_pending_toggle = false;
+  return selection_constraint_apply(C, allow_growth);
+}
+
+void selection_constraint_click_track(bContext *C,
+                                      ClarityWindowRuntime &runtime,
+                                      const ClarityInputAction &action)
+{
+  const wmEvent *event = action.source_event;
+  if (event == nullptr) {
+    return;
+  }
+
+  if (event->type == LEFTMOUSE) {
+    if (left_mouse_click_press_arms(*event)) {
+      const ARegion *region = CTX_wm_region(C);
+      const bool can_select_components =
+          runtime.selection_settings.selection_constraint != ClaritySelectionConstraint::Off &&
+          is_mesh_component_context(C) && !runtime.transform_active &&
+          runtime.pivot_edit.target == ClarityPivotEditTarget::None && region != nullptr &&
+          region->regiontype == RGN_TYPE_WINDOW && !WM_gizmomap_region_is_highlighted(region);
+      runtime.selection_constraint_click_press_pending = can_select_components;
+      if (can_select_components) {
+        runtime.selection_constraint_click_modifier = uint8_t(event->modifier);
+        runtime.selection_constraint_selected_before = edit_mesh_selected_count(C);
+      }
+      return;
+    }
+
+    if (event->val == KM_RELEASE) {
+      const bool is_click = runtime.selection_constraint_click_press_pending &&
+                            left_mouse_click_release_is(*event);
+      runtime.selection_constraint_click_press_pending = false;
+      if (!is_click) {
+        return;
+      }
+
+      const bool shift = runtime.selection_constraint_click_modifier & KM_SHIFT;
+      const bool ctrl = runtime.selection_constraint_click_modifier & KM_CTRL;
+      runtime.selection_constraint_pending = true;
+      runtime.selection_constraint_pending_allow_growth = !ctrl || shift;
+      runtime.selection_constraint_pending_toggle = shift && !ctrl;
+      /* The queued move is handled only after the current release has reached Blender's CLICK
+       * keymap, so both PRESS-based and CLICK-based selection keymaps are covered. */
+      if (wmWindow *window = CTX_wm_window(C)) {
+        WM_event_add_mousemove(window);
+      }
+      return;
+    }
+
+    /* A double-click press belongs to topology selection and must not leave a click armed. */
+    runtime.selection_constraint_click_press_pending = false;
+    return;
+  }
+
+  if (runtime.selection_constraint_click_press_pending && ISMOUSE_MOTION(event->type) &&
+      event->prev_press_type == LEFTMOUSE && WM_event_drag_test(event, event->prev_press_xy))
+  {
+    runtime.selection_constraint_click_press_pending = false;
+  }
 }
 
 bool middle_mouse_axis_drag_handle(bContext *C,

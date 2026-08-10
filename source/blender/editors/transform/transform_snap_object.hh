@@ -241,6 +241,12 @@ eSnapMode snapCamera(SnapObjectContext *sctx,
 
 eSnapMode snapCurve(SnapObjectContext *sctx, const Object *ob_eval, const float4x4 &obmat);
 
+/**
+ * Point mode treats the point an object actually transforms around as a target. This is its
+ * authored Clarity/custom pivot when present and its evaluated object/instance origin otherwise.
+ */
+float3 snap_object_pivot_world_get(const Object &object, const float4x4 &obmat);
+
 /* `transform_snap_object_editmesh.cc` */
 
 eSnapMode snap_object_editmesh(SnapObjectContext *sctx,

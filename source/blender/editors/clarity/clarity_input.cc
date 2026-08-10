@@ -19,17 +19,18 @@ namespace blender {
 namespace ed::clarity {
 
 ClaritySnapMode snap_key_event_mode_get(const int key_type,
-                                     const short key_val,
-                                     const uint8_t modifier)
+                                        const short key_val,
+                                        const uint8_t modifier)
 {
   if (!ELEM(key_val, KM_PRESS, KM_RELEASE)) {
     return ClaritySnapMode::None;
   }
 
   ClaritySnapMode mode = ClaritySnapMode::None;
-  /* `Shift` belongs to the drag that `J` is held during, not to another binding of the key: Clarity
-   * steps a shift-duplicate drag just like any other. */
-  bool shift_allowed = false;
+  /* `Shift` belongs to the manipulator drag, not to another binding of the snap key. This must be
+   * true for every mode: Maya accepts both orders in a smart-duplicate gesture (`V`, then `Shift`
+   * and `Shift`, then `V`), and a duplicate chain may hold `Shift + X` for its next grid target.
+   */
   switch (key_type) {
     case EVT_XKEY:
       mode = ClaritySnapMode::Grid;
@@ -41,7 +42,6 @@ ClaritySnapMode snap_key_event_mode_get(const int key_type,
       mode = ClaritySnapMode::Point;
       break;
     case EVT_JKEY:
-      shift_allowed = true;
       mode = ClaritySnapMode::Step;
       break;
     default:
@@ -54,10 +54,7 @@ ClaritySnapMode snap_key_event_mode_get(const int key_type,
     return mode;
   }
 
-  int blocked = int(KM_CTRL) | int(KM_ALT) | int(KM_OSKEY);
-  if (!shift_allowed) {
-    blocked |= int(KM_SHIFT);
-  }
+  const int blocked = int(KM_CTRL) | int(KM_ALT) | int(KM_OSKEY);
   return (int(modifier) & blocked) == 0 ? mode : ClaritySnapMode::None;
 }
 
@@ -76,8 +73,8 @@ bool left_mouse_click_release_is(const wmEvent &event)
 
 }  // namespace ed::clarity
 
-std::optional<ed::clarity::ClarityInputAction> ED_clarity_input_translate(
-    const bContext * /*C*/, const wmEvent &event)
+std::optional<ed::clarity::ClarityInputAction> ED_clarity_input_translate(const bContext * /*C*/,
+                                                                          const wmEvent &event)
 {
   ed::clarity::ClarityInputAction action;
   action.mouse = int2(event.xy);
@@ -103,8 +100,7 @@ std::optional<ed::clarity::ClarityInputAction> ED_clarity_input_translate(
     action.phase = ed::clarity::ClarityActionPhase::End;
   }
   else if (!action.alt &&
-           ((event.type == MIDDLEMOUSE && event.val == KM_PRESS) ||
-            ISMOUSE_GESTURE(event.type)))
+           ((event.type == MIDDLEMOUSE && event.val == KM_PRESS) || ISMOUSE_GESTURE(event.type)))
   {
     action.id = ed::clarity::ClarityActionID::BlockViewportNavigation;
   }
@@ -173,13 +169,12 @@ std::optional<ed::clarity::ClarityInputAction> ED_clarity_input_translate(
            (event.val == KM_RELEASE || (!action.shift && !action.ctrl && !action.alt)))
   {
     action.id = event.val == KM_PRESS ? ed::clarity::ClarityActionID::EditPivotKeyPressed :
-                                       ed::clarity::ClarityActionID::EditPivotKeyReleased;
+                                        ed::clarity::ClarityActionID::EditPivotKeyReleased;
     action.phase = event.val == KM_PRESS ? ed::clarity::ClarityActionPhase::Begin :
-                                          ed::clarity::ClarityActionPhase::End;
+                                           ed::clarity::ClarityActionPhase::End;
   }
   else if (event.type == EVT_INSERTKEY && event.val == KM_PRESS &&
-           (event.flag & WM_EVENT_IS_REPEAT) == 0 && !action.shift && !action.ctrl &&
-           !action.alt)
+           (event.flag & WM_EVENT_IS_REPEAT) == 0 && !action.shift && !action.ctrl && !action.alt)
   {
     action.id = ed::clarity::ClarityActionID::TogglePersistentPivot;
     action.phase = ed::clarity::ClarityActionPhase::Begin;
@@ -193,7 +188,7 @@ std::optional<ed::clarity::ClarityInputAction> ED_clarity_input_translate(
   {
     action.id = ed::clarity::ClarityActionID::TemporarySnap;
     action.phase = event.val == KM_PRESS ? ed::clarity::ClarityActionPhase::Begin :
-                                          ed::clarity::ClarityActionPhase::End;
+                                           ed::clarity::ClarityActionPhase::End;
   }
   else if (event.type == EVT_JKEY && event.val == KM_PRESS && action.ctrl && !action.shift &&
            !action.alt)
@@ -238,12 +233,11 @@ std::optional<ed::clarity::ClarityInputAction> ED_clarity_input_translate(
     action.phase = ed::clarity::ClarityActionPhase::Begin;
   }
   else if (event.type == LEFTMOUSE && event.val == KM_PRESS && !action.shift && !action.ctrl &&
-           !action.alt &&
-           ELEM(event.keymodifier, EVT_QKEY, EVT_WKEY, EVT_EKEY, EVT_RKEY))
+           !action.alt && ELEM(event.keymodifier, EVT_QKEY, EVT_WKEY, EVT_EKEY, EVT_RKEY))
   {
-    /* Clarity opens a tool's marking menu by holding its key and pressing the left button. The held
-     * key is the one the window reports as the key modifier, which is also the only place a key
-     * that is down without generating events can be read from. */
+    /* Clarity opens a tool's marking menu by holding its key and pressing the left button. The
+     * held key is the one the window reports as the key modifier, which is also the only place a
+     * key that is down without generating events can be read from. */
     if (event.keymodifier == EVT_QKEY) {
       action.tool = ed::clarity::ClarityToolID::Select;
     }
@@ -279,13 +273,14 @@ std::optional<ed::clarity::ClarityInputAction> ED_clarity_input_translate(
     action.id = ed::clarity::ClarityActionID::SelectTopology;
     action.phase = ed::clarity::ClarityActionPhase::Begin;
   }
-  /* The marquee has no entry here on purpose: Blender never queues a #KM_PRESS_DRAG event, so it is
-   * recognized from the motion that crosses the drag threshold. See #left_mouse_marquee_drag_handle.
+  /* The marquee has no entry here on purpose: Blender never queues a #KM_PRESS_DRAG event, so it
+   * is recognized from the motion that crosses the drag threshold. See
+   * #left_mouse_marquee_drag_handle.
    *
    * Nor does it queue a #KM_CLICK: the promotion lives inside #wm_handlers_do and is undone before
-   * that call returns, so no event carrying this value ever reaches the dispatcher. The branch below
-   * therefore only describes the gesture - the handlers that need the click recognize it from the
-   * press and release themselves, with #left_mouse_click_release_is. */
+   * that call returns, so no event carrying this value ever reaches the dispatcher. The branch
+   * below therefore only describes the gesture - the handlers that need the click recognize it
+   * from the press and release themselves, with #left_mouse_click_release_is. */
   else if (event.type == LEFTMOUSE && event.val == KM_CLICK && !action.alt) {
     if (action.ctrl && action.shift) {
       /* This chord belongs exclusively to the additive marquee. A click without a drag is consumed
@@ -329,8 +324,7 @@ std::optional<ed::clarity::ClarityInputAction> ED_clarity_input_translate(
     }
     action.phase = ed::clarity::ClarityActionPhase::Begin;
   }
-  else if (ELEM(event.type, EVT_QKEY, EVT_WKEY, EVT_EKEY, EVT_RKEY))
-  {
+  else if (ELEM(event.type, EVT_QKEY, EVT_WKEY, EVT_EKEY, EVT_RKEY)) {
     if (event.type == EVT_QKEY) {
       action.tool = ed::clarity::ClarityToolID::Select;
     }
@@ -349,8 +343,8 @@ std::optional<ed::clarity::ClarityInputAction> ED_clarity_input_translate(
       action.phase = ed::clarity::ClarityActionPhase::Begin;
     }
     else if (event.val == KM_RELEASE) {
-      /* Tool keys are permanent switches in Clarity: the release must be consumed so it cannot reach
-       * a Blender keymap and start a one-shot operator. */
+      /* Tool keys are permanent switches in Clarity: the release must be consumed so it cannot
+       * reach a Blender keymap and start a one-shot operator. */
       action.id = ed::clarity::ClarityActionID::ToolHotkeyReleased;
       action.phase = ed::clarity::ClarityActionPhase::End;
     }

@@ -1,0 +1,882 @@
+Maya 2025 model snapping
+native input: macOS CoreGraphics
+tests: 55
+
+object_pivot_to_object_point_snap: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  distanceToNearestPoint: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [4.0, -1.0, -1.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+object_vertex_to_object_vertex_snap: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  geometryPointDistance: 0.0
+  pivotDistanceToTargetPoint: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [4.0, -1.0, -1.0]
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr -5 0.75 0.75 snapSubject.scalePivot snapSubject.rotatePivot ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: currentCtx;
+  cmd: if(`exists dR_updateCommandPanel`) dR_updateCommandPanel;
+  cmd: updateEditPivot;
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+axis_x_to_object_point_snap: PASS
+  pivotMoved: 8.25
+  passed: True
+  activeAxes: ['X']
+  activeTargetResidual: 0.0
+  inactiveAxisResidual: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [4.0, 0.0, 0.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr -x 4 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+axis_y_to_object_point_snap: PASS
+  pivotMoved: 1.0
+  passed: True
+  activeAxes: ['Y']
+  activeTargetResidual: 0.0
+  inactiveAxisResidual: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, -1.0, 0.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr -y -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+axis_z_to_object_point_snap: PASS
+  pivotMoved: 1.0
+  passed: True
+  activeAxes: ['Z']
+  activeTargetResidual: 0.0
+  inactiveAxisResidual: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, -1.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr -z -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: updateEditPivot;
+
+plane_xy_to_object_point_snap: FAIL
+  pivotMoved: 0.0
+  passed: False
+  activeAxes: ['X', 'Y']
+  activeTargetResidual: 6.329494450586082
+  inactiveAxisResidual: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: select -r snapCurveTarget snapCenterTarget snapPointTarget snapSubject ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+
+plane_xz_to_object_point_snap: PASS
+  pivotMoved: 8.31038506929733
+  passed: True
+  activeAxes: ['X', 'Z']
+  activeTargetResidual: 0.0
+  inactiveAxisResidual: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [4.0, 0.0, -1.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr 4 0 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+plane_yz_to_object_point_snap: FAIL
+  pivotMoved: 0.0
+  passed: False
+  activeAxes: ['Y', 'Z']
+  activeTargetResidual: 1.4142135623730951
+  inactiveAxisResidual: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: select -r snapCurveTarget snapCenterTarget snapPointTarget snapSubject ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: updateEditPivot;
+
+object_space_x_axis_snap: FAIL
+  pivotMoved: 7.086667270548812
+  passed: False
+  localAxisDirection: [1.0, 0.0, 0.0]
+  distanceAlongAxis: 5.7168661072269895
+  perpendicularDistance: 4.187874749262098
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [1.4668661072269895, 1.0080377398018905, -4.064745358646981]
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -r -os -wd 7.086667 0 0 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+object_pivot_to_other_custom_pivot_snap: FAIL
+  pivotMoved: 7.300171309414142
+  passed: False
+  distanceToTargetPivot: 1.3219305229700937
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [0.8999999761581421, 3.9000000953674316, 3.4000000953674316]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr 0.9 3.9 3.4 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+model_curve_snap: FAIL
+  pivotMoved: 6.131678870218072
+  passed: False
+  distanceToCurve: 1.2389001736863055
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [0.2835628161108428, -0.5982125727042531, -4.084903386582656]
+  cmd: SnapToCurvePress;
+  cmd: snapMode -curve 1;
+  cmd: move -r 4.533563 -0.598213 -4.084903 ;
+  cmd: SnapToCurveRelease;
+  cmd: snapMode -curve 0;
+
+curved_nurbs_curve_snap: FAIL
+  pivotMoved: 6.134015192981539
+  passed: False
+  distanceToNurbsCurve: 2.3968729817548313
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-1.3729718643279636, 2.542403433992826, -4.783830711166662]
+  cmd: SnapToCurvePress;
+  cmd: snapMode -curve 1;
+  cmd: move -r 2.877028 2.542403 -4.783831 ;
+  cmd: SnapToCurveRelease;
+  cmd: snapMode -curve 0;
+
+closed_nurbs_curve_snap: FAIL
+  pivotMoved: 4.55757222890891
+  passed: False
+  distanceToNurbsCurve: 0.6098802821364542
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-2.0613835624659185, 1.8245483467477621, -3.557027697594913]
+  cmd: SnapToCurvePress;
+  cmd: snapMode -curve 1;
+  cmd: currentCtx;
+  cmd: move -r 2.188616 1.824548 -3.557028 ;
+  cmd: SnapToCurveRelease;
+  cmd: snapMode -curve 0;
+
+point_snap_to_curve_cv: FAIL
+  pivotMoved: 6.425145863387584
+  passed: False
+  distanceToCurveCV: 6.911584403050794
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [1.7999999523162842, 1.2000000476837158, 1.7999999523162842]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: updateEditPivot;
+  cmd: currentCtx;
+  cmd: move -rpr 1.8 1.2 1.8 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+model_grid_snap: PASS
+  pivotMoved: 4.25
+  passed: True
+  nearestGridPoint: [0.0, 0.0, 0.0]
+  distanceToGrid: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [0.0, 0.0, 0.0]
+  cmd: SnapToGridPress;
+  cmd: snapMode -grid 1;
+  cmd: move -rpr 0 0 0 ;
+  cmd: SnapToGridRelease;
+  cmd: snapMode -grid 0;
+  cmd: updateEditPivot;
+
+custom_spacing_grid_snap: PASS
+  pivotMoved: 7.198090024443984
+  passed: True
+  nearestGridPoint: [2.5, 0.0, 2.5]
+  distanceToGrid: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [2.5, 0.0, 2.5]
+  cmd: SnapToGridPress;
+  cmd: snapMode -grid 1;
+  cmd: move -rpr 2.5 0 2.5 ;
+  cmd: SnapToGridRelease;
+  cmd: snapMode -grid 0;
+
+object_to_object_mesh_center_snap: FAIL
+  pivotMoved: 7.851445950863304
+  passed: False
+  distanceToMeshCenter: 0.060258912602629555
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [2.989175086253587, -0.04434417316477424, 3.039338938683785]
+  cmd: move -r 7.239175 -0.0443442 3.039339 ;
+
+model_view_plane_snap: PASS
+  pivotMoved: 2.823449254333395
+  passed: True
+  cameraDirection: [-0.6246950475544245, -0.46852128566581774, -0.6246950475544244]
+  depthDelta: -2.6645352591003757e-15
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-3.0397927150269535, -2.4689535551197226, 0.6415078813667474]
+  cmd: move -r 1.210207 -2.468954 0.641508 ;
+
+pivot_edit_to_object_point_snap: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  distanceToNearestPoint: 0.0
+  objectTranslationDelta: 0.0
+  geometryBoundsDelta: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [4.0, -1.0, -1.0]
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr 4 -1 -1 snapSubject.scalePivot snapSubject.rotatePivot ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: ctxEditMode;
+
+pivot_edit_to_object_mesh_center_snap: FAIL
+  pivotMoved: 7.851445950863304
+  passed: False
+  distanceToMeshCenter: 0.060258912602629555
+  objectTranslationDelta: 0.0
+  geometryBoundsDelta: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [2.989175086253587, -0.04434417316477424, 3.039338938683785]
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: move -r 7.239175 -0.0443442 3.039339 snapSubject.scalePivot snapSubject.rotatePivot ;
+  cmd: ctxEditMode;
+
+pivot_orientation_to_rotated_mesh: FAIL
+  pivotMoved: 0.0
+  passed: False
+  manipOrientationDelta: 0.0
+  rotateAxisDelta: 0.0
+  geometryBoundsDelta: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: manipPivot -o -142.310558 -20.25437 85.025989 ;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: ctxEditMode;
+
+custom_pivot_persists_across_tools: PASS
+  pivotMoved: 1.299038105676658
+  passed: True
+  vertexDistanceToPivot: 0.0
+  objectTranslationDelta: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-5.0, 0.75, 0.75]
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: currentCtx;
+  cmd: move -rpr -5 0.75 0.75 snapSubject.scalePivot snapSubject.rotatePivot ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: updateEditPivot;
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: currentCtx;
+  cmd: updateEditPivot;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: currentCtx;
+  cmd: updateEditPivot;
+
+rotate_after_custom_pivot_snap: PASS
+  pivotMoved: 1.2990381056766567
+  passed: True
+  vertexDistanceToCustomPivot: 0.0
+  stepResidual: 8.881784197001252e-16
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.999999999999999, 0.75, 0.7499999999999988]
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr -5 0.75 0.75 snapSubject.scalePivot snapSubject.rotatePivot ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: rotate -r -os -fo 0 45 0 ;
+  cmd: currentCtx;
+  cmd: updateEditPivot;
+
+scale_after_custom_pivot_snap: PASS
+  pivotMoved: 1.299038105676658
+  passed: True
+  geometryScaleRatios: [2.5, 1.0, 1.0]
+  vertexDistanceToCustomPivot: 0.0
+  stepResidual: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-5.0, 0.75, 0.75]
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr -5 0.75 0.75 snapSubject.scalePivot snapSubject.rotatePivot ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: updateEditPivot;
+  cmd: scale -ws -r 2.5 1 1 ;
+  cmd: # Warning: Non object-space scale baked onto components.
+  cmd: currentCtx;
+
+reset_after_custom_pivot_snap: PASS
+  pivotMoved: 0.0
+  passed: True
+  distanceToObjectOrigin: 0.0
+  geometryBoundsDelta: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr -5 0.75 0.75 snapSubject.scalePivot snapSubject.rotatePivot ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: updateEditPivot;
+  cmd: ctxEditMode;
+  cmd: manipPivotReset true true;
+
+parented_rotated_scaled_object_snap: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  parentAfter: ['|snapHierarchyParent']
+  distanceToNearestPoint: 4.965068306494546e-16
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [4.0, -1.0000000000000004, -1.0000000000000002]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+negative_scale_parent_object_snap: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  parentAfter: ['|snapHierarchyParent']
+  distanceToNearestPoint: 2.220446049250313e-16
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [4.0, -1.0, -1.0000000000000002]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: updateEditPivot;
+  cmd: currentCtx;
+
+shift_duplicate_to_object_point_snap: PASS
+  pivotMoved: 0.0
+  passed: True
+  objectCountBefore: 1
+  objectCountAfter: 2
+  newObjects: ['|snapSubject1']
+  originalTranslationDelta: 0.0
+  originalBoundsDelta: 0.0
+  copyDistanceToTarget: 0.0
+  copyGeometryPointDistance: 1.299038105676658
+  sharedShapeUuids: []
+  selectedAfter: ['|snapSubject1']
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: ShiftClickSmartDupe 1;
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+
+shift_duplicate_vertex_to_object_vertex_snap: PASS
+  pivotMoved: 1.299038105676658
+  passed: True
+  objectCountBefore: 1
+  objectCountAfter: 2
+  newObjects: ['|snapSubject1']
+  originalTranslationDelta: 0.0
+  originalBoundsDelta: 0.0
+  copyDistanceToTarget: 0.0
+  copyGeometryPointDistance: 0.0
+  sharedShapeUuids: []
+  selectedAfter: ['|snapSubject1']
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-5.0, 0.75, 0.75]
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: currentCtx;
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr -5 0.75 0.75 snapSubject.scalePivot snapSubject.rotatePivot ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: updateEditPivot;
+  cmd: ctxEditMode;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: ShiftClickSmartDupe 1;
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+
+shift_duplicate_to_object_mesh_center_snap: FAIL
+  pivotMoved: 0.0
+  passed: False
+  objectCountBefore: 1
+  objectCountAfter: 2
+  newObjects: ['|snapSubject1']
+  originalTranslationDelta: 0.0
+  originalBoundsDelta: 0.0
+  copyDistanceToTarget: 0.060258912602629555
+  copyGeometryPointDistance: None
+  sharedShapeUuids: []
+  selectedAfter: ['|snapSubject1']
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: ShiftClickSmartDupe 1;
+  cmd: move -r 7.239175 -0.0443442 3.039339 ;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+
+shift_duplicate_copy_point_snap: PASS
+  pivotMoved: 0.0
+  passed: True
+  objectCountBefore: 1
+  objectCountAfter: 2
+  newObjects: ['|snapSubject1']
+  originalTranslationDelta: 0.0
+  originalBoundsDelta: 0.0
+  copyDistanceToTarget: 0.0
+  copyGeometryPointDistance: 1.299038105676658
+  sharedShapeUuids: []
+  selectedAfter: ['|snapSubject1']
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: currentCtx;
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: updateEditPivot;
+  cmd: ShiftClickSmartDupe 1;
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+
+shift_duplicate_instance_point_snap: PASS
+  pivotMoved: 0.0
+  passed: True
+  objectCountBefore: 1
+  objectCountAfter: 2
+  newObjects: ['|snapSubject1']
+  originalTranslationDelta: 0.0
+  originalBoundsDelta: 0.0
+  copyDistanceToTarget: 0.0
+  copyGeometryPointDistance: 1.299038105676658
+  sharedShapeUuids: ['A8AB317C-C447-A527-505C-8AB656763592']
+  selectedAfter: ['|snapSubject1']
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: ShiftClickSmartDupe 2;
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+
+shift_duplicate_reverse_modifier_order: PASS
+  pivotMoved: 0.0
+  passed: True
+  objectCountBefore: 1
+  objectCountAfter: 2
+  newObjects: ['|snapSubject1']
+  originalTranslationDelta: 0.0
+  originalBoundsDelta: 0.0
+  copyDistanceToTarget: 0.0
+  copyGeometryPointDistance: 1.299038105676658
+  sharedShapeUuids: []
+  selectedAfter: ['|snapSubject1']
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: currentCtx;
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: ShiftClickSmartDupe 1;
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+
+shift_drag_with_smart_duplicate_disabled: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  objectCountAfter: 1
+  distanceToTarget: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [4.0, -1.0, -1.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+
+shift_duplicate_with_rotate_step: FAIL
+  pivotMoved: 0.0
+  passed: False
+  newObjects: []
+  stepResidual: 1.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: rotate -r -os -fo 0 45 0 ;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+
+shift_duplicate_with_scale_step: FAIL
+  pivotMoved: 0.0
+  passed: False
+  newObjects: ['|snapSubject1']
+  stepResidual: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: currentCtx;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: ShiftClickSmartDupe 1;
+  cmd: scale -ws -r 2.5 1 1 ;
+  cmd: # Warning: Non object-space scale baked onto components.
+  cmd: getUIComponentDockControl("Tool Settings", false);
+
+sequential_shift_duplicate_chain: PASS
+  pivotMoved: 0.0
+  passed: True
+  objectCountAfter: 3
+  newObjects: ['|snapSubject1', '|snapSubject2']
+  selectedAfter: ['|snapSubject2']
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: ShiftClickSmartDupe 1;
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: SnapToGridPress;
+  cmd: snapMode -grid 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: updateEditPivot;
+  cmd: ShiftClickSmartDupe 1;
+  cmd: move -rpr 0 0 0 ;
+  cmd: SnapToGridRelease;
+  cmd: snapMode -grid 0;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: currentCtx;
+
+shift_duplicate_modifier_release_first: PASS
+  pivotMoved: 0.0
+  passed: True
+  objectCountBefore: 1
+  objectCountAfter: 2
+  newObjects: ['|snapSubject1']
+  originalTranslationDelta: 0.0
+  originalBoundsDelta: 0.0
+  copyDistanceToTarget: 0.0
+  copyGeometryPointDistance: 1.299038105676658
+  sharedShapeUuids: []
+  selectedAfter: ['|snapSubject1']
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: ShiftClickSmartDupe 1;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: move -rpr 4 -1 -1 ;
+
+live_surface_snap: PASS
+  pivotMoved: 8.00390529679106
+  passed: True
+  distanceToSurfacePlane: 4.440892098500626e-16
+  insideSurfaceBounds: True
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [2.0, -3.0000000000000004, 4.0]
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: move -r 6.25 -3 4 ;
+  cmd: currentCtx;
+
+asymmetric_mesh_center_snap: PASS
+  pivotMoved: 6.026221514847387
+  passed: True
+  insideAsymmetricMeshBounds: True
+  distanceToTransformCenter: 1.1583088925617555
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-0.6051821460382616, 1.4648492677971023, 4.569996190379767]
+  cmd: move -r 3.644818 1.464849 4.569996 ;
+  cmd: currentCtx;
+
+multi_object_spacing_point_snap: FAIL
+  pivotMoved: 1.0
+  passed: False
+  relativeSpacingDelta: 2.5
+  companionMoved: 3.5
+  selectionCenterDistanceToTarget: 6.329494450586082
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, -1.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: currentCtx;
+  cmd: move -rpr -z -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+component_point_snap_preserve_spacing: PASS
+  pivotMoved: 0.0
+  passed: True
+  spacingBefore: 1.5
+  spacingAfter: 1.5
+  maxDistanceToTargetPoint: 0.75
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: hilite snapSubject.vtx[0:1] ;
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: move -r 8.25 -0.25 -1.75 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: currentCtx;
+
+component_point_snap_collapse_spacing: PASS
+  pivotMoved: 0.0
+  passed: True
+  spacingBefore: 1.5
+  spacingAfter: 0.0
+  maxDistanceToTargetPoint: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: hilite snapSubject.vtx[0:1] ;
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: move 4 -1 -1 ;
+  cmd: updateSelectionModeIcons;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: updateEditPivot;
+  cmd: currentCtx;
+
+orthographic_view_plane_snap: FAIL
+  ERROR: orthographic_view_plane_snap: цель во view plane находится вне viewport
+  pivotMoved: 0.0
+  passed: False
+  cameraDirection: [-0.6246950475544245, -0.46852128566581774, -0.6246950475544244]
+  depthDelta: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: currentCtx;
+
+ambiguous_point_target_selection: PASS
+  pivotMoved: 5.7019733792111404
+  passed: True
+  candidateDistances: [0.20000002384186358, 5.331201499700045e-08]
+  chosenCandidate: 1
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [1.100000023841858, 1.7000000476837158, 1.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: currentCtx;
+  cmd: move -rpr 1.1 1.7 1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+cancel_point_snap_drag: FAIL
+  pivotMoved: 6.425145863387584
+  passed: False
+  objectCountUnchanged: True
+  geometryBoundsDelta: 6.049999952316284
+  activeSnapModesAfter: []
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [1.7999999523162842, 1.2000000476837158, 1.7999999523162842]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: move -rpr 1.8 1.2 1.8 ;
+
+cancel_shift_duplicate_snap_drag: FAIL
+  pivotMoved: 0.0
+  passed: False
+  objectCountUnchanged: False
+  geometryBoundsDelta: 0.0
+  activeSnapModesAfter: []
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: ShiftClickSmartDupe 1;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: move -rpr 1.8 1.2 1.8 ;
+
+undo_object_point_snap: PASS
+  pivotMoved: 0.0
+  passed: True
+  objectCountUnchanged: True
+  geometryBoundsDelta: 0.0
+  activeSnapModesAfter: []
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: currentCtx;
+
+redo_object_point_snap: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  distanceAfterRedo: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [4.0, -1.0, -1.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: eval( "hikCustomRigUndoRedo" );
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+tool_change_during_point_snap_drag: PASS
+  pivotMoved: 6.425145863387584
+  passed: True
+  activeSnapModesAfter: []
+  currentContextAfter: Rotate
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [1.7999999523162842, 1.2000000476837158, 1.7999999523162842]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: eval( "hikCustomRigUndoRedo" );
+  cmd: eval( "hikCustomRigUndoRedo" );
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+
+frozen_transform_object_point_snap: PASS
+  pivotMoved: 8.370334521391603
+  passed: True
+  distanceToNearestPoint: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [4.0, -1.0, -1.0]
+  cmd: SnapToPointPress;
+  cmd: snapMode -point 1;
+  cmd: move -rpr 4 -1 -1 ;
+  cmd: SnapToPointRelease;
+  cmd: snapMode -point 0;
+  cmd: getUIComponentDockControl("Tool Settings", false);
+
+model_step_move_absolute: PASS
+  pivotMoved: 2.25
+  passed: True
+  axis: X
+  stepSize: 1.0
+  stepResidual: 0.0
+  orthogonalResidual: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-2.0, 0.0, 0.0]
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: move -r 2.25 0 0 ;
+  cmd: updateEditPivot;
+  cmd: currentCtx;
+
+model_step_move_relative: PASS
+  pivotMoved: 2.0
+  passed: True
+  axis: X
+  stepSize: 1.0
+  stepResidual: 0.0
+  orthogonalResidual: 0.0
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-2.25, 0.0, 0.0]
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: move -r 2 0 0 ;
+  cmd: updateEditPivot;
+
+model_step_rotate: PASS
+  pivotMoved: 0.0
+  passed: True
+  stepDegrees: 15.0
+  stepResidual: 8.881784197001252e-16
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: rotate -r -os -fo 0 45 0 ;
+
+model_step_scale: PASS
+  pivotMoved: 0.0
+  passed: True
+  stepSize: 0.5
+  boundingBoxBefore: [1.5, 1.5, 1.5]
+  boundingBoxAfter: [3.75, 1.5, 1.5]
+  geometryScaleRatios: [2.5, 1.0, 1.0]
+  changedAxes: ['X']
+  stepResidual: 0.0
+  transformScale: [1.0, 1.0, 1.0]
+  before pivot: [-4.25, 0.0, 0.0]
+  after pivot:  [-4.25, 0.0, 0.0]
+  cmd: getUIComponentDockControl("Tool Settings", false);
+  cmd: scale -ws -r 2.5 1 1 ;
+  cmd: # Warning: Non object-space scale baked onto components.

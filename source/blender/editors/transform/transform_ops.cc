@@ -55,8 +55,8 @@
 #include "UI_interface_layout.hh"
 #include "UI_resources.hh"
 
-#include "ED_screen.hh"
 #include "ED_clarity.hh"
+#include "ED_screen.hh"
 #include "ED_transform_snap_object_context.hh"
 #include "ED_view3d.hh"
 /** For #USE_LOOPSLIDE_HACK only. */
@@ -122,9 +122,9 @@ static void transform_clarity_pivot_update(const bContext *C, const TransInfo *t
 }
 
 static void transform_clarity_snap_apply(const bContext *C,
-                                      TransInfo *t,
-                                      wmOperator *op,
-                                      const bool restore_from_scene)
+                                         TransInfo *t,
+                                         wmOperator *op,
+                                         const bool restore_from_scene)
 {
   if (restore_from_scene) {
     transform_snap_reset_from_mode(t, op);
@@ -135,6 +135,8 @@ static void transform_clarity_snap_apply(const bContext *C,
   t->tsnap.clarity_include_object_pivots = false;
   t->tsnap.clarity_view_plane = false;
   t->tsnap.clarity_mesh_center = false;
+  t->tsnap.clarity_collapse_components = false;
+  t->tsnap.clarity_keep_applied_until_motion = false;
   t->tsnap.clarity_snap_dist_px = 0.0f;
   if (!ED_clarity_interaction_enabled(C)) {
     return;
@@ -155,15 +157,16 @@ static void transform_clarity_snap_apply(const bContext *C,
   plan_input.step = ED_clarity_snap_step_settings_get(C);
   const ClaritySnapPlan plan = transform_snap_clarity_plan_get(plan_input);
 
-  /* The Clarity state is the only thing that snaps in this interaction model. Blender's magnet and its
-   * `Ctrl` invert are not part of it, so they are taken out of the decision instead of being left
-   * to snap on their own: that is what quantized every transform to the increment grid with no key
-   * held, and what kept Clarity's own modes from snapping while the magnet was off. */
+  /* The Clarity state is the only thing that snaps in this interaction model. Blender's magnet and
+   * its `Ctrl` invert are not part of it, so they are taken out of the decision instead of being
+   * left to snap on their own: that is what quantized every transform to the increment grid with
+   * no key held, and what kept Clarity's own modes from snapping while the magnet was off. */
   t->tsnap.clarity_mode_active = plan.use_snap || plan.view_plane;
   t->tsnap.mode = plan.snap_to;
   t->tsnap.clarity_curve_targets_only = plan.curve_targets_only;
   t->tsnap.clarity_include_object_pivots = plan.include_object_pivots;
   t->tsnap.clarity_mesh_center = plan.mesh_center;
+  t->tsnap.clarity_collapse_components = plan.collapse_components;
   t->tsnap.clarity_view_plane = plan.view_plane;
   SET_FLAG_FROM_TEST(t->tsnap.flag, plan.absolute_grid, SCE_SNAP_ABS_GRID);
   SET_FLAG_FROM_TEST(t->modifiers, plan.use_snap, MOD_SNAP);
@@ -182,30 +185,38 @@ static void transform_clarity_snap_apply(const bContext *C,
     t->increment = float3(plan.increment);
   }
   if (plan.use_snap) {
-    /* Clarity only magnets onto a target the pointer is actually near, so the search is restricted to
-     * the snap tolerance; outside it the transform follows the pointer as if nothing was held. */
+    /* Clarity only magnets onto a target the pointer is actually near, so the search is restricted
+     * to the snap tolerance; outside it the transform follows the pointer as if nothing was held.
+     */
     t->tsnap.clarity_snap_dist_px = ED_clarity_snap_tolerance_px_get(
         C, transform_clarity_region_extent(t->region));
   }
   transform_snap_callbacks_update(t);
 }
 
-static bool transform_clarity_snap_event(const bContext *C,
-                                      TransInfo *t,
-                                      wmOperator *op,
-                                      const wmEvent *event)
+enum class ClaritySnapEventResult : uint8_t {
+  Ignored,
+  Apply,
+  /** Modifier/key released before the mouse: keep the last snapped transform until motion. */
+  KeepApplied,
+};
+
+static ClaritySnapEventResult transform_clarity_snap_event(const bContext *C,
+                                                           TransInfo *t,
+                                                           wmOperator *op,
+                                                           const wmEvent *event)
 {
   if (!ED_clarity_interaction_enabled(C)) {
     if (t->tsnap.clarity_mode_active) {
       transform_clarity_snap_apply(C, t, op, true);
       t->redraw |= TREDRAW_HARD;
     }
-    return false;
+    return ClaritySnapEventResult::Ignored;
   }
   if (event->type == WINDEACTIVATE) {
     transform_clarity_snap_apply(C, t, op, true);
     t->redraw |= TREDRAW_HARD;
-    return false;
+    return ClaritySnapEventResult::Ignored;
   }
   /* The modal keymap rewrites matched keys into #EVT_MODAL_MAP before the operator sees them and
    * keeps the physical key in `prev_type`/`prev_val`. Without resolving it back, `X` would arrive
@@ -219,11 +230,16 @@ static bool transform_clarity_snap_event(const bContext *C,
   }
 
   if (!ED_clarity_snap_key_event_apply(C, int(key_type), key_val, event->modifier)) {
-    return false;
+    return ClaritySnapEventResult::Ignored;
   }
   transform_clarity_snap_apply(C, t, op, true);
   t->redraw |= TREDRAW_HARD;
-  return true;
+  /* Maya commits the already snapped value when the snap modifier comes up before the mouse. If
+   * this release immediately re-applies the raw pointer value, the duplicate jumps away from its
+   * point (scenario 38). A later mouse move uses the newly unsnapped plan normally. */
+  t->tsnap.clarity_keep_applied_until_motion = key_val == KM_RELEASE;
+  return t->tsnap.clarity_keep_applied_until_motion ? ClaritySnapEventResult::KeepApplied :
+                                                      ClaritySnapEventResult::Apply;
 }
 
 static void TRANSFORM_OT_translate(wmOperatorType *ot);
@@ -569,6 +585,12 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
   TransInfo *t = static_cast<TransInfo *>(op->customdata);
   const eTfmMode mode_prev = t->mode;
 
+  if (event->type == MOUSEMOVE) {
+    /* Once the pointer moves after a modifier-first release, the now-unsnapped transform follows
+     * it normally. Until then a mouse-button release confirms the last snapped value. */
+    t->tsnap.clarity_keep_applied_until_motion = false;
+  }
+
 #if defined(WITH_INPUT_NDOF) && 0
   /* Stable 2D mouse coords map to different 3D coords while the 3D mouse is active
    * in other words, 2D deltas are no longer good enough!
@@ -583,7 +605,8 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
   t->context = C;
 
   const double event_start = clarity_debug ? BLI_time_now_seconds() : 0.0;
-  if (transform_clarity_snap_event(C, t, op, event)) {
+  const ClaritySnapEventResult clarity_snap_event = transform_clarity_snap_event(C, t, op, event);
+  if (clarity_snap_event != ClaritySnapEventResult::Ignored) {
     exit_code = OPERATOR_RUNNING_MODAL;
   }
   else {
@@ -596,6 +619,17 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
         (BLI_time_now_seconds() - event_start) * 1000.0);
   }
   t->context = nullptr;
+
+  if (clarity_snap_event == ClaritySnapEventResult::KeepApplied) {
+    /* State and callbacks were updated above, but the release itself has no motion to apply. */
+    if (clarity_debug) {
+      ED_clarity_navigation_debug_stage_sample(
+          C,
+          ed::clarity::ClarityNavigationDebugStage::TransformModalTotal,
+          (BLI_time_now_seconds() - modal_start) * 1000.0);
+    }
+    return OPERATOR_RUNNING_MODAL;
+  }
 
   /* Allow navigation while transforming. */
   if (t->vod && (exit_code & OPERATOR_PASS_THROUGH)) {
@@ -640,8 +674,10 @@ static wmOperatorStatus transform_modal(bContext *C, wmOperator *op, const wmEve
     }
   }
 
-  transformApply(C, t);
-  transform_clarity_pivot_update(C, t);
+  if (!t->tsnap.clarity_keep_applied_until_motion) {
+    transformApply(C, t);
+    transform_clarity_pivot_update(C, t);
+  }
 
   exit_code |= transformEnd(C, t);
 
@@ -744,10 +780,10 @@ static wmOperatorStatus transform_invoke(bContext *C, wmOperator *op, const wmEv
   TransInfo *t = static_cast<TransInfo *>(op->customdata);
   transform_clarity_snap_apply(C, t, op, false);
   ED_clarity_transform_begin(C,
-                          op->type->idname,
-                          int(CTX_data_mode_enum(C)),
-                          scene && scene->toolsettings ? scene->toolsettings->selectmode : 0,
-                          (t->options & CTX_CLARITY_PIVOT) != 0);
+                             op->type->idname,
+                             int(CTX_data_mode_enum(C)),
+                             scene && scene->toolsettings ? scene->toolsettings->selectmode : 0,
+                             (t->options & CTX_CLARITY_PIVOT) != 0);
 
   /* When modal, allow 'value' to set initial offset. */
   if ((event == nullptr) && RNA_struct_property_is_set(op->ptr, "value")) {
@@ -1749,7 +1785,11 @@ enum eClaritySnapToggleMode {
 };
 
 static const EnumPropertyItem clarity_snap_toggle_mode_items[] = {
-    {CLARITY_SNAP_TOGGLE_GRID, "GRID", ICON_SNAP_GRID, "Grid", "Snap the transform pivot to the grid"},
+    {CLARITY_SNAP_TOGGLE_GRID,
+     "GRID",
+     ICON_SNAP_GRID,
+     "Grid",
+     "Snap the transform pivot to the grid"},
     {CLARITY_SNAP_TOGGLE_CURVE,
      "CURVE",
      ICON_SNAP_EDGE,
@@ -1812,8 +1852,8 @@ static wmOperatorStatus clarity_snap_toggle_exec(bContext *C, wmOperator *op)
   const ed::clarity::ClaritySnapMode mode = clarity_snap_toggle_mode_get(
       RNA_enum_get(op->ptr, "mode"));
   const ed::clarity::ClaritySnapMode next_mode = ED_clarity_snap_mode_get(C) == mode ?
-                                               ed::clarity::ClaritySnapMode::None :
-                                               mode;
+                                                     ed::clarity::ClaritySnapMode::None :
+                                                     mode;
   ED_clarity_snap_mode_set(C, next_mode);
 
   return OPERATOR_FINISHED;
@@ -1833,9 +1873,9 @@ static void TRANSFORM_OT_clarity_snap_toggle(wmOperatorType *ot)
 }
 
 /**
- * One line per pivot click into `BLENDER_CLARITY_SNAP_TRACE_FILE`, the same file the drag writes to.
- * A click that does not turn the pivot leaves no trace of its own otherwise: the operator simply
- * returns, and every step that could have stopped it looks the same from outside.
+ * One line per pivot click into `BLENDER_CLARITY_SNAP_TRACE_FILE`, the same file the drag writes
+ * to. A click that does not turn the pivot leaves no trace of its own otherwise: the operator
+ * simply returns, and every step that could have stopped it looks the same from outside.
  */
 static void clarity_pivot_click_trace(const char *stage, const char *format, ...)
 {
@@ -1862,10 +1902,10 @@ static void clarity_pivot_click_trace(const char *stage, const char *format, ...
 /**
  * Normal of a clicked edge: the average of the normals of the faces that share it.
  *
- * Clarity aligns the pivot with the *normal* of whatever component was clicked, and an edge's normal
- * is the mean of its two faces - a capture of Clarity 2025 shows a clicked vertical edge leaving the
- * pivot's X axis on the bisector of the two faces beside it, not along the edge. The snap search
- * hands back `v1 - v0` for an edge, which is why the normal has to be rebuilt here.
+ * Clarity aligns the pivot with the *normal* of whatever component was clicked, and an edge's
+ * normal is the mean of its two faces - a capture of Clarity 2025 shows a clicked vertical edge
+ * leaving the pivot's X axis on the bisector of the two faces beside it, not along the edge. The
+ * snap search hands back `v1 - v0` for an edge, which is why the normal has to be rebuilt here.
  *
  * Returns false when the mesh cannot be read, and the caller falls back to the normal of the face
  * the ray crossed.
@@ -1926,9 +1966,8 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
 {
   ARegion *region = CTX_wm_region(C);
   View3D *view = CTX_wm_view3d(C);
-  RegionView3D *region_view = region != nullptr ?
-                                 static_cast<RegionView3D *>(region->regiondata) :
-                                 nullptr;
+  RegionView3D *region_view = region != nullptr ? static_cast<RegionView3D *>(region->regiondata) :
+                                                  nullptr;
   if (ED_clarity_pivot_edit_target_get(C) == ed::clarity::ClarityPivotEditTarget::None ||
       region == nullptr || region->regiontype != RGN_TYPE_WINDOW || view == nullptr ||
       region_view == nullptr)
@@ -1952,8 +1991,7 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
   ed::clarity::ClarityPivotFrame frame = target->frame_get();
   frame.position_valid = true;
 
-  ed::transform::SnapObjectContext *snap_context =
-      ed::transform::snap_object_context_create();
+  ed::transform::SnapObjectContext *snap_context = ed::transform::snap_object_context_create();
   if (snap_context == nullptr) {
     return OPERATOR_CANCELLED;
   }
@@ -1972,9 +2010,8 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
   int hit_index = -1;
   const Object *hit_object = nullptr;
   const float mouse_float[2] = {float(mouse[0]), float(mouse[1])};
-  const float previous_position[3] = {float(frame.position_world.x),
-                                      float(frame.position_world.y),
-                                      float(frame.position_world.z)};
+  const float previous_position[3] = {
+      float(frame.position_world.x), float(frame.position_world.y), float(frame.position_world.z)};
   const float tolerance_px = ED_clarity_snap_tolerance_px_get(
       C, transform_clarity_region_extent(region));
 
@@ -2023,9 +2060,9 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
 
   bool has_position = hit_type != SCE_SNAP_TO_NONE;
   /* What the clicked element hands back is not the same thing for all of them: a face and a vertex
-   * return a normal, an edge returns `v1 - v0`. The pivot aligns with the element's normal in every
-   * case, so an edge has its own rebuilt from the faces beside it. The ray normal is the fallback,
-   * and it is also what an element with no vector of its own gets. */
+   * return a normal, an edge returns `v1 - v0`. The pivot aligns with the element's normal in
+   * every case, so an edge has its own rebuilt from the faces beside it. The ray normal is the
+   * fallback, and it is also what an element with no vector of its own gets. */
   ClarityPivotSnapVector target_vector = has_position ? clarity_pivot_snap_vector_get(hit_type) :
                                                         ClarityPivotSnapVector::None;
   if (target_vector == ClarityPivotSnapVector::EdgeDirection) {
@@ -2043,8 +2080,7 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
   if (is_zero_v3(hit_normal)) {
     target_vector = ClarityPivotSnapVector::None;
   }
-  const bool has_orientation = has_position &&
-                               clarity_pivot_snap_aim_axis_get(target_vector) >= 0;
+  const bool has_orientation = has_position && clarity_pivot_snap_aim_axis_get(target_vector) >= 0;
 
   ed::clarity::ClarityPivotSnapResult snap_result;
   if (has_position) {
@@ -2086,22 +2122,23 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
   }
 
   if (!has_position) {
-    /* Nothing under the pointer, which is Maya's "in the area outside of the object" - and there the
-     * same modifiers mean reset instead of snap. *Reset a component's custom pivot*: a plain click
-     * resets position and orientation, `Ctrl` resets "the custom pivot's orientation" alone, and
-     * `Ctrl + Shift` puts both back "to its reference frame of selected components", which is the
-     * component bounding-box centre and frame the Center reset already produces.
+    /* Nothing under the pointer, which is Maya's "in the area outside of the object" - and there
+     * the same modifiers mean reset instead of snap. *Reset a component's custom pivot*: a plain
+     * click resets position and orientation, `Ctrl` resets "the custom pivot's orientation" alone,
+     * and `Ctrl + Shift` puts both back "to its reference frame of selected components", which is
+     * the component bounding-box centre and frame the Center reset already produces.
      *
      * `Shift` never reaches this branch: it placed the pivot on the view plane above, following
      * *Change the pivot point* ("Shift + click to place the pivot at the cursor"). The older reset
      * page reads that gesture as a position reset instead; the two disagree and the newer page
      * wins, the same way the rest of this operator follows it. */
     if (!shift && !ctrl && target->type() == ed::clarity::ClarityPivotTargetType::Object) {
-      /* Except for an object's pivot, where the Maya capture is unambiguous: a plain click in empty
-       * space clears the selection and ends Edit Pivot - the manipulator that comes back with the
-       * next selection is the ordinary one, and the pivot keeps the position it was given. The reset
-       * gesture the help documents is titled *Reset a component's custom pivot*, so it stays with the
-       * component pivot. The caller owns the selection, so the click goes back to it. */
+      /* Except for an object's pivot, where the Maya capture is unambiguous: a plain click in
+       * empty space clears the selection and ends Edit Pivot - the manipulator that comes back
+       * with the next selection is the ordinary one, and the pivot keeps the position it was
+       * given. The reset gesture the help documents is titled *Reset a component's custom pivot*,
+       * so it stays with the component pivot. The caller owns the selection, so the click goes
+       * back to it. */
       clarity_pivot_click_trace("pass-through", "empty space, object pivot");
       return OPERATOR_PASS_THROUGH;
     }
@@ -2123,11 +2160,12 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
     clarity_pivot_click_trace("cancelled", "nothing under the pointer to align to");
     return OPERATOR_CANCELLED;
   }
-  /* A click orients, it does not move. Two Maya 2025 screen recordings show the pivot centre holding
-   * the same screen position through every click - on a face, on a vertex, on an edge - while its
-   * axes turn to what was clicked, and the cursor carries the label `orient` while hovering. The
-   * help reads the other way ("click a component to snap and align the pivot", "by default, pivot
-   * position and orientation snap to the selected component"), and the capture wins.
+  /* A click orients, it does not move. Two Maya 2025 screen recordings show the pivot centre
+   * holding the same screen position through every click - on a face, on a vertex, on an edge -
+   * while its axes turn to what was clicked, and the cursor carries the label `orient` while
+   * hovering. The help reads the other way ("click a component to snap and align the pivot", "by
+   * default, pivot position and orientation snap to the selected component"), and the capture
+   * wins.
    *
    * Position is what a drag is for, and what `Shift` asks for explicitly: "Shift + click to place
    * the pivot at the cursor". #ClarityPivotToolSettings::snap_position still gates both of those -
@@ -2143,8 +2181,9 @@ static wmOperatorStatus clarity_pivot_click_exec(bContext *C, wmOperator *op)
   if (apply_orientation) {
     apply_orientation = aim_axis || has_orientation;
     if (apply_orientation) {
-      /* "If the center handle or X-axis handle is selected, the custom pivot aims its X-axis" - the
-       * centre is not a fourth axis, so it aims X rather than whatever axis was picked last. */
+      /* "If the center handle or X-axis handle is selected, the custom pivot aims its X-axis" -
+       * the centre is not a fourth axis, so it aims X rather than whatever axis was picked last.
+       */
       const int aim_target_axis = settings.active_axis_handle ? settings.active_axis : 0;
       const int target_axis = aim_axis ? aim_target_axis :
                                          clarity_pivot_snap_aim_axis_get(target_vector);

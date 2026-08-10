@@ -1,0 +1,4932 @@
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridPress;
+snapMode -grid 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurvePress;
+snapMode -curve 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToCurveRelease;
+snapMode -curve 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointPress;
+snapMode -point 1;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+SnapToPointRelease;
+snapMode -point 0;
+SnapToCurveRelease;
+snapMode -curve 0;
+SnapToGridRelease;
+snapMode -grid 0;
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gMove;
+// moveSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gRotate;
+// RotateSuperContext
+$tmp = $gScale;
+// scaleSuperContext
+$tmp = $gScale;
+// scaleSuperContext

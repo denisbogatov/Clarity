@@ -558,16 +558,22 @@ struct TransSnap {
   float clarity_view_plane_normal[3];
   /** Use deterministic front/back depth pairing for Clarity Mesh Center Snap. */
   bool clarity_mesh_center;
+  /** Maya `snapComponentsRelative = false`: each selected component lands on the point target. */
+  bool clarity_collapse_components;
+  /** Preserve the last snapped value when its key is released before the confirming mouse button.
+   */
+  bool clarity_keep_applied_until_motion;
   /**
    * Radius in pixels around the pointer that Clarity snapping accepts a target in, Clarity's "Snap
-   * tolerance". Zero while Clarity snapping is not driving the transform, and the size of the region
-   * when the tolerance is turned off, which is Clarity's "snap to anything viewable".
+   * tolerance". Zero while Clarity snapping is not driving the transform, and the size of the
+   * region when the tolerance is turned off, which is Clarity's "snap to anything viewable".
    */
   float clarity_snap_dist_px;
   /**
-   * World-space position of the visible Clarity pivot, captured before the transform moved anything.
-   * Clarity puts that pivot onto the snap target, so it is the snap source instead of the center of
-   * the selection. Captured once because the pivot itself travels with the data during the drag.
+   * World-space position of the visible Clarity pivot, captured before the transform moved
+   * anything. Clarity puts that pivot onto the snap target, so it is the snap source instead of
+   * the center of the selection. Captured once because the pivot itself travels with the data
+   * during the drag.
    */
   bool clarity_pivot_source_valid;
   float clarity_pivot_source[3];

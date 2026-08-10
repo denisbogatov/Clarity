@@ -251,6 +251,9 @@ static ed::clarity::ClarityDispatchResult clarity_dispatch_idle_action(
   }
 
   const bool active_tool_owns_pointer = clarity_active_blender_tool_is(C, "builtin.knife");
+  if (!active_tool_owns_pointer) {
+    ed::clarity::selection_constraint_click_track(C, runtime, action);
+  }
   if (!active_tool_owns_pointer && ed::clarity::left_mouse_marquee_drag_handle(C, runtime, action)) {
     return ed::clarity::ClarityDispatchResult::Handled;
   }
@@ -326,6 +329,7 @@ static ed::clarity::ClarityDispatchResult clarity_dispatch_idle_action(
   }
   if (action.id == ed::clarity::ClarityActionID::FocusLost) {
     ed::clarity::pivot_edit_input_reset(C, runtime);
+    runtime.selection_constraint_click_press_pending = false;
     runtime.tool.held_hotkey = ed::clarity::ClarityToolID::None;
     return ed::clarity::ClarityDispatchResult::PassThrough;
   }

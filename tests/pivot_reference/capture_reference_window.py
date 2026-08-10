@@ -25,6 +25,18 @@ The commands Maya runs are collected by `capture_reference_commands.py` - one gl
 straight to a file with no UI of its own - so a record carries both where the pivot ended up and
 which command put it there, and the window does not have to show a pane of Maya talking to itself.
 
+`Записать активацию снаппинга` is independent of those three gesture modes. It runs
+`capture_reference_snapping.py` and records the complete X/C/V/J/Shift-J press/repeat/release state
+machine, overlapping keys, and temporary keys over Maya's persistent snap modes with one click.
+
+`Записать снаппинг на моделях` builds a dedicated scene and drives the actual transform
+manipulators against point, curve, grid, mesh-center, view-plane and step targets. It also records
+object-to-object vertex alignment, pivot-only alignment, and Shift-drag duplicates snapped to the
+other object. It is the numeric behavior capture: transforms, target distances, commands and
+screenshots, not only mode flags. The extended run contains 55 isolated interactions, including
+handles/spaces, hierarchy, Copy/Instance, complex geometry, multi-selection, cameras and
+cancel/undo cleanup.
+
 From Maya's Script Editor. The reload is not decoration: a Maya session stays open across a day of
 edits to these files and `import` answers from the cache it filled this morning, which is what
 "module has no attribute" for a function plainly on disk actually means. `show()` re-reads what it
@@ -50,6 +62,8 @@ from typing import Any, Callable
 import capture_reference_autopilot as autopilot
 import capture_reference_commands as commands
 import capture_reference_gestures as gestures
+import capture_reference_model_snapping as model_snapping
+import capture_reference_snapping as snapping
 from reference_backend import cmds
 
 _WINDOW = "clarityReferenceCaptureWindow"
@@ -84,6 +98,8 @@ def reload_engine() -> None:
     importlib.reload(commands)
     importlib.reload(gestures)
     importlib.reload(autopilot)
+    importlib.reload(snapping)
+    importlib.reload(model_snapping)
     gestures.set_command_reader(commands.read)
 
 
@@ -106,6 +122,8 @@ def refresh_modules(force: bool = False) -> None:
     importlib.reload(commands)
     importlib.reload(gestures)
     importlib.reload(autopilot)
+    importlib.reload(snapping)
+    importlib.reload(model_snapping)
     gestures.set_command_reader(commands.read)
 
 
@@ -121,6 +139,11 @@ def _session_running() -> bool:
 def _refresh(message: str | None = None) -> None:
     if not cmds.window(_WINDOW, exists=True):
         return
+
+    if "snap_activation" in _UI and cmds.control(_UI["snap_activation"], exists=True):
+        cmds.button(_UI["snap_activation"], edit=True, enable=not commands.running())
+    if "model_snapping" in _UI and cmds.control(_UI["model_snapping"], exists=True):
+        cmds.button(_UI["model_snapping"], edit=True, enable=not commands.running())
 
     if not _session_running():
         cmds.text(_UI["heading"], edit=True,
@@ -160,7 +183,12 @@ def _guard(action: Callable[[], str | None]) -> Callable[..., None]:
     """Run a button's action and put whatever went wrong on screen instead of only in the log."""
 
     def run(*_args: Any) -> None:
-        if not _session_running() and action not in (_start, _retry_failed):
+        if not _session_running() and action not in (
+            _start,
+            _retry_failed,
+            _run_snap_activation,
+            _run_model_snapping,
+        ):
             _refresh("Сессии нет. Выберите режим и нажмите кнопку справа от него.")
             return
         try:
@@ -280,6 +308,60 @@ def _retry_failed() -> str:
     return "{} Доснимаем шагов: {}.".format(message, len(_FAILED))
 
 
+def _run_snap_activation() -> str:
+    """Record Maya's snap key/persistent-mode state machine without a gesture session."""
+    if commands.running():
+        return "Сначала завершите текущую сессию: запись снаппинга использует свой журнал команд."
+    output = _output()
+    if not output:
+        return "Сначала укажите путь вывода."
+    refresh_modules(force=True)
+    source = Path(output)
+    stem = source.stem
+    snap_output = source.with_name(
+        stem if stem.endswith("_snap_activation") else stem + "_snap_activation"
+    )
+    result = snapping.run(
+        snap_output,
+        filter_noise=cmds.checkBox(_UI["filter"], query=True, value=True),
+    )
+    return "Активация снаппинга: {} сценариев, записано в {}".format(
+        result["scenarios"], result["json"]
+    )
+
+
+def _run_model_snapping() -> str:
+    """Build target models and drive real snapped manipulator drags through native input."""
+    if commands.running():
+        return "Сначала завершите текущую сессию: тест моделей использует свой журнал команд."
+    output = _output()
+    if not output:
+        return "Сначала укажите путь вывода."
+    refresh_modules(force=True)
+    source = Path(output)
+    stem = source.stem
+    model_output = source.with_name(
+        stem if stem.endswith("_model_snapping") else stem + "_model_snapping"
+    )
+    visible = cmds.window(_WINDOW, exists=True)
+    if visible:
+        cmds.window(_WINDOW, edit=True, visible=False)
+    try:
+        result = model_snapping.run(
+            model_output,
+            filter_noise=cmds.checkBox(_UI["filter"], query=True, value=True),
+        )
+    finally:
+        if visible:
+            cmds.window(_WINDOW, edit=True, visible=True)
+    message = "Снаппинг моделей: прошло {}/{}, записано в {}".format(
+        result["passed"], result["tests"], result["json"]
+    )
+    if result.get("failed"):
+        message += "; не прошли: " + ", ".join(result["failed"])
+    return message
+
+
 def _recorded(name: str) -> str:
     """What the record just written actually caught - said out loud, filtering included."""
     records = gestures._SESSION["records"] if _session_running() else []
@@ -388,6 +470,15 @@ def _build() -> str:
                                   changeCommand=_toggle_filter)
     _UI["start"] = cmds.button(label="Прогнать без рук", command=_guard(_start))
     cmds.setParent("..")
+
+    _UI["snap_activation"] = cmds.button(
+        label="Записать активацию снаппинга (X / C / V / J / Shift-J)",
+        command=_guard(_run_snap_activation),
+    )
+    _UI["model_snapping"] = cmds.button(
+        label="Записать снаппинг на моделях (заменит текущую сцену)",
+        command=_guard(_run_model_snapping),
+    )
 
     cmds.separator(style="in", height=8)
     _UI["heading"] = cmds.text(label="Сессии нет.", align="left", font="boldLabelFont")
