@@ -15,7 +15,6 @@
 #include "DNA_workspace_types.h"
 
 #include "BLI_assert.h"
-#include "BLI_path_utils.hh"
 #include "BLI_time.h"
 #include "BLI_utildefines.h"
 
@@ -39,13 +38,6 @@
 #include "clarity_tools.hh"
 
 namespace blender {
-
-bool ED_clarity_gizmo_trace_enabled()
-{
-  static const bool enabled = BLI_getenv("BLENDER_CLARITY_GIZMO_TRACE") != nullptr ||
-                              BLI_getenv("BLENDER_MAYA_GIZMO_TRACE") != nullptr;
-  return enabled;
-}
 
 bool ED_clarity_interaction_preset_enabled(const bContext *C)
 {

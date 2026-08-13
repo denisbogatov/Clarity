@@ -37,6 +37,12 @@ screenshots, not only mode flags. The extended run contains 55 isolated interact
 handles/spaces, hierarchy, Copy/Instance, complex geometry, multi-selection, cameras and
 cancel/undo cleanup.
 
+`Записать внешний вид пивота` is the rendering reference. It captures Move, Rotate, Scale and Edit
+Pivot in perspective and orthographic views, active and locked handles, custom/pinned state and
+three manipulator sizes. Every state is composited over black, gray and white so the capture can
+recover per-pixel RGB/alpha and verify the blend transfer of arrows, planes and circles. The JSON also
+stores Maya color palettes, viewport/DPI data, camera matrices, manipulator preferences and bounds.
+
 From Maya's Script Editor. The reload is not decoration: a Maya session stays open across a day of
 edits to these files and `import` answers from the cache it filled this morning, which is what
 "module has no attribute" for a function plainly on disk actually means. `show()` re-reads what it
@@ -63,6 +69,7 @@ import capture_reference_autopilot as autopilot
 import capture_reference_commands as commands
 import capture_reference_gestures as gestures
 import capture_reference_model_snapping as model_snapping
+import capture_reference_pivot_visual as pivot_visual
 import capture_reference_snapping as snapping
 from reference_backend import cmds
 
@@ -100,6 +107,7 @@ def reload_engine() -> None:
     importlib.reload(autopilot)
     importlib.reload(snapping)
     importlib.reload(model_snapping)
+    importlib.reload(pivot_visual)
     gestures.set_command_reader(commands.read)
 
 
@@ -124,6 +132,7 @@ def refresh_modules(force: bool = False) -> None:
     importlib.reload(autopilot)
     importlib.reload(snapping)
     importlib.reload(model_snapping)
+    importlib.reload(pivot_visual)
     gestures.set_command_reader(commands.read)
 
 
@@ -144,6 +153,8 @@ def _refresh(message: str | None = None) -> None:
         cmds.button(_UI["snap_activation"], edit=True, enable=not commands.running())
     if "model_snapping" in _UI and cmds.control(_UI["model_snapping"], exists=True):
         cmds.button(_UI["model_snapping"], edit=True, enable=not commands.running())
+    if "pivot_visual" in _UI and cmds.control(_UI["pivot_visual"], exists=True):
+        cmds.button(_UI["pivot_visual"], edit=True, enable=not commands.running())
 
     if not _session_running():
         cmds.text(_UI["heading"], edit=True,
@@ -188,6 +199,7 @@ def _guard(action: Callable[[], str | None]) -> Callable[..., None]:
             _retry_failed,
             _run_snap_activation,
             _run_model_snapping,
+            _run_pivot_visual,
         ):
             _refresh("Сессии нет. Выберите режим и нажмите кнопку справа от него.")
             return
@@ -362,6 +374,37 @@ def _run_model_snapping() -> str:
     return message
 
 
+def _run_pivot_visual() -> str:
+    """Measure the transform/pivot manipulator's actual rendered RGB, alpha and geometry."""
+    if commands.running():
+        return "Сначала завершите текущую сессию: визуальный тест временно меняет viewport."
+    output = _output()
+    if not output:
+        return "Сначала укажите путь вывода."
+    refresh_modules(force=True)
+    source = Path(output)
+    stem = source.stem
+    if stem.endswith("_pivot_gestures"):
+        stem = stem[: -len("_pivot_gestures")] + "_pivot_visual"
+    visual_output = source.with_name(
+        stem if stem.endswith("_pivot_visual") else stem + "_pivot_visual"
+    )
+    visible = cmds.window(_WINDOW, exists=True)
+    if visible:
+        cmds.window(_WINDOW, edit=True, visible=False)
+    try:
+        result = pivot_visual.run(visual_output)
+    finally:
+        if visible:
+            cmds.window(_WINDOW, edit=True, visible=True)
+    message = "Внешний вид пивота: снято {}, записано в {}".format(
+        result["captures"], result["json"]
+    )
+    if result.get("failed"):
+        message += "; не снялись: " + ", ".join(result["failed"])
+    return message
+
+
 def _recorded(name: str) -> str:
     """What the record just written actually caught - said out loud, filtering included."""
     records = gestures._SESSION["records"] if _session_running() else []
@@ -478,6 +521,10 @@ def _build() -> str:
     _UI["model_snapping"] = cmds.button(
         label="Записать снаппинг на моделях (заменит текущую сцену)",
         command=_guard(_run_model_snapping),
+    )
+    _UI["pivot_visual"] = cmds.button(
+        label="Записать внешний вид пивота (цвета / alpha / геометрия)",
+        command=_guard(_run_pivot_visual),
     )
 
     cmds.separator(style="in", height=8)

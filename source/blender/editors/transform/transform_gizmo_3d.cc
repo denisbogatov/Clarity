@@ -11,7 +11,6 @@
  */
 
 #include <cmath>
-#include <cstdio>
 
 #include "BLI_array_utils.h"
 #include "BLI_bounds.hh"
@@ -20,8 +19,6 @@
 #include "BLI_math_geom.h"
 #include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
-#include "BLI_path_utils.hh"
-#include "BLI_time.h"
 
 #include "DNA_armature_types.h"
 #include "DNA_lattice_types.h"
@@ -79,25 +76,15 @@ namespace blender::ed::transform {
 static wmGizmoGroupType *g_GGT_xform_gizmo = nullptr;
 static wmGizmoGroupType *g_GGT_xform_gizmo_context = nullptr;
 
-/**
- * Diagnostic trace of every path that can take the manipulator off screen, enabled by setting the
- * `BLENDER_CLARITY_GIZMO_TRACE` environment variable. Temporary: remove once the Clarity manipulator
- * lifecycle is settled.
- */
-static bool gizmo_trace_enabled()
+static void clarity_gizmo_color_set(const ClarityGizmoRGB8 color, float r_color[4])
 {
-  return ED_clarity_gizmo_trace_enabled();
+  constexpr float byte_to_float = 1.0f / 255.0f;
+  ARRAY_SET_ITEMS(r_color,
+                  float(color.r) * byte_to_float,
+                  float(color.g) * byte_to_float,
+                  float(color.b) * byte_to_float,
+                  1.0f);
 }
-
-#define GIZMO_TRACE(...) \
-  if (gizmo_trace_enabled()) { \
-    fprintf(stderr, "GZTRACE %.3f ", BLI_time_now_seconds()); \
-    fprintf(stderr, __VA_ARGS__); \
-    fprintf(stderr, "\n"); \
-    fflush(stderr); \
-  } \
-  ((void)0)
-
 
 static void gizmogroup_refresh_from_matrix(wmGizmoGroup *gzgroup,
                                            const float twmat[4][4],
@@ -390,8 +377,10 @@ static void gizmo_get_axis_color(const int axis_idx,
 
   if (axis_idx >= MAN_AXIS_RANGE_ROT_START && axis_idx < MAN_AXIS_RANGE_ROT_END) {
     /* Never fade rotation rings. */
-    /* Trackball rotation axis is a special case, we only draw a slight overlay. */
-    alpha_fac = (axis_idx == MAN_AXIS_ROT_T) ? 0.05f : 1.0f;
+    /* Maya's arcball is selectable but has no filled visible disc. */
+    alpha_fac = (axis_idx == MAN_AXIS_ROT_T) ?
+                    (use_clarity_palette ? ClarityGizmoVisualProfile::trackball_alpha : 0.05f) :
+                    1.0f;
   }
   else {
     bool is_plane = false;
@@ -421,7 +410,7 @@ static void gizmo_get_axis_color(const int axis_idx,
     case MAN_AXIS_TRANS_YZ:
     case MAN_AXIS_SCALE_YZ:
       if (use_clarity_palette) {
-        ARRAY_SET_ITEMS(r_col, 1.0f, 0.0f, 0.0f, 1.0f);
+        clarity_gizmo_color_set(ClarityGizmoVisualProfile::axis_x, r_col);
       }
       else {
         ui::theme::get_color_4fv(TH_AXIS_X, r_col);
@@ -433,7 +422,7 @@ static void gizmo_get_axis_color(const int axis_idx,
     case MAN_AXIS_TRANS_ZX:
     case MAN_AXIS_SCALE_ZX:
       if (use_clarity_palette) {
-        ARRAY_SET_ITEMS(r_col, 0.0f, 1.0f, 0.0f, 1.0f);
+        clarity_gizmo_color_set(ClarityGizmoVisualProfile::axis_y, r_col);
       }
       else {
         ui::theme::get_color_4fv(TH_AXIS_Y, r_col);
@@ -445,7 +434,7 @@ static void gizmo_get_axis_color(const int axis_idx,
     case MAN_AXIS_TRANS_XY:
     case MAN_AXIS_SCALE_XY:
       if (use_clarity_palette) {
-        ARRAY_SET_ITEMS(r_col, 0.0f, 0.0f, 1.0f, 1.0f);
+        clarity_gizmo_color_set(ClarityGizmoVisualProfile::axis_z, r_col);
       }
       else {
         ui::theme::get_color_4fv(TH_AXIS_Z, r_col);
@@ -454,8 +443,7 @@ static void gizmo_get_axis_color(const int axis_idx,
     case MAN_AXIS_ROT_C:
     case MAN_AXIS_ROT_T:
       if (use_clarity_palette) {
-        /* Sampled from Clarity's view aligned circle. */
-        ARRAY_SET_ITEMS(r_col, 0.34f, 0.86f, 1.0f, 1.0f);
+        clarity_gizmo_color_set(ClarityGizmoVisualProfile::view, r_col);
       }
       else {
         ui::theme::get_color_4fv(TH_GIZMO_VIEW_ALIGN, r_col);
@@ -464,7 +452,7 @@ static void gizmo_get_axis_color(const int axis_idx,
     case MAN_AXIS_TRANS_C:
     case MAN_AXIS_SCALE_C:
       if (use_clarity_palette) {
-        ARRAY_SET_ITEMS(r_col, 1.0f, 1.0f, 0.0f, 1.0f);
+        clarity_gizmo_color_set(ClarityGizmoVisualProfile::selected, r_col);
       }
       else {
         ui::theme::get_color_4fv(TH_GIZMO_VIEW_ALIGN, r_col);
@@ -474,7 +462,8 @@ static void gizmo_get_axis_color(const int axis_idx,
 
   r_col[3] = alpha * alpha_fac;
   if (use_clarity_palette) {
-    ARRAY_SET_ITEMS(r_col_hi, 1.0f, 1.0f, 0.0f, alpha_hi * alpha_fac);
+    clarity_gizmo_color_set(ClarityGizmoVisualProfile::selected, r_col_hi);
+    r_col_hi[3] = alpha_hi * alpha_fac;
   }
   else {
     copy_v4_v4(r_col_hi, r_col);
@@ -2037,7 +2026,6 @@ static void gizmogroup_init_properties_from_twtype(wmGizmoGroup *gzgroup)
 
 static void WIDGETGROUP_gizmo_setup(const bContext *C, wmGizmoGroup *gzgroup)
 {
-  GIZMO_TRACE("setup: gizmo group created (%s)", gzgroup->type->idname);
   GizmoGroup *ggd = gizmogroup_init(gzgroup);
 
   gzgroup->customdata = ggd;
@@ -2184,63 +2172,129 @@ static int gizmogroup_twtype_calc(const bContext *C,
   return gizmo_3d_twtype_resolve(clarity_edit_pivot, v3d->gizmo_show_object & ggd->twtype_init);
 }
 
-static void gizmogroup_apply_clarity_center_style(GizmoGroup *ggd,
-                                               const bool use_clarity_style,
-                                               const bool use_edit_pivot_style)
+static void gizmo_clarity_axis_range_set(wmGizmo *axis, const float start, const float end)
 {
-  if (!ggd->clarity_style_cache.update_needed(use_clarity_style, use_edit_pivot_style, ggd->twtype)) {
+  mul_v3_v3fl(axis->matrix_offset[3], axis->matrix_offset[2], start);
+  RNA_float_set(axis->ptr, "length", end - start);
+  RNA_enum_set(axis->ptr, "draw_options", ED_GIZMO_ARROW_DRAW_FLAG_STEM);
+  WM_gizmo_set_flag(axis, WM_GIZMO_DRAW_OFFSET_SCALE, true);
+}
+
+static void gizmogroup_apply_clarity_center_style(GizmoGroup *ggd,
+                                                   const bool use_clarity_style,
+                                                   const bool use_edit_pivot_style)
+{
+  if (!ggd->clarity_style_cache.update_needed(
+          use_clarity_style, use_edit_pivot_style, ggd->twtype))
+  {
     return;
   }
+
+  const bool use_clarity_edit_pivot_style = use_clarity_style && use_edit_pivot_style;
 
   wmGizmo *translate_center = ggd->gizmos[MAN_AXIS_TRANS_C];
   RNA_enum_set(translate_center->ptr,
                "draw_style",
                gizmo_3d_translate_center_style_get(use_clarity_style, false, use_edit_pivot_style));
   RNA_boolean_set(translate_center->ptr, "draw_inner", false);
+  WM_gizmo_set_scale(translate_center,
+                     use_clarity_style ? ClarityGizmoVisualProfile::translate_center_scale :
+                                         0.2f);
+  WM_gizmo_set_line_width(translate_center,
+                          use_clarity_style ? ClarityGizmoVisualProfile::line_width :
+                                              GIZMO_AXIS_LINE_WIDTH);
 
   wmGizmo *scale_center = ggd->gizmos[MAN_AXIS_SCALE_C];
   RNA_enum_set(scale_center->ptr,
                "draw_style",
                gizmo_3d_scale_center_style_get(use_clarity_style, false));
   RNA_boolean_set(scale_center->ptr, "draw_inner", false);
-  WM_gizmo_set_scale(scale_center, use_clarity_style ? 0.065f : 0.2f);
+  WM_gizmo_set_scale(scale_center,
+                     use_clarity_style ? ClarityGizmoVisualProfile::scale_center_scale : 0.2f);
+  WM_gizmo_set_line_width(scale_center,
+                          use_clarity_style ? ClarityGizmoVisualProfile::line_width :
+                                              GIZMO_AXIS_LINE_WIDTH);
   if (wmGizmoOpElem *gzop = WM_gizmo_operator_get(scale_center, 0)) {
     RNA_float_set(&gzop->ptr, "mouse_sensitivity", use_clarity_style ? 0.2f : 1.0f);
   }
 
-  /* The rings Edit Pivot adds surround the translate handles instead of rearranging them. */
+  /* Edit Pivot adds rings without changing the active tool's translate-handle layout. */
   const int translate_twtype = gizmo_3d_translate_layout_twtype_get(use_clarity_style, ggd->twtype);
   for (int axis_idx = MAN_AXIS_RANGE_TRANS_START; axis_idx < MAN_AXIS_RANGE_TRANS_END; axis_idx++) {
     gizmo_3d_setup_draw_from_twtype(ggd->gizmos[axis_idx], axis_idx, translate_twtype);
   }
-  if (use_edit_pivot_style) {
-    /* Measured, not guessed: that layout runs the arrows from 13 to 61 px out, and the trackball
-     * Edit Pivot adds is a filled disc 75 px across at the same centre, so every pixel an arrow
-     * covers belongs to the disc first and no press can reach one. The rotate-aware range is what
-     * Blender's combined manipulator uses to clear its own rings, and it is what Maya draws: the
-     * arrows outside the orientation rings. The stem is kept - that range alone would leave only
-     * the cone heads. */
+  for (int axis_idx = MAN_AXIS_SCALE_X; axis_idx <= MAN_AXIS_SCALE_Z; axis_idx++) {
+    gizmo_3d_setup_draw_from_twtype(ggd->gizmos[axis_idx], axis_idx, ggd->twtype);
+  }
+  if (use_clarity_style) {
     for (const int axis_idx : {MAN_AXIS_TRANS_X, MAN_AXIS_TRANS_Y, MAN_AXIS_TRANS_Z}) {
-      wmGizmo *axis = ggd->gizmos[axis_idx];
-      float start;
-      float end;
-      gizmo_line_range(ggd->twtype, MAN_AXES_TRANSLATE, &start, &end);
-      mul_v3_v3fl(axis->matrix_offset[3], axis->matrix_offset[2], start);
-      RNA_float_set(axis->ptr, "length", end - start);
-      RNA_enum_set(axis->ptr, "draw_options", ED_GIZMO_ARROW_DRAW_FLAG_STEM);
+      gizmo_clarity_axis_range_set(ggd->gizmos[axis_idx],
+                                   ClarityGizmoVisualProfile::translate_axis_start,
+                                   ClarityGizmoVisualProfile::translate_axis_end);
+    }
+    for (const int axis_idx : {MAN_AXIS_SCALE_X, MAN_AXIS_SCALE_Y, MAN_AXIS_SCALE_Z}) {
+      gizmo_clarity_axis_range_set(ggd->gizmos[axis_idx],
+                                   ClarityGizmoVisualProfile::scale_axis_start,
+                                   ClarityGizmoVisualProfile::scale_axis_end);
     }
   }
-  /* Clarity draws the whole ring, not just the half facing the view, and draws it thin: measured on the
-   * reference capture the rings are about two pixels and the axis stems one, against Blender's three
-   * and two. */
-  for (int axis_idx = MAN_AXIS_ROT_X; axis_idx <= MAN_AXIS_ROT_Z; axis_idx++) {
-    RNA_enum_set(ggd->gizmos[axis_idx]->ptr,
-                 "draw_options",
-                 use_clarity_style ? 0 : ED_GIZMO_DIAL_DRAW_FLAG_CLIP);
-    WM_gizmo_set_line_width(ggd->gizmos[axis_idx],
-                            use_clarity_style ? GIZMO_AXIS_LINE_WIDTH :
-                                             GIZMO_AXIS_LINE_WIDTH + 1.0f);
+
+  const float translate_plane_length =
+      use_clarity_style ?
+          (use_clarity_edit_pivot_style ?
+               ClarityGizmoVisualProfile::edit_pivot_plane_length :
+               ClarityGizmoVisualProfile::plane_length) :
+          MAN_AXIS_SCALE_PLANE_SCALE;
+  const float scale_plane_length = use_clarity_style ? ClarityGizmoVisualProfile::plane_length :
+                                                      MAN_AXIS_SCALE_PLANE_SCALE;
+  for (const int axis_idx : {MAN_AXIS_TRANS_XY, MAN_AXIS_TRANS_YZ, MAN_AXIS_TRANS_ZX}) {
+    wmGizmo *axis = ggd->gizmos[axis_idx];
+    RNA_float_set(axis->ptr, "length", translate_plane_length);
+    RNA_float_set(axis->ptr,
+                  "fill_alpha",
+                  use_clarity_style ? ClarityGizmoVisualProfile::plane_fill_alpha : 0.5f);
   }
+  for (const int axis_idx : {MAN_AXIS_SCALE_XY, MAN_AXIS_SCALE_YZ, MAN_AXIS_SCALE_ZX}) {
+    wmGizmo *axis = ggd->gizmos[axis_idx];
+    RNA_float_set(axis->ptr, "length", scale_plane_length);
+    RNA_float_set(axis->ptr,
+                  "fill_alpha",
+                  use_clarity_style ? ClarityGizmoVisualProfile::plane_fill_alpha : 0.5f);
+  }
+
+  /* Clarity draws the whole ring, not just the half facing the view. Maya's lineSize=1 applies to
+   * rings, centre outlines and axis stems alike. */
+  for (int axis_idx = MAN_AXIS_ROT_X; axis_idx <= MAN_AXIS_ROT_Z; axis_idx++) {
+    wmGizmo *axis = ggd->gizmos[axis_idx];
+    RNA_enum_set(axis->ptr, "draw_options", use_clarity_style ? 0 : ED_GIZMO_DIAL_DRAW_FLAG_CLIP);
+    const float ring_scale = use_clarity_edit_pivot_style ?
+                                 ClarityGizmoVisualProfile::edit_pivot_rotate_scale :
+                                 ClarityGizmoVisualProfile::rotate_axis_scale;
+    WM_gizmo_set_scale(axis, use_clarity_style ? ring_scale : 1.0f);
+    WM_gizmo_set_line_width(axis,
+                            use_clarity_style ? ClarityGizmoVisualProfile::line_width :
+                                             GIZMO_AXIS_LINE_WIDTH + 1.0f);
+    RNA_float_set(axis->ptr,
+                  "select_line_width",
+                  use_clarity_edit_pivot_style ?
+                      ClarityGizmoVisualProfile::edit_pivot_ring_select_width :
+                      0.0f);
+  }
+  const float view_ring_scale = use_clarity_edit_pivot_style ?
+                                    ClarityGizmoVisualProfile::edit_pivot_rotate_scale :
+                                    ClarityGizmoVisualProfile::rotate_view_scale;
+  WM_gizmo_set_scale(
+      ggd->gizmos[MAN_AXIS_ROT_C], use_clarity_style ? view_ring_scale : 1.2f);
+  WM_gizmo_set_line_width(ggd->gizmos[MAN_AXIS_ROT_C],
+                          use_clarity_style ? ClarityGizmoVisualProfile::line_width :
+                                              GIZMO_AXIS_LINE_WIDTH);
+  RNA_float_set(ggd->gizmos[MAN_AXIS_ROT_C]->ptr,
+                "select_line_width",
+                use_clarity_edit_pivot_style ?
+                    ClarityGizmoVisualProfile::edit_pivot_ring_select_width :
+                    0.0f);
+  WM_gizmo_set_scale(ggd->gizmos[MAN_AXIS_ROT_T],
+                     use_clarity_style ? ClarityGizmoVisualProfile::rotate_axis_scale : 1.0f);
   for (const int axis_idx : {MAN_AXIS_TRANS_X,
                              MAN_AXIS_TRANS_Y,
                              MAN_AXIS_TRANS_Z,
@@ -2249,18 +2303,27 @@ static void gizmogroup_apply_clarity_center_style(GizmoGroup *ggd,
                              MAN_AXIS_SCALE_Z})
   {
     WM_gizmo_set_line_width(ggd->gizmos[axis_idx],
-                            use_clarity_style ? 1.0f : GIZMO_AXIS_LINE_WIDTH);
+                            use_clarity_style ? ClarityGizmoVisualProfile::line_width :
+                                                GIZMO_AXIS_LINE_WIDTH);
+  }
+  for (const int axis_idx : {MAN_AXIS_TRANS_X, MAN_AXIS_TRANS_Y, MAN_AXIS_TRANS_Z}) {
+    /* Keep Maya's one-pixel stem visible, but make Edit Pivot forgiving to acquire. At the
+     * reference 75 px gizmo size, radius 0.12 produces an 18 px-wide invisible hit cylinder. */
+    RNA_float_set(
+        ggd->gizmos[axis_idx]->ptr,
+        "stem_select_radius",
+        use_clarity_edit_pivot_style ? ClarityGizmoVisualProfile::edit_pivot_axis_select_radius :
+                                       0.05f);
   }
 
   ggd->use_clarity_center_style = use_clarity_style;
-  ggd->use_clarity_edit_pivot_style = use_edit_pivot_style;
+  ggd->use_clarity_edit_pivot_style = use_clarity_edit_pivot_style;
   ggd->clarity_style_cache.mark_applied(use_clarity_style, use_edit_pivot_style, ggd->twtype);
 }
 
 static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
 {
   if (WM_gizmo_group_is_modal(gzgroup)) {
-    GIZMO_TRACE("refresh: skipped, group is modal");
     return;
   }
 
@@ -2273,7 +2336,6 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
   TransformBounds tbounds;
 
   if (rv3d->rflag & RV3D_NAVIGATING) {
-    GIZMO_TRACE("refresh: skipped, view is navigating");
     return;
   }
 
@@ -2308,11 +2370,6 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
   const bool clarity_pivot = !ggd->all_hidden &&
                           ED_clarity_pivot_custom_matrix_get(
                               C, ed::clarity::ClarityPivotUsage::Display, clarity_pivot_matrix);
-  GIZMO_TRACE("refresh: twtype=%d edit_pivot=%d clarity_pivot=%d all_hidden=%d",
-              ggd->twtype,
-              int(clarity_edit_pivot),
-              int(clarity_pivot),
-              int(ggd->all_hidden));
   if (ggd->all_hidden) {
     return;
   }
@@ -2357,83 +2414,6 @@ static void gizmogroup_hide_all(GizmoGroup *ggd)
   MAN_ITER_AXES_END;
 }
 
-/**
- * Every number that decides where a handle lands on screen, one line per axis. #wmGizmo::scale_final
- * is a frame behind here - the gizmo map recomputes it after `draw_prepare`, so the first block of a
- * session reads every scale as zero. `draw_prepare` runs on every redraw and this is nineteen lines,
- * so it is rate limited to one block a second - except for the first few hundred, or a simulated
- * session that lasts a second or two would never get past the cold one.
- * Temporary, like the rest of #GIZMO_TRACE.
- */
-static void gizmo_trace_dump_axes(const ARegion *region, const GizmoGroup *ggd, const char *tag)
-{
-  static int count = 0;
-  static double time_prev = 0.0;
-  const double time_now = BLI_time_now_seconds();
-  if (count >= 400 && time_now - time_prev < 1.0) {
-    return;
-  }
-  count++;
-  time_prev = time_now;
-
-  static const char *axis_names[MAN_AXIS_LAST] = {
-      "TRANS_X", "TRANS_Y", "TRANS_Z",  "TRANS_C",  "TRANS_XY", "TRANS_YZ", "TRANS_ZX",
-      "ROT_X",   "ROT_Y",   "ROT_Z",    "ROT_C",    "ROT_T",    "SCALE_X",  "SCALE_Y",
-      "SCALE_Z", "SCALE_C", "SCALE_XY", "SCALE_YZ", "SCALE_ZX",
-  };
-
-  MAN_ITER_AXES_BEGIN (axis, axis_idx) {
-    float matrix_final[4][4];
-    WM_gizmo_calc_matrix_final(axis, matrix_final);
-
-    float length = -1.0f;
-    if (PropertyRNA *prop = RNA_struct_find_property(axis->ptr, "length")) {
-      if (RNA_property_type(prop) == PROP_FLOAT) {
-        length = RNA_property_float_get(axis->ptr, prop);
-      }
-    }
-    int draw_options = -1;
-    if (PropertyRNA *prop = RNA_struct_find_property(axis->ptr, "draw_options")) {
-      if (RNA_property_type(prop) == PROP_ENUM) {
-        draw_options = RNA_property_enum_get(axis->ptr, prop);
-      }
-    }
-
-    /* The tip of the arrow, or the rim of a dial: both sit at the gizmo's own length along Z. */
-    float tip_co[3] = {0.0f, 0.0f, length > 0.0f ? length : 1.0f};
-    mul_m4_v3(matrix_final, tip_co);
-
-    float origin_px[2] = {-1.0f, -1.0f};
-    float tip_px[2] = {-1.0f, -1.0f};
-    ED_view3d_project_float_global(region, matrix_final[3], origin_px, V3D_PROJ_TEST_NOP);
-    ED_view3d_project_float_global(region, tip_co, tip_px, V3D_PROJ_TEST_NOP);
-
-    GIZMO_TRACE(
-        "%s %-8s gz=%p hidden=%d basis=%.3f final=%.5f len=%.3f offset=(%.3f %.3f %.3f) opts=%d "
-        "bias=%.1f lw=%.1f alpha=%.2f origin=(%.1f %.1f) tip=(%.1f %.1f) reach=%.1fpx",
-        tag,
-        axis_names[axis_idx],
-        static_cast<const void *>(axis),
-        int((axis->flag & WM_GIZMO_HIDDEN) != 0),
-        double(axis->scale_basis),
-        double(axis->scale_final),
-        double(length),
-        double(axis->matrix_offset[3][0]),
-        double(axis->matrix_offset[3][1]),
-        double(axis->matrix_offset[3][2]),
-        draw_options,
-        double(axis->select_bias),
-        double(axis->line_width),
-        double(axis->color[3]),
-        double(origin_px[0]),
-        double(origin_px[1]),
-        double(tip_px[0]),
-        double(tip_px[1]),
-        double(len_v2v2(origin_px, tip_px)));
-  }
-  MAN_ITER_AXES_END;
-}
-
 static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgroup)
 {
   GizmoGroup *ggd = static_cast<GizmoGroup *>(gzgroup->customdata);
@@ -2463,7 +2443,8 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
   }
 
   if (use_clarity_palette) {
-    WM_gizmo_set_scale(ggd->gizmos[MAN_AXIS_SCALE_C], 0.065f);
+    WM_gizmo_set_scale(ggd->gizmos[MAN_AXIS_SCALE_C],
+                       ClarityGizmoVisualProfile::scale_center_scale);
   }
   float viewinv_m3[3][3];
   copy_m3_m4(viewinv_m3, rv3d->viewinv);
@@ -2472,10 +2453,6 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
   /* When looking through a selected camera, the gizmo can be at the
    * exact same position as the view, skip so we don't break selection. */
   if (ggd->all_hidden || fabsf(ED_view3d_pixel_size(rv3d, rv3d->twmat[3])) < 5e-7f) {
-    GIZMO_TRACE("draw_prepare: hiding all, all_hidden=%d pixel_size=%g modal=%d",
-                int(ggd->all_hidden),
-                double(ED_view3d_pixel_size(rv3d, rv3d->twmat[3])),
-                int(is_modal));
     if (!is_modal) {
       gizmogroup_hide_all(ggd);
     }
@@ -2536,10 +2513,9 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
                                         gizmo_3d_translate_layout_twtype_get(use_clarity_palette,
                                                                              ggd->twtype) :
                                         ggd->twtype;
-      /* Edit Pivot turns the rotate layout on to get the orientation rings, and the trackball comes
-       * with it. Maya's pivot manipulator has no such handle - and measured here, its filled disc
-       * takes every pixel out to 75 px, so no press ever reaches an axis arrow: the same walk with
-       * the plain move manipulator, the same three arrows, answers from 30 px out. */
+      /* Edit Pivot turns the rotate layout on to get the orientation rings, and Blender's trackball
+       * comes with it. Maya's pivot manipulator has no trackball handle; hiding it also keeps its
+       * selection disc from covering the translate arrows. */
       if (axis_idx == MAN_AXIS_ROT_T && ggd->use_clarity_edit_pivot_style) {
         WM_gizmo_set_flag(axis, WM_GIZMO_HIDDEN, true);
         continue;
@@ -2577,36 +2553,6 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
     WM_gizmo_set_color_highlight(axis, color_hi);
   }
   MAN_ITER_AXES_END;
-
-  if (gizmo_trace_enabled()) {
-    int visible = 0;
-    MAN_ITER_AXES_BEGIN (axis, axis_idx) {
-      UNUSED_VARS(axis_idx);
-      visible += (axis->flag & WM_GIZMO_HIDDEN) == 0;
-    }
-    MAN_ITER_AXES_END;
-    GIZMO_TRACE("draw_prepare: visible=%d twtype=%d modal=%d clarity=%d pivot_style=%d at (%.3f %.3f "
-                "%.3f)",
-                visible,
-                ggd->twtype,
-                int(is_modal),
-                int(use_clarity_palette),
-                int(ggd->use_clarity_edit_pivot_style),
-                double(rv3d->twmat[3][0]),
-                double(rv3d->twmat[3][1]),
-                double(rv3d->twmat[3][2]));
-    GIZMO_TRACE("draw_prepare: twmat rows (%.3f %.3f %.3f) (%.3f %.3f %.3f) (%.3f %.3f %.3f)",
-                double(rv3d->twmat[0][0]),
-                double(rv3d->twmat[0][1]),
-                double(rv3d->twmat[0][2]),
-                double(rv3d->twmat[1][0]),
-                double(rv3d->twmat[1][1]),
-                double(rv3d->twmat[1][2]),
-                double(rv3d->twmat[2][0]),
-                double(rv3d->twmat[2][1]),
-                double(rv3d->twmat[2][2]));
-    gizmo_trace_dump_axes(region, ggd, "draw_prepare:");
-  }
 
   /* Refresh handled above when using view orientation. */
   if (!equals_m3m3(viewinv_m3, ggd->prev.viewinv_m3)) {
@@ -2864,13 +2810,6 @@ static bool WIDGETGROUP_gizmo_poll_context(const bContext *C, wmGizmoGroupType *
     return false;
   }
   const bToolRef *tref = area->runtime.tool;
-  GIZMO_TRACE("poll_context: flag=%d show_object=%d moving=%d clarity=%d edit_pivot=%d tool_gizmo=%d",
-              int(v3d->gizmo_flag),
-              int(v3d->gizmo_show_object),
-              int(G.moving),
-              int(ED_clarity_interaction_enabled(C)),
-              int(ED_clarity_pivot_edit_target_get(C) != ed::clarity::ClarityPivotEditTarget::None),
-              int(tref && tref->runtime && tref->runtime->gizmo_group[0] != '\0'));
   if (v3d->gizmo_flag & V3D_GIZMO_HIDE_CONTEXT) {
     return false;
   }

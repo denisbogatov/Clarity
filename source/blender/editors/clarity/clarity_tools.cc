@@ -31,7 +31,6 @@
 #include "BLI_math_vector.hh"
 #include "BLI_set.hh"
 #include "BLI_string.h"
-#include "BLI_time.h"
 #include "BLI_utildefines.h"
 #include "BLI_vector.hh"
 
@@ -909,20 +908,6 @@ static wmOperatorStatus select_marquee_call(bContext *C, const ClarityInputActio
     }
   }
   RNA_boolean_set(&ptr, "use_depth", use_depth);
-  if (ED_clarity_gizmo_trace_enabled()) {
-    /* Whether the marquee reaches behind the surface is decided from three pieces of state that
-     * are invisible in the result: the setting, the shading mode and X-Ray. Naming them here is
-     * what tells "the setting is off" apart from "X-Ray is on". */
-    const View3D *v3d = CTX_wm_view3d(C);
-    fprintf(stderr,
-            "MARQUEE %.3f use_depth=%d setting=%d shading=%d xray=%d\n",
-            BLI_time_now_seconds(),
-            int(use_depth),
-            runtime != nullptr ? int(runtime->selection_settings.camera_based_selection) : -1,
-            v3d != nullptr ? int(v3d->shading.type) : -1,
-            v3d != nullptr ? int(XRAY_FLAG_ENABLED(v3d)) : -1);
-    fflush(stderr);
-  }
   const wmOperatorStatus status = WM_operator_name_call_ptr(
       C, ot, wm::OpCallContext::InvokeDefault, &ptr, action.source_event);
   WM_operator_properties_free(&ptr);
@@ -1992,22 +1977,6 @@ ClarityDispatchResult selection_handle_action(bContext *C,
     }
     const bool use_path = op != ClarityTopologySelectOp::Replace &&
                           has_path_source_component(C, runtime);
-    if (ED_clarity_gizmo_trace_enabled()) {
-      /* Which branch a topology gesture takes depends on state that is gone by the time the result
-       * is visible - the anchor, the component mode, whether the two faces touch. Naming all of it
-       * at the fork in the road is the difference between reading a log and guessing. */
-      fprintf(stderr,
-              "TOPOSEL %.3f op=%d face_mode=%d anchor=%c/%d shell=%d adjacent=%d path=%d\n",
-              BLI_time_now_seconds(),
-              int(op),
-              int(is_face_mode),
-              runtime.topology_anchor_htype ? runtime.topology_anchor_htype : '-',
-              runtime.topology_anchor_index,
-              int(use_face_shell),
-              int(face_loop_pick.shared_edge != nullptr),
-              int(use_path));
-      fflush(stderr);
-    }
     wmOperatorStatus status;
     if (use_face_shell) {
       status = select_face_shell_call(C);
@@ -2290,23 +2259,6 @@ static Vector<Object *> selected_objects_get(const bContext *C)
   return objects;
 }
 
-/** Why a drag was or was not taken to be a Shift Extrude, under `BLENDER_CLARITY_GIZMO_TRACE`. */
-static void shift_transform_trace(const char *verdict, wmOperator *op, const wmEvent &event)
-{
-  if (!ED_clarity_gizmo_trace_enabled()) {
-    return;
-  }
-  fprintf(stderr,
-          "SHIFTX %.3f %s op=%s type=%d val=%d mod=%d\n",
-          BLI_time_now_seconds(),
-          verdict,
-          op != nullptr ? op->type->idname : "-",
-          int(event.type),
-          event.val,
-          int(event.modifier));
-  fflush(stderr);
-}
-
 static bool shift_transform_is_gizmo_drag(const ClarityWindowRuntime &runtime,
                                           wmOperator *op,
                                           const wmEvent &event)
@@ -2315,11 +2267,9 @@ static bool shift_transform_is_gizmo_drag(const ClarityWindowRuntime &runtime,
        !runtime.selection_settings.shift_duplicate) ||
       runtime.pivot_edit.target != ClarityPivotEditTarget::None)
   {
-    shift_transform_trace("no: setting off or edit pivot", op, event);
     return false;
   }
   if (!ELEM(runtime.tool.active, ClarityToolID::Move, ClarityToolID::Rotate, ClarityToolID::Scale)) {
-    shift_transform_trace("no: tool is not move/rotate/scale", op, event);
     return false;
   }
   /* The manipulator is bound to a click-drag, so the press that reaches the transform operator
@@ -2328,7 +2278,6 @@ static bool shift_transform_is_gizmo_drag(const ClarityWindowRuntime &runtime,
   if (event.type != LEFTMOUSE || !ELEM(event.val, KM_PRESS, KM_PRESS_DRAG) ||
       (event.modifier & KM_SHIFT) == 0 || (event.modifier & KM_ALT) != 0)
   {
-    shift_transform_trace("no: not a shifted left press", op, event);
     return false;
   }
   if (!(STREQ(op->type->idname, "TRANSFORM_OT_translate") ||
@@ -2336,13 +2285,11 @@ static bool shift_transform_is_gizmo_drag(const ClarityWindowRuntime &runtime,
         STREQ(op->type->idname, "TRANSFORM_OT_trackball") ||
         STREQ(op->type->idname, "TRANSFORM_OT_resize")))
   {
-    shift_transform_trace("no: not a transform operator", op, event);
     return false;
   }
   PropertyRNA *release_confirm = RNA_struct_find_property(op->ptr, "release_confirm");
   const bool from_gizmo = release_confirm != nullptr &&
                           RNA_property_boolean_get(op->ptr, release_confirm);
-  shift_transform_trace(from_gizmo ? "yes: gizmo drag" : "no: not a gizmo drag", op, event);
   return from_gizmo;
 }
 
@@ -2467,17 +2414,14 @@ static bool transform_slide_invoke(bContext *C, wmOperator *op, const wmEvent *e
   }
   /* Only a translation slides; a rotation or a scale has nothing to slide along. */
   if (!STREQ(op->type->idname, "TRANSFORM_OT_translate")) {
-    shift_transform_trace("slide no: not a translation", op, *event);
     return false;
   }
   const Object *edit_object = CTX_data_edit_object(C);
   if (edit_object == nullptr || edit_object->type != OB_MESH) {
-    shift_transform_trace("slide no: not an edit mesh", op, *event);
     return false;
   }
   const BMEditMesh *em = BKE_editmesh_from_object(const_cast<Object *>(edit_object));
   if (em == nullptr || em->bm == nullptr || em->bm->totvertsel == 0) {
-    shift_transform_trace("slide no: nothing selected", op, *event);
     return false;
   }
 
@@ -2498,7 +2442,6 @@ static bool transform_slide_invoke(bContext *C, wmOperator *op, const wmEvent *e
   WM_operator_properties_free(&ptr);
 
   const bool took_it = (status & OPERATOR_RUNNING_MODAL) != 0;
-  shift_transform_trace(took_it ? "slide yes: started" : "slide no: operator declined", op, *event);
   return took_it;
 }
 

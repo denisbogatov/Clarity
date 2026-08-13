@@ -18,6 +18,57 @@ static constexpr bool blender_default = false;
 static constexpr bool visible = true;
 static constexpr bool hidden = false;
 
+TEST(transform_gizmo_3d, ClarityVisualProfileMatchesMayaReferencePixels)
+{
+  using Profile = ClarityGizmoVisualProfile;
+  const float pixels = Profile::reference_size_px;
+
+  /* Move: 20 px to the stem, 60 px to the cone base and about 80 px to its tip. */
+  EXPECT_NEAR(Profile::translate_axis_start * pixels, 18.75f, 0.01f);
+  EXPECT_NEAR(Profile::translate_axis_end * pixels, 60.0f, 0.01f);
+  EXPECT_NEAR((Profile::translate_axis_end + 0.25f) * pixels, 78.75f, 0.01f);
+
+  /* Scale: the cube occupies the ten pixels after the 56 px stem end. */
+  EXPECT_NEAR(Profile::scale_axis_start * pixels, 18.75f, 0.01f);
+  EXPECT_NEAR(Profile::scale_axis_end * pixels, 56.25f, 0.01f);
+  EXPECT_NEAR((Profile::scale_axis_end + 0.10f) * pixels, 63.75f, 0.01f);
+
+  /* Plane diamonds are centred at 45 px normally and 60 px while editing the pivot. */
+  EXPECT_NEAR((Profile::plane_length + 0.10f) * pixels, 45.0f, 0.01f);
+  EXPECT_NEAR((Profile::edit_pivot_plane_length + 0.10f) * pixels, 60.0f, 0.01f);
+  EXPECT_FLOAT_EQ(Profile::plane_fill_alpha, 0.25f);
+  EXPECT_FLOAT_EQ(Profile::trackball_alpha, 0.0f);
+
+  EXPECT_NEAR(Profile::translate_center_scale * pixels, 10.125f, 0.01f);
+  EXPECT_NEAR(Profile::rotate_axis_scale * pixels, 60.0f, 0.01f);
+  EXPECT_NEAR(Profile::rotate_view_scale * pixels, 69.0f, 0.01f);
+  EXPECT_NEAR(Profile::maya_edit_pivot_rotate_scale * pixels, 30.0f, 0.01f);
+  EXPECT_NEAR(Profile::edit_pivot_rotate_scale * pixels, 37.5f, 0.01f);
+  EXPECT_FLOAT_EQ(Profile::line_width, 1.0f);
+  EXPECT_NEAR(Profile::edit_pivot_axis_select_radius * pixels * 2.0f, 18.0f, 0.01f);
+  EXPECT_FLOAT_EQ(Profile::edit_pivot_ring_select_width, 14.0f);
+}
+
+TEST(transform_gizmo_3d, ClarityVisualProfileMatchesMayaReferenceColors)
+{
+  using Profile = ClarityGizmoVisualProfile;
+  EXPECT_EQ(Profile::axis_x.r, 255);
+  EXPECT_EQ(Profile::axis_x.g, 1);
+  EXPECT_EQ(Profile::axis_x.b, 0);
+  EXPECT_EQ(Profile::axis_y.r, 0);
+  EXPECT_EQ(Profile::axis_y.g, 255);
+  EXPECT_EQ(Profile::axis_y.b, 15);
+  EXPECT_EQ(Profile::axis_z.r, 0);
+  EXPECT_EQ(Profile::axis_z.g, 0);
+  EXPECT_EQ(Profile::axis_z.b, 255);
+  EXPECT_EQ(Profile::view.r, 100);
+  EXPECT_EQ(Profile::view.g, 220);
+  EXPECT_EQ(Profile::view.b, 255);
+  EXPECT_EQ(Profile::selected.r, 253);
+  EXPECT_EQ(Profile::selected.g, 255);
+  EXPECT_EQ(Profile::selected.b, 136);
+}
+
 static bool visible_during_drag(const bool use_clarity_style,
                                 const int axis_idx_active,
                                 const int axis_idx,

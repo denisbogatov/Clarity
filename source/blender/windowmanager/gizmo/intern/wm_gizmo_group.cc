@@ -1284,13 +1284,6 @@ void WM_gizmo_group_refresh(const bContext *C, wmGizmoGroup *gzgroup)
         gzgroup->init_flag &= ~WM_GIZMOGROUP_INIT_REFRESH;
         WM_gizmomap_tag_refresh_drawstep(gzmap, WM_gizmomap_drawstep_from_gizmo_group(gzgroup));
         gzgroup->hide.delay_refresh_for_tweak = true;
-        if (ED_clarity_gizmo_trace_enabled()) {
-          fprintf(stderr,
-                  "GZTRACE %.3f group_hidden_for_tweak: %s\n",
-                  BLI_time_now_seconds(),
-                  gzgt->idname);
-          fflush(stderr);
-        }
         return;
       }
     }

@@ -9,7 +9,7 @@
 #    clarity/mac/go.sh --check         report whether anything is stale; build nothing
 #    clarity/mac/go.sh --tests-only    run the suites against the current tree
 #    clarity/mac/go.sh --python        sync Python scripts only, then launch (no native build)
-#    clarity/mac/go.sh --trace         build, then run with the manipulator and pivot traces on
+#    clarity/mac/go.sh --trace         build, then run with the pivot trace on
 #    clarity/mac/go.sh --full          reconfigure and rebuild the tree from scratch
 #    clarity/mac/go.sh --help
 #
@@ -222,7 +222,7 @@ Usage: clarity/mac/go.sh [options]
   --check        report whether anything is stale; build nothing
   --tests-only   run the suites against the current tree
   --python       sync Python scripts only, then launch
-  --trace        build, then run with manipulator and pivot traces enabled
+  --trace        build, then run with the pivot trace enabled
   --full         reconfigure and rebuild from scratch
 EOF
 }
@@ -639,22 +639,19 @@ launch() {
   fi
   export BLENDER_STARTUP_TRACE_FILE="${LOG_DIR}/blender-startup-trace.log"
   if [ "${DO_TRACE}" = "1" ]; then
-    # A trace session owns the terminal: stderr carries the manipulator trace, so Blender runs
-    # in the foreground until the problem has been reproduced and the editor closed.
-    export BLENDER_CLARITY_GIZMO_TRACE=1
+    # A trace session owns the terminal and runs in the foreground until the problem has been
+    # reproduced and the editor closed.
     export BLENDER_CLARITY_SNAP_TRACE_FILE="${LOG_DIR}/clarity-snap-trace.log"
     rm -f "${BLENDER_CLARITY_SNAP_TRACE_FILE}"
     say "=== Trace session ==="
     say "Reproduce the problem, then close Blender. Logs:"
     say "  ${LOG_DIR}/blender-startup-trace.log"
-    say "  ${LOG_DIR}/gizmo-trace.log"
     say "  ${LOG_DIR}/clarity-snap-trace.log"
     say ""
-    "${BLENDER_BIN}" 2>"${LOG_DIR}/gizmo-trace.log"
+    "${BLENDER_BIN}"
   else
-    # Detailed pivot and gizmo traces stay off here: they put synchronous file writes directly
-    # in the modal interaction path, which is the last place to add latency.
-    unset BLENDER_CLARITY_GIZMO_TRACE
+    # The detailed pivot trace stays off here: it puts synchronous file writes directly in the
+    # modal interaction path, which is the last place to add latency.
     unset BLENDER_CLARITY_SNAP_TRACE_FILE
     say "=== Start Blender ==="
     # The binary inside the bundle is started directly rather than through `open`, because

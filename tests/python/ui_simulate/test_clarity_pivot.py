@@ -818,9 +818,9 @@ def _pivot_axis_arrow_pixels(object, region, region_3d, axis_index):
     stem spans, in window pixels.
 
     The manipulator is drawn at a constant pixel size - one gizmo unit is `gizmo_size` pixels in the
-    view plane - and Edit Pivot lays the arrows out from 0.415 to 1.415 units, the range that clears
-    the orientation rings. A world axis is foreshortened by however far it leans out of that plane,
-    which is the ratio between its projected length and a view-plane vector's.
+    view plane. The Maya visual fixture measures the stem from 0.25 to 0.80 units; its cone continues
+    to 1.05. A world axis is foreshortened by however far it leans out of that plane, which is the
+    ratio between its projected length and a view-plane vector's.
     """
     import bpy
     from bpy_extras.view3d_utils import location_3d_to_region_2d
@@ -841,7 +841,7 @@ def _pivot_axis_arrow_pixels(object, region, region_3d, axis_index):
 
     unit = bpy.context.preferences.view.gizmo_size * ((along - here).length / (across - here).length)
     centre = Vector((region.x + here.x, region.y + here.y))
-    return centre, (along - here).normalized(), 0.415 * unit, 1.415 * unit
+    return centre, (along - here).normalized(), 0.25 * unit, 0.80 * unit
 
 
 def pivot_axis_handle_drags_the_pivot_along_one_axis():
@@ -850,10 +850,8 @@ def pivot_axis_handle_drags_the_pivot_along_one_axis():
 
     Maya's number for the gesture is in `fixtures/maya_2025_pivot_gestures.json`: a press 75 px out
     along X answers `move -r -1.405948 0 0`, one component. The rule on this side is pinned by
-    `AConstrainedDragKeepsThePivotOnItsConstraint`, and until now nothing could reach it - the
-    trackball Edit Pivot brings in with the rotate layout claimed every pixel out to 75 px, so the
-    press never arrived. `probe_clarity_pivot_handles` measured that, and `MAN_AXIS_ROT_T` is hidden
-    in the mode because of it. This test is what keeps the arrow reachable.
+    `AConstrainedDragKeepsThePivotOnItsConstraint`. Blender's trackball is hidden in Edit Pivot so
+    its selection disc cannot cover the Maya-sized arrow; this test keeps that arrow reachable.
 
     The drag is cancelled: what is being checked is which transform the press began and under which
     constraint, and letting it finish would only move the pivot.
@@ -883,15 +881,8 @@ def pivot_axis_handle_drags_the_pivot_along_one_axis():
 
     e.cursor_position_set(int(round(centre.x)), int(round(centre.y)), move=True)
     yield
-    # `W` is Clarity's Move tool, and it is here because of a defect this test is not the place to
-    # assert: in a session where no Clarity transform tool has ever been chosen, the manipulator's
-    # axis arrows answer no press at all. `probe_clarity_pivot_handles` pins that down - the same
-    # gizmo objects at the same addresses, the same eleven offered to the pick, the same geometry in
-    # the select buffer and the same cursor, and zero hits until `W` has been pressed once, after
-    # which every later pass answers. See "The cold session" in
-    # `tests/pivot_reference/behavior_matrix.md`. A Maya user reaches for `W` before anything else;
-    # this test does the same so that it is testing the axis rule and not that.
-    yield e.w()
+    # Enter Edit Pivot directly from the factory-startup Select state. This intentionally keeps the
+    # Metal selection pass cold: the axis must not depend on a transform-tool draw having warmed it.
     # `D` toggles Edit Pivot; without it the press belongs to the object manipulator.
     yield e.d()
 

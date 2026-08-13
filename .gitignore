@@ -89,3 +89,7 @@ blendcache_*
 *.blend1
 *.blend2
 *.png
+
+# Maya pivot visual golden-reference frames are test inputs, not temporary viewport captures.
+!tests/pivot_reference/fixtures/maya_2025_pivot_visual_*.png
+*.png

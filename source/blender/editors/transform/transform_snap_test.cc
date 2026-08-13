@@ -420,7 +420,7 @@ TEST(transform_snap_clarity_plan, FirstTwentyMayaModelScenariosUseTheCanonicalTa
 TEST(transform_snap_object, PointModeResolvesTheOtherObjectsAuthoredPivot)
 {
   Object object{};
-  object.runtime = MEM_new<ObjectRuntime>(__func__);
+  object.runtime = MEM_new<bke::ObjectRuntime>(__func__);
   const float4x4 evaluated_matrix = math::from_location<float4x4>(float3(1.0f, 2.0f, 3.0f));
   object.runtime->object_to_world = evaluated_matrix;
 

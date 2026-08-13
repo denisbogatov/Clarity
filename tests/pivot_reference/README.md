@@ -140,6 +140,100 @@ snapping.run(
 )
 ```
 
+### Pivot visual appearance
+
+`Записать внешний вид пивота (цвета / alpha / геометрия)` records what Maya actually draws, not
+only the tool state behind it. This is the golden reference for reproducing the transform gizmo in
+Clarity/Blender.
+
+The suite contains 45 deterministic states:
+
+- Move, Rotate and Scale in perspective, front, right and top views;
+- every axis, center, plane, view-ring and arcball handle addressable by Maya's tool contexts;
+- manipulator size factors 0.75, 1.0 and 1.5;
+- one locked channel for each transform tool;
+- Edit Pivot in all four views, both unpinned and pinned;
+- authored custom orientation and pinned pivot after edit mode for all three tools.
+
+Each state is captured three times at the same camera and pivot position: over flat black, 50% gray
+and flat white. Maya's `M3dView` framebuffer supplies a stable native alpha map for the manipulator;
+the black capture supplies its display RGB. The gray and white frames preserve Maya's actual
+background-dependent blending so the eventual Blender drawing can be compared on more than one
+background.
+
+If a Maya build cannot return native framebuffer alpha, black and white provide the fallback solve
+
+```text
+composite = alpha * foreground + (1 - alpha) * background
+```
+
+Gray is predicted twice: once assuming direct display-byte blending and once after sRGB
+linearization. Both models are scored on exactly the same pixels. The residual is diagnostic—the
+straight-alpha `_rgba.png` prefers Maya's native framebuffer alpha and only uses the equation when
+that channel is unavailable. The image therefore contains measured display RGB and opacity of arrow
+heads, shafts, planar handles, circles and their anti-aliased edges.
+
+The primary capture path reads Maya's own viewport framebuffer through `M3dView`, so it includes
+the manipulator while remaining independent of desktop occlusion and macOS Screen Recording
+permission. An operating-system screen grab is kept only as a recorded fallback for Maya builds
+whose viewport API cannot return a color buffer.
+
+The JSON records enough context to interpret the pixels rather than copying an accidental desktop
+setup: viewport and crop dimensions, OS and device-pixel ratios, renderer/panel state, color
+management, all `manipOptions`, Move/Rotate/Scale context flags, custom-pivot state, indexed and
+named Maya palettes, camera world/model-view/projection matrices, pivot pixel, per-hue bounds,
+radial distributions, alpha percentiles and dominant display colors. The `.log` is a compact row per
+state. Per-hue radial alpha profiles make ring opacity readable separately from the broader arrow
+shafts and heads while the RGBA PNG remains the pixel-exact source of truth.
+
+The button temporarily hides its own window and uses an empty transform plus a temporary camera in
+the current scene. It does **not** replace or save the scene. Selection, active tool, viewport
+camera/options, cursor, background colors, manipulator size, context modes and custom-pivot state
+are restored even if one capture fails.
+
+Direct Script Editor entry point:
+
+```python
+import sys, importlib
+sys.path.append(r"S:\Clarity\blender\tests\pivot_reference")
+import capture_reference_pivot_visual as visual
+importlib.reload(visual)
+visual.run(
+    r"S:\Clarity\blender\tests\pivot_reference\fixtures\maya_2025_pivot_visual"
+)
+```
+
+The primary outputs are `maya_2025_pivot_visual.json`, `.log`, and four PNGs per state:
+`_dark.png`, `_middle.png`, `_light.png` and `_rgba.png`. After capturing, the host-independent
+fixture checks run with:
+
+```bash
+python3 -m unittest tests/pivot_reference/test_pivot_visual_schema.py -v
+```
+
+The Clarity runtime consumes the measurements as a screen-space profile in
+`source/blender/editors/transform/transform_gizmo_clarity_cache.hh`. It covers the five sampled
+colours, Move/Scale axis extents, normal and Edit Pivot plane positions, plane fill alpha, centre
+sizes, normal/Edit Pivot ring radii, and Maya's invisible-but-selectable arcball. The host-independent
+contract test reads those C++
+constants and checks them against the actual Maya bounds, radial profiles and dominant colours:
+
+```bash
+python3 -m unittest tests/pivot_reference/test_clarity_pivot_visual_profile.py -v
+```
+
+The native `transform_gizmo_3d` suite repeats the same pixel conversions in C++, while the UI
+simulation keeps the Maya-sized Edit Pivot arrow selectable from a cold Metal session. After a
+native style change, run the repository's supported build/test entry point and compare Move,
+Rotate, Scale and Edit Pivot visually against the matching `_rgba.png` fixture.
+
+The measured 30 px Edit Pivot ring is retained as a reference constant. Blender presents that ring
+at 37.5 logical pixels after visual review on Retina, while all Clarity ring, centre and axis
+outlines use Maya's one-unit line width. To keep those thin Edit Pivot axes practical to grab, their
+visible one-pixel stems have a separate 18 logical px selection cylinder. The Edit Pivot rings use
+a matching 14 logical px selection line instead of Blender's roughly 7 px default. These wider hit
+areas are active only in Edit Pivot; they do not alter the rendered geometry or ordinary gizmos.
+
 ### Snapping real models
 
 `Записать снаппинг на моделях (заменит текущую сцену)` is the geometry half of the capture. Save

@@ -225,12 +225,6 @@ enum class ClarityNavigationDebugStage : uint8_t {
 
 }  // namespace ed::clarity
 
-/**
- * Whether the temporary manipulator trace is on, set by the `BLENDER_CLARITY_GIZMO_TRACE` environment
- * variable. Remove together with the trace once the manipulator lifecycle is settled.
- */
-bool ED_clarity_gizmo_trace_enabled();
-
 bool ED_clarity_interaction_enabled(const bContext *C);
 /**
  * Whether the Clarity interaction model owns this session at all, regardless of what the pointer

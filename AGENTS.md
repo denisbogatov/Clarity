@@ -20,7 +20,7 @@ Both entry points take the same flags and mean the same thing by them:
 - `--no-launch` - the result is a test outcome, not something to look at;
 - `--tests-only` - run the suites against the tree as it stands;
 - `--python` - a Python-only edit: sync scripts and launch, no native build;
-- `--trace` - a foreground session that also collects the manipulator and pivot traces;
+- `--trace` - a foreground session that also collects the pivot trace;
 - `--check` - report whether anything is stale without building;
 - `--full` - reconfigure and rebuild from scratch.
 

@@ -48,7 +48,6 @@ void ED_operatortypes_maya();
 #define MAYA_STEP_SNAP_ABSOLUTE CLARITY_STEP_SNAP_ABSOLUTE
 
 #define ED_maya_event_dispatch ED_clarity_event_dispatch
-#define ED_maya_gizmo_trace_enabled ED_clarity_gizmo_trace_enabled
 #define ED_maya_interaction_enabled ED_clarity_interaction_enabled
 #define ED_maya_interaction_frame_rate_limit ED_clarity_interaction_frame_rate_limit
 #define ED_maya_interaction_preset_enabled ED_clarity_interaction_preset_enabled

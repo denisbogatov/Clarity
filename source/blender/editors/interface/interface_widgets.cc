@@ -34,7 +34,6 @@
 
 #include "BLF_api.hh"
 
-#include "ED_clarity.hh"
 #include "ED_node.hh"
 
 #include "UI_interface_icons.hh"
@@ -6050,13 +6049,6 @@ void draw_menu_back(uiStyle * /*style*/, Block *block, const rcti *rect)
   WidgetType *wt = widget_type(WidgetStyle::MenuBack);
 
   wt->state(wt, &STATE_INFO_NULL, EmbossType::Undefined);
-  if (block && ED_clarity_gizmo_trace_enabled()) {
-    fprintf(stderr,
-            "MENUBACK theme_style=%d flag=%d\n",
-            int(block->theme_style),
-            int(block->flag));
-    fflush(stderr);
-  }
   if (block && block->theme_style == BLOCK_THEME_STYLE_CLARITY_MENU) {
     /* Backed in the same grey as the rows that opened it, so the sub-menu reads as a second panel
      * of one menu instead of a black window dropped on top of it. */

@@ -17,6 +17,8 @@
  * - `matrix[2]` is the axis the dial rotates around (all dials).
  */
 
+#include <algorithm>
+
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math_geom.h"
@@ -474,7 +476,11 @@ static void dial_draw_intern(const bContext *C,
   params.arc_inner_factor = arc_inner_factor;
   params.clip_plane = use_clip_plane ? clip_plane : nullptr;
 
-  const float line_width = (gz->line_width * U.pixelsize) + WM_gizmo_select_bias(select);
+  float line_width = (gz->line_width * U.pixelsize) + WM_gizmo_select_bias(select);
+  if (select) {
+    const float select_line_width = RNA_float_get(gz->ptr, "select_line_width") * U.pixelsize;
+    line_width = std::max(line_width, select_line_width);
+  }
   dial_3d_draw_util(matrix_final, line_width, color, select, &params);
 }
 
@@ -694,6 +700,15 @@ static void GIZMO_GT_dial_3d(wmGizmoType *gzt)
   };
   RNA_def_enum_flag(gzt->srna, "draw_options", rna_enum_draw_options, 0, "Draw Options", "");
   RNA_def_boolean(gzt->srna, "wrap_angle", true, "Wrap Angle", "");
+  RNA_def_float(gzt->srna,
+                "select_line_width",
+                0.0f,
+                0.0f,
+                FLT_MAX,
+                "Select Line Width",
+                "Minimum logical-pixel width used only while selecting the dial",
+                0.0f,
+                100.0f);
   RNA_def_float_factor(
       gzt->srna, "arc_inner_factor", 0.0f, 0.0f, 1.0f, "Arc Inner Factor", "", 0.0f, 1.0f);
   RNA_def_float_factor(gzt->srna,

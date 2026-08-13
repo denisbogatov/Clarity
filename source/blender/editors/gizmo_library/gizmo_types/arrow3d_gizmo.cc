@@ -130,7 +130,9 @@ static void arrow_draw_geom(const ArrowGizmo3D *arrow,
         {-scale, 0, scale},
     };
 
-    const float color_inner[4] = {UNPACK3(color), color[3] * 0.5f};
+    /* Keep the historical selection fill: this property controls appearance, not hit coverage. */
+    const float fill_alpha = select ? 0.5f : RNA_float_get(arrow->gizmo.ptr, "fill_alpha");
+    const float color_inner[4] = {UNPACK3(color), color[3] * fill_alpha};
 
     /* Translate to line end. */
     GPU_matrix_push();
@@ -155,9 +157,21 @@ static void arrow_draw_geom(const ArrowGizmo3D *arrow,
     };
 
     if (draw_options & ED_GIZMO_ARROW_DRAW_FLAG_STEM) {
-      immUniform1f("lineWidth",
-                   (arrow->gizmo.line_width * U.pixelsize) + WM_gizmo_select_bias(select));
-      wm_gizmo_vec_draw(color, vec, ARRAY_SIZE(vec), pos, GPU_PRIM_LINE_STRIP);
+      if (select) {
+        /* Use filled geometry for picking. Metal expands wide polylines through a separate
+         * procedural draw path; before that path has been used once, an occlusion query can see
+         * no samples from the stem. Keep the visible line unchanged, but make selection
+         * independent of that backend-specific warm-up. */
+        const float select_radius = RNA_float_get(arrow->gizmo.ptr, "stem_select_radius");
+        immUnbindProgram();
+        immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+        immUniformColor4fv(color);
+        imm_draw_cylinder_fill_3d(pos, select_radius, select_radius, arrow_length, 8, 1);
+      }
+      else {
+        immUniform1f("lineWidth", arrow->gizmo.line_width * U.pixelsize);
+        wm_gizmo_vec_draw(color, vec, ARRAY_SIZE(vec), pos, GPU_PRIM_LINE_STRIP);
+      }
     }
     else {
       immUniformColor4fv(color);
@@ -586,6 +600,24 @@ static void GIZMO_GT_arrow_3d(wmGizmoType *gzt)
 
   RNA_def_float(
       gzt->srna, "length", 1.0f, -FLT_MAX, FLT_MAX, "Arrow Line Length", "", -FLT_MAX, FLT_MAX);
+  RNA_def_float_factor(gzt->srna,
+                       "fill_alpha",
+                       0.5f,
+                       0.0f,
+                       1.0f,
+                       "Fill Alpha",
+                       "Opacity of a plane handle's interior relative to its outline",
+                       0.0f,
+                       1.0f);
+  RNA_def_float(gzt->srna,
+                "stem_select_radius",
+                0.05f,
+                0.0f,
+                FLT_MAX,
+                "Stem Select Radius",
+                "Radius of the invisible cylinder used to select a normal arrow stem",
+                0.0f,
+                1.0f);
   RNA_def_float_vector(
       gzt->srna, "aspect", 2, nullptr, 0, FLT_MAX, "Aspect", "Cone/box style only", 0.0f, FLT_MAX);
 

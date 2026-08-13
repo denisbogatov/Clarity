@@ -418,8 +418,8 @@ Two fixes were tried against a build and neither moved a pixel, so neither is th
   Blender's combined gizmo is what pushes the arrows outside the rings. The drawing did not change,
   so the layout is not what decides their absence.
 
-Visibility was the third guess and it is wrong too. `BLENDER_CLARITY_GIZMO_TRACE=1` during a real
-Edit Pivot session reports `refresh: twtype=3 edit_pivot=1 clarity_pivot=1 all_hidden=0` and
+Visibility was the third guess and it is wrong too. The diagnostic run of a real Edit Pivot
+session reported `refresh: twtype=3 edit_pivot=1 clarity_pivot=1 all_hidden=0` and
 `draw_prepare: visible=12` - translate arrows, plane handles, centre, the three rings, the view ring
 and the trackball, all of them shown. Nothing is hidden and the layout is the combined one.
 
@@ -485,11 +485,10 @@ manipulator does not explain, so it has to be re-taken before it is read again.
 
 ### What the handles actually measure
 
-`gizmo_trace_dump_axes` in `transform_gizmo_3d.cc` prints, once a second per `draw_prepare` and once
-per handle, everything that decides where a handle lands: hidden flag, `scale_basis`, `scale_final`,
-`length`, the `matrix_offset` translation, draw options, select bias, line width, colour alpha, and
-where the handle's origin and its tip fall in pixels. A real Edit Pivot session, `twtype=3`,
-`clarity=1`, `pivot_style=1`, `visible=12`:
+The per-handle measurements recorded everything that decides where a handle lands: hidden flag,
+`scale_basis`, `scale_final`, `length`, the `matrix_offset` translation, draw options, select bias,
+line width, colour alpha, and where the handle's origin and its tip fall in pixels. In a real Edit
+Pivot session, `twtype=3`, `clarity=1`, `pivot_style=1`, `visible=12`:
 
 | Handle | `scale_final` | `length` | Options | Alpha | From the centre |
 | --- | --- | --- | --- | --- | --- |
@@ -518,20 +517,16 @@ it were already in pixels - is never called on this path. Reading it by hand in 
 was tested was `WM_GIZMO_SELECT_BACKGROUND`, which is the depth mask, not whether the disc claims
 the pixel.
 
-The walk itself no longer has to be done by hand. `probe_clarity_pivot_handles.walk_the_axes` in
-`tests/python/ui_simulate` drives the pointer out along each pivot axis in 5 px steps and presses
-nothing - a press at a distance where no handle answers becomes a click, and in Edit Pivot a click
-aims the pivot, so the next reading would be taken from a centre that moved. Highlighting needs only
-a motion. It marks each stop on `stderr`, where the gizmo trace is already writing, and
-`read_handle_walk.py` pairs the two into the table. Handles are matched by the `gz=` pointer both
-traces print: the id the select buffer uses indexes the visible gizmos of that frame, and which
-handles are visible changes with the mode. It asserts nothing, so it is not registered as a test.
+During the investigation the pointer was walked out along each pivot axis in 5 px steps without
+pressing. That kept misses from becoming Edit Pivot clicks which would move the centre before the
+next reading. The temporary probe and its parser were removed with the diagnostic traces after the
+selection defects were closed; the executable regression is now
+`pivot_axis_handle_drags_the_pivot_along_one_axis`.
 
-The obvious fix was the one Maya's own frames show - the arrows outside the rings, not under them.
-`gizmogroup_apply_clarity_center_style` gives the three axis arrows the rotate-aware line range in
-Edit Pivot, `0.415` to `1.415`, keeping the stem the range alone would drop. The dump confirms it
-took: `TRANS_X len=1.000 offset=(0.415 0.000 0.000) opts=1`. It is kept because it is what Maya
-draws, not because it fixed anything - it did not.
+The provisional fix put the arrows outside the rings with Blender's rotate-aware range, `0.415` to
+`1.415`. The dump confirmed it took and the later selection investigation still established the
+important part: hiding `ROT_T` makes the arrows reachable. The pixel-exact visual capture recorded
+after this investigation supersedes that provisional geometry; its final measurements are below.
 
 ### The nine that never answer
 
@@ -590,18 +585,18 @@ That retires occlusion, ordering and bias together. Nothing is on top of `TRANS_
 What the three that answer have in common is that they are view-aligned: the final matrix of
 `TRANS_C`, `ROT_C` and `ROT_T` has its Z column pointing at the camera, and every handle that fails
 has its own along a world axis. Whether that is the cause or another correlation is the next
-question, and the cheap way to split it is a control: the same walk with Edit Pivot off. The arrows
+question, and the cheap way to split it was a control: the same walk with Edit Pivot off. The arrows
 are the same three handles there, without the dials Edit Pivot adds. If they answer, the dials are
 implicated; if they do not, Clarity's translate arrows cannot be picked at all, which is a larger
 bug than this one and has an obvious suspect in the `WM_gizmo_set_line_width(axis, 1.0f)` the
-Clarity style gives them. `probe_clarity_pivot_handles` now walks both, and marks which.
+Clarity style gives them.
 
 The first attempt at that control answered nothing and is worth recording so it is not repeated:
 the `move` pass reported `drawn=0` at every stop, no `drawsel:` line and no pick at all. Outside
 Edit Pivot the layout comes from the active tool, and a session that never chose one has no
 manipulator to walk - Edit Pivot offers the pivot handles regardless, which is why every earlier run
-looked like the manipulator was simply there. The probe now presses `W`, Clarity's Move tool, before
-the first pass.
+looked like the manipulator was simply there. The control therefore pressed `W`, Clarity's Move
+tool, before the first pass.
 
 One more pair is worth holding on to while that runs. `ROT_C` and `ROT_X` are the same gizmo type
 with the same draw options (`0` - Clarity draws the whole ring, so neither is filled even for
@@ -669,93 +664,50 @@ So the row moves from open to agreeing under the pointer, and
 `pivot_axis_handle_drags_the_pivot_along_one_axis` presses the middle of the X arrow, cancels the
 drag, and reads `pivot-drag-begin` for `mode=1` with `CON_APPLY | CON_AXIS0`. It derives the press
 pixel rather than hard-coding it: the manipulator is drawn at a constant pixel size, one gizmo unit
-is `gizmo_size` pixels in the view plane, the arrow spans 0.415 to 1.415 of those, and a world axis
-is foreshortened by the ratio between its projected length and a view-plane vector's.
+is `gizmo_size` pixels in the view plane, the Maya-sized arrow stem spans `0.25` to `0.80` of those,
+and a world axis is foreshortened by the ratio between its projected length and a view-plane
+vector's.
 
-### The cold session
+### The cold session, closed
 
-Open, and separate from the row above. In a session where no Clarity transform tool has ever been
-chosen, the manipulator's axis arrows answer no press at all. Press `W` once and they answer from
-then on - including after switching to Select, which has no manipulator of its own.
+In a session where no Clarity transform tool had ever been chosen, the axis arrows produced no
+selection samples until `W` was pressed once. The centre handle still answered, and the gizmo
+objects, matrices, viewport, depth state and cursor were identical between the cold and warm
+passes.
 
-It is not the arrows and not the state they are in. Across a cold pass and a warm one the probe
-reads the same gizmo objects at the same addresses, the same eleven offered to the pick, the same
-geometry drawn into the select buffer, the same `twtype=3`, the same `flag=8`, and the same cursor
-pixel - and zero hits against one or more. `TRANS_C` answers in both, so the pick itself is running;
-only the six arrows go missing, which is why the centre handle's reach reads 5 px longer cold.
+The remaining difference was the arrow stem's selectable geometry. Its visible and selectable stem
+used `GPU_SHADER_3D_POLYLINE_UNIFORM_COLOR`; on Metal that wide line is expanded through a separate
+procedural draw path, and the cold occlusion query could finish with no samples from it. The arrow
+head and centre use filled primitives and did not share the failure.
 
-What has been ruled out, each as its own pass of `probe_clarity_pivot_handles`, each before `W`:
+`gizmo_arrow_draw_select` now represents a normal arrow stem with a narrow filled cylinder. The
+ordinary visible stem remains the same polyline, while picking no longer depends on the Metal
+wide-line path having been used by `W`. The regression test enters Edit Pivot directly from the
+factory-startup Select state and requires the X arrow to begin a constrained transform. The
+temporary gizmo, pick and GPU-query traces used to isolate the failure were removed after this
+point. Normal Move keeps the original `0.05` cylinder radius. Edit Pivot raises only that invisible
+radius to `0.12`, giving its one-pixel X/Y/Z stems an 18 logical px hit width at the 75 px reference
+size. Its rotation rings simultaneously receive a 14 logical px selection line instead of the
+roughly 7 px default, keeping the two handle families balanced without changing either appearance.
 
-| Suspect | Pass | Result |
+### Pixel-exact visual profile
+
+`fixtures/maya_2025_pivot_visual.json` and its straight-alpha PNGs replace the estimates made from
+the earlier viewport screenshot and handle walk. At Maya's default size, one Blender gizmo unit is
+75 px and the implementation now uses this measured profile:
+
+| Element | Maya pixels | Clarity gizmo units |
 | --- | --- | --- |
-| The window, 800x600 against 1280x900 | both sizes | not it - the warm passes answer in either |
-| The view distance, and the world length one gizmo unit stands for | `move-view-0.5x` | not it |
-| The cube's surface in the depth buffer the pick reads | `move-wire`, `pivot-cold-wire-no-floor` | not it |
-| The ground plane in the same buffer | `move-no-floor`, `pivot-cold-wire-no-floor` | not it |
-| The manipulator being too small to hit | `pivot-cold-gizmo-150` | not it |
-| The first entry into the mode | `pivot-no-tool-again` | not it |
-| Frames - ten steps of settling before the walk | every pass | not it |
-| A stale region, never redrawn | `pivot-cold-redraw`, `pivot-cold-view-nudge` | not it |
-| `gizmo_show_object` | `pivot-cold-show-object` | untestable: the fork syncs the flag back to the active tool within the pass |
-| The Blender tool, forced to Box Select the way `clarity_blender_tool_neutralize` does | `pivot-cold-box-select` | not it |
-| A Clarity tool being active at all | `pivot-cold-select-tool`, `Q` | not it |
-| Clarity's Move tool, `W` | `move` | **this is the one** |
+| Move stem / cone base / cone tip | 19 / 60 / 79-80 | `0.25` / `0.80` / `1.05` |
+| Scale stem / cube base / cube end | 19 / 56 / 64 | `0.25` / `0.75` / `0.85` |
+| normal / Edit Pivot plane centre | 45 / 60 | length `0.50` / `0.70`, plus the diamond's `0.10` |
+| Move centre half-width | 10 | `0.135` |
+| Rotate axis / view ring radius | 60 / 69 | `0.80` / `0.92` |
+| Edit Pivot ring radius | 30 | measured `0.40`; Blender presentation `0.50` (37.5 logical px) |
+| plane interior opacity | 64/255 | `0.25` |
+| arcball visible opacity | no filled pixels | `0.0` (selection geometry remains active) |
 
-`clarity_move_tool_activate` does exactly two things: neutralize the Blender tool, and
-`clarity_transform_gizmo_activate`, which sets `gizmo_show_object`, clears `V3D_GIZMO_HIDE_CONTEXT`,
-sets `V3D_GIZMO_HIDE_TOOL` and tags the region. Each of those has been reproduced on its own without
-effect, and `gizmo_show_object` is read in exactly two places in the tree - the twtype calculation,
-which resolves to the same `3` either way, and Clarity's own tool-state matching. So the field that
-tracks the fix cannot be the field that causes it.
-
-### Where the tracing ran out
-
-Gizmo picking does not go through `gpu_select_pick` at all. `GPU_SELECT_NEAREST_FIRST_PASS` selects
-`ALGO_SAMPLE_QUERY`, so what decides a hit is an occlusion query per id: samples rasterized, nothing
-else. Traced there, the same pixel 45 px out along X:
-
-| Pass | Samples, by select id |
-| --- | --- |
-| `move` | `TRANS_X` 60 |
-| `pivot` | `TRANS_X` 36, `ROT_Z` 24, `ROT_Y` 22 |
-| `pivot-cold` | every id 0 |
-
-Over a whole cold walk only three of the eleven ever rasterize anything - `TRANS_Z`, `TRANS_C` and
-`ROT_C`. `TRANS_X` and `TRANS_Y` are zero at every stop on every axis.
-
-Everything the draw is handed was then read at the moment of the draw, and cold matches warm on all
-of it:
-
-* the GPU state the handles are rasterized under - `depth_test=1` (always, so nothing is rejected),
-  `depth_mask=1`, `scissor=(0 0 6 6)`, `viewport=(0 0 6 6)`;
-* the matrix each handle draws itself with - `TRANS_X` from world `(1.160, 0, 0)` along
-  `(2.795, 0, 0)`, `scale_final` 2.795;
-* the projection: the stem's endpoints, put through the model, projection and viewport in force at
-  that instant, land at `(-16.5, -6.7)` and `(23.4, 13.2)` cold against `(-17.0, -5.9)` and
-  `(23.9, 13.7)` warm - both crossing the 6 x 6 pick viewport, entering at `y = 1.5` and `2.3`;
-* what the arrow reads for itself when it draws - `style=0`, `options=1` (the stem is drawn),
-  `length=1.000`, `width=1.00`, `alpha=1.00`, identical.
-
-Identical vertices, identical state, identical projection, zero samples against thirty-six. That is
-the end of what a `fprintf` can say: every input to the rasterizer has been read and they agree, so
-the next step is a frame capture, not another trace. The two traces built for this last stretch - the
-projected endpoints in the select loop and the arrow's own read at draw time - have been taken back
-out; they answered, and they cost thousands of lines a run.
-
-What stays is the per-handle dump in `draw_prepare`, `pick:` with the cursor and the offered count on
-every call, `pick: winner`, `drawsel:`, `drawstate:`, and the occlusion samples in
-`gpu_select_sample_query.cc`. Between them a session reproduces the whole finding in one run, which
-is why they are still here.
-
-`pivot_axis_handle_drags_the_pivot_along_one_axis` presses `W` before `D` for this reason, and says
-so at the press. A Maya user reaches for `W` before anything else, so the test is realistic - but it
-is stepping around this, not covering it, and the suite is 11 of 11 with that step in place.
-
-All of it is temporary and comes out with the rest of `GIZMO_TRACE` - but not before this one is
-closed. To reproduce the whole finding in one run:
-
-    set BLENDER_CLARITY_GIZMO_TRACE=1
-    blender --factory-startup -p 0 0 800 600 --enable-event-simulate \
-        --python tests/python/ui_simulate/run_blender_setup.py -- \
-        --tests probe_clarity_pivot_handles.walk_the_axes 2> gztrace.txt
-    python tests/pivot_reference/read_handle_walk.py gztrace.txt
+The measured display palette is X `(255, 1, 0)`, Y `(0, 255, 15)`, Z `(0, 0, 255)`, view
+`(100, 220, 255)` and selected `(253, 255, 136)`. The profile lives beside the style cache so the
+C++ test and runtime consume one set of values; `test_clarity_pivot_visual_profile.py` binds those
+values back to the fixture's bounds, radii, alpha and dominant colours.
