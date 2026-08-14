@@ -30,7 +30,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .min(0.0f)
       .max(1.0f)
       .subtype(PROP_FACTOR);
-  b.add_input<decl::Vector>("Vector"_ustr).default_value({0.0, 0.0, 1.0}).subtype(PROP_XYZ);
+  b.add_input<decl::Vector>("Vector"_ustr).default_value({0.0, 1.0, 0.0}).subtype(PROP_XYZ);
 }
 
 static void node_layout(ui::Layout &layout, bContext * /*C*/, PointerRNA *ptr)
@@ -43,7 +43,7 @@ static void node_layout(ui::Layout &layout, bContext * /*C*/, PointerRNA *ptr)
 
 static void node_init(bNodeTree * /*tree*/, bNode *node)
 {
-  node->custom1 = int16_t(math::Axis::Z);
+  node->custom1 = int16_t(math::Axis::Y);
 }
 
 static void align_rotations_auto_pivot(const IndexMask &mask,

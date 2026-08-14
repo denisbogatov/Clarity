@@ -39,7 +39,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_TRANSLATION)
       .description("Position of the first vertex");
   b.add_input<decl::Vector>("Offset"_ustr)
-      .default_value({0.0f, 0.0f, 1.0f})
+      .default_value({0.0f, 1.0f, 0.0f})
       .subtype(PROP_TRANSLATION)
       .description(
           "In offset mode, the distance between each socket on each axis. In end points mode, the "

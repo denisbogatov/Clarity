@@ -81,7 +81,7 @@ struct ClothSimSettings {
   /** Viscous/fluid damping. */
   float Cvi = 1.0f;
   /** Gravity/external force vector. */
-  float gravity[3] = {0.0f, 0.0f, -9.81f};
+  float gravity[3] = {0.0f, -9.81f, 0.0f};
   /** This is the duration of our time step, computed. */
   float dt = 0.0f;
   /** The mass of the entire cloth. */

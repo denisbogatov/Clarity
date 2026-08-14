@@ -197,10 +197,10 @@ void WM_OT_stl_export(wmOperatorType *ot)
                   "Scene Unit",
                   "Apply current scene's unit (as defined by unit scale) to exported data");
 
-  prop = RNA_def_enum(ot->srna, "forward_axis", io_transform_axis, IO_AXIS_Y, "Forward Axis", "");
+  prop = RNA_def_enum(ot->srna, "forward_axis", io_transform_axis, IO_AXIS_Z, "Forward Axis", "");
   RNA_def_property_update_runtime(prop, io_ui_forward_axis_update);
 
-  prop = RNA_def_enum(ot->srna, "up_axis", io_transform_axis, IO_AXIS_Z, "Up Axis", "");
+  prop = RNA_def_enum(ot->srna, "up_axis", io_transform_axis, IO_AXIS_Y, "Up Axis", "");
   RNA_def_property_update_runtime(prop, io_ui_up_axis_update);
 
   RNA_def_boolean(
@@ -324,8 +324,8 @@ void WM_OT_stl_import(wmOperatorType *ot)
                   false,
                   "Facet Normals",
                   "Use (import) facet normals (note that this will still give flat shading)");
-  RNA_def_enum(ot->srna, "forward_axis", io_transform_axis, IO_AXIS_Y, "Forward Axis", "");
-  RNA_def_enum(ot->srna, "up_axis", io_transform_axis, IO_AXIS_Z, "Up Axis", "");
+  RNA_def_enum(ot->srna, "forward_axis", io_transform_axis, IO_AXIS_Z, "Forward Axis", "");
+  RNA_def_enum(ot->srna, "up_axis", io_transform_axis, IO_AXIS_Y, "Up Axis", "");
 
   RNA_def_boolean(
       ot->srna,

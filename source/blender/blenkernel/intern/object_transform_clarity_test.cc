@@ -8,10 +8,15 @@
 #include <cstring>
 #include <random>
 
+#include "DNA_cloth_types.h"
+#include "DNA_fluid_types.h"
 #include "DNA_object_types.h"
 
 #include "BLI_math_constants.h"
 #include "BLI_math_rotation.h"
+#include "BLI_math_vector.h"
+#include "BLI_math_vector.hh"
+#include "BLI_math_world.hh"
 
 #include "BKE_object.hh"
 #include "BKE_object_transform_clarity.hh"
@@ -27,6 +32,30 @@ using RowMatrix = std::array<double, 16>;
 static RowMatrix row_identity()
 {
   return {1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0};
+}
+
+TEST(object_transform_clarity, NativeWorldAxesAreYUpZForwardAndRightHanded)
+{
+  EXPECT_EQ(math::world::right_axis, math::Axis::X);
+  EXPECT_EQ(math::world::up_axis, math::Axis::Y);
+  EXPECT_EQ(math::world::forward_axis, math::Axis::Z);
+
+  const float3 cross = math::cross(math::world::right, math::world::up);
+  EXPECT_EQ(cross, math::world::forward);
+  EXPECT_EQ(math::world::gravity, float3(0.0f, -9.81f, 0.0f));
+}
+
+TEST(object_transform_clarity, SimulationDefaultsUseNativeWorldGravity)
+{
+  const ClothSimSettings cloth;
+  EXPECT_FLOAT_EQ(cloth.gravity[0], 0.0f);
+  EXPECT_FLOAT_EQ(cloth.gravity[1], -9.81f);
+  EXPECT_FLOAT_EQ(cloth.gravity[2], 0.0f);
+
+  const FluidDomainSettings fluid;
+  EXPECT_FLOAT_EQ(fluid.gravity[0], 0.0f);
+  EXPECT_FLOAT_EQ(fluid.gravity[1], -9.81f);
+  EXPECT_FLOAT_EQ(fluid.gravity[2], 0.0f);
 }
 
 static RowMatrix row_multiply(const RowMatrix &a, const RowMatrix &b)

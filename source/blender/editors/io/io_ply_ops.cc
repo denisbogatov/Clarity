@@ -185,9 +185,9 @@ void WM_OT_ply_export(wmOperatorType *ot)
                                  FILE_SORT_DEFAULT);
 
   /* Object transform options. */
-  prop = RNA_def_enum(ot->srna, "forward_axis", io_transform_axis, IO_AXIS_Y, "Forward Axis", "");
+  prop = RNA_def_enum(ot->srna, "forward_axis", io_transform_axis, IO_AXIS_Z, "Forward Axis", "");
   RNA_def_property_update_runtime(prop, io_ui_forward_axis_update);
-  prop = RNA_def_enum(ot->srna, "up_axis", io_transform_axis, IO_AXIS_Z, "Up Axis", "");
+  prop = RNA_def_enum(ot->srna, "up_axis", io_transform_axis, IO_AXIS_Y, "Up Axis", "");
   RNA_def_property_update_runtime(prop, io_ui_up_axis_update);
   RNA_def_float(
       ot->srna,
@@ -338,9 +338,9 @@ void WM_OT_ply_import(wmOperatorType *ot)
                   false,
                   "Scene Unit",
                   "Apply current scene's unit (as defined by unit scale) to imported data");
-  prop = RNA_def_enum(ot->srna, "forward_axis", io_transform_axis, IO_AXIS_Y, "Forward Axis", "");
+  prop = RNA_def_enum(ot->srna, "forward_axis", io_transform_axis, IO_AXIS_Z, "Forward Axis", "");
   RNA_def_property_update_runtime(prop, io_ui_forward_axis_update);
-  prop = RNA_def_enum(ot->srna, "up_axis", io_transform_axis, IO_AXIS_Z, "Up Axis", "");
+  prop = RNA_def_enum(ot->srna, "up_axis", io_transform_axis, IO_AXIS_Y, "Up Axis", "");
   RNA_def_property_update_runtime(prop, io_ui_up_axis_update);
   RNA_def_boolean(ot->srna, "merge_verts", false, "Merge Vertices", "Merges vertices by distance");
   RNA_def_enum(ot->srna,

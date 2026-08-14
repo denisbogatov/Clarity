@@ -45,6 +45,14 @@ struct ObjectRuntime {
   float4x4 object_to_world = float4x4::identity();
   float4x4 world_to_object = float4x4::identity();
   ClarityObjectTransformRuntime clarity_transform;
+  /**
+   * Runtime presentation mirror for Maya-compatible Make Live.
+   *
+   * The authoritative live-object registry belongs to the editor. This bit is copied to evaluated
+   * objects so the draw manager and the Outliner can present the state without depending on an
+   * editor module. It is deliberately not serialized with the object.
+   */
+  bool clarity_live_surface = false;
 
   /**
    * The custom data layer mask that was last used

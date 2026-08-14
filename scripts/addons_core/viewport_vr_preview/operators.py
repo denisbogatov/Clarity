@@ -17,8 +17,15 @@ from bpy.types import (
     Operator,
 )
 import math
-from math import radians
 from mathutils import Color, Euler, Matrix, Quaternion, Vector
+
+
+def _y_up_heading(rotation):
+    """Return the yaw of an XR/camera rotation around Clarity's native Y-up axis."""
+    forward = rotation @ Vector((0.0, 0.0, -1.0))
+    if forward.x * forward.x + forward.z * forward.z < 1.0e-12:
+        return 0.0
+    return math.atan2(-forward.x, -forward.z)
 
 
 # Landmarks.
@@ -90,10 +97,10 @@ class VIEW3D_OT_vr_landmark_from_session(Operator):
         scene.vr_landmarks_selected = len(landmarks) - 1
 
         loc = wm.xr_session_state.viewer_pose_location
-        rot = wm.xr_session_state.viewer_pose_rotation.to_euler()
+        rotation = wm.xr_session_state.viewer_pose_rotation
 
         lm.base_pose_location = loc
-        lm.base_pose_angle = rot[2]
+        lm.base_pose_angle = _y_up_heading(rotation)
 
         return {'FINISHED'}
 
@@ -148,10 +155,10 @@ class VIEW3D_OT_update_vr_landmark(Operator):
         lm = properties.VRLandmark.get_selected_landmark(context)
 
         loc = wm.xr_session_state.viewer_pose_location
-        rot = wm.xr_session_state.viewer_pose_rotation.to_euler()
+        rotation = wm.xr_session_state.viewer_pose_rotation
 
         lm.base_pose_location = loc
-        lm.base_pose_angle = rot
+        lm.base_pose_angle = _y_up_heading(rotation)
 
         # Re-activate the landmark to trigger viewer reset and flush landmark settings to the session settings.
         properties.vr_landmark_active_update(None, context)
@@ -223,7 +230,7 @@ class VIEW3D_OT_add_camera_from_vr_landmark(Operator):
         scene.collection.objects.link(new_cam)
         angle = lm.base_pose_angle
         new_cam.location = lm.base_pose_location
-        new_cam.rotation_euler = (math.pi / 2, 0, angle)
+        new_cam.rotation_euler = (0, angle, 0)
 
         return {'FINISHED'}
 
@@ -245,7 +252,7 @@ class VIEW3D_OT_camera_to_vr_landmark(Operator):
         cam = scene.camera
         angle = lm.base_pose_angle
         cam.location = lm.base_pose_location
-        cam.rotation_euler = (math.pi / 2, 0, angle)
+        cam.rotation_euler = (0, angle, 0)
 
         return {'FINISHED'}
 
@@ -1049,7 +1056,7 @@ class VIEW3D_GGT_vr_landmarks(GizmoGroup):
                 lm_mat = lm.base_pose_object.matrix_world
             else:
                 angle = lm.base_pose_angle
-                raw_rot = Euler((radians(90.0), 0, angle))
+                raw_rot = Euler((0, angle, 0))
 
                 rotmat = Matrix.Identity(3)
                 rotmat.rotate(raw_rot)

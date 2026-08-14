@@ -121,18 +121,18 @@ static void set_instance_collection(USDInstanceReader *instance_reader,
   }
 }
 
-/* Update the given import settings with the global rotation matrix to orient
- * imported objects with Z-up, if necessary */
-static void convert_to_z_up(pxr::UsdStageRefPtr stage, ImportSettings &settings)
+/* Orient non-native USD stages to Clarity's Y-up world. */
+static void convert_to_y_up(pxr::UsdStageRefPtr stage, ImportSettings &settings)
 {
-  if (!stage || pxr::UsdGeomGetStageUpAxis(stage) == pxr::UsdGeomTokens->z) {
+  if (!stage || pxr::UsdGeomGetStageUpAxis(stage) == pxr::UsdGeomTokens->y) {
     return;
   }
 
   settings.do_convert_mat = true;
 
-  /* Rotate 90 degrees about the X-axis. */
-  settings.conversion_mat = math::from_rotation<float4x4>(math::EulerXYZ(M_PI_2, 0.0f, 0.0f));
+  /* Convert a Z-up stage to Y-up. */
+  settings.conversion_mat = math::from_rotation<float4x4>(
+      math::EulerXYZ(-M_PI_2, 0.0f, 0.0f));
 }
 
 /**
@@ -200,7 +200,7 @@ USDStageReader::USDStageReader(pxr::UsdStageRefPtr stage,
     : stage_(stage), params_(params)
 {
   determine_blender_compat(stage_, settings_);
-  convert_to_z_up(stage_, settings_);
+  convert_to_y_up(stage_, settings_);
   find_prefix_to_skip(stage_, settings_);
   settings_.get_cache_file = get_cache_file_fn;
   settings_.stage_meters_per_unit = pxr::UsdGeomGetStageMetersPerUnit(stage);

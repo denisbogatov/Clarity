@@ -149,7 +149,7 @@ static inline int bezier_point_count(int alembic_count, bool is_cyclic)
   return is_cyclic ? (alembic_count / 3) : ((alembic_count / 3) + 1);
 }
 
-static inline float3 to_zup_float3(Imath::V3f v)
+static inline float3 to_native_yup_float3(Imath::V3f v)
 {
   float3 p;
   copy_zup_from_yup(p, v.getValue());
@@ -420,10 +420,10 @@ void AbcCurveReader::readObjectData(Main *bmain, const Alembic::Abc::ISampleSele
   }
 }
 
-BLI_INLINE float3 interpolate_to_zup(const Span<Imath::V3f> &floor_positions,
-                                     const Span<Imath::V3f> &ceil_positions,
-                                     int i,
-                                     float weight)
+BLI_INLINE float3 interpolate_to_native_yup(const Span<Imath::V3f> &floor_positions,
+                                            const Span<Imath::V3f> &ceil_positions,
+                                            int i,
+                                            float weight)
 {
   float3 p;
   const Imath::V3f &floor_pos = floor_positions[i];
@@ -443,18 +443,22 @@ static void add_bezier_control_point(int cp,
                                      MutableSpan<float3> handles_right,
                                      float weight)
 {
-  positions[cp] = interpolate_to_zup(floor_positions, ceil_positions, offset, weight);
+  positions[cp] = interpolate_to_native_yup(floor_positions, ceil_positions, offset, weight);
   if (offset == 0) {
-    handles_right[cp] = interpolate_to_zup(floor_positions, ceil_positions, offset + 1, weight);
+    handles_right[cp] = interpolate_to_native_yup(
+        floor_positions, ceil_positions, offset + 1, weight);
     handles_left[cp] = 2.0f * positions[cp] - handles_right[cp];
   }
   else if (offset == floor_positions.size() - 1) {
-    handles_left[cp] = interpolate_to_zup(floor_positions, ceil_positions, offset - 1, weight);
+    handles_left[cp] = interpolate_to_native_yup(
+        floor_positions, ceil_positions, offset - 1, weight);
     handles_right[cp] = 2.0f * positions[cp] - handles_left[cp];
   }
   else {
-    handles_left[cp] = interpolate_to_zup(floor_positions, ceil_positions, offset - 1, weight);
-    handles_right[cp] = interpolate_to_zup(floor_positions, ceil_positions, offset + 1, weight);
+    handles_left[cp] = interpolate_to_native_yup(
+        floor_positions, ceil_positions, offset - 1, weight);
+    handles_right[cp] = interpolate_to_native_yup(
+        floor_positions, ceil_positions, offset + 1, weight);
   }
 }
 
@@ -538,11 +542,11 @@ void AbcCurveReader::read_curves_sample(Curves *curves_id,
       int position_offset = data.offset_in_alembic[i_curve];
       for (const int i_point : curves.points_by_curve()[i_curve]) {
         if (data.interpolation_settings.has_value()) {
-          curves_positions[i_point] = interpolate_to_zup(
+          curves_positions[i_point] = interpolate_to_native_yup(
               alembic_points, alembic_points_ceil, position_offset++, interp_weight);
         }
         else {
-          curves_positions[i_point] = to_zup_float3(alembic_points[position_offset++]);
+          curves_positions[i_point] = to_native_yup_float3(alembic_points[position_offset++]);
         }
       }
     }

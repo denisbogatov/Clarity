@@ -144,6 +144,13 @@ enum class ClaritySnapMode : uint8_t {
   Step,
 };
 
+/** Target type used by Maya's Move Snap Settings while a live surface is active. */
+enum class ClarityLiveSurfaceSnapMode : uint8_t {
+  Surface = 0,
+  FaceCenter = 1,
+  Vertex = 2,
+};
+
 /**
  * Clarity's `manipMoveContext -xformConstraint`: what the moved components stay attached to. Lives
  * here rather than with the rest of the marking menu state because the transform module is what
@@ -153,6 +160,24 @@ enum class ClarityTransformConstraint : uint8_t {
   Off = 0,
   Edge = 1,
   Surface = 2,
+};
+
+/** Coordinate system used to find and transform symmetric mesh components. */
+enum class ClaritySymmetryMode : uint8_t {
+  Off = 0,
+  Object = 1,
+  World = 2,
+  Topology = 3,
+};
+
+struct ClaritySymmetrySettings {
+  ClaritySymmetryMode mode = ClaritySymmetryMode::Off;
+  /** 0/1/2 are X/Y/Z. Topology keeps this as the geometric reflection axis. */
+  uint8_t axis = 0;
+  float tolerance = 0.001f;
+  bool preserve_seam = true;
+  float seam_tolerance = 0.001f;
+  bool allow_partial = true;
 };
 
 enum eClarityStepSnapMode : uint8_t {
@@ -235,6 +260,16 @@ bool ED_clarity_interaction_preset_enabled(const bContext *C);
 ed::clarity::ClarityObjectRuntimeRef ED_clarity_object_runtime_ref_create(const Object &object);
 Object *ED_clarity_object_runtime_ref_resolve(
     Main &bmain, const ed::clarity::ClarityObjectRuntimeRef &reference);
+bool ED_clarity_live_surface_active(const bContext *C);
+bool ED_clarity_live_surface_object_is_live(const bContext *C, const Object *object);
+/** Callback matching #ed::transform::SnapObjectParams::object_filter_fn. */
+bool ED_clarity_live_surface_object_filter(const Object *object, void *context);
+ed::clarity::ClarityLiveSurfaceSnapMode ED_clarity_live_surface_snap_mode_get(const bContext *C);
+void ED_clarity_live_surface_snap_mode_set(
+    const bContext *C, ed::clarity::ClarityLiveSurfaceSnapMode mode);
+int ED_clarity_live_surface_count(const bContext *C);
+int ED_clarity_live_surface_history_count(const bContext *C);
+void ED_clarity_live_surface_label_get(const bContext *C, char *value, int value_maxncpy);
 void ED_operatortypes_clarity();
 ed::clarity::ClarityDispatchResult ED_clarity_event_dispatch(bContext *C, const wmEvent *event);
 int ED_clarity_interaction_frame_rate_limit(const bContext *C);
@@ -274,6 +309,8 @@ void ED_clarity_pivot_reset_position(bContext *C, ed::clarity::eClarityPivotRese
 void ED_clarity_pivot_reset_orientation(bContext *C);
 void ED_clarity_pivot_reset_all(bContext *C, ed::clarity::eClarityPivotResetMode mode);
 void ED_clarity_pivot_undo_begin(const bContext *C);
+/** Capture an undo baseline even before the first live surface creates registry state. */
+void ED_clarity_live_surface_undo_begin(const bContext *C);
 bool ED_clarity_pivot_bake(bContext *C, ed::clarity::eClarityPivotBakeMode mode);
 /**
  * Read-only world-space frame of the runtime pivot manipulator of the context window. Returns
@@ -327,6 +364,10 @@ bool ED_clarity_snap_override_release_all(const bContext *C);
 ed::clarity::ClaritySnapMode ED_clarity_snap_override_get(const bContext *C);
 bool ED_clarity_snap_mode_set(const bContext *C, ed::clarity::ClaritySnapMode mode);
 ed::clarity::ClaritySnapMode ED_clarity_snap_mode_get(const bContext *C);
+/** Global symmetric-modeling state shared by Select and the transform tools. */
+ed::clarity::ClaritySymmetrySettings ED_clarity_symmetry_settings_get(const bContext *C);
+bool ED_clarity_symmetry_settings_set(
+    const bContext *C, const ed::clarity::ClaritySymmetrySettings &settings);
 /** Step size and reference of #ed::clarity::ClaritySnapMode::Step, the defaults when there is no window. */
 ed::clarity::ClarityStepSnapSettings ED_clarity_snap_step_settings_get(const bContext *C);
 ed::clarity::ClaritySnapToleranceSettings ED_clarity_snap_tolerance_settings_get(const bContext *C);

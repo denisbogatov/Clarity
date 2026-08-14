@@ -28,7 +28,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_TRANSLATION)
       .description("Position of the start control point of the curve");
   b.add_input<decl::Vector>("Start Handle"_ustr)
-      .default_value({-0.5f, 0.5f, 0.0f})
+      .default_value({-0.5f, 0.0f, -0.5f})
       .subtype(PROP_TRANSLATION)
       .description(
           "Position of the start handle used to define the shape of the curve. In Offset mode, "

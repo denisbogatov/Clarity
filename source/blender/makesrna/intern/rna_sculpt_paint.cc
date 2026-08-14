@@ -47,17 +47,17 @@ static const EnumPropertyItem rna_enum_gpencil_lock_axis_items[] = {
      ICON_RESTRICT_VIEW_ON,
      "View",
      "Align strokes to current view plane"},
-    {GP_LOCKAXIS_Y,
-     "AXIS_Y",
+    {GP_LOCKAXIS_Z,
+     "AXIS_Z",
      ICON_AXIS_FRONT,
-     "Front (X-Z)",
-     "Project strokes to plane locked to Y"},
+     "Front (X-Y)",
+     "Project strokes to plane locked to Z"},
     {GP_LOCKAXIS_X,
      "AXIS_X",
      ICON_AXIS_SIDE,
      "Side (Y-Z)",
      "Project strokes to plane locked to X"},
-    {GP_LOCKAXIS_Z, "AXIS_Z", ICON_AXIS_TOP, "Top (X-Y)", "Project strokes to plane locked to Z"},
+    {GP_LOCKAXIS_Y, "AXIS_Y", ICON_AXIS_TOP, "Top (X-Z)", "Project strokes to plane locked to Y"},
     {GP_LOCKAXIS_CURSOR,
      "CURSOR",
      ICON_PIVOT_CURSOR,
@@ -1286,7 +1286,7 @@ static void rna_def_sculpt(BlenderRNA *brna)
   prop = RNA_def_property(srna, "gravity_object", PROP_POINTER, PROP_NONE);
   RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(
-      prop, "Orientation", "Object whose Z axis defines orientation of gravity");
+      prop, "Orientation", "Object whose Y axis defines orientation of gravity");
   RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr);
 }
 

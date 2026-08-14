@@ -143,6 +143,8 @@ struct WindowManagerRuntime {
   uint8_t clarity_transform_orientation;
   uint8_t clarity_snap_mode;
   uint8_t clarity_snap_temporary_mode;
+  /** #ed::clarity::ClarityLiveSurfaceSnapMode. */
+  uint8_t clarity_live_surface_snap_mode;
   /** #ed::clarity::eClarityStepSnapMode of the Step Snap widget. */
   uint8_t clarity_snap_step_mode;
   /** Translation step in scene units, rotation step in radians. */
@@ -161,6 +163,19 @@ struct WindowManagerRuntime {
    * property can reach.
    */
   float clarity_selection_constraint_angle;
+  /**
+   * Global symmetric-modeling state. Values follow #ed::clarity::ClaritySymmetryMode and the
+   * X/Y/Z axis indices. This belongs to the tool runtime, not to a mesh or a scene: Maya exposes
+   * one symmetry mode shared by Select, Move, Rotate and Scale.
+   */
+  uint8_t clarity_symmetry_mode;
+  uint8_t clarity_symmetry_axis;
+  uint8_t clarity_symmetry_last_mode;
+  uint8_t clarity_symmetry_last_axis;
+  float clarity_symmetry_tolerance;
+  bool clarity_symmetry_preserve_seam;
+  float clarity_symmetry_seam_tolerance;
+  bool clarity_symmetry_allow_partial;
   uint64_t clarity_interaction_revision;
 
   WindowManagerRuntime();

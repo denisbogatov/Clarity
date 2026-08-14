@@ -1591,7 +1591,7 @@ static void append_primitive_curve(bContext *C,
   float3 location;
   float3 rotation;
   float3 scale;
-  object::add_generic_get_opts(C, &op, 'Z', location, rotation, scale, nullptr, nullptr, nullptr);
+  object::add_generic_get_opts(C, &op, 'Y', location, rotation, scale, nullptr, nullptr, nullptr);
   const float4x4 transform = math::from_loc_rot_scale<float4x4>(
       location, math::EulerXYZ(rotation), scale);
   geometry::transform_geometry(new_geometry, transform);
@@ -1632,9 +1632,9 @@ static CurvesGeometry generate_circle_primitive(const float radius)
 
   MutableSpan<float3> positions = curves.positions_for_write();
   positions[0] = float3(-radius, 0, 0);
-  positions[1] = float3(0, radius, 0);
+  positions[1] = float3(0, 0, -radius);
   positions[2] = float3(radius, 0, 0);
-  positions[3] = float3(0, -radius, 0);
+  positions[3] = float3(0, 0, radius);
 
   /* Ensure these attributes exist. */
   curves.handle_positions_left_for_write();
@@ -1694,9 +1694,9 @@ static CurvesGeometry generate_bezier_primitive(const float radius)
   MutableSpan<float3> left_handles = curves.handle_positions_left_for_write();
   MutableSpan<float3> right_handles = curves.handle_positions_right_for_write();
 
-  left_handles[0] = float3(-1.5f, -0.5, 0) * radius;
+  left_handles[0] = float3(-1.5f, 0, 0.5f) * radius;
   positions[0] = float3(-1.0f, 0, 0) * radius;
-  right_handles[0] = float3(-0.5f, 0.5f, 0) * radius;
+  right_handles[0] = float3(-0.5f, 0, -0.5f) * radius;
 
   left_handles[1] = float3(0, 0, 0) * radius;
   positions[1] = float3(1.0f, 0, 0) * radius;

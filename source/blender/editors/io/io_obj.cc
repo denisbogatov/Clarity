@@ -309,7 +309,7 @@ void WM_OT_obj_export(wmOperatorType *ot)
               INT_MAX);
   /* Object transform options. */
   prop = RNA_def_enum(
-      ot->srna, "forward_axis", io_transform_axis, IO_AXIS_NEGATIVE_Z, "Forward Axis", "");
+      ot->srna, "forward_axis", io_transform_axis, IO_AXIS_Z, "Forward Axis", "");
   RNA_def_property_update_runtime(prop, io_ui_forward_axis_update);
   prop = RNA_def_enum(ot->srna, "up_axis", io_transform_axis, IO_AXIS_Y, "Up Axis", "");
   RNA_def_property_update_runtime(prop, io_ui_up_axis_update);
@@ -545,7 +545,7 @@ void WM_OT_obj_import(wmOperatorType *ot)
       0.0f,
       1000.0f);
   prop = RNA_def_enum(
-      ot->srna, "forward_axis", io_transform_axis, IO_AXIS_NEGATIVE_Z, "Forward Axis", "");
+      ot->srna, "forward_axis", io_transform_axis, IO_AXIS_Z, "Forward Axis", "");
   RNA_def_property_update_runtime(prop, io_ui_forward_axis_update);
   prop = RNA_def_enum(ot->srna, "up_axis", io_transform_axis, IO_AXIS_Y, "Up Axis", "");
   RNA_def_property_update_runtime(prop, io_ui_up_axis_update);

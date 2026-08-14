@@ -205,7 +205,7 @@ static void meshcache_do(MeshCacheModifierData *mcmd,
     float mat[3][3];
     unit_m3(mat);
 
-    if (mat3_from_axis_conversion(mcmd->forward_axis, mcmd->up_axis, 1, 2, mat)) {
+    if (mat3_from_axis_conversion(mcmd->forward_axis, mcmd->up_axis, 2, 1, mat)) {
       use_matrix = true;
     }
 

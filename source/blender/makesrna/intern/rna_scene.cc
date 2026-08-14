@@ -3258,6 +3258,128 @@ static void rna_def_view3d_cursor(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_WINDOW, nullptr);
 }
 
+static void rna_def_soft_selection_settings(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  static const EnumPropertyItem falloff_mode_items[] = {
+      {SOFT_SELECT_FALLOFF_VOLUME,
+       "VOLUME",
+       0,
+       "Volume",
+       "Use world-space straight-line distance on meshes containing selected components"},
+      {SOFT_SELECT_FALLOFF_SURFACE,
+       "SURFACE",
+       0,
+       "Surface",
+       "Follow the mesh surface so nearby disconnected or folded surfaces do not influence each "
+       "other"},
+      {SOFT_SELECT_FALLOFF_GLOBAL,
+       "GLOBAL",
+       0,
+       "Global",
+       "Use world-space straight-line distance across all meshes in multi-object Edit Mode"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
+  static const EnumPropertyItem interpolation_items[] = {
+      {SOFT_SELECT_INTERP_NONE,
+       "NONE",
+       0,
+       "None",
+       "Keep this point's value constant until the next point"},
+      {SOFT_SELECT_INTERP_LINEAR,
+       "LINEAR",
+       0,
+       "Linear",
+       "Interpolate linearly to the next point"},
+      {SOFT_SELECT_INTERP_SMOOTH,
+       "SMOOTH",
+       0,
+       "Smooth",
+       "Blend to the next point with Maya's smooth bell-shaped transition"},
+      {SOFT_SELECT_INTERP_SPLINE,
+       "SPLINE",
+       0,
+       "Spline",
+       "Use neighboring ramp points for a smooth cubic transition"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
+  srna = RNA_def_struct(brna, "SoftSelectionCurvePoint", nullptr);
+  RNA_def_struct_sdna(srna, "SoftSelectionCurvePoint");
+  RNA_def_struct_ui_text(srna, "Soft Selection Curve Point", "One Maya falloff ramp entry");
+  RNA_def_struct_clear_flag(srna, STRUCT_UNDO);
+
+  prop = RNA_def_property(srna, "position", PROP_FLOAT, PROP_FACTOR);
+  RNA_def_property_float_sdna(prop, nullptr, "position");
+  RNA_def_property_range(prop, 0.0f, 1.0f);
+  RNA_def_property_ui_text(prop, "Position", "Normalized distance from the selected components");
+  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr);
+
+  prop = RNA_def_property(srna, "value", PROP_FLOAT, PROP_FACTOR);
+  RNA_def_property_float_sdna(prop, nullptr, "value");
+  RNA_def_property_range(prop, 0.0f, 1.0f);
+  RNA_def_property_ui_text(prop, "Value", "Transform weight at this distance");
+  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr);
+
+  prop = RNA_def_property(srna, "interpolation", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, nullptr, "interpolation");
+  RNA_def_property_enum_items(prop, interpolation_items);
+  RNA_def_property_ui_text(prop, "Interpolation", "Interpolation from this point to the next");
+  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr);
+
+  srna = RNA_def_struct(brna, "SoftSelectionSettings", nullptr);
+  RNA_def_struct_sdna(srna, "SoftSelectionSettings");
+  RNA_def_struct_ui_text(
+      srna, "Soft Selection Settings", "Maya-compatible 3D viewport soft selection");
+  RNA_def_struct_clear_flag(srna, STRUCT_UNDO);
+
+  prop = RNA_def_property(srna, "radius", PROP_FLOAT, PROP_DISTANCE);
+  RNA_def_property_float_sdna(prop, nullptr, "radius");
+  RNA_def_property_range(prop, 0.00001f, 5000.0f);
+  RNA_def_property_ui_range(prop, 0.001f, 100.0f, 0.1f, 3);
+  RNA_def_property_ui_text(prop, "Falloff Radius", "World-space soft-selection falloff radius");
+  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr);
+
+  prop = RNA_def_property(srna, "falloff_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, nullptr, "falloff_mode");
+  RNA_def_property_enum_items(prop, falloff_mode_items);
+  RNA_def_property_ui_text(prop, "Falloff Mode", "Shape and object scope of the falloff region");
+  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr);
+
+  prop = RNA_def_property(srna, "use_falloff_color", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, nullptr, "use_falloff_color", 1);
+  RNA_def_property_ui_text(
+      prop, "Viewport Color", "Display the soft-selection influence using the Maya color ramp");
+  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr);
+
+  prop = RNA_def_property(srna, "falloff_color", PROP_POINTER, PROP_NONE);
+  RNA_def_property_pointer_sdna(prop, nullptr, "falloff_color");
+  RNA_def_property_flag(prop, PROP_NEVER_NULL);
+  RNA_def_property_struct_type(prop, "ColorRamp");
+  RNA_def_property_ui_text(
+      prop, "Falloff Color", "Color assigned to each soft-selection influence weight");
+  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr);
+
+  prop = RNA_def_property(srna, "curve_points", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_collection_sdna(prop, nullptr, "curve_points", "curve_point_count");
+  RNA_def_property_struct_type(prop, "SoftSelectionCurvePoint");
+  RNA_def_property_ui_text(prop, "Curve Points", "Active entries in the Maya falloff ramp");
+
+  prop = RNA_def_property(srna, "curve_point_count", PROP_INT, PROP_UNSIGNED);
+  RNA_def_property_int_sdna(prop, nullptr, "curve_point_count");
+  RNA_def_property_range(prop, 0, SOFT_SELECTION_CURVE_POINT_MAX);
+  RNA_def_property_flag(prop, PROP_HIDDEN);
+  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr);
+
+  prop = RNA_def_property(srna, "active_curve_point", PROP_INT, PROP_UNSIGNED);
+  RNA_def_property_int_sdna(prop, nullptr, "active_curve_point");
+  RNA_def_property_range(prop, 0, SOFT_SELECTION_CURVE_POINT_MAX - 1);
+  RNA_def_property_ui_text(prop, "Active Curve Point", "Curve point selected in the editor");
+}
+
 static void rna_def_tool_settings(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -3389,6 +3511,12 @@ static void rna_def_tool_settings(BlenderRNA *brna)
    * undo steps.
    */
   RNA_def_struct_clear_flag(srna, STRUCT_UNDO);
+
+  prop = RNA_def_property(srna, "soft_selection", PROP_POINTER, PROP_NONE);
+  RNA_def_property_pointer_sdna(prop, nullptr, "soft_selection");
+  RNA_def_property_flag(prop, PROP_NEVER_NULL | PROP_DEG_SYNC_ONLY);
+  RNA_def_property_struct_type(prop, "SoftSelectionSettings");
+  RNA_def_property_ui_text(prop, "Soft Selection", "Maya-compatible viewport soft selection");
 
   prop = RNA_def_property(srna, "sculpt", PROP_POINTER, PROP_NONE);
   RNA_def_property_struct_type(prop, "Sculpt");
@@ -3950,7 +4078,7 @@ static void rna_def_tool_settings(BlenderRNA *brna)
   RNA_def_property_enum_sdna(prop, nullptr, "plane_axis");
   RNA_def_property_flag(prop, PROP_DEG_SYNC_ONLY);
   RNA_def_property_enum_items(prop, rna_enum_axis_xyz_items);
-  RNA_def_property_enum_default(prop, 2);
+  RNA_def_property_enum_default(prop, 1);
   RNA_def_property_ui_text(prop, "Plane Axis", "The axis used for placing the base region");
 
   prop = RNA_def_property(srna, "plane_axis_auto", PROP_BOOLEAN, PROP_NONE);
@@ -9403,6 +9531,7 @@ void RNA_def_scene(BlenderRNA *brna)
   /* *** Non-Animated *** */
   RNA_define_animate_sdna(false);
   rna_def_tool_settings(brna);
+  rna_def_soft_selection_settings(brna);
   rna_def_gpencil_interpolate(brna);
   rna_def_curve_paint_settings(brna);
   rna_def_sequencer_tool_settings(brna);

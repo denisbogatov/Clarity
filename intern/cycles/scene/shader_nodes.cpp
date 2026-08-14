@@ -677,7 +677,9 @@ void EnvironmentTextureNode::compile(OSLCompiler &compiler)
 
 static float2 sky_spherical_coordinates(const float3 dir)
 {
-  return make_float2(acosf(dir.z), atan2f(dir.x, dir.y));
+  /* Native Y-up (X, Y, Z) to the analytic sky models' Z-up frame (X, -Z, Y). */
+  const float3 sky_dir = make_float3(dir.x, -dir.z, dir.y);
+  return make_float2(acosf(sky_dir.z), atan2f(sky_dir.x, sky_dir.y));
 }
 
 struct SunSky {
@@ -930,7 +932,7 @@ NODE_DEFINE(SkyTextureNode)
   SOCKET_OUT_COLOR(color, "Color");
 
   /* Legacy parameters. */
-  SOCKET_VECTOR(sun_direction, "Sun Direction", make_float3(0.0f, 0.0f, 1.0f));
+  SOCKET_VECTOR(sun_direction, "Sun Direction", make_float3(0.0f, 1.0f, 0.0f));
   SOCKET_FLOAT(turbidity, "Turbidity", 2.2f);
   SOCKET_FLOAT(ground_albedo, "Ground Albedo", 0.3f);
 
@@ -7123,7 +7125,7 @@ NODE_DEFINE(VectorRotateNode)
   SOCKET_IN_VECTOR(vector, "Vector", zero_float3());
   SOCKET_IN_POINT(rotation, "Rotation", zero_float3());
   SOCKET_IN_POINT(center, "Center", zero_float3());
-  SOCKET_IN_VECTOR(axis, "Axis", make_float3(0.0f, 0.0f, 1.0f));
+  SOCKET_IN_VECTOR(axis, "Axis", make_float3(0.0f, 1.0f, 0.0f));
   SOCKET_IN_FLOAT(angle, "Angle", 0.0f);
   SOCKET_OUT_VECTOR(vector, "Vector");
 

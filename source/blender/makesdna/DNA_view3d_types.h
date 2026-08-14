@@ -803,7 +803,7 @@ struct View3D {
   eView3D_GizmoShowLight gizmo_show_light = {};
   eView3D_GizmoShowCamera gizmo_show_camera = {};
 
-  eView3D_GridFlag gridflag = V3D_SHOW_X | V3D_SHOW_Y | V3D_SHOW_FLOOR | V3D_SHOW_ORTHO_GRID;
+  eView3D_GridFlag gridflag = V3D_SHOW_X | V3D_SHOW_Z | V3D_SHOW_FLOOR | V3D_SHOW_ORTHO_GRID;
 
   short gridlines = 16;
   /** Number of subdivisions in the grid between each highlighted grid line. */

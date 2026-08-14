@@ -47,6 +47,7 @@ const EnumPropertyItem rna_enum_color_space_convert_default_items[] = {
 #  include "DNA_node_types.h"
 #  include "DNA_object_types.h"
 #  include "DNA_particle_types.h"
+#  include "DNA_scene_types.h"
 #  include "DNA_sequence_types.h"
 
 #  include "MEM_guardedalloc.h"
@@ -232,6 +233,15 @@ static std::optional<std::string> rna_ColorRamp_path(const PointerRNA *ptr)
     ID *id = ptr->owner_id;
 
     switch (GS(id->name)) {
+      case ID_SCE: {
+        const Scene *scene = id_cast<Scene *>(id);
+        if (scene->toolsettings &&
+            &scene->toolsettings->soft_selection.falloff_color == ptr->data)
+        {
+          return "tool_settings.soft_selection.falloff_color";
+        }
+        break;
+      }
       case ID_NT: {
         bNodeTree *ntree = id_cast<bNodeTree *>(id);
         bNode *node;
@@ -324,6 +334,15 @@ static std::optional<std::string> rna_ColorRampElement_path(const PointerRNA *pt
         listbase.free_no_destruct();
         break;
       }
+      case ID_SCE: {
+        Scene *scene = id_cast<Scene *>(id);
+        if (scene->toolsettings) {
+          ramp_ptr = RNA_pointer_create_discrete(
+              id, RNA_ColorRamp, &scene->toolsettings->soft_selection.falloff_color);
+          COLRAMP_GETPATH;
+        }
+        break;
+      }
 
       default: /* everything else should have a "color_ramp" property */
       {
@@ -349,6 +368,10 @@ static void rna_ColorRamp_update(Main *bmain, Scene * /*scene*/, PointerRNA *ptr
     ID *id = ptr->owner_id;
 
     switch (GS(id->name)) {
+      case ID_SCE: {
+        WM_main_add_notifier(NC_SCENE | ND_TOOLSETTINGS, id);
+        break;
+      }
       case ID_MA: {
         Material *ma = id_cast<Material *>(ptr->owner_id);
 

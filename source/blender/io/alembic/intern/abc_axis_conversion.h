@@ -20,40 +20,34 @@ namespace io::alembic {
  * used in Y-up software, but eventually they'll be set by the user in the UI
  * like other importers/exporters do, to support other axis. */
 
-/* Copy from Y-up to Z-up. */
+/* Legacy names retained for call-site stability. Alembic and Clarity are both Y-up. */
 
 BLI_INLINE void copy_zup_from_yup(float zup[3], const float yup[3])
 {
-  const float old_yup1 = yup[1]; /* in case zup == yup */
   zup[0] = yup[0];
-  zup[1] = -yup[2];
-  zup[2] = old_yup1;
+  zup[1] = yup[1];
+  zup[2] = yup[2];
 }
 
 BLI_INLINE void copy_zup_from_yup(short zup[3], const short yup[3])
 {
-  const short old_yup1 = yup[1]; /* in case zup == yup */
   zup[0] = yup[0];
-  zup[1] = -yup[2];
-  zup[2] = old_yup1;
+  zup[1] = yup[1];
+  zup[2] = yup[2];
 }
-
-/* Copy from Z-up to Y-up. */
 
 BLI_INLINE void copy_yup_from_zup(float yup[3], const float zup[3])
 {
-  const float old_zup1 = zup[1]; /* in case yup == zup */
   yup[0] = zup[0];
-  yup[1] = zup[2];
-  yup[2] = -old_zup1;
+  yup[1] = zup[1];
+  yup[2] = zup[2];
 }
 
 BLI_INLINE void copy_yup_from_zup(short yup[3], const short zup[3])
 {
-  const short old_zup1 = zup[1]; /* in case yup == zup */
   yup[0] = zup[0];
-  yup[1] = zup[2];
-  yup[2] = -old_zup1;
+  yup[1] = zup[1];
+  yup[2] = zup[2];
 }
 
 /* Names are given in (dst, src) order, just like
@@ -75,8 +69,8 @@ void create_swapped_rotation_matrix(float rot_x_mat[3][3],
                                     AbcAxisSwapMode mode);
 
 /**
- * Convert matrix from Z=up to Y=up or vice versa.
- * Use yup_mat = zup_mat for in-place conversion.
+ * Preserve a matrix between Alembic and Clarity's matching Y-up coordinate systems.
+ * The legacy swap mode is ignored and the operation supports in-place copies.
  */
 void copy_m44_axis_swap(float dst_mat[4][4], float src_mat[4][4], AbcAxisSwapMode mode);
 
@@ -86,8 +80,7 @@ enum AbcMatrixMode {
 };
 
 /**
- * Recompute transform matrix of object in new coordinate system
- * (from Z-Up to Y-Up).
+ * Get an object's local or world transform in Alembic's matching Y-up system.
  */
 void create_transform_matrix(Object *obj,
                              float r_yup_mat[4][4],

@@ -17,21 +17,21 @@ static void node_declare(NodeDeclarationBuilder &b)
       .min(0.0f)
       .subtype(PROP_DISTANCE)
       .description("Side length of the plane in the X direction");
-  b.add_input<decl::Float>("Size Y"_ustr)
+  b.add_input<decl::Float>("Size Z"_ustr)
       .default_value(1.0f)
       .min(0.0f)
       .subtype(PROP_DISTANCE)
-      .description("Side length of the plane in the Y direction");
+      .description("Side length of the plane in the Z direction");
   b.add_input<decl::Int>("Vertices X"_ustr)
       .default_value(3)
       .min(2)
       .max(1000)
       .description("Number of vertices in the X direction");
-  b.add_input<decl::Int>("Vertices Y"_ustr)
+  b.add_input<decl::Int>("Vertices Z"_ustr)
       .default_value(3)
       .min(2)
       .max(1000)
-      .description("Number of vertices in the Y direction");
+      .description("Number of vertices in the Z direction");
   b.add_output<decl::Geometry>("Mesh"_ustr);
   b.add_output<decl::Vector>("UV Map"_ustr).anonymous_attribute_output();
 }
@@ -39,10 +39,10 @@ static void node_declare(NodeDeclarationBuilder &b)
 static void node_geo_exec(GeoNodeExecParams params)
 {
   const float size_x = params.extract_input<float>("Size X"_ustr);
-  const float size_y = params.extract_input<float>("Size Y"_ustr);
+  const float size_z = params.extract_input<float>("Size Z"_ustr);
   const int verts_x = params.extract_input<int>("Vertices X"_ustr);
-  const int verts_y = params.extract_input<int>("Vertices Y"_ustr);
-  if (verts_x < 1 || verts_y < 1) {
+  const int verts_z = params.extract_input<int>("Vertices Z"_ustr);
+  if (verts_x < 1 || verts_z < 1) {
     params.set_default_remaining_outputs();
     return;
   }
@@ -50,7 +50,8 @@ static void node_geo_exec(GeoNodeExecParams params)
   std::optional<std::string> uv_map_id = params.get_output_anonymous_attribute_id_if_needed(
       "UV Map"_ustr);
 
-  Mesh *mesh = geometry::create_grid_mesh(verts_x, verts_y, size_x, size_y, uv_map_id);
+  Mesh *mesh = geometry::create_grid_mesh(verts_x, verts_z, size_x, size_z, uv_map_id);
+  transform_legacy_z_up_mesh(*mesh);
   BKE_id_material_eval_ensure_default_slot(reinterpret_cast<ID *>(mesh));
 
   params.set_output("Mesh"_ustr, GeometrySet::from_mesh(mesh));
@@ -62,7 +63,7 @@ static void node_register()
 
   geo_node_type_base(&ntype, "GeometryNodeMeshGrid"_ustr, GEO_NODE_MESH_PRIMITIVE_GRID);
   ntype.ui_name = "Grid";
-  ntype.ui_description = "Generate a planar mesh on the XY plane";
+  ntype.ui_description = "Generate a planar mesh on the XZ ground plane";
   ntype.enum_name_legacy = "MESH_PRIMITIVE_GRID";
   ntype.nclass = NODE_CLASS_GEOMETRY;
   ntype.declare = node_declare;

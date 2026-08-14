@@ -74,8 +74,8 @@ class Rig(BaseLimbRig):
         foot = self.get_bone(orgs[2])
 
         ik_y_axis = (0, 1, 0)
-        foot_y_axis = -self.vector_without_z(foot.y_axis)
-        foot_x = foot_y_axis.cross((0, 0, 1))
+        foot_y_axis = -self.vector_without_y(foot.y_axis)
+        foot_x = foot_y_axis.cross((0, 1, 0))
 
         if self.params.rotation_axis == 'automatic':
             align_chain_x_axis(self.obj, orgs[0:2])
@@ -84,7 +84,7 @@ class Rig(BaseLimbRig):
             align_bone_x_axis(self.obj, orgs[2], foot_x)
             align_bone_x_axis(self.obj, orgs[3], -foot_x)
 
-            align_bone_x_axis(self.obj, self.bones.org.heel, Vector((0, 0, 1)))
+            align_bone_x_axis(self.obj, self.bones.org.heel, Vector((0, 1, 0)))
 
         elif self.params.auto_align_extremity:
             if self.main_axis == 'x':
@@ -324,7 +324,7 @@ class Rig(BaseLimbRig):
             roll3 = self.copy_bone(toe, make_derived_name(heel, 'mch', '_roll3'), scale=0.3)
 
             toe_pos = Vector(self.get_bone(toe).tail)
-            toe_pos.z = self.get_bone(roll2).head.z
+            toe_pos.y = self.get_bone(roll2).head.y
 
             put_bone(self.obj, roll3, toe_pos, matrix=self.roll_matrix)
 

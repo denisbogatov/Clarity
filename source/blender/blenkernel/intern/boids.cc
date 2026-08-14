@@ -658,7 +658,9 @@ static bool rule_average_speed(BoidRule *rule,
     copy_v3_v3(bbd->wanted_co, pa->prev_state.ave);
 
     /* may happen at birth */
-    if (dot_v2v2(bbd->wanted_co, bbd->wanted_co) == 0.0f) {
+    if (bbd->wanted_co[0] * bbd->wanted_co[0] + bbd->wanted_co[2] * bbd->wanted_co[2] ==
+        0.0f)
+    {
       bbd->wanted_co[0] = 2.0f * (0.5f - BLI_rng_get_float(bbd->rng));
       bbd->wanted_co[1] = 2.0f * (0.5f - BLI_rng_get_float(bbd->rng));
       bbd->wanted_co[2] = 2.0f * (0.5f - BLI_rng_get_float(bbd->rng));
@@ -826,6 +828,32 @@ static void set_boid_values(BoidValues *val, BoidSettings *boids, ParticleData *
   }
 }
 
+static float len_xz(const float v[3])
+{
+  return sqrtf(v[0] * v[0] + v[2] * v[2]);
+}
+
+static float normalize_xz(float v[3])
+{
+  const float length = len_xz(v);
+  if (length != 0.0f) {
+    v[0] /= length;
+    v[2] /= length;
+  }
+  return length;
+}
+
+static float dot_xz(const float a[3], const float b[3])
+{
+  return a[0] * b[0] + a[2] * b[2];
+}
+
+static void mul_xz(float v[3], const float factor)
+{
+  v[0] *= factor;
+  v[2] *= factor;
+}
+
 static Object *boid_find_ground(BoidBrainData *bbd,
                                 ParticleData *pa,
                                 float ground_co[3],
@@ -851,7 +879,7 @@ static Object *boid_find_ground(BoidBrainData *bbd,
     return bpa->ground;
   }
 
-  const float zvec[3] = {0.0f, 0.0f, 2000.0f};
+  const float upvec[3] = {0.0f, 2000.0f, 0.0f};
   ParticleCollision col;
   BVHTreeRayHit hit;
   float radius = 0.0f, t, ray_dir[3];
@@ -864,7 +892,7 @@ static Object *boid_find_ground(BoidBrainData *bbd,
 
   /* first try to find below boid */
   copy_v3_v3(col.co1, pa->state.co);
-  sub_v3_v3v3(col.co2, pa->state.co, zvec);
+  sub_v3_v3v3(col.co2, pa->state.co, upvec);
   sub_v3_v3v3(ray_dir, col.co2, col.co1);
   col.f = 0.0f;
   hit.index = -1;
@@ -896,9 +924,9 @@ static Object *boid_find_ground(BoidBrainData *bbd,
   }
 
   /* couldn't find below, so find upmost deflector object */
-  add_v3_v3v3(col.co1, pa->state.co, zvec);
-  sub_v3_v3v3(col.co2, pa->state.co, zvec);
-  sub_v3_v3(col.co2, zvec);
+  add_v3_v3v3(col.co1, pa->state.co, upvec);
+  sub_v3_v3v3(col.co2, pa->state.co, upvec);
+  sub_v3_v3(col.co2, upvec);
   sub_v3_v3v3(ray_dir, col.co2, col.co1);
   col.f = 0.0f;
   hit.index = -1;
@@ -927,11 +955,11 @@ static Object *boid_find_ground(BoidBrainData *bbd,
     return col.hit;
   }
 
-  /* default to z=0 */
+  /* Default to the native XZ ground plane. */
   copy_v3_v3(ground_co, pa->state.co);
-  ground_co[2] = 0;
-  ground_nor[0] = ground_nor[1] = 0.0f;
-  ground_nor[2] = 1.0f;
+  ground_co[1] = 0;
+  ground_nor[0] = ground_nor[2] = 0.0f;
+  ground_nor[1] = 1.0f;
   return nullptr;
 }
 static bool boid_rule_applies(ParticleData *pa, BoidSettings * /*boids*/, BoidRule *rule)
@@ -1135,16 +1163,16 @@ void boid_brain(BoidBrainData *bbd, int p, ParticleData *pa)
     /* Fuzziness makes boids capable of misjudgment. */
     float mul = 1.0f + state->rule_fuzziness;
 
-    if (boids->options & BOID_ALLOW_FLIGHT && bbd->wanted_co[2] > 0.0f) {
+    if (boids->options & BOID_ALLOW_FLIGHT && bbd->wanted_co[1] > 0.0f) {
       float cvel[3], dir[3];
 
       copy_v3_v3(dir, pa->prev_state.ave);
-      normalize_v2(dir);
+      normalize_xz(dir);
 
       copy_v3_v3(cvel, bbd->wanted_co);
-      normalize_v2(cvel);
+      normalize_xz(cvel);
 
-      if (dot_v2v2(cvel, dir) > 0.95f / mul) {
+      if (dot_xz(cvel, dir) > 0.95f / mul) {
         bpa->data.mode = eBoidMode_Liftoff;
       }
     }
@@ -1153,31 +1181,31 @@ void boid_brain(BoidBrainData *bbd, int p, ParticleData *pa)
       int jump = 0;
 
       /* jump to get to a location */
-      if (bbd->wanted_co[2] > 0.0f) {
+      if (bbd->wanted_co[1] > 0.0f) {
         float cvel[3], dir[3];
-        float z_v, ground_v, cur_v;
+        float up_v, ground_v, cur_v;
         float len;
 
         copy_v3_v3(dir, pa->prev_state.ave);
-        normalize_v2(dir);
+        normalize_xz(dir);
 
         copy_v3_v3(cvel, bbd->wanted_co);
-        normalize_v2(cvel);
+        normalize_xz(cvel);
 
-        len = len_v2(pa->prev_state.vel);
+        len = len_xz(pa->prev_state.vel);
 
         /* first of all, are we going in a suitable direction? */
         /* or at a suitably slow speed */
-        if (dot_v2v2(cvel, dir) > 0.95f / mul || len <= state->rule_fuzziness) {
+        if (dot_xz(cvel, dir) > 0.95f / mul || len <= state->rule_fuzziness) {
           /* try to reach goal at highest point of the parabolic path */
-          cur_v = len_v2(pa->prev_state.vel);
-          z_v = safe_sqrtf(-2.0f * bbd->sim->scene->physics_settings.gravity[2] *
-                           bbd->wanted_co[2]);
-          ground_v = len_v2(bbd->wanted_co) *
-                     safe_sqrtf(-0.5f * bbd->sim->scene->physics_settings.gravity[2] /
-                                bbd->wanted_co[2]);
+          cur_v = len_xz(pa->prev_state.vel);
+          up_v = safe_sqrtf(-2.0f * bbd->sim->scene->physics_settings.gravity[1] *
+                            bbd->wanted_co[1]);
+          ground_v = len_xz(bbd->wanted_co) *
+                     safe_sqrtf(-0.5f * bbd->sim->scene->physics_settings.gravity[1] /
+                                bbd->wanted_co[1]);
 
-          len = safe_sqrtf((ground_v - cur_v) * (ground_v - cur_v) + z_v * z_v);
+          len = safe_sqrtf((ground_v - cur_v) * (ground_v - cur_v) + up_v * up_v);
 
           if (len < val.jump_speed * mul || bbd->part->boids->options & BOID_ALLOW_FLIGHT) {
             jump = 1;
@@ -1185,12 +1213,13 @@ void boid_brain(BoidBrainData *bbd, int p, ParticleData *pa)
             len = std::min(len, val.jump_speed);
 
             copy_v3_v3(jump_v, dir);
-            jump_v[2] = z_v;
-            mul_v3_fl(jump_v, ground_v);
+            mul_xz(jump_v, ground_v);
+            jump_v[1] = up_v;
 
             normalize_v3(jump_v);
             mul_v3_fl(jump_v, len);
-            add_v2_v2v2(jump_v, jump_v, pa->prev_state.vel);
+            jump_v[0] += pa->prev_state.vel[0];
+            jump_v[2] += pa->prev_state.vel[2];
           }
         }
       }
@@ -1219,7 +1248,7 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
   float old_dir[3], old_speed;
   float wanted_dir[3];
   float q[4], mat[3][3]; /* rotation */
-  float ground_co[3] = {0.0f, 0.0f, 0.0f}, ground_nor[3] = {0.0f, 0.0f, 1.0f};
+  float ground_co[3] = {0.0f, 0.0f, 0.0f}, ground_nor[3] = {0.0f, 1.0f, 0.0f};
   float force[3] = {0.0f, 0.0f, 0.0f};
   float pa_mass = bbd->part->mass, dtime = bbd->dfra * bbd->timestep;
 
@@ -1242,7 +1271,7 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
 
   if (bpa->data.mode == eBoidMode_Falling) {
     /* Falling boids are only effected by gravity. */
-    acc[2] = bbd->sim->scene->physics_settings.gravity[2];
+    copy_v3_v3(acc, bbd->sim->scene->physics_settings.gravity);
   }
   else {
     /* figure out acceleration */
@@ -1260,11 +1289,11 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
       bpa->ground = boid_find_ground(bbd, pa, ground_co, ground_nor);
 
       /* level = how many particle sizes above ground */
-      level = (pa->prev_state.co[2] - ground_co[2]) / (2.0f * pa->size) - 0.5f;
+      level = (pa->prev_state.co[1] - ground_co[1]) / (2.0f * pa->size) - 0.5f;
 
-      landing_level = -boids->landing_smoothness * pa->prev_state.vel[2] * pa_mass;
+      landing_level = -boids->landing_smoothness * pa->prev_state.vel[1] * pa_mass;
 
-      if (pa->prev_state.vel[2] < 0.0f) {
+      if (pa->prev_state.vel[1] < 0.0f) {
         if (level < 1.0f) {
           bbd->wanted_co[0] = bbd->wanted_co[1] = bbd->wanted_co[2] = 0.0f;
           bbd->wanted_speed = 0.0f;
@@ -1272,7 +1301,7 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
         }
         else if (level < landing_level) {
           bbd->wanted_speed *= (level - 1.0f) / landing_level;
-          bbd->wanted_co[2] *= (level - 1.0f) / landing_level;
+          bbd->wanted_co[1] *= (level - 1.0f) / landing_level;
         }
       }
     }
@@ -1285,15 +1314,15 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
       copy_v3_v3(new_dir, old_dir);
     }
     else {
-      float old_dir2[2], wanted_dir2[2], nor[3], angle;
-      copy_v2_v2(old_dir2, old_dir);
-      normalize_v2(old_dir2);
-      copy_v2_v2(wanted_dir2, wanted_dir);
-      normalize_v2(wanted_dir2);
+      float old_dir_ground[3], wanted_dir_ground[3], nor[3], angle;
+      copy_v3_v3(old_dir_ground, old_dir);
+      normalize_xz(old_dir_ground);
+      copy_v3_v3(wanted_dir_ground, wanted_dir);
+      normalize_xz(wanted_dir_ground);
 
       /* choose random direction to turn if wanted velocity */
-      /* is directly behind regardless of z-coordinate */
-      if (dot_v2v2(old_dir2, wanted_dir2) < -0.99f) {
+      /* is directly behind regardless of vertical position */
+      if (dot_xz(old_dir_ground, wanted_dir_ground) < -0.99f) {
         wanted_dir[0] = 2.0f * (0.5f - BLI_rng_get_float(bbd->rng));
         wanted_dir[1] = 2.0f * (0.5f - BLI_rng_get_float(bbd->rng));
         wanted_dir[2] = 2.0f * (0.5f - BLI_rng_get_float(bbd->rng));
@@ -1333,16 +1362,16 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
 
     /* maintain minimum flying velocity if not landing */
     if (level >= landing_level) {
-      float len2 = dot_v2v2(new_vel, new_vel);
+      float len2 = dot_xz(new_vel, new_vel);
       float root;
 
       len2 = std::max(len2, val.min_speed * val.min_speed);
       root = safe_sqrtf(new_speed * new_speed - len2);
 
-      new_vel[2] = new_vel[2] < 0.0f ? -root : root;
+      new_vel[1] = new_vel[1] < 0.0f ? -root : root;
 
-      normalize_v2(new_vel);
-      mul_v2_fl(new_vel, safe_sqrtf(len2));
+      normalize_xz(new_vel);
+      mul_xz(new_vel, safe_sqrtf(len2));
     }
 
     /* finally constrain speed to max speed */
@@ -1407,9 +1436,7 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
     case eBoidMode_InAir: {
       float grav[3];
 
-      grav[0] = 0.0f;
-      grav[1] = 0.0f;
-      grav[2] = bbd->sim->scene->physics_settings.gravity[2] < 0.0f ? -1.0f : 0.0f;
+      normalize_v3_v3(grav, bbd->sim->scene->physics_settings.gravity);
 
       /* don't take forward acceleration into account (better banking) */
       if (dot_v3v3(bpa->data.acc, pa->state.vel) > 0.0f) {
@@ -1433,17 +1460,17 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
         boid_find_ground(bbd, pa, ground_co, ground_nor);
         boid_climb(boids, pa, ground_co, ground_nor);
       }
-      else if (pa->state.co[2] <= ground_co[2] + pa->size * boids->height) {
+      else if (pa->state.co[1] <= ground_co[1] + pa->size * boids->height) {
         /* land boid when below ground */
         if (boids->options & BOID_ALLOW_LAND) {
-          pa->state.co[2] = ground_co[2] + pa->size * boids->height;
-          pa->state.vel[2] = 0.0f;
+          pa->state.co[1] = ground_co[1] + pa->size * boids->height;
+          pa->state.vel[1] = 0.0f;
           bpa->data.mode = eBoidMode_OnLand;
         }
         /* fly above ground */
         else if (bpa->ground) {
-          pa->state.co[2] = ground_co[2] + pa->size * boids->height;
-          pa->state.vel[2] = 0.0f;
+          pa->state.co[1] = ground_co[1] + pa->size * boids->height;
+          pa->state.vel[1] = 0.0f;
         }
       }
       break;
@@ -1451,9 +1478,7 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
     case eBoidMode_Falling: {
       float grav[3];
 
-      grav[0] = 0.0f;
-      grav[1] = 0.0f;
-      grav[2] = bbd->sim->scene->physics_settings.gravity[2] < 0.0f ? -1.0f : 0.0f;
+      normalize_v3_v3(grav, bbd->sim->scene->physics_settings.gravity);
 
       /* gather apparent gravity */
       madd_v3_v3fl(bpa->gravity, grav, dtime);
@@ -1470,13 +1495,13 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
           boid_climb(boids, pa, ground_co, ground_nor);
         }
         /* land boid when really near ground */
-        else if (pa->state.co[2] <= ground_co[2] + 1.01f * pa->size * boids->height) {
-          pa->state.co[2] = ground_co[2] + pa->size * boids->height;
-          pa->state.vel[2] = 0.0f;
+        else if (pa->state.co[1] <= ground_co[1] + 1.01f * pa->size * boids->height) {
+          pa->state.co[1] = ground_co[1] + pa->size * boids->height;
+          pa->state.vel[1] = 0.0f;
           bpa->data.mode = eBoidMode_OnLand;
         }
         /* if we're falling, can fly and want to go upwards lets fly */
-        else if (boids->options & BOID_ALLOW_FLIGHT && bbd->wanted_co[2] > 0.0f) {
+        else if (boids->options & BOID_ALLOW_FLIGHT && bbd->wanted_co[1] > 0.0f) {
           bpa->data.mode = eBoidMode_InAir;
         }
       }
@@ -1516,13 +1541,13 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
         boid_climb(boids, pa, ground_co, ground_nor);
       }
       /* ground is too far away so boid falls */
-      else if (pa->state.co[2] - ground_co[2] > 1.1f * pa->size * boids->height) {
+      else if (pa->state.co[1] - ground_co[1] > 1.1f * pa->size * boids->height) {
         bpa->data.mode = eBoidMode_Falling;
       }
       else {
         /* constrain to surface */
-        pa->state.co[2] = ground_co[2] + pa->size * boids->height;
-        pa->state.vel[2] = 0.0f;
+        pa->state.co[1] = ground_co[1] + pa->size * boids->height;
+        pa->state.vel[1] = 0.0f;
       }
 
       if (boids->banking > 0.0f) {
@@ -1551,7 +1576,7 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
   /* (boids can't effect their direction when falling) */
   if (bpa->data.mode != eBoidMode_Falling && len_v3(pa->state.vel) > 0.1f * pa->size) {
     copy_v3_v3(pa->state.ave, pa->state.vel);
-    pa->state.ave[2] *= bbd->part->boids->pitch;
+    pa->state.ave[1] *= bbd->part->boids->pitch;
     normalize_v3(pa->state.ave);
   }
 

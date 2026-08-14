@@ -30,7 +30,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .optional_label()
       .description("Mode for curve normal evaluation");
   b.add_input<decl::Vector>("Normal"_ustr)
-      .default_value({0.0f, 0.0f, 1.0f})
+      .default_value({0.0f, 1.0f, 0.0f})
       .subtype(PROP_XYZ)
       .evaluated_geometry_field()
       .usage_by_single_menu(NORMAL_MODE_FREE);

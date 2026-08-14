@@ -234,11 +234,11 @@ class Grid : Overlay {
 
     /* Set `grid_flag_` dependent on view configuration. */
     if (rv3d->is_persp || rv3d->view == RV3D_VIEW_USER) {
-      /* Perspective/orthographic; set selected axes and plane (floor = XY) bits. */
+      /* Perspective/orthographic; the native Y-up floor lies on XZ. */
       axis_flag_ |= (show_axis_x ? AXIS_X : OVERLAY_GridBits(0));
       axis_flag_ |= (show_axis_y ? AXIS_Y : OVERLAY_GridBits(0));
       axis_flag_ |= (show_axis_z ? AXIS_Z : OVERLAY_GridBits(0));
-      grid_flag_ |= (show_persp ? PLANE_XY : OVERLAY_GridBits(0));
+      grid_flag_ |= (show_persp ? PLANE_XZ : OVERLAY_GridBits(0));
 
       /* If any options were set, set SHOW_AXES/SHOW_GRID. */
       axis_flag_ |= (axis_flag_ ? SHOW_AXES : OVERLAY_GridBits(0));
@@ -261,13 +261,13 @@ class Grid : Overlay {
       }
       else if (ELEM(rv3d->view, RV3D_VIEW_TOP, RV3D_VIEW_BOTTOM)) {
         axis_flag_ = (show_axis_x ? (AXIS_X | GRID_ALIGNED) : OVERLAY_GridBits(0)) |
-                     (show_axis_y ? (AXIS_Y | GRID_ALIGNED) : OVERLAY_GridBits(0));
-        grid_flag_ = (show_ortho ? (PLANE_XY | GRID_ALIGNED) : OVERLAY_GridBits(0));
+                     (show_axis_z ? (AXIS_Z | GRID_ALIGNED) : OVERLAY_GridBits(0));
+        grid_flag_ = (show_ortho ? (PLANE_XZ | GRID_ALIGNED) : OVERLAY_GridBits(0));
       }
       else if (ELEM(rv3d->view, RV3D_VIEW_FRONT, RV3D_VIEW_BACK)) {
         axis_flag_ = (show_axis_x ? (AXIS_X | GRID_ALIGNED) : OVERLAY_GridBits(0)) |
-                     (show_axis_z ? (AXIS_Z | GRID_ALIGNED) : OVERLAY_GridBits(0));
-        grid_flag_ = (show_ortho ? (PLANE_XZ | GRID_ALIGNED) : OVERLAY_GridBits(0));
+                     (show_axis_y ? (AXIS_Y | GRID_ALIGNED) : OVERLAY_GridBits(0));
+        grid_flag_ = (show_ortho ? (PLANE_XY | GRID_ALIGNED) : OVERLAY_GridBits(0));
       }
 
       /* If any axes are set, set SHOW_AXES. If `grid` is toggled, set SHOW_GRID.
@@ -289,15 +289,24 @@ class Grid : Overlay {
       return false;
     }
 
-    /* Match Clarity's default finite floor: 40 one-unit cells, centered at the world origin.
-     * Keep all step entries valid because the same shader data layout is shared with SpaceImage. */
-    constexpr float grid_step = 1.0f;
-    constexpr uint grid_cell_count = 40u;
+    /* Keep Clarity's default 40-cell floor centered at the world origin while making both
+     * View3D Overlay controls meaningful. The floor has four emphasized sections across;
+     * Subdivisions controls the number of fine cells inside each section. */
+    constexpr uint emphasized_section_count = 4u;
+    constexpr float default_cells_per_section = 10.0f;
+    const float grid_scale = std::max(state.v3d->grid, 1.0e-6f);
+    const uint grid_subdivisions = uint(std::max(int(state.v3d->gridsubdiv), 1));
+    const uint grid_cell_count = emphasized_section_count * grid_subdivisions;
+    const float emphasized_grid_step = default_cells_per_section * grid_scale;
+    const float grid_step = emphasized_grid_step / float(grid_subdivisions);
     for (int i : IndexRange(SI_GRID_STEPS_LEN)) {
-      grid_ubo_.steps[i] = float4(grid_step);
+      grid_ubo_.steps[i] = float4(i < OVERLAY_GRID_STEPS_DRAW - 1 ?
+                                     grid_step :
+                                     emphasized_grid_step);
     }
     grid_ubo_.offset = float2(0.0f);
-    grid_ubo_.clip_rect = float2(float(grid_cell_count) * 0.5f * grid_step);
+    grid_ubo_.clip_rect = float2(
+        float(emphasized_section_count) * 0.5f * emphasized_grid_step);
     grid_ubo_.level = 0.0f;
     grid_ubo_.num_lines = grid_cell_count + 1u;
     /* Two passes for the gray grid, three for the heavier black axes. */

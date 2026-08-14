@@ -617,7 +617,7 @@ struct FluidDomainSettings {
   eFluidDomain_BorderFlags border_collisions = {}; /* How domain border collisions are handled. */
   eFluidDomain_Flags flags = FLUID_DOMAIN_USE_DISSOLVE_LOG | FLUID_DOMAIN_USE_ADAPTIVE_TIME |
                              FLUID_DOMAIN_USE_MESH; /* Use-mesh, use-noise, etc. */
-  float gravity[3] = {0.0f, 0.0f, -9.81f};
+  float gravity[3] = {0.0f, -9.81f, 0.0f};
   eFluidDomain_ActiveFields active_fields = {};
   eFluidDomain_Type type = FLUID_DOMAIN_TYPE_GAS; /* Gas, liquid. */
   char _pad2[6] = {};                             /* Unused. */

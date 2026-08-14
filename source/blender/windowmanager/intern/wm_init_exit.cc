@@ -122,6 +122,11 @@ namespace blender {
 
 static void wm_clarity_interaction_defaults_ensure()
 {
+  /* Clarity starts directly in the workspace. The splash remains available from the Help menu. */
+  if ((U.uiflag & USER_SPLASH_DISABLE) == 0) {
+    U.uiflag |= USER_SPLASH_DISABLE;
+    U.runtime.is_dirty = true;
+  }
   if (U.interaction_preset == INTERACTION_PRESET_CLARITY && STREQ(U.keyconfigstr, "Maya")) {
     STRNCPY(U.keyconfigstr, "Clarity");
     U.runtime.is_dirty = true;

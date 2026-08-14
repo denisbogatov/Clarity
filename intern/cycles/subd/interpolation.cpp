@@ -347,7 +347,7 @@ void SubdAttributeInterpolation::setup_attribute_vertex_smooth(const Attribute &
             dv += p * dv_weights[k];
           }
           mesh_normal_data[vert_index[i]] = packed_normal(
-              safe_normalize_fallback(cross(du, dv), make_float3(0.0f, 0.0f, 1.0f)));
+              safe_normalize_fallback(cross(du, dv), make_float3(0.0f, 1.0f, 0.0f)));
         }
       }
     }

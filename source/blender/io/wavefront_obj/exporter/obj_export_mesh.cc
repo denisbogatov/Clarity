@@ -153,8 +153,8 @@ void OBJMesh::set_world_axes_transform(const Object &obj_eval,
                                        const bool apply_transform)
 {
   float3x3 axes_transform;
-  /* +Y-forward and +Z-up are the default Blender axis settings. */
-  mat3_from_axis_conversion(forward, up, IO_AXIS_Y, IO_AXIS_Z, axes_transform.ptr());
+  /* Clarity's native world uses +Z-forward and +Y-up. */
+  mat3_from_axis_conversion(forward, up, IO_AXIS_Z, IO_AXIS_Y, axes_transform.ptr());
 
   const float4x4 &object_to_world = apply_transform ? obj_eval.object_to_world() :
                                                       float4x4::identity();

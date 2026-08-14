@@ -1426,7 +1426,7 @@ struct ScrewModifierData {
   float angle = 2.0f * M_PI;
   float merge_dist = 0.01f;
   ScrewModifierFlag flag = MOD_SCREW_SMOOTH_SHADING;
-  char axis = 2;
+  char axis = 1;
   char _pad[5] = {};
   void *_pad1 = nullptr;
 };
@@ -2103,8 +2103,8 @@ struct MeshCacheModifierData {
   MeshCacheModifierPlayMode play_mode = MOD_MESHCACHE_PLAY_CFEA;
 
   /* axis conversion */
-  char forward_axis = 1;
-  char up_axis = 2;
+  char forward_axis = 2;
+  char up_axis = 1;
   MeshCacheModifierFlipAxis flip_axis = {};
 
   MeshCacheModifierInterpolation interp = MOD_MESHCACHE_INTERP_LINEAR;

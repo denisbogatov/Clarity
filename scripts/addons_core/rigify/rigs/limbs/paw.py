@@ -39,7 +39,7 @@ class Rig(BaseLimbRig):
     def prepare_bones(self):
         orgs = self.bones.org.main
 
-        foot_x = self.vector_without_z(self.get_bone(orgs[2]).y_axis).cross((0, 0, 1))
+        foot_x = self.vector_without_y(self.get_bone(orgs[2]).y_axis).cross((0, 1, 0))
 
         if self.params.rotation_axis == 'automatic':
             axis = compute_chain_x_axis(self.obj, orgs[0:2])
@@ -66,7 +66,7 @@ class Rig(BaseLimbRig):
             flip_bone(self.obj, name)
 
             bone = self.get_bone(name)
-            bone.tail[2] = bone.head[2]
+            bone.tail[1] = bone.head[1]
             bone.roll = 0
 
     ####################################################
@@ -106,7 +106,7 @@ class Rig(BaseLimbRig):
         self.align_ik_control_bone(name)
 
         vec = self.get_bone(org_two).tail - self.get_bone(org_one).head
-        self.get_bone(name).length = self.vector_without_z(vec).length
+        self.get_bone(name).length = self.vector_without_y(vec).length
 
         return name
 

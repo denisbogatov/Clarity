@@ -162,8 +162,10 @@ static void generate_ocean_geometry_verts(void *__restrict userdata,
     const int i = y * (gogd->res_x + 1) + x;
     float *co = gogd->vert_positions[i];
     co[0] = gogd->ox + (x * gogd->sx);
-    co[1] = gogd->oy + (y * gogd->sy);
-    co[2] = 0.0f;
+    co[1] = 0.0f;
+    /* The simulator is already Y-up. Map its positive second horizontal coordinate to native
+     * negative Z, matching the old-Z to native-Y basis change and preserving face winding. */
+    co[2] = -(gogd->oy + (y * gogd->sy));
   }
 }
 
@@ -376,7 +378,7 @@ static Mesh *doOcean(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mes
         for (j = face.size(); j--; corner_vert++, mlcol++) {
           const float *vco = positions[*corner_vert];
           const float u = OCEAN_CO(size_co_inv, vco[0]);
-          const float v = OCEAN_CO(size_co_inv, vco[1]);
+          const float v = OCEAN_CO(size_co_inv, -vco[2]);
           float foam;
 
           if (omd->oceancache && omd->cached) {
@@ -427,7 +429,7 @@ static Mesh *doOcean(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mes
     for (i = 0; i < verts_num; i++) {
       float *vco = positions[i];
       const float u = OCEAN_CO(size_co_inv, vco[0]);
-      const float v = OCEAN_CO(size_co_inv, vco[1]);
+      const float v = OCEAN_CO(size_co_inv, -vco[2]);
 
       if (omd->oceancache && omd->cached) {
         BKE_ocean_cache_eval_uv(omd->oceancache, &ocr, cfra_for_cache, u, v);
@@ -436,11 +438,11 @@ static Mesh *doOcean(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mes
         BKE_ocean_eval_uv(omd->ocean, &ocr, u, v);
       }
 
-      vco[2] += ocr.disp[1];
+      vco[1] += ocr.disp[1];
 
       if (omd->chop_amount > 0.0f) {
         vco[0] += ocr.disp[0];
-        vco[1] += ocr.disp[2];
+        vco[2] -= ocr.disp[2];
       }
     }
   }
@@ -483,7 +485,7 @@ static void panel_draw(const bContext * /*C*/, Panel *panel)
   if (RNA_enum_get(ptr, "geometry_mode") == MOD_OCEAN_GEOM_GENERATE) {
     ui::Layout &sub = col.column(true);
     sub.prop(ptr, "repeat_x", UI_ITEM_NONE, IFACE_("Repeat X"), ICON_NONE);
-    sub.prop(ptr, "repeat_y", UI_ITEM_NONE, IFACE_("Y"), ICON_NONE);
+    sub.prop(ptr, "repeat_y", UI_ITEM_NONE, IFACE_("Z"), ICON_NONE);
   }
 
   ui::Layout &sub = col.column(true);

@@ -4,6 +4,10 @@
 
 #include "testing/testing.h"
 
+#include "BLI_math_matrix.h"
+#include "BLI_math_rotation.h"
+#include "BLI_math_vector.h"
+
 #include "DNA_view3d_types.h"
 
 #include "ED_gizmo_library.hh"
@@ -134,6 +138,29 @@ TEST(transform_gizmo_3d, ClarityTranslateCenterSquareBecomesCircleWhileDragging)
   /* The square is restored once the drag ended. */
   EXPECT_EQ(gizmo_3d_translate_center_style_get(clarity, false, no_edit_pivot),
             ED_GIZMO_PRIMITIVE_STYLE_PLANE);
+}
+
+TEST(transform_gizmo_3d, ClarityTranslateCenterSquareKeepsCompleteViewBasis)
+{
+  float basis[4][4];
+  unit_m4(basis);
+  copy_v3_fl3(basis[3], 4.0f, 5.0f, 6.0f);
+
+  float viewinv[4][4];
+  unit_m4(viewinv);
+  const float axis[3] = {0.0f, 0.0f, 1.0f};
+  axis_angle_to_mat4(viewinv, axis, 0.75f);
+
+  gizmo_3d_view_aligned_basis_rotation_set(basis, viewinv);
+
+  for (int column = 0; column < 3; column++) {
+    for (int row = 0; row < 3; row++) {
+      EXPECT_FLOAT_EQ(basis[column][row], viewinv[column][row]);
+    }
+  }
+  EXPECT_FLOAT_EQ(basis[3][0], 4.0f);
+  EXPECT_FLOAT_EQ(basis[3][1], 5.0f);
+  EXPECT_FLOAT_EQ(basis[3][2], 6.0f);
 }
 
 /** Edit Pivot adds the rotation rings on top of the layout the active tool asked for. */

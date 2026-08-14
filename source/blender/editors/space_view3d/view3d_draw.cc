@@ -964,9 +964,9 @@ static void draw_ndof_guide_orbit_axis(const RegionView3D *rv3d)
       const float step = 2.0f * float(M_PI / ROT_AXIS_DETAIL);
 
       float q[4]; /* rotate ring so it's perpendicular to axis */
-      const int upright = fabsf(rv3d->ndof_rot_axis[2]) >= 0.95f;
+      const int upright = fabsf(rv3d->ndof_rot_axis[1]) >= 0.95f;
       if (!upright) {
-        const float up[3] = {0.0f, 0.0f, 1.0f};
+        const float up[3] = {0.0f, 1.0f, 0.0f};
         float vis_angle, vis_axis[3];
 
         cross_v3_v3v3(vis_axis, up, rv3d->ndof_rot_axis);
@@ -979,7 +979,7 @@ static void draw_ndof_guide_orbit_axis(const RegionView3D *rv3d)
       immAttr4fv(col, color);
       float angle = 0.0f;
       for (int i = 0; i < ROT_AXIS_DETAIL; i++, angle += step) {
-        float p[3] = {s * cosf(angle), s * sinf(angle), 0.0f};
+        float p[3] = {s * cosf(angle), 0.0f, s * sinf(angle)};
 
         if (!upright) {
           mul_qt_v3(q, p);
@@ -1991,7 +1991,7 @@ void ED_view3d_draw_offscreen_simple(Depsgraph *depsgraph,
       v3d.flag2 |= V3D_SHOW_ANNOTATION;
     }
     if (draw_flags & V3D_OFSDRAW_SHOW_GRIDFLOOR) {
-      v3d.gridflag |= V3D_SHOW_FLOOR | V3D_SHOW_X | V3D_SHOW_Y;
+      v3d.gridflag |= V3D_SHOW_FLOOR | V3D_SHOW_X | V3D_SHOW_Z;
       v3d.grid = 1.0f;
       v3d.gridlines = 16;
       v3d.gridsubdiv = 10;
@@ -2298,7 +2298,7 @@ ImBuf *ED_view3d_draw_offscreen_imbuf_simple(Depsgraph *depsgraph,
     v3d.flag2 |= V3D_SHOW_ANNOTATION;
   }
   if (draw_flags & V3D_OFSDRAW_SHOW_GRIDFLOOR) {
-    v3d.gridflag |= V3D_SHOW_FLOOR | V3D_SHOW_X | V3D_SHOW_Y;
+    v3d.gridflag |= V3D_SHOW_FLOOR | V3D_SHOW_X | V3D_SHOW_Z;
   }
 
   if ((draw_flags & V3D_OFSDRAW_NO_WORLD_BACKGROUND_OVERRIDE) == 0) {

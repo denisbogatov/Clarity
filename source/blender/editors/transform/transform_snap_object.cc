@@ -450,7 +450,14 @@ static bool snap_object_is_snappable(const SnapObjectContext *sctx,
                                      const Base *base_act,
                                      const Base *base)
 {
-  if (!BASE_VISIBLE(sctx->runtime.v3d, base)) {
+  if (sctx->runtime.params.object_filter_fn != nullptr &&
+      !sctx->runtime.params.object_filter_fn(base->object,
+                                             sctx->runtime.params.object_filter_user_data))
+  {
+    return false;
+  }
+
+  if (!sctx->runtime.params.include_hidden && !BASE_VISIBLE(sctx->runtime.v3d, base)) {
     return false;
   }
 

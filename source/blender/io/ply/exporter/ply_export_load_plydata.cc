@@ -59,8 +59,8 @@ static void set_world_axes_transform(const Object &object,
 {
   float axes_transform[3][3];
   unit_m3(axes_transform);
-  /* +Y-forward and +Z-up are the default Blender axis settings. */
-  mat3_from_axis_conversion(forward, up, IO_AXIS_Y, IO_AXIS_Z, axes_transform);
+  /* Clarity's native world uses +Z-forward and +Y-up. */
+  mat3_from_axis_conversion(forward, up, IO_AXIS_Z, IO_AXIS_Y, axes_transform);
   mul_m4_m3m4(r_world_and_axes_transform, axes_transform, object.object_to_world().ptr());
   /* mul_m4_m3m4 does not transform last row of obmat, i.e. location data. */
   mul_v3_m3v3(r_world_and_axes_transform[3], axes_transform, object.object_to_world().location());

@@ -49,12 +49,12 @@ static Curves *create_star_curve(const float inner_radius,
   const float theta_step = (2.0f * M_PI) / float(points);
   for (const int i : IndexRange(points)) {
     const float x = outer_radius * cos(theta_step * i);
-    const float y = outer_radius * sin(theta_step * i);
-    positions[i * 2] = {x, y, 0.0f};
+    const float z = -outer_radius * sin(theta_step * i);
+    positions[i * 2] = {x, 0.0f, z};
 
     const float inner_x = inner_radius * cos(theta_step * i + theta_step * 0.5f + twist);
-    const float inner_y = inner_radius * sin(theta_step * i + theta_step * 0.5f + twist);
-    positions[i * 2 + 1] = {inner_x, inner_y, 0.0f};
+    const float inner_z = -inner_radius * sin(theta_step * i + theta_step * 0.5f + twist);
+    positions[i * 2 + 1] = {inner_x, 0.0f, inner_z};
   }
 
   return curves_id;

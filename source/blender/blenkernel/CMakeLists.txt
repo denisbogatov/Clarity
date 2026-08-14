@@ -270,6 +270,7 @@ set(SRC
   intern/screen.cc
   intern/shader_fx.cc
   intern/shrinkwrap.cc
+  intern/soft_selection.cc
   intern/softbody.cc
   intern/sound.cc
   intern/speaker.cc
@@ -513,6 +514,7 @@ set(SRC
   BKE_screen.hh
   BKE_shader_fx.hh
   BKE_shrinkwrap.hh
+  BKE_soft_selection.hh
   BKE_softbody.h
   BKE_sound.hh
   BKE_sound_sample.hh

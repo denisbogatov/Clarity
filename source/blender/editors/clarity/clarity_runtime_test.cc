@@ -33,6 +33,55 @@ namespace blender::ed::clarity::tests {
  */
 class ClarityRuntimeTest : public bke::BlenderGTestBase {};
 
+static ClarityObjectRuntimeRef live_ref(const uint32_t session_uid)
+{
+  ClarityObjectRuntimeRef reference;
+  reference.session_uid = session_uid;
+  return reference;
+}
+
+TEST(clarity_live_surface_registry, MultipleTargetsHistoryAndDormantState)
+{
+  ClarityLiveSurfaceRegistry registry;
+  const ClarityObjectRuntimeRef a = live_ref(1);
+  const ClarityObjectRuntimeRef b = live_ref(2);
+  const ClarityObjectRuntimeRef c = live_ref(3);
+
+  EXPECT_TRUE(registry.set({a}));
+  EXPECT_TRUE(registry.add({b, a}));
+  ASSERT_EQ(registry.active().size(), 2);
+  EXPECT_EQ(registry.active()[0].session_uid, 1);
+  EXPECT_EQ(registry.active()[1].session_uid, 2);
+
+  EXPECT_TRUE(registry.remove({a}));
+  ASSERT_EQ(registry.active().size(), 1);
+  EXPECT_EQ(registry.active().first().session_uid, 2);
+  EXPECT_TRUE(registry.set({c}));
+  EXPECT_EQ(registry.history().size(), 4);
+
+  EXPECT_TRUE(registry.deactivate());
+  EXPECT_TRUE(registry.active().is_empty());
+  EXPECT_TRUE(registry.reactivate());
+  ASSERT_EQ(registry.active().size(), 1);
+  EXPECT_EQ(registry.active().first().session_uid, 3);
+
+  EXPECT_TRUE(registry.activate_history(2));
+  ASSERT_EQ(registry.active().size(), 2);
+  EXPECT_EQ(registry.active()[0].session_uid, 1);
+  EXPECT_EQ(registry.active()[1].session_uid, 2);
+}
+
+TEST(clarity_live_surface_registry, HistoryIsBoundedAndDoesNotDuplicateASet)
+{
+  ClarityLiveSurfaceRegistry registry;
+  for (uint32_t uid = 1; uid <= 20; uid++) {
+    EXPECT_TRUE(registry.set({live_ref(uid)}));
+  }
+  EXPECT_EQ(registry.history().size(), ClarityLiveSurfaceRegistry::history_capacity);
+  EXPECT_FALSE(registry.set({live_ref(20), live_ref(20)}));
+  EXPECT_EQ(registry.history().size(), ClarityLiveSurfaceRegistry::history_capacity);
+}
+
 /** Momentary snap keys: the state machine behind temporary snapping getting stuck. */
 TEST(clarity_snap_override, HeldKeysStackAndTheLastOneWins)
 {

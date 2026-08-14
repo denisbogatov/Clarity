@@ -86,7 +86,7 @@ pxr::HdContainerDataSourceHandle build_world_data_source(Main *bmain,
     }
 
     transform = pxr::GfMatrix4d().SetRotate(pxr::GfRotation(
-        pxr::GfVec3d(0.0, 0.0, -1.0), RAD2DEGF(view3d->shading.studiolight_rot_z)));
+        pxr::GfVec3d(0.0, -1.0, 0.0), RAD2DEGF(view3d->shading.studiolight_rot_z)));
   }
 
   *r_transform = transform;

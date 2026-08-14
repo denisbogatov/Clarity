@@ -2717,8 +2717,8 @@ static void but_paste_normalized_vector(bContext *C,
   float xyz[3];
   if (parse_float_array(buf_paste, xyz, 3)) {
     if (normalize_v3(xyz) == 0.0f) {
-      /* better set Z up then have a zero vector */
-      xyz[2] = 1.0;
+      /* Prefer native world-up over leaving a zero direction. */
+      xyz[1] = 1.0;
     }
     but_set_float_array(C, but, data, xyz, 3);
   }

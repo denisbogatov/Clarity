@@ -37,9 +37,9 @@ struct AbcReaderConstructorArgs;
 
 std::string get_valid_abc_name(const char *name);
 
-/* Convert from float to Alembic matrix representations. Does NOT convert from Z-up to Y-up. */
+/* Convert from float to Alembic matrix representations without changing the shared Y-up basis. */
 Imath::M44d convert_matrix_datatype(const float mat[4][4]);
-/* Convert from Alembic to float matrix representations. Does NOT convert from Y-up to Z-up. */
+/* Convert from Alembic to float matrix representations without changing the shared Y-up basis. */
 void convert_matrix_datatype(const Imath::M44d &xform, float r_mat[4][4]);
 
 void split(const std::string &s, char delim, std::vector<std::string> &tokens);

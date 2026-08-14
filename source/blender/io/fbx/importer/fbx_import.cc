@@ -355,9 +355,10 @@ void importer_main(Main *bmain, Scene *scene, ViewLayer *view_layer, const FBXIm
   opts.pivot_handling = UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT;
 
   opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+  /* Convert every imported FBX scene into Clarity's native Maya-compatible world basis. */
   opts.target_axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
-  opts.target_axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Z;
-  opts.target_axes.front = UFBX_COORDINATE_AXIS_NEGATIVE_Y;
+  opts.target_axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;
+  opts.target_axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
   opts.target_unit_meters = 1.0f / params.global_scale;
 
   opts.target_camera_axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;

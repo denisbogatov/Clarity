@@ -2139,6 +2139,13 @@ void RNA_api_ui_layout(StructRNA *srna)
   RNA_def_boolean(func, "show_tone", false, "", "Show tone options");
   RNA_def_boolean(func, "show_presets", false, "", "Show preset options");
 
+  func = RNA_def_function(
+      srna, "template_soft_selection_curve", "template_soft_selection_curve");
+  RNA_def_function_ui_description(
+      func, "Compact Maya-style editor for SoftSelectionSettings falloff points");
+  parm = RNA_def_pointer(func, "data", "SoftSelectionSettings", "", "Soft selection settings");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+
   func = RNA_def_function(srna, "template_curveprofile", "template_curve_profile");
   RNA_def_function_ui_description(func, "A profile path editor used for custom profiles");
   api_ui_item_rna_common(func);

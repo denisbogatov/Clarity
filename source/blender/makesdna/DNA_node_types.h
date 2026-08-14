@@ -2607,7 +2607,7 @@ struct NodeTexSky {
 
   NodeTexBase base;
   int sky_model = 0;
-  float sun_direction[3] = {0.0f, 0.0f, 1.0f};
+  float sun_direction[3] = {0.0f, 1.0f, 0.0f};
   float turbidity = 0;
   float ground_albedo = 0;
   float sun_size = 0;

@@ -2301,7 +2301,7 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop,
       "Base Pose Angle",
-      "Rotation angle around the Z-Axis to apply the rotation deltas from the VR headset to");
+      "Rotation angle around the Y-Axis to apply the rotation deltas from the VR headset to");
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, nullptr);
 
   prop = RNA_def_property(srna, "base_scale", PROP_FLOAT, PROP_NONE);

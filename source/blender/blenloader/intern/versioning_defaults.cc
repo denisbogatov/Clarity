@@ -18,6 +18,8 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_listbase.h"
+#include "BLI_math_constants.h"
+#include "BLI_math_matrix.h"
 #include "BLI_math_rotation.h"
 #include "BLI_math_vector.h"
 #include "BLI_math_vector_types.hh"
@@ -59,6 +61,7 @@
 #include "BKE_node_legacy_types.hh"
 #include "BKE_node_runtime.hh"
 #include "BKE_node_tree_update.hh"
+#include "BKE_object.hh"
 #include "BKE_paint.hh"
 #include "BKE_paint_types.hh"
 #include "BKE_screen.hh"
@@ -234,6 +237,9 @@ static void blo_update_defaults_screen(bScreen *screen,
       v3d->overlay.gpencil_vertex_paint_opacity = 1.0f;
       /* Show Clarity polygon statistics in every factory-default viewport. */
       v3d->overlay.flag |= V3D_OVERLAY_STATS;
+      /* Clarity's native Y-up ground plane is XZ. */
+      v3d->gridflag |= V3D_SHOW_FLOOR | V3D_SHOW_ORTHO_GRID | V3D_SHOW_X | V3D_SHOW_Z;
+      v3d->gridflag &= ~V3D_SHOW_Y;
       /* Always use theme color for wireframe by default. */
       v3d->shading.wire_color_type = V3D_SHADING_SINGLE_COLOR;
 
@@ -247,29 +253,23 @@ static void blo_update_defaults_screen(bScreen *screen,
           {0x1.6e7cb6p-1, -0x1.c17476p-2, -0x1.2997dep-2, -0x1.d5d80cp-2},
       };
 
-      constexpr float viewports_to_clear_ofs[][4] = {
-          /* Geometry Nodes. */
-          {0x1.6e7cb6p-1, -0x1.c17476p-2, -0x1.2997dep-2, -0x1.d5d80cp-2},
-          /* Sculpting. */
-          {0x1.885b28p-1, -0x1.2d10cp-1, -0x1.42ae54p-3, -0x1.a486a2p-3},
-      };
-
       constexpr float unified_viewquat[4] = {
           0x1.6cbc88p-1, -0x1.c3a5c8p-2, -0x1.26413ep-2, -0x1.db430ap-2};
+      const float old_from_native[4] = {M_SQRT1_2, M_SQRT1_2, 0.0f, 0.0f};
 
       for (ARegion &region : area.regionbase) {
         if (region.regiontype == RGN_TYPE_WINDOW) {
           RegionView3D *rv3d = static_cast<RegionView3D *>(region.regiondata);
 
-          for (int i = 0; i < ARRAY_SIZE(viewports_to_clear_ofs); i++) {
-            if (equals_v4v4(rv3d->viewquat, viewports_to_clear_ofs[i])) {
-              zero_v3(rv3d->ofs);
-            }
-          }
+          /* Every factory workspace starts centered on the native world origin. */
+          zero_v3(rv3d->ofs);
+          zero_v3(rv3d->ndof_ofs);
 
           for (int i = 0; i < ARRAY_SIZE(viewports_to_level); i++) {
-            if (equals_v4v4(rv3d->viewquat, viewports_to_level[i])) {
-              copy_qt_qt(rv3d->viewquat, unified_viewquat);
+            float native_viewquat[4];
+            mul_qt_qtqt(native_viewquat, viewports_to_level[i], old_from_native);
+            if (equals_v4v4(rv3d->viewquat, native_viewquat)) {
+              mul_qt_qtqt(rv3d->viewquat, unified_viewquat, old_from_native);
             }
           }
         }
@@ -429,6 +429,9 @@ static void blo_update_defaults_windowmanager(wmWindowManager *wm)
 static void blo_update_defaults_scene(Main *bmain, Scene *scene)
 {
   ToolSettings *ts = scene->toolsettings;
+
+  copy_v3_fl3(scene->physics_settings.gravity, 0.0f, -9.81f, 0.0f);
+  ts->plane_axis = 1;
 
   STRNCPY_UTF8(scene->r.engine, RE_engine_id_BLENDER_EEVEE);
 
@@ -768,12 +771,32 @@ void BLO_update_defaults_startup_blend(Main *bmain, const char *app_template)
     }
   }
 
+  const bool startup_uses_legacy_z_up = bmain->versionfile < 502 ||
+                                        (bmain->versionfile == 502 &&
+                                         bmain->subversionfile < 47);
   for (Object &object : bmain->objects) {
     const Object dob;
     /* Set default for shadow terminator bias. */
     object.shadow_terminator_normal_offset = dob.shadow_terminator_normal_offset;
     object.shadow_terminator_geometry_offset = dob.shadow_terminator_geometry_offset;
     object.shadow_terminator_shading_offset = dob.shadow_terminator_shading_offset;
+
+    if (startup_uses_legacy_z_up && object.parent == nullptr &&
+        ELEM(object.type, OB_CAMERA, OB_LAMP))
+    {
+      /* The bundled startup cameras and lights were authored in Blender's former Z-up basis. */
+      const float native_from_old[4][4] = {
+          {1.0f, 0.0f, 0.0f, 0.0f},
+          {0.0f, 0.0f, -1.0f, 0.0f},
+          {0.0f, 1.0f, 0.0f, 0.0f},
+          {0.0f, 0.0f, 0.0f, 1.0f},
+      };
+      float old_matrix[4][4];
+      float native_matrix[4][4];
+      BKE_object_to_mat4(&object, old_matrix);
+      mul_m4_m4m4(native_matrix, native_from_old, old_matrix);
+      BKE_object_apply_mat4(&object, native_matrix, true, false);
+    }
   }
 
   for (Mesh &mesh : bmain->meshes) {

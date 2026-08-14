@@ -24,7 +24,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .min(0.0f)
       .max(1.0f)
       .subtype(PROP_FACTOR);
-  b.add_input<decl::Vector>("Vector"_ustr).default_value({0.0, 0.0, 1.0});
+  b.add_input<decl::Vector>("Vector"_ustr).default_value({0.0, 1.0, 0.0});
   b.add_output<decl::Vector>("Rotation"_ustr).subtype(PROP_EULER);
 }
 

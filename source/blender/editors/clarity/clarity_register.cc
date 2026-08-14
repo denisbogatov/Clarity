@@ -15,6 +15,7 @@ namespace blender::ed::clarity {
 
 void register_types()
 {
+  register_live_surface_operators();
   register_tool_operators();
   register_marking_menu_types();
   register_selection_menu_types();

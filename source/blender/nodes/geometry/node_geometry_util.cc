@@ -4,6 +4,8 @@
 
 #include <optional>
 
+#include "BLI_math_constants.h"
+#include "BLI_math_euler.hh"
 #include "BLI_string.h"
 
 #include "node_geometry_util.hh"
@@ -13,6 +15,8 @@
 #include "DNA_userdef_types.h"
 
 #include "BKE_node.hh"
+
+#include "GEO_transform.hh"
 
 #include "NOD_rna_define.hh"
 #include "NOD_socket.hh"
@@ -24,6 +28,14 @@
 namespace blender {
 
 namespace nodes {
+
+void transform_legacy_z_up_mesh(Mesh &mesh)
+{
+  geometry::transform_mesh(mesh,
+                           float3(0.0f),
+                           math::to_quaternion(math::EulerXYZ(-M_PI_2, 0.0f, 0.0f)),
+                           float3(1.0f));
+}
 
 bool check_tool_context_and_error(GeoNodeExecParams &params)
 {

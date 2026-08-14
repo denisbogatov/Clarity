@@ -228,7 +228,7 @@ struct ParticleCollision {
   float co1[3], co2[3];
   float ve1[3], ve2[3];
 
-  float acc[3], boid_z;
+  float acc[3], boid_height;
 
   int boid;
 };

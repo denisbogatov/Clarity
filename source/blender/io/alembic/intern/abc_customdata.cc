@@ -251,7 +251,7 @@ void write_generated_coordinates(const OCompoundProperty &prop, CDStreamConfig &
   }
   const float (*orcodata)[3] = static_cast<const float (*)[3]>(customdata);
 
-  /* Convert 3D vertices from float[3] z=up to V3f y=up. */
+  /* Copy native Y-up coordinates into Alembic's matching V3f basis. */
   std::vector<Imath::V3f> coords(config.totvert);
   float orco_yup[3];
   for (int vertex_idx = 0; vertex_idx < config.totvert; vertex_idx++) {

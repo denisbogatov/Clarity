@@ -486,6 +486,8 @@ class ShaderModule {
   StaticShader mesh_loop_normal_subdiv = shader_clippable("overlay_mesh_loop_normal_subdiv");
   StaticShader mesh_vert_normal = shader_clippable("overlay_mesh_vert_normal");
   StaticShader mesh_vert_normal_subdiv = shader_clippable("overlay_mesh_vert_normal_subdiv");
+  StaticShader soft_selection_point = shader_clippable("overlay_soft_selection_point");
+  StaticShader soft_selection_wire = shader_clippable("overlay_soft_selection_wire");
   StaticShader motion_path_line = shader_clippable("overlay_motion_path_line");
   StaticShader motion_path_vert = shader_clippable("overlay_motion_path_point");
   StaticShader outline_detect = {"overlay_outline_detect"};
@@ -719,6 +721,8 @@ struct Resources : public select::SelectMap {
     shaders->extra_shape.ensure_compile_async();
     shaders->extra_wire_object.ensure_compile_async();
     shaders->extra_wire.ensure_compile_async();
+    shaders->soft_selection_point.ensure_compile_async();
+    shaders->soft_selection_wire.ensure_compile_async();
     shaders->fluid_grid_lines_flags.ensure_compile_async();
     shaders->fluid_grid_lines_flat.ensure_compile_async();
     shaders->fluid_grid_lines_range.ensure_compile_async();
@@ -1212,6 +1216,17 @@ struct LinePrimitiveBuf : public VertexPrimitiveBuf {
     select_buf.select_append(select_id);
     VertexPrimitiveBuf::append(start, color);
     VertexPrimitiveBuf::append(end, color);
+  }
+
+  void append(const float3 &start,
+              const float3 &end,
+              const float4 &start_color,
+              const float4 &end_color,
+              select::ID select_id = select::SelectMap::select_invalid_id())
+  {
+    select_buf.select_append(select_id);
+    VertexPrimitiveBuf::append(start, start_color);
+    VertexPrimitiveBuf::append(end, end_color);
   }
 
   void append(const float3 &start,

@@ -397,7 +397,7 @@ void OsdPatch::eval(
     *dPdv = dv;
   }
   if (N) {
-    *N = safe_normalize_fallback(cross(du, dv), make_float3(0.0f, 0.0f, 1.0f));
+    *N = safe_normalize_fallback(cross(du, dv), make_float3(0.0f, 1.0f, 0.0f));
   }
 }
 

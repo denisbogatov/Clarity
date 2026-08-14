@@ -38,6 +38,10 @@ struct ClaritySnapPlan {
   bool absolute_grid = false;
   bool curve_targets_only = false;
   bool include_object_pivots = false;
+  /** Restrict the query to the global Maya-compatible live set. */
+  bool live_surface = false;
+  /** Curve Snap wins near a curve; otherwise fall back to the live surface. */
+  bool live_surface_fallback = false;
   /** Not a snap but a constraint: translation is projected onto the frozen view plane. */
   bool view_plane = false;
   bool mesh_center = false;
@@ -75,6 +79,9 @@ struct ClaritySnapPlanInput {
   /** Components are what a transform constraint applies to; whole objects are never constrained.
    */
   bool is_component_edit = false;
+  bool live_surface_active = false;
+  ed::clarity::ClarityLiveSurfaceSnapMode live_surface_snap_mode =
+      ed::clarity::ClarityLiveSurfaceSnapMode::Surface;
   ed::clarity::ClarityStepSnapSettings step;
 };
 

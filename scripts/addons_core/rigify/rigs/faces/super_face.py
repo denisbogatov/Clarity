@@ -150,7 +150,7 @@ class Rig:
 
         interpupillary_distance = eyeL_e.head - eyeR_e.head
         distance = (eyeL_e.head - eyeR_e.head) * 3
-        distance = distance.cross((0, 0, 1))
+        distance = distance.cross((0, 1, 0))
 
         eyeL_ctrl_e.head += distance
         eyeR_ctrl_e.head += distance
@@ -158,7 +158,7 @@ class Rig:
 
         for bone in [eyeL_ctrl_e, eyeR_ctrl_e, eyes_ctrl_e]:
             # bone.tail[:] = bone.head + Vector( [ 0, 0, eyeL_e.length * 1.35 ] )
-            bone.tail[:] = bone.head + Vector([0, 0, interpupillary_distance.length * 0.3144])
+            bone.tail[:] = bone.head + Vector([0, interpupillary_distance.length * 0.3144, 0])
 
         # Widget for transforming the both eyes
         eye_master_names = []

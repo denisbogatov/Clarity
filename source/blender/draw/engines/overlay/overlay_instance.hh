@@ -104,6 +104,7 @@ class Instance : public DrawEngine {
     Prepass prepass;
     Relations relations = {selection_type_};
     Sculpts sculpts;
+    SoftSelectionFalseColor soft_selection_false_color;
     Speakers speakers = {selection_type_};
     Wireframe wireframe;
   } regular{selection_type_}, infront{selection_type_};

@@ -39,7 +39,7 @@ class Rig(BaseLimbRig):
                 align_bone_x_axis(self.obj, bone, axis)
 
         elif self.params.auto_align_extremity:
-            axis = self.vector_without_z(self.get_bone(orgs[2]).z_axis)
+            axis = self.vector_without_y(self.get_bone(orgs[2]).z_axis)
 
             align_bone_z_axis(self.obj, orgs[2], axis)
 

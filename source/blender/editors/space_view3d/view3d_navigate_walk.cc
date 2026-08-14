@@ -131,7 +131,7 @@ enum eWalkGravityState {
   WALK_GRAVITY_STATE_ON,
 };
 
-/** Relative view axis Z axis locking. */
+/** Relative view correction toward the native Y-up axis. */
 enum eWalkLockState {
   /** Disabled. */
   WALK_AXISLOCK_STATE_OFF = 0,
@@ -183,7 +183,7 @@ void walk_modal_keymap(wmKeyConfig *keyconf)
 
       {WALK_MODAL_GRAVITY_TOGGLE, "GRAVITY_TOGGLE", 0, "Toggle Gravity", "Toggle gravity effect"},
 
-      {WALK_MODAL_AXIS_LOCK_Z, "AXIS_LOCK_Z", 0, "Z Axis Correction", "Z axis correction"},
+      {WALK_MODAL_AXIS_LOCK_Z, "AXIS_LOCK_Z", 0, "Y Axis Correction", "Y-up axis correction"},
 
       {WALK_MODAL_INCREASE_JUMP,
        "INCREASE_JUMP",
@@ -425,7 +425,7 @@ static bool walk_floor_distance_get(RegionView3D *rv3d,
                                     const float dvec[3],
                                     float *r_distance)
 {
-  const float ray_normal[3] = {0, 0, -1}; /* down */
+  const float ray_normal[3] = {0, -1, 0}; /* World down. */
   float ray_start[3];
   float location_dummy[3];
   float normal_dummy[3];
@@ -610,7 +610,7 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op, const int 
   walk->gravity_state = WALK_GRAVITY_STATE_OFF;
 
   if (walk->scene->physics_settings.flag & PHYS_GLOBAL_GRAVITY) {
-    walk->gravity = fabsf(walk->scene->physics_settings.gravity[2]) / walk->grid;
+    walk->gravity = fabsf(walk->scene->physics_settings.gravity[1]) / walk->grid;
   }
   else {
     walk->gravity = 9.80668f / walk->grid; /* m/s2 */
@@ -932,7 +932,8 @@ static void walkEvent(WalkInfo *walk, const wmEvent *event)
           copy_v3_v3(walk->teleport.origin, walk->rv3d->viewinv[3]);
 
           /* Using previous vector because WASD keys are not called when SPACE is. */
-          copy_v2_v2(walk->teleport.direction, walk->dvec_prev);
+          copy_v3_v3(walk->teleport.direction, walk->dvec_prev);
+          walk->teleport.direction[1] = 0.0f;
 
           /* When jumping, duration is how long it takes before we start going down. */
           walk->teleport.duration = walk_calc_velocity_zero_time(walk->gravity, walk->speed_jump);
@@ -1153,7 +1154,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
         y *= walk->mouse_speed;
 
         /* Clamp the angle limits: it ranges from 90.0f to -90.0f. */
-        angle = -asinf(rv3d->viewmat[2][2]);
+        angle = -asinf(rv3d->viewmat[1][2]);
 
         if (angle > WALK_TOP_LIMIT && y > 0.0f) {
           y = 0.0f;
@@ -1170,7 +1171,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
         changed_viewquat = true;
       }
 
-      /* Rotate about the Y axis- look left/right. */
+      /* Rotate around world Y-up to look left/right. */
       if (moffset[0]) {
         float upvec[3];
         float x;
@@ -1179,7 +1180,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
         copy_v3_fl3(upvec, 0.0f, 1.0f, 0.0f);
         mul_m3_v3(mat, upvec);
 
-        if (upvec[2] < 0.0f) {
+        if (upvec[1] < 0.0f) {
           moffset[0] = -moffset[0];
         }
 
@@ -1202,7 +1203,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
         x *= walk->mouse_speed;
 
         /* Rotate about the relative up vector */
-        axis_angle_to_quat_single(tmp_quat, 'Z', x);
+        axis_angle_to_quat_single(tmp_quat, 'Y', x);
         mul_qt_qtqt(rv3d->viewquat, rv3d->viewquat, tmp_quat);
         changed_viewquat = true;
       }
@@ -1212,9 +1213,9 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
         copy_v3_fl3(upvec, 1.0f, 0.0f, 0.0f);
         mul_m3_v3(mat, upvec);
 
-        /* Make sure we have some Z rolling. */
-        if (fabsf(upvec[2]) > 0.00001f) {
-          float roll = upvec[2] * 5.0f;
+        /* Measure roll against world Y-up. */
+        if (fabsf(upvec[1]) > 0.00001f) {
+          float roll = upvec[1] * 5.0f;
           /* Rotate the view about this axis. */
           copy_v3_fl3(upvec, 0.0f, 0.0f, 1.0f);
           mul_m3_v3(mat, upvec);
@@ -1259,7 +1260,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
         mul_m3_v3(mat, dvec_tmp);
 
         if (walk->navigation_mode == WALK_MODE_GRAVITY) {
-          dvec_tmp[2] = 0.0f;
+          dvec_tmp[1] = 0.0f;
         }
 
         add_v3_v3(dvec, dvec_tmp);
@@ -1280,8 +1281,8 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
         }
 
         dvec_tmp[0] = direction * rv3d->viewinv[0][0];
-        dvec_tmp[1] = direction * rv3d->viewinv[0][1];
-        dvec_tmp[2] = 0.0f;
+        dvec_tmp[1] = 0.0f;
+        dvec_tmp[2] = direction * rv3d->viewinv[0][2];
 
         add_v3_v3(dvec, dvec_tmp);
       }
@@ -1301,7 +1302,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
             direction += 1;
           }
 
-          copy_v3_fl3(dvec_tmp, 0.0f, 0.0f, direction);
+          copy_v3_fl3(dvec_tmp, 0.0f, direction, 0.0f);
           add_v3_v3(dvec, dvec_tmp);
         }
 
@@ -1344,7 +1345,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
 
       if (fabsf(difference) < fall_distance) {
         /* slope/stairs */
-        dvec[2] -= difference;
+        dvec[1] -= difference;
 
         /* In case we switched from FREE to GRAVITY too close to the ground. */
         if (walk->gravity_state == WALK_GRAVITY_STATE_START) {
@@ -1358,7 +1359,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
         walk->teleport.duration = 0.0f;
 
         copy_v3_v3(walk->teleport.origin, walk->rv3d->viewinv[3]);
-        copy_v2_v2(walk->teleport.direction, dvec);
+        copy_v3_v3(walk->teleport.direction, dvec);
       }
     }
 
@@ -1369,10 +1370,10 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
       const float t = float(BLI_time_now_seconds() - walk->teleport.initial_time);
 
       /* Keep moving if we were moving. */
-      copy_v2_v2(dvec, walk->teleport.direction);
+      copy_v3_v3(dvec, walk->teleport.direction);
 
-      const float z_cur = walk->rv3d->viewinv[3][2] / walk->grid;
-      const float z_new = ((walk->teleport.origin[2] / walk->grid) -
+      const float y_cur = walk->rv3d->viewinv[3][1] / walk->grid;
+      const float y_new = ((walk->teleport.origin[1] / walk->grid) -
                            walk_calc_free_fall_distance(walk->gravity, t)) +
                           /* Jump. */
                           (t * walk->speed_jump);
@@ -1387,18 +1388,18 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
 
         if (difference > 0.0f) {
           /* Quit falling, lands at "view_height" from the floor. */
-          dvec[2] -= difference;
+          dvec[1] -= difference;
           walk->gravity_state = WALK_GRAVITY_STATE_OFF;
           walk->speed_jump = 0.0f;
         }
         else {
           /* Keep falling. */
-          dvec[2] = z_cur - z_new;
+          dvec[1] = y_cur - y_new;
         }
       }
       else {
         /* Keep going up (jump). */
-        dvec[2] = z_cur - z_new;
+        dvec[1] = y_cur - y_new;
       }
     }
 
@@ -1552,7 +1553,7 @@ static void walk_draw_status(bContext *C, wmOperator *op)
   status.opmodal("", op->type, WALK_MODAL_DECREASE_JUMP);
   status.item(fmt::format("{} ({:.2f})", IFACE_("Jump Height"), g_walk.jump_height), ICON_NONE);
 
-  status.opmodal(IFACE_("Z Axis Correction"),
+  status.opmodal(IFACE_("Y Axis Correction"),
                  op->type,
                  WALK_MODAL_AXIS_LOCK_Z,
                  walk->zlock != WALK_AXISLOCK_STATE_OFF);

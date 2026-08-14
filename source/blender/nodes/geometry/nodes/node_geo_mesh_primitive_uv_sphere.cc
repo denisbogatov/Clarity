@@ -52,6 +52,7 @@ static void node_geo_exec(GeoNodeExecParams params)
       "UV Map"_ustr);
 
   Mesh *mesh = geometry::create_uv_sphere_mesh(radius, segments_num, rings_num, uv_map_id);
+  transform_legacy_z_up_mesh(*mesh);
   BKE_id_material_eval_ensure_default_slot(reinterpret_cast<ID *>(mesh));
   params.set_output("Mesh"_ustr, GeometrySet::from_mesh(mesh));
 }

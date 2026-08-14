@@ -28,7 +28,7 @@ static void node_declare(NodeDeclarationBuilder &b)
                      .default_value(2.0f)
                      .min(0.0f)
                      .subtype(PROP_DISTANCE)
-                     .description("The Y axis size of the shape")
+                     .description("The Z axis size of the shape")
                      .available(false);
   auto &bottom = b.add_input<decl::Float>("Bottom Width"_ustr)
                      .default_value(4.0f)
@@ -62,22 +62,22 @@ static void node_declare(NodeDeclarationBuilder &b)
                          .description("The distance between the top point and the X axis")
                          .available(false);
   auto &p1 = b.add_input<decl::Vector>("Point 1"_ustr)
-                 .default_value({-1.0f, -1.0f, 0.0f})
+                 .default_value({-1.0f, 0.0f, 1.0f})
                  .subtype(PROP_TRANSLATION)
                  .description("The exact location of the point to use")
                  .available(false);
   auto &p2 = b.add_input<decl::Vector>("Point 2"_ustr)
-                 .default_value({1.0f, -1.0f, 0.0f})
+                 .default_value({1.0f, 0.0f, 1.0f})
                  .subtype(PROP_TRANSLATION)
                  .description("The exact location of the point to use")
                  .available(false);
   auto &p3 = b.add_input<decl::Vector>("Point 3"_ustr)
-                 .default_value({1.0f, 1.0f, 0.0f})
+                 .default_value({1.0f, 0.0f, -1.0f})
                  .subtype(PROP_TRANSLATION)
                  .description("The exact location of the point to use")
                  .available(false);
   auto &p4 = b.add_input<decl::Vector>("Point 4"_ustr)
-                 .default_value({-1.0f, 1.0f, 0.0f})
+                 .default_value({-1.0f, 0.0f, -1.0f})
                  .subtype(PROP_TRANSLATION)
                  .description("The exact location of the point to use")
                  .available(false);
@@ -268,6 +268,12 @@ static void node_geo_exec(GeoNodeExecParams params)
     default:
       params.set_default_remaining_outputs();
       return;
+  }
+
+  if (mode != GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_POINTS) {
+    for (float3 &position : positions) {
+      position = float3(position.x, position.z, -position.y);
+    }
   }
 
   params.set_output("Curve"_ustr, GeometrySet::from_curves(curves_id));

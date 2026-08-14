@@ -97,10 +97,10 @@ void main()
   LineData line = flag_test(grid_flag, SHOW_GRID) ? decode_grid_data(gl_VertexID) :
                                                     decode_axis_data(gl_VertexID);
 
-  /* A finite 3D grid has only one scale level. The draw call keeps the shared three-level
-   * allocation used by the image editor, so discard the two unused levels here. */
+  /* A finite 3D grid uses a fine level and an emphasized subdivision level. The draw call keeps
+   * the shared three-level allocation used by the image editor, so discard the unused level. */
   if (flag_test(grid_flag, GRID_FINITE) && flag_test(grid_flag, SHOW_GRID) &&
-      line.level != OVERLAY_GRID_STEPS_DRAW - 1)
+      line.level == 0)
   {
     return;
   }
@@ -133,7 +133,9 @@ void main()
   /* Output vertex position in [-1,1], which we use to fade level boundaries. */
   vertex_out.coord = line.P / max(float(grid_buf.num_lines >> 1), 1.0f);
   /* Output an interpolant between `grid` and `grid_emphasis` for the second grid level. */
-  vertex_out_flat.emphasis = saturate(float(line.level) - fract(grid_buf.level));
+  vertex_out_flat.emphasis = flag_test(grid_flag, GRID_FINITE) ?
+                                 float(line.level == OVERLAY_GRID_STEPS_DRAW - 1) :
+                                 saturate(float(line.level) - fract(grid_buf.level));
   /* Output alpha that smoothly transitions the lowest grid level in/out. */
   vertex_out_flat.alpha = saturate(line.level + 1.0f - fract(grid_buf.level));
   if (!drw_view_is_perspective() && !flag_test(grid_flag, GRID_FINITE)) {

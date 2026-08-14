@@ -342,6 +342,10 @@ void transform_convert_mesh_connectivity_distance(BMesh *bm,
 void transform_convert_mesh_mirrordata_calc(BMEditMesh *em,
                                             bool use_select,
                                             bool use_topology,
+                                            bool allow_partial,
+                                            bool use_world,
+                                            const float object_to_world[4][4],
+                                            float tolerance,
                                             const bool mirror_axis[3],
                                             TransMirrorData *r_mirror_data);
 void transform_convert_mesh_mirrordata_free(TransMirrorData *mirror_data);

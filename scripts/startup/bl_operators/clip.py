@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import bpy
+from math import pi
 from bpy.types import Operator
 from bpy.props import FloatProperty
 from mathutils import (
@@ -578,12 +579,13 @@ class CLIP_OT_setup_tracking_scene(Operator):
 
         scene.camera = camob
 
-        camob.matrix_local = (
+        legacy_matrix = (
             Matrix.Translation((7.481, -6.508, 5.344)) @
             Matrix.Rotation(0.815, 4, 'Z') @
             Matrix.Rotation(0.011, 4, 'Y') @
             Matrix.Rotation(1.109, 4, 'X')
         )
+        camob.matrix_local = Matrix.Rotation(-pi / 2.0, 4, 'X') @ legacy_matrix
 
         return camob
 
@@ -831,12 +833,12 @@ class CLIP_OT_setup_tracking_scene(Operator):
         return ob
 
     @staticmethod
-    def _getPlaneVertices(half_size, z):
+    def _getPlaneVertices(half_size, y):
         return [
-            (-half_size, -half_size, z),
-            (half_size, -half_size, z),
-            (half_size, half_size, z),
-            (-half_size, half_size, z),
+            (-half_size, y, half_size),
+            (half_size, y, half_size),
+            (half_size, y, -half_size),
+            (-half_size, y, -half_size),
         ]
 
     def _createGround(self, collection):
@@ -863,7 +865,7 @@ class CLIP_OT_setup_tracking_scene(Operator):
         light = bpy.data.lights.new(name="Light", type='POINT')
         lightob = bpy.data.objects.new(name="Light", object_data=light)
 
-        lightob.matrix_local = Matrix.Translation((4.076, 1.005, 5.904))
+        lightob.matrix_local = Matrix.Translation((4.076, 5.904, -1.005))
 
         return lightob
 

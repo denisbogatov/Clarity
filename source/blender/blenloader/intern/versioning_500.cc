@@ -18,7 +18,10 @@
 #include "DNA_ID.h"
 #include "DNA_brush_types.h"
 #include "DNA_camera_types.h"
+#include "DNA_cloth_types.h"
+#include "DNA_constraint_types.h"
 #include "DNA_curves_types.h"
+#include "DNA_fluid_types.h"
 #include "DNA_genfile.h"
 #include "DNA_grease_pencil_types.h"
 #include "DNA_layer_types.h"
@@ -37,6 +40,8 @@
 #include "BLI_function_ref.hh"
 #include "BLI_listbase.h"
 #include "BLI_math_color.h"
+#include "BLI_math_constants.h"
+#include "BLI_math_rotation.h"
 #include "BLI_math_vector.h"
 #include "BLI_math_vector.hh"
 #include "BLI_math_vector_types.hh"
@@ -64,6 +69,7 @@
 #include "BKE_paint.hh"
 #include "BKE_pointcache.h"
 #include "BKE_report.hh"
+#include "BKE_scene.hh"
 
 #include "BLT_translation.hh"
 
@@ -4516,6 +4522,583 @@ void blo_do_versions_500(FileData *fd, Library * /*lib*/, Main *bmain)
       }
     }
     FOREACH_NODETREE_END;
+  }
+
+  if (!MAIN_VERSION_FILE_ATLEAST(bmain, 502, 45)) {
+    if (!DNA_struct_member_exists(
+            fd->filesdna, "ToolSettings", "SoftSelectionSettings", "soft_selection"))
+    {
+      for (Scene &scene : bmain->scenes) {
+        if (scene.toolsettings) {
+          scene.toolsettings->soft_selection = SoftSelectionSettings();
+        }
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_FILE_ATLEAST(bmain, 502, 46)) {
+    for (Scene &scene : bmain->scenes) {
+      if (scene.toolsettings) {
+        BKE_soft_selection_color_default_set(&scene.toolsettings->soft_selection);
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_FILE_ATLEAST(bmain, 502, 47)) {
+    /* Viewport state written by the former Z-up world has to follow the same basis change as
+     * scene coordinates. This also turns the old default X/Y grid into the native X/Z floor. */
+    const auto version_grid_axes = [](View3D &v3d) {
+      const bool old_show_y = bool(v3d.gridflag & V3D_SHOW_Y);
+      const bool old_show_z = bool(v3d.gridflag & V3D_SHOW_Z);
+      v3d.gridflag &= ~(V3D_SHOW_Y | V3D_SHOW_Z);
+      if (old_show_y) {
+        v3d.gridflag |= V3D_SHOW_Z;
+      }
+      if (old_show_z) {
+        v3d.gridflag |= V3D_SHOW_Y;
+      }
+    };
+    const auto version_region_view = [](RegionView3D &rv3d) {
+      const float old_from_native[4] = {M_SQRT1_2, M_SQRT1_2, 0.0f, 0.0f};
+      mul_qt_qtqt(rv3d.viewquat, rv3d.viewquat, old_from_native);
+      mul_qt_qtqt(rv3d.lviewquat, rv3d.lviewquat, old_from_native);
+
+      const auto version_position = [](float position[3]) {
+        const float old_y = position[1];
+        position[1] = position[2];
+        position[2] = -old_y;
+      };
+      version_position(rv3d.ofs);
+      version_position(rv3d.ndof_ofs);
+    };
+
+    for (bScreen &screen : bmain->screens) {
+      for (ScrArea &area : screen.areabase) {
+        for (SpaceLink &sl : area.spacedata) {
+          if (sl.spacetype != SPACE_VIEW3D) {
+            continue;
+          }
+
+          View3D *v3d = reinterpret_cast<View3D *>(&sl);
+          version_grid_axes(*v3d);
+          if (v3d->localvd != nullptr) {
+            version_grid_axes(*v3d->localvd);
+          }
+
+          ListBaseT<ARegion> *regionbase = (&sl == area.spacedata.first) ? &area.regionbase :
+                                                                           &sl.regionbase;
+          for (ARegion &region : *regionbase) {
+            if (region.regiontype != RGN_TYPE_WINDOW || region.regiondata == nullptr) {
+              continue;
+            }
+
+            RegionView3D *rv3d = static_cast<RegionView3D *>(region.regiondata);
+            version_region_view(*rv3d);
+            if (rv3d->localvd != nullptr) {
+              version_region_view(*rv3d->localvd);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_FILE_ATLEAST(bmain, 502, 49)) {
+    /* World-space force vectors stored before the axis transition follow the native basis change.
+     * Files written by Clarity 5.2.47/48 are already Y-up, but Cloth and Fluid still inherited an
+     * overlooked legacy default; correct only that exact value in those files. */
+    const bool file_uses_legacy_z_up = !MAIN_VERSION_FILE_ATLEAST(bmain, 502, 47);
+    const float legacy_default_gravity[3] = {0.0f, 0.0f, -9.81f};
+    const auto version_world_vector = [](float vector[3]) {
+      const float old_y = vector[1];
+      vector[1] = vector[2];
+      vector[2] = -old_y;
+    };
+
+    if (file_uses_legacy_z_up) {
+      for (Scene &scene : bmain->scenes) {
+        version_world_vector(scene.physics_settings.gravity);
+      }
+    }
+
+    for (Object &object : bmain->objects) {
+      for (ModifierData &modifier : object.modifiers) {
+        if (modifier.type == eModifierType_Cloth) {
+          ClothModifierData &cloth = reinterpret_cast<ClothModifierData &>(modifier);
+          if (cloth.sim_parms != nullptr) {
+            if (file_uses_legacy_z_up ||
+                equals_v3v3(cloth.sim_parms->gravity, legacy_default_gravity))
+            {
+              version_world_vector(cloth.sim_parms->gravity);
+            }
+          }
+        }
+        else if (modifier.type == eModifierType_Fluid) {
+          FluidModifierData &fluid = reinterpret_cast<FluidModifierData &>(modifier);
+          if (fluid.domain != nullptr) {
+            if (file_uses_legacy_z_up ||
+                equals_v3v3(fluid.domain->gravity, legacy_default_gravity))
+            {
+              version_world_vector(fluid.domain->gravity);
+            }
+            if (file_uses_legacy_z_up) {
+              version_world_vector(fluid.domain->gravity_final);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_FILE_ATLEAST(bmain, 502, 50)) {
+    const bool file_uses_legacy_z_up = !MAIN_VERSION_FILE_ATLEAST(bmain, 502, 47);
+    const auto old_z_up_to_native_y_up = [](float vector[3]) {
+      const float old_y = vector[1];
+      vector[1] = vector[2];
+      vector[2] = -old_y;
+    };
+
+    /* Until this subversion Sky Texture directions were interpreted directly by analytic models
+     * whose equations use Z as zenith. They now enter those models through an explicit native
+     * Y-up boundary, so migrate every stored direction, including files written during the
+     * 5.2.47-49 transition. */
+    FOREACH_NODETREE_BEGIN (bmain, node_tree, id) {
+      if (node_tree->type != NTREE_SHADER) {
+        continue;
+      }
+      for (bNode &node : node_tree->nodes) {
+        if (node.type_legacy == SH_NODE_TEX_SKY && node.storage != nullptr) {
+          NodeTexSky &sky = *static_cast<NodeTexSky *>(node.storage);
+          old_z_up_to_native_y_up(sky.sun_direction);
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
+
+    if (file_uses_legacy_z_up) {
+      for (Scene &scene : bmain->scenes) {
+        old_z_up_to_native_y_up(scene.cursor.location);
+
+        if (scene.toolsettings == nullptr) {
+          continue;
+        }
+
+        /* Axis-valued settings follow the same old-Z/native-Y permutation. */
+        if (scene.toolsettings->plane_axis == 1) {
+          scene.toolsettings->plane_axis = 2;
+        }
+        else if (scene.toolsettings->plane_axis == 2) {
+          scene.toolsettings->plane_axis = 1;
+        }
+
+        eGP_Lockaxis_Types &lock_axis = scene.toolsettings->gp_sculpt.lock_axis;
+        if (lock_axis == GP_LOCKAXIS_Y) {
+          lock_axis = GP_LOCKAXIS_Z;
+        }
+        else if (lock_axis == GP_LOCKAXIS_Z) {
+          lock_axis = GP_LOCKAXIS_Y;
+        }
+      }
+
+      for (wmWindowManager &wm : bmain->wm) {
+        old_z_up_to_native_y_up(wm.xr.session_settings.base_pose_location);
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_FILE_ATLEAST(bmain, 502, 51)) {
+    const bool file_uses_legacy_z_up = !MAIN_VERSION_FILE_ATLEAST(bmain, 502, 47);
+    const auto version_floor_constraints = [file_uses_legacy_z_up](
+                                               ListBaseT<bConstraint> &constraints) {
+      for (bConstraint &constraint : constraints) {
+        if (constraint.type != CONSTRAINT_TYPE_MINMAX || constraint.data == nullptr) {
+          continue;
+        }
+        bMinMaxConstraint &floor = *static_cast<bMinMaxConstraint *>(constraint.data);
+        if (file_uses_legacy_z_up) {
+          switch (floor.minmaxflag) {
+            case TRACK_Z:
+              floor.minmaxflag = TRACK_Y;
+              break;
+            case TRACK_nZ:
+              floor.minmaxflag = TRACK_nY;
+              break;
+            case TRACK_Y:
+              floor.minmaxflag = TRACK_nZ;
+              break;
+            case TRACK_nY:
+              floor.minmaxflag = TRACK_Z;
+              break;
+            default:
+              break;
+          }
+        }
+        else if (floor.minmaxflag == TRACK_Z) {
+          /* Clarity 5.2.47-50 was already Y-up, but still created Floor constraints with the old
+           * +Z default. Do not reinterpret any of the other explicitly selected axes. */
+          floor.minmaxflag = TRACK_Y;
+        }
+      }
+    };
+
+    for (Object &object : bmain->objects) {
+      version_floor_constraints(object.constraints);
+      if (object.pose != nullptr) {
+        for (bPoseChannel &pose_channel : object.pose->chanbase) {
+          version_floor_constraints(pose_channel.constraints);
+        }
+      }
+
+      if (!file_uses_legacy_z_up) {
+        for (ModifierData &modifier : object.modifiers) {
+          if (modifier.type != eModifierType_Screw) {
+            continue;
+          }
+          ScrewModifierData &screw = reinterpret_cast<ScrewModifierData &>(modifier);
+          if (screw.ob_axis == nullptr && screw.steps == 16 && screw.render_steps == 16 &&
+              screw.iter == 1 && screw.screw_ofs == 0.0f &&
+              screw.angle == float(2.0 * M_PI) && screw.merge_dist == 0.01f &&
+              screw.flag == MOD_SCREW_SMOOTH_SHADING && screw.axis == 2)
+          {
+            /* Clarity 5.2.47-50 created an otherwise untouched Screw modifier around the former
+             * Z-up default. Preserve explicit/customized modifiers and repair only the exact
+             * constructor state. */
+            screw.axis = 1;
+          }
+        }
+      }
+    }
+
+    /* Canonical Geometry Nodes primitives now use the native X/Z ground plane and Y height.
+     * Rename the Grid dimension sockets without disturbing their links, and update only exact
+     * legacy point defaults. Explicit user-provided point coordinates remain untouched. */
+    const auto replace_exact_vector_default = [](bNode &node,
+                                                 const UString identifier,
+                                                 const float legacy_value[3],
+                                                 const float native_value[3]) {
+      bNodeSocket *socket = bke::node_find_socket(node, SOCK_IN, identifier);
+      if (socket == nullptr || socket->default_value == nullptr) {
+        return;
+      }
+      float *value = version_cycles_node_socket_vector_value(socket);
+      if (equals_v3v3(value, legacy_value)) {
+        copy_v3_v3(value, native_value);
+      }
+    };
+
+    FOREACH_NODETREE_BEGIN (bmain, node_tree, id) {
+      if (node_tree->type != NTREE_GEOMETRY) {
+        continue;
+      }
+
+      version_node_input_socket_name(
+          node_tree, GEO_NODE_MESH_PRIMITIVE_GRID, "Size Y", "Size Z");
+      version_node_input_socket_name(
+          node_tree, GEO_NODE_MESH_PRIMITIVE_GRID, "Vertices Y", "Vertices Z");
+
+      for (bNode &node : node_tree->nodes) {
+        if (node.type_legacy == GEO_NODE_CURVE_PRIMITIVE_CIRCLE) {
+          const float legacy[3] = {0.0f, 1.0f, 0.0f};
+          const float native[3] = {0.0f, 0.0f, -1.0f};
+          replace_exact_vector_default(node, "Point 2"_ustr, legacy, native);
+        }
+        else if (node.type_legacy == GEO_NODE_CURVE_PRIMITIVE_ARC) {
+          const float legacy[3] = {0.0f, 2.0f, 0.0f};
+          const float native[3] = {0.0f, 0.0f, -2.0f};
+          replace_exact_vector_default(node, "Middle"_ustr, legacy, native);
+        }
+        else if (node.type_legacy == GEO_NODE_CURVE_PRIMITIVE_QUADRILATERAL) {
+          const float legacy_defaults[4][3] = {
+              {-1.0f, -1.0f, 0.0f},
+              {1.0f, -1.0f, 0.0f},
+              {1.0f, 1.0f, 0.0f},
+              {-1.0f, 1.0f, 0.0f},
+          };
+          const float native_defaults[4][3] = {
+              {-1.0f, 0.0f, 1.0f},
+              {1.0f, 0.0f, 1.0f},
+              {1.0f, 0.0f, -1.0f},
+              {-1.0f, 0.0f, -1.0f},
+          };
+          const UString point_identifiers[4] = {
+              "Point 1"_ustr, "Point 2"_ustr, "Point 3"_ustr, "Point 4"_ustr};
+          for (const int i : IndexRange(4)) {
+            replace_exact_vector_default(node,
+                                         point_identifiers[i],
+                                         legacy_defaults[i],
+                                         native_defaults[i]);
+          }
+        }
+        else if (node.type_legacy == GEO_NODE_CURVE_PRIMITIVE_LINE) {
+          const float legacy[3] = {0.0f, 0.0f, 1.0f};
+          const float native[3] = {0.0f, 1.0f, 0.0f};
+          replace_exact_vector_default(node, "End"_ustr, legacy, native);
+          replace_exact_vector_default(node, "Direction"_ustr, legacy, native);
+        }
+        else if (node.type_legacy == GEO_NODE_MESH_PRIMITIVE_LINE) {
+          const float legacy[3] = {0.0f, 0.0f, 1.0f};
+          const float native[3] = {0.0f, 1.0f, 0.0f};
+          replace_exact_vector_default(node, "Offset"_ustr, legacy, native);
+        }
+        else if (node.type_legacy == GEO_NODE_SET_CURVE_NORMAL) {
+          const float legacy[3] = {0.0f, 0.0f, 1.0f};
+          const float native[3] = {0.0f, 1.0f, 0.0f};
+          replace_exact_vector_default(node, "Normal"_ustr, legacy, native);
+        }
+        else if (node.type_legacy == GEO_NODE_GIZMO_DIAL) {
+          const float legacy[3] = {0.0f, 0.0f, 1.0f};
+          const float native[3] = {0.0f, 1.0f, 0.0f};
+          replace_exact_vector_default(node, "Up"_ustr, legacy, native);
+        }
+        else if (node.type_legacy == GEO_NODE_GIZMO_LINEAR) {
+          const float legacy[3] = {0.0f, 0.0f, 1.0f};
+          const float native[3] = {0.0f, 1.0f, 0.0f};
+          replace_exact_vector_default(node, "Direction"_ustr, legacy, native);
+        }
+        else if (node.type_legacy == GEO_NODE_RAYCAST) {
+          const float legacy[3] = {0.0f, 0.0f, -1.0f};
+          const float native[3] = {0.0f, -1.0f, 0.0f};
+          replace_exact_vector_default(node, "Ray Direction"_ustr, legacy, native);
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
+  }
+
+  if (!MAIN_VERSION_FILE_ATLEAST(bmain, 502, 52)) {
+    /* Finish migrating user-visible node defaults that still treated +Z as the canonical up
+     * direction. Only exact constructor defaults are changed so authored axes remain intact. */
+    const float legacy_up[3] = {0.0f, 0.0f, 1.0f};
+    const float native_up[3] = {0.0f, 1.0f, 0.0f};
+    const float secondary_x[3] = {1.0f, 0.0f, 0.0f};
+
+    const auto socket_vector = [](bNode &node,
+                                  const eNodeSocketInOut in_out,
+                                  const UString identifier) -> float * {
+      bNodeSocket *socket = bke::node_find_socket(node, in_out, identifier);
+      if (socket == nullptr || socket->default_value == nullptr) {
+        return nullptr;
+      }
+      return version_cycles_node_socket_vector_value(socket);
+    };
+
+    FOREACH_NODETREE_BEGIN (bmain, node_tree, id) {
+      for (bNode &node : node_tree->nodes) {
+        if (node.type_legacy == SH_NODE_VECTOR_ROTATE) {
+          if (float *axis = socket_vector(node, SOCK_IN, "Axis"_ustr); axis != nullptr &&
+              equals_v3v3(axis, legacy_up))
+          {
+            copy_v3_v3(axis, native_up);
+          }
+        }
+        else if (node.type_legacy == FN_NODE_AXES_TO_ROTATION && node.custom1 == 2 &&
+                 node.custom2 == 0)
+        {
+          float *primary = socket_vector(node, SOCK_IN, "Primary Axis"_ustr);
+          float *secondary = socket_vector(node, SOCK_IN, "Secondary Axis"_ustr);
+          if (primary != nullptr && secondary != nullptr && equals_v3v3(primary, legacy_up) &&
+              equals_v3v3(secondary, secondary_x))
+          {
+            copy_v3_v3(primary, native_up);
+            node.custom1 = 1;
+          }
+        }
+        else if (ELEM(node.type_legacy,
+                      FN_NODE_ROTATE_EULER,
+                      FN_NODE_AXIS_ANGLE_TO_ROTATION))
+        {
+          if (float *axis = socket_vector(node, SOCK_IN, "Axis"_ustr); axis != nullptr &&
+              equals_v3v3(axis, legacy_up))
+          {
+            copy_v3_v3(axis, native_up);
+          }
+        }
+        else if (node.type_legacy == FN_NODE_ALIGN_ROTATION_TO_VECTOR) {
+          float *vector = socket_vector(node, SOCK_IN, "Vector"_ustr);
+          if (node.custom1 == 2 && vector != nullptr && equals_v3v3(vector, legacy_up)) {
+            copy_v3_v3(vector, native_up);
+            node.custom1 = 1;
+          }
+        }
+        else if (node.type_legacy == FN_NODE_ALIGN_EULER_TO_VECTOR) {
+          if (float *vector = socket_vector(node, SOCK_IN, "Vector"_ustr); vector != nullptr &&
+              equals_v3v3(vector, legacy_up))
+          {
+            copy_v3_v3(vector, native_up);
+          }
+        }
+        else if (node.type_legacy == SH_NODE_NORMAL) {
+          if (float *normal = socket_vector(node, SOCK_IN, "Normal"_ustr); normal != nullptr &&
+              equals_v3v3(normal, legacy_up))
+          {
+            copy_v3_v3(normal, native_up);
+          }
+          if (float *normal = socket_vector(node, SOCK_OUT, "Normal"_ustr); normal != nullptr &&
+              equals_v3v3(normal, legacy_up))
+          {
+            copy_v3_v3(normal, native_up);
+          }
+        }
+        else if (node.type_legacy == CMP_NODE_NORMAL) {
+          if (float *normal = socket_vector(node, SOCK_OUT, "Normal"_ustr); normal != nullptr &&
+              equals_v3v3(normal, legacy_up))
+          {
+            copy_v3_v3(normal, native_up);
+          }
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
+
+    if (MAIN_VERSION_FILE_ATLEAST(bmain, 502, 47)) {
+      for (Object &object : bmain->objects) {
+        for (ModifierData &modifier : object.modifiers) {
+          if (modifier.type != eModifierType_MeshCache) {
+            continue;
+          }
+          MeshCacheModifierData &mesh_cache = reinterpret_cast<MeshCacheModifierData &>(modifier);
+          if (mesh_cache.filepath[0] == '\0' && mesh_cache.forward_axis == 1 &&
+              mesh_cache.up_axis == 2 &&
+              mesh_cache.flip_axis == MeshCacheModifierFlipAxis(0))
+          {
+            /* Clarity 5.2.47-51 constructed native cache modifiers with Blender's former target
+             * basis. Legacy Blender files keep their declared external-cache axes and are
+             * converted to the new internal basis at evaluation time. */
+            mesh_cache.forward_axis = 2;
+            mesh_cache.up_axis = 1;
+          }
+        }
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_FILE_ATLEAST(bmain, 502, 53)) {
+    const bool file_uses_legacy_z_up = !MAIN_VERSION_FILE_ATLEAST(bmain, 502, 47);
+
+    /* Two planar curve-node defaults were missed by the earlier primitive migration. Change only
+     * untouched constructor values; linked and authored coordinates keep their exact meaning. */
+    const auto replace_exact_vector_default = [](bNode &node,
+                                                 const UString identifier,
+                                                 const float legacy_value[3],
+                                                 const float native_value[3]) {
+      bNodeSocket *socket = bke::node_find_socket(node, SOCK_IN, identifier);
+      if (socket == nullptr || socket->default_value == nullptr) {
+        return;
+      }
+      float *value = version_cycles_node_socket_vector_value(socket);
+      if (equals_v3v3(value, legacy_value)) {
+        copy_v3_v3(value, native_value);
+      }
+    };
+
+    FOREACH_NODETREE_BEGIN (bmain, node_tree, id) {
+      if (node_tree->type != NTREE_GEOMETRY) {
+        continue;
+      }
+      for (bNode &node : node_tree->nodes) {
+        if (node.type_legacy == GEO_NODE_CURVE_PRIMITIVE_BEZIER_SEGMENT) {
+          const float legacy[3] = {-0.5f, 0.5f, 0.0f};
+          const float native[3] = {-0.5f, 0.0f, -0.5f};
+          replace_exact_vector_default(node, "Start Handle"_ustr, legacy, native);
+        }
+        else if (node.type_legacy == GEO_NODE_CURVE_PRIMITIVE_QUADRATIC_BEZIER) {
+          const float legacy[3] = {0.0f, 2.0f, 0.0f};
+          const float native[3] = {0.0f, 0.0f, -2.0f};
+          replace_exact_vector_default(node, "Middle"_ustr, legacy, native);
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
+
+    if (file_uses_legacy_z_up) {
+      /* Overhang analysis is evaluated in world space, so preserve its authored direction across
+       * the old-Z/native-Y basis change. */
+      const auto version_world_axis = [](const char axis) -> char {
+        switch (axis) {
+          case OB_POSY:
+            return OB_NEGZ;
+          case OB_NEGY:
+            return OB_POSZ;
+          case OB_POSZ:
+            return OB_POSY;
+          case OB_NEGZ:
+            return OB_NEGY;
+          default:
+            return axis;
+        }
+      };
+      for (Scene &scene : bmain->scenes) {
+        if (scene.toolsettings != nullptr) {
+          scene.toolsettings->statvis.overhang_axis = version_world_axis(
+              scene.toolsettings->statvis.overhang_axis);
+        }
+      }
+    }
+    else {
+      /* Clarity 5.2.47-52 already stored native scene coordinates, but retained the former
+       * constructor default for overhang analysis. */
+      for (Scene &scene : bmain->scenes) {
+        if (scene.toolsettings != nullptr && scene.toolsettings->statvis.overhang_axis == OB_NEGZ) {
+          scene.toolsettings->statvis.overhang_axis = OB_NEGY;
+        }
+      }
+
+      const auto version_constraint_defaults = [](ListBaseT<bConstraint> &constraints) {
+        for (bConstraint &constraint : constraints) {
+          if (constraint.data == nullptr) {
+            continue;
+          }
+          if (constraint.type == CONSTRAINT_TYPE_FOLLOWPATH) {
+            bFollowPathConstraint &follow_path = *static_cast<bFollowPathConstraint *>(
+                constraint.data);
+            if (follow_path.trackflag == TRACK_Y && follow_path.upflag == UP_Z) {
+              follow_path.trackflag = TRACK_Z;
+              follow_path.upflag = UP_Y;
+            }
+          }
+          else if (constraint.type == CONSTRAINT_TYPE_LOCKTRACK) {
+            bLockTrackConstraint &locked_track = *static_cast<bLockTrackConstraint *>(
+                constraint.data);
+            if (locked_track.trackflag == TRACK_Y && locked_track.lockflag == LOCK_Z) {
+              locked_track.trackflag = TRACK_Z;
+              locked_track.lockflag = LOCK_Y;
+            }
+          }
+          else if (constraint.type == CONSTRAINT_TYPE_DAMPTRACK) {
+            bDampTrackConstraint &damped_track = *static_cast<bDampTrackConstraint *>(
+                constraint.data);
+            if (damped_track.trackflag == TRACK_Y) {
+              damped_track.trackflag = TRACK_Z;
+            }
+          }
+          else if (constraint.type == CONSTRAINT_TYPE_SHRINKWRAP) {
+            bShrinkwrapConstraint &shrinkwrap = *static_cast<bShrinkwrapConstraint *>(
+                constraint.data);
+            if (shrinkwrap.projAxis == OB_POSZ &&
+                shrinkwrap.projAxisSpace == CONSTRAINT_SPACE_LOCAL)
+            {
+              shrinkwrap.projAxis = OB_POSY;
+            }
+          }
+        }
+      };
+
+      for (Object &object : bmain->objects) {
+        if (!ELEM(object.type, OB_CAMERA, OB_LAMP, OB_SPEAKER) &&
+            object.trackflag == OB_POSY && object.upflag == OB_POSZ)
+        {
+          object.trackflag = OB_POSZ;
+          object.upflag = OB_POSY;
+        }
+
+        version_constraint_defaults(object.constraints);
+        if (object.pose != nullptr) {
+          for (bPoseChannel &pose_channel : object.pose->chanbase) {
+            version_constraint_defaults(pose_channel.constraints);
+          }
+        }
+      }
+    }
   }
 
   /**

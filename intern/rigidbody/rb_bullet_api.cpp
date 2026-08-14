@@ -678,7 +678,7 @@ rbCollisionShape *RB_shape_new_sphere(float radius)
 rbCollisionShape *RB_shape_new_capsule(float radius, float height)
 {
   rbCollisionShape *shape = new rbCollisionShape;
-  shape->cshape = new btCapsuleShapeZ(radius, height);
+  shape->cshape = new btCapsuleShape(radius, height);
   shape->mesh = nullptr;
   shape->compoundChilds = 0;
   shape->compoundChildShapes = nullptr;
@@ -688,7 +688,7 @@ rbCollisionShape *RB_shape_new_capsule(float radius, float height)
 rbCollisionShape *RB_shape_new_cone(float radius, float height)
 {
   rbCollisionShape *shape = new rbCollisionShape;
-  shape->cshape = new btConeShapeZ(radius, height);
+  shape->cshape = new btConeShape(radius, height);
   shape->mesh = nullptr;
   shape->compoundChilds = 0;
   shape->compoundChildShapes = nullptr;
@@ -698,7 +698,7 @@ rbCollisionShape *RB_shape_new_cone(float radius, float height)
 rbCollisionShape *RB_shape_new_cylinder(float radius, float height)
 {
   rbCollisionShape *shape = new rbCollisionShape;
-  shape->cshape = new btCylinderShapeZ(btVector3(radius, radius, height));
+  shape->cshape = new btCylinderShape(btVector3(radius, height, radius));
   shape->mesh = nullptr;
   shape->compoundChilds = 0;
   shape->compoundChildShapes = nullptr;

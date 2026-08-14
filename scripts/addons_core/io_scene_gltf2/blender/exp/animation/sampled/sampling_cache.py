@@ -434,8 +434,7 @@ def object_caching(data, obj_uuids, current_instance, action_name, slot_identifi
                                                               .nodes[obj_uuid].parent_bone_uuid].blender_bone
                 armature_object = export_settings['vtree'].nodes[export_settings['vtree']
                                                                  .nodes[export_settings['vtree'].nodes[obj_uuid].parent_bone_uuid].armature].blender_object
-                axis_basis_change = mathutils.Matrix(
-                    ((1.0, 0.0, 0.0, 0.0), (0.0, 0.0, 1.0, 0.0), (0.0, -1.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)))
+                axis_basis_change = mathutils.Matrix.Identity(4)
 
                 parent_mat = armature_object.matrix_world @ blender_bone.matrix @ axis_basis_change
 

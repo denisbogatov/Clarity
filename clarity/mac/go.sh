@@ -676,11 +676,11 @@ run_tests() {
   # ctest hands each suite the environment the build system defines for it. Starting
   # blender_test by hand fails on a missing library before running a single test.
   #
-  # The `ui_opengl_test_clarity_pivot.*` suites are event-simulation tests: they start Blender
+  # The Clarity pivot and soft-selection UI suites are event-simulation tests: they start Blender
   # with a real window, so they need the tree to be built, not just the gtest runner. Only the
   # Clarity ones are selected - WITH_UI_TESTS registers the whole upstream set as well.
   ctest --test-dir "${BUILD_DIR}" \
-    -R '^(editor_.*|clarity_interaction_defaults|clarity_pivot_lifecycle|ui_opengl_test_clarity_pivot\..*)$' \
+    -R '^(editor_.*|clarity_interaction_defaults|clarity_pivot_lifecycle|clarity_soft_selection|ui_opengl_test_clarity_(pivot|soft_selection)\..*)$' \
     --output-on-failure \
     --parallel "$(sysctl -n hw.ncpu)"
 }

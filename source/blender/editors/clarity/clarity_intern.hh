@@ -11,5 +11,6 @@
 namespace blender::ed::clarity {
 
 void register_types();
+void register_live_surface_operators();
 
 }  // namespace blender::ed::clarity

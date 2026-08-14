@@ -178,6 +178,7 @@ template<class Float3Type>
 ccl_device_inline auto svm_node_tex_environment_projection(Float3Type co, const uint proj)
 {
   co = safe_normalize(co);
+  co = environment_z_up_from_native_y_up(co);
   if (proj == 0) {
     return direction_to_equirectangular(co);
   }

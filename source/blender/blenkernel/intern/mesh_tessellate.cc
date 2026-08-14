@@ -89,7 +89,7 @@ BLI_INLINE void mesh_calc_tessellation_for_face_impl(const Span<int> corner_vert
           co_prev = co_curr;
         }
         if (UNLIKELY(normalize_v3(normal) == 0.0f)) {
-          normal[2] = 1.0f;
+          normal[1] = 1.0f;
         }
         axis_dominant_v3_to_m3_negate(axis_mat, normal);
       }

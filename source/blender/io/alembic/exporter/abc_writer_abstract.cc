@@ -113,14 +113,14 @@ void ABCAbstractWriter::update_bounding_box(Object *object)
 
   const std::array<float3, 8> corners = bounds::corners(*bounds);
 
-  /* Convert Z-up to Y-up. This also changes which vector goes into which min/max property. */
+  /* Alembic and Clarity share the same native Y-up basis. */
   bounding_box_.min.x = corners[0][0];
-  bounding_box_.min.y = corners[0][2];
-  bounding_box_.min.z = -corners[6][1];
+  bounding_box_.min.y = corners[0][1];
+  bounding_box_.min.z = corners[0][2];
 
   bounding_box_.max.x = corners[6][0];
-  bounding_box_.max.y = corners[6][2];
-  bounding_box_.max.z = -corners[0][1];
+  bounding_box_.max.y = corners[6][1];
+  bounding_box_.max.z = corners[6][2];
 }
 
 void ABCAbstractWriter::write_visibility(const HierarchyContext &context)

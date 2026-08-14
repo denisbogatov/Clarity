@@ -627,6 +627,23 @@ ClaritySnapPlan transform_snap_clarity_plan_get(const ClaritySnapPlanInput &inpu
 {
   ClaritySnapPlan plan;
   if (input.mode == ed::clarity::ClaritySnapMode::None) {
+    if (input.is_translation && input.live_surface_active) {
+      plan.use_snap = true;
+      plan.live_surface = true;
+      plan.source_is_center = true;
+      switch (input.live_surface_snap_mode) {
+        case ed::clarity::ClarityLiveSurfaceSnapMode::Surface:
+          plan.snap_to = SCE_SNAP_TO_FACE;
+          break;
+        case ed::clarity::ClarityLiveSurfaceSnapMode::FaceCenter:
+          plan.snap_to = SCE_SNAP_TO_FACE_MIDPOINT;
+          break;
+        case ed::clarity::ClarityLiveSurfaceSnapMode::Vertex:
+          plan.snap_to = SCE_SNAP_TO_VERTEX;
+          break;
+      }
+      return plan;
+    }
     /* A transform constraint is what holds a component on the geometry while nothing is snapping
      * it anywhere. A held snap key is a deliberate one-off and outranks it, which is why this only
      * answers when there is no snap mode. */
@@ -666,6 +683,7 @@ ClaritySnapPlan transform_snap_clarity_plan_get(const ClaritySnapPlanInput &inpu
       plan.snap_to = SCE_SNAP_TO_EDGE;
       plan.curve_targets_only = true;
       plan.source_is_center = true;
+      plan.live_surface_fallback = input.live_surface_active;
       break;
     case ed::clarity::ClaritySnapMode::Point:
       plan.use_snap = true;
@@ -1871,6 +1889,13 @@ static eSnapMode snapObjectsTransform(
   snap_object_params.use_backface_culling = (t->tsnap.flag & SCE_SNAP_BACKFACE_CULLING) != 0;
   snap_object_params.curve_targets_only = t->tsnap.clarity_curve_targets_only;
   snap_object_params.include_object_pivots = t->tsnap.clarity_include_object_pivots;
+  if (t->tsnap.clarity_live_surface) {
+    snap_object_params.include_hidden = true;
+    snap_object_params.occlusion_test = SNAP_OCCLUSION_NEVER;
+    snap_object_params.use_backface_culling = false;
+    snap_object_params.object_filter_fn = ED_clarity_live_surface_object_filter;
+    snap_object_params.object_filter_user_data = t->context;
+  }
   /* Clarity never snaps the moved data onto the pivot it is being moved by, so the pivot that acts
    * as the snap source is excluded from the pivot targets in every mode, not only while the pivot
    * itself is edited. */
@@ -1901,6 +1926,61 @@ static eSnapMode snapObjectsTransform(
       dist_px,
       r_loc,
       r_no);
+  if (result == SCE_SNAP_TO_NONE &&
+      ((t->tsnap.clarity_live_surface && t->tsnap.mode == SCE_SNAP_TO_FACE) ||
+       t->tsnap.clarity_live_surface_fallback))
+  {
+    /* Maya's surface-shape API asks a live surface for the closest screen-space point when the
+     * pointer ray misses it. Blender's projected edge query is the equivalent silhouette query.
+     * It is only a fallback: combining FACE and EDGE in the first pass would make a nearby mesh
+     * edge steal an otherwise valid surface hit. */
+    SnapObjectParams live_params = snap_object_params;
+    live_params.curve_targets_only = false;
+    live_params.include_object_pivots = false;
+    live_params.include_hidden = true;
+    live_params.occlusion_test = SNAP_OCCLUSION_NEVER;
+    live_params.use_backface_culling = false;
+    live_params.object_filter_fn = ED_clarity_live_surface_object_filter;
+    live_params.object_filter_user_data = t->context;
+    if (t->tsnap.clarity_live_surface_fallback) {
+      float live_face_dist_px = *dist_px;
+      const eSnapMode live_face = ed::transform::snap_object_project_view3d(
+          t->tsnap.object_context,
+          t->depsgraph,
+          t->region,
+          static_cast<const View3D *>(t->view),
+          SCE_SNAP_TO_FACE,
+          &live_params,
+          nullptr,
+          mval,
+          prev_co,
+          &live_face_dist_px,
+          r_loc,
+          r_no);
+      if (live_face == SCE_SNAP_TO_FACE) {
+        *dist_px = live_face_dist_px;
+        return live_face;
+      }
+    }
+    float silhouette_dist_px = float(t->region->winx + t->region->winy);
+    const eSnapMode silhouette = ed::transform::snap_object_project_view3d(
+        t->tsnap.object_context,
+        t->depsgraph,
+        t->region,
+        static_cast<const View3D *>(t->view),
+        SCE_SNAP_TO_EDGE,
+        &live_params,
+        nullptr,
+        mval,
+        prev_co,
+        &silhouette_dist_px,
+        r_loc,
+        r_no);
+    if (silhouette != SCE_SNAP_TO_NONE) {
+      zero_v3(r_no);
+      return SCE_SNAP_TO_FACE;
+    }
+  }
   /* The visible pivot of the moved selection is deliberately not added as a target here: it is the
    * snap source, so offering it created a dead zone around the manipulator in which the selection
    * snapped onto itself. Pivots of other objects still come from #include_object_pivots. */
@@ -1985,10 +2065,10 @@ bool peelObjectsTransform(TransInfo *t,
         *r_thickness = hit_max->depth - hit_min->depth;
       }
 
-      /* XXX, is there a correct normal in this case ???, for now just z up. */
+      /* No surface normal is available here; fall back to native world-up. */
       r_no[0] = 0.0;
-      r_no[1] = 0.0;
-      r_no[2] = 1.0;
+      r_no[1] = 1.0;
+      r_no[2] = 0.0;
     }
 
     for (SnapObjectHitDepth &link : depths_peel.items_mutable()) {

@@ -159,9 +159,9 @@ void importer_main(Main *bmain,
   unit_m3(obmat3x3);
   float obmat4x4[4][4];
   unit_m4(obmat4x4);
-  /* +Y-forward and +Z-up are the Blender's default axis settings. */
+  /* Clarity's native world uses +Z-forward and +Y-up. */
   mat3_from_axis_conversion(
-      IO_AXIS_Y, IO_AXIS_Z, import_params.forward_axis, import_params.up_axis, obmat3x3);
+      IO_AXIS_Z, IO_AXIS_Y, import_params.forward_axis, import_params.up_axis, obmat3x3);
   copy_m4_m3(obmat4x4, obmat3x3);
   rescale_m4(obmat4x4, scale_vec);
   BKE_object_apply_mat4(obj, obmat4x4, true, false);

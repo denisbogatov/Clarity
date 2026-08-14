@@ -42,7 +42,7 @@ struct OBJExportParams {
   int end_frame = INT_MAX;
 
   /* Geometry Transform options. */
-  eIOAxis forward_axis = IO_AXIS_NEGATIVE_Z;
+  eIOAxis forward_axis = IO_AXIS_Z;
   eIOAxis up_axis = IO_AXIS_Y;
   float global_scale = 1.0f;
 
@@ -87,7 +87,7 @@ struct OBJImportParams {
   /** Value 0 disables clamping. */
   float clamp_size = 0.0f;
   float global_scale = 1.0f;
-  eIOAxis forward_axis = IO_AXIS_NEGATIVE_Z;
+  eIOAxis forward_axis = IO_AXIS_Z;
   eIOAxis up_axis = IO_AXIS_Y;
   char collection_separator = 0;
   bool use_split_objects = true;

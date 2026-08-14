@@ -189,28 +189,25 @@ static void wm_xr_session_base_pose_calc(const Scene *scene,
                                        scene->camera;
 
   if (settings->base_pose_type == XR_BASE_POSE_CUSTOM) {
-    float tmp_quatx[4], tmp_quatz[4];
-
     copy_v3_v3(r_base_pose->position, settings->base_pose_location);
-    axis_angle_to_quat_single(tmp_quatx, 'X', M_PI_2);
-    axis_angle_to_quat_single(tmp_quatz, 'Z', settings->base_pose_angle);
-    mul_qt_qtqt(r_base_pose->orientation_quat, tmp_quatz, tmp_quatx);
+    axis_angle_to_quat_single(r_base_pose->orientation_quat, 'Y', settings->base_pose_angle);
   }
   else if (base_pose_object) {
     float tmp_quat[4];
-    float tmp_eul[3];
+    float forward[3] = {0.0f, 0.0f, -1.0f};
 
     mat4_to_loc_quat(r_base_pose->position, tmp_quat, base_pose_object->object_to_world().ptr());
 
-    /* Only use rotation around Z-axis to align view with floor. */
-    quat_to_eul(tmp_eul, tmp_quat);
-    tmp_eul[0] = M_PI_2;
-    tmp_eul[1] = 0;
-    eul_to_quat(r_base_pose->orientation_quat, tmp_eul);
+    /* OpenXR and Clarity are both Y-up. Keep only the object's heading around world Y so camera
+     * pitch and roll cannot tilt the tracking floor. */
+    mul_qt_v3(tmp_quat, forward);
+    forward[1] = 0.0f;
+    const float heading = normalize_v3(forward) != 0.0f ? atan2f(-forward[0], -forward[2]) : 0.0f;
+    axis_angle_to_quat_single(r_base_pose->orientation_quat, 'Y', heading);
   }
   else {
     copy_v3_fl(r_base_pose->position, 0.0f);
-    axis_angle_to_quat_single(r_base_pose->orientation_quat, 'X', M_PI_2);
+    unit_qt(r_base_pose->orientation_quat);
   }
 
   *r_base_scale = settings->base_scale;
@@ -340,11 +337,11 @@ static void wm_xr_session_scale_maintain_viewer_pos(wmXrSessionState *state,
   const float offset_val = prev_scale - new_scale;
   const float3 view_scaling_offset = viewer_base_offset * offset_val;
 
-  /* On X/Y axes: Add the scaling offset to maintain relative horizontal world position. */
+  /* On X/Z axes: Add the scaling offset to maintain relative horizontal world position. */
   state->nav_pose.position[0] += view_scaling_offset.x;
-  state->nav_pose.position[1] += view_scaling_offset.y;
-  /* On Z axis: Scale proportionally for the scaling change to be visible. */
-  state->nav_pose.position[2] *= new_scale / prev_scale;
+  state->nav_pose.position[2] += view_scaling_offset.z;
+  /* On the native Y-up axis: Scale proportionally for the scaling change to be visible. */
+  state->nav_pose.position[1] *= new_scale / prev_scale;
 }
 
 static void wm_xr_session_state_viewer_scale_update(wmXrSessionState *state,

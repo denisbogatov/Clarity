@@ -499,6 +499,7 @@ void Instance::begin_sync()
     layer.light_probes.begin_sync(resources, state);
     layer.metaballs.begin_sync(resources, state);
     layer.meshes.begin_sync(resources, state);
+    layer.soft_selection_false_color.begin_sync(resources, state);
     layer.mesh_uvs.begin_sync(resources, state);
     layer.mode_transfer.begin_sync(resources, state);
     layer.names.begin_sync(resources, state);
@@ -592,6 +593,7 @@ void Instance::object_sync(ObjectRef &ob_ref, Manager &manager)
     switch (ob_ref.object->type) {
       case OB_MESH:
         layer.meshes.edit_object_sync(manager, ob_ref, resources, state);
+        layer.soft_selection_false_color.edit_object_sync(manager, ob_ref, resources, state);
         break;
       case OB_ARMATURE:
         layer.armatures.edit_object_sync(manager, ob_ref, resources, state);
@@ -728,6 +730,7 @@ void Instance::end_sync()
     layer.mesh_uvs.end_sync(resources, state);
     layer.metaballs.end_sync(resources, state);
     layer.relations.end_sync(resources, state);
+    layer.soft_selection_false_color.end_sync(resources, state);
     layer.fluids.end_sync(resources, state);
     layer.speakers.end_sync(resources, state);
   };
@@ -914,6 +917,7 @@ void Instance::draw_v3d(Manager &manager, View &view)
   auto draw_color_only = [&](OverlayLayer &layer, Framebuffer &framebuffer) {
     layer.light_probes.draw_color_only(framebuffer, manager, view);
     layer.meshes.draw_color_only(framebuffer, manager, view);
+    layer.soft_selection_false_color.draw_color_only(framebuffer, manager, view);
     layer.curves.draw_color_only(framebuffer, manager, view);
     layer.grease_pencil.draw_color_only(framebuffer, manager, view);
   };
@@ -1001,7 +1005,10 @@ void Instance::draw_v3d(Manager &manager, View &view)
     xray_fade.draw_color_only(resources.overlay_color_only_fb, manager, view);
 
     regular.meshes.draw_line(resources.overlay_line_fb, manager, view);
+    regular.soft_selection_false_color.draw_line(resources.overlay_line_fb, manager, view);
     infront.meshes.draw_line(resources.overlay_line_in_front_fb, manager, view);
+    infront.soft_selection_false_color.draw_line(
+        resources.overlay_line_in_front_fb, manager, view);
     clarity_pivot_snap_preview.draw_line(clarity_pivot_snap_preview.is_in_front() ?
                                           resources.overlay_line_in_front_fb :
                                           resources.overlay_line_fb,

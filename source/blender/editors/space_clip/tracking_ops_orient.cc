@@ -12,6 +12,7 @@
 #include "DNA_space_types.h"
 
 #include "BLI_listbase.h"
+#include "BLI_assert.h"
 #include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
 
@@ -253,14 +254,12 @@ static void set_axis(Scene *scene,
 {
   Object *camera = get_camera_with_movieclip(scene, clip);
   const bool is_camera = (tracking_object->flag & TRACKING_OBJECT_CAMERA) != 0;
-  bool flip = false;
-  float mat[4][4], vec[3], obmat[4][4], dvec[3];
+  float mat[4][4], vec[3], obmat[4][4];
 
   BKE_object_to_mat4(ob, obmat);
 
   BKE_tracking_get_camera_object_matrix(camera, mat);
   mul_v3_m4v3(vec, mat, track->bundle_pos);
-  copy_v3_v3(dvec, vec);
 
   if (!is_camera) {
     float imat[4][4];
@@ -268,81 +267,30 @@ static void set_axis(Scene *scene,
     object_solver_inverted_matrix(scene, ob, imat);
     mul_v3_m4v3(vec, imat, vec);
 
-    invert_m4_m4(imat, obmat);
-    mul_v3_m4v3(dvec, imat, vec);
-
     sub_v3_v3(vec, obmat[3]);
   }
 
-  if (len_squared_v2(vec) < (1e-3f * 1e-3f)) {
+  /* Scene axes are defined on Clarity's horizontal X/Z plane. */
+  vec[1] = 0.0f;
+  if ((vec[0] * vec[0] + vec[2] * vec[2]) < (1e-3f * 1e-3f)) {
     return;
   }
+  normalize_v3(vec);
 
   unit_m4(mat);
-
   if (axis == 'X') {
-    if (fabsf(dvec[1]) < 1e-3f) {
-      flip = true;
-
-      mat[0][0] = -1.0f;
-      mat[0][1] = 0.0f;
-      mat[0][2] = 0.0f;
-      mat[1][0] = 0.0f;
-      mat[1][1] = -1.0f;
-      mat[1][2] = 0.0f;
-      mat[2][0] = 0.0f;
-      mat[2][1] = 0.0f;
-      mat[2][2] = 1.0f;
-    }
-    else {
-      copy_v3_v3(mat[0], vec);
-
-      if (is_camera || fabsf(vec[2]) < 1e-3f) {
-        mat[0][2] = 0.0f;
-        mat[2][0] = 0.0f;
-        mat[2][1] = 0.0f;
-        mat[2][2] = 1.0f;
-        cross_v3_v3v3(mat[1], mat[2], mat[0]);
-      }
-      else {
-        vec[2] = 0.0f;
-
-        cross_v3_v3v3(mat[1], mat[0], vec);
-        cross_v3_v3v3(mat[2], mat[0], mat[1]);
-      }
-    }
+    copy_v3_v3(mat[0], vec);
+    copy_v3_fl3(mat[1], 0.0f, 1.0f, 0.0f);
+    cross_v3_v3v3(mat[2], mat[0], mat[1]);
+  }
+  else if (axis == 'Z') {
+    copy_v3_fl3(mat[1], 0.0f, 1.0f, 0.0f);
+    copy_v3_v3(mat[2], vec);
+    cross_v3_v3v3(mat[0], mat[1], mat[2]);
   }
   else {
-    if (fabsf(dvec[0]) < 1e-3f) {
-      flip = true;
-
-      mat[0][0] = -1.0f;
-      mat[0][1] = 0.0f;
-      mat[0][2] = 0.0f;
-      mat[1][0] = 0.0f;
-      mat[1][1] = -1.0f;
-      mat[1][2] = 0.0f;
-      mat[2][0] = 0.0f;
-      mat[2][1] = 0.0f;
-      mat[2][2] = 1.0f;
-    }
-    else {
-      copy_v3_v3(mat[1], vec);
-
-      if (is_camera || fabsf(vec[2]) < 1e-3f) {
-        mat[1][2] = 0.0f;
-        mat[2][0] = 0.0f;
-        mat[2][1] = 0.0f;
-        mat[2][2] = 1.0f;
-        cross_v3_v3v3(mat[0], mat[1], mat[2]);
-      }
-      else {
-        vec[2] = 0.0f;
-
-        cross_v3_v3v3(mat[0], vec, mat[1]);
-        cross_v3_v3v3(mat[2], mat[0], mat[1]);
-      }
-    }
+    BLI_assert_unreachable();
+    return;
   }
 
   normalize_v3(mat[0]);
@@ -355,22 +303,17 @@ static void set_axis(Scene *scene,
     mul_m4_m4m4(mat, mat, obmat);
   }
   else {
-    if (!flip) {
-      float lmat[4][4], ilmat[4][4], rmat[3][3];
+    float lmat[4][4], ilmat[4][4], rmat[3][3];
 
-      BKE_object_rot_to_mat3(ob, rmat, true);
-      invert_m3(rmat);
-      mul_m4_m4m3(mat, mat, rmat);
+    BKE_object_rot_to_mat3(ob, rmat, true);
+    invert_m3(rmat);
+    mul_m4_m4m3(mat, mat, rmat);
 
-      unit_m4(lmat);
-      copy_v3_v3(lmat[3], obmat[3]);
-      invert_m4_m4(ilmat, lmat);
+    unit_m4(lmat);
+    copy_v3_v3(lmat[3], obmat[3]);
+    invert_m4_m4(ilmat, lmat);
 
-      mul_m4_series(mat, lmat, mat, ilmat, obmat);
-    }
-    else {
-      mul_m4_m4m4(mat, obmat, mat);
-    }
+    mul_m4_series(mat, lmat, mat, ilmat, obmat);
   }
 
   BKE_object_apply_mat4(ob, mat, false, false);
@@ -382,17 +325,10 @@ static wmOperatorStatus set_plane_exec(bContext *C, wmOperator *op)
   MovieClip *clip = ED_space_clip_get_clip(sc);
   Scene *scene = CTX_data_scene(C);
   MovieTracking *tracking = &clip->tracking;
-  const MovieTrackingTrack *axis_track = nullptr;
   Object *camera = get_camera_with_movieclip(scene, clip);
   int tot = 0;
   float vec[3][3], mat[4][4], obmat[4][4], newmat[4][4], orig[3] = {0.0f, 0.0f, 0.0f};
   int plane = RNA_enum_get(op->ptr, "plane");
-  float rot[4][4] = {
-      {0.0f, 0.0f, -1.0f, 0.0f},
-      {0.0f, 1.0f, 0.0f, 0.0f},
-      {1.0f, 0.0f, 0.0f, 0.0f},
-      {0.0f, 0.0f, 0.0f, 1.0f},
-  }; /* 90 degrees Y-axis rotation matrix */
 
   if (count_selected_bundles(C) != 3) {
     BKE_report(op->reports, RPT_ERROR, "Three tracks with bundles are needed to orient the floor");
@@ -411,17 +347,15 @@ static wmOperatorStatus set_plane_exec(bContext *C, wmOperator *op)
   BKE_tracking_get_camera_object_matrix(camera, mat);
 
   /* Get 3 bundles to use as reference. */
+  int origin_index = -1;
   {
     const MovieTrackingTrack *track = static_cast<const MovieTrackingTrack *>(
         tracking_object->tracks.first);
     while (track && tot < 3) {
       if (track->flag & TRACK_HAS_BUNDLE && TRACK_VIEW_SELECTED(sc, track)) {
         mul_v3_m4v3(vec[tot], mat, track->bundle_pos);
-        if (tot == 0 || track == tracking_object->active_track) {
-          copy_v3_v3(orig, vec[tot]);
-        }
-        else {
-          axis_track = track;
+        if (track == tracking_object->active_track) {
+          origin_index = tot;
         }
         tot++;
       }
@@ -429,20 +363,31 @@ static wmOperatorStatus set_plane_exec(bContext *C, wmOperator *op)
     }
   }
 
-  sub_v3_v3(vec[1], vec[0]);
-  sub_v3_v3(vec[2], vec[0]);
+  if (origin_index == -1) {
+    origin_index = 0;
+  }
+  copy_v3_v3(orig, vec[origin_index]);
+  int direction_index = 0;
+  for (int i = 0; i < 3; i++) {
+    if (i != origin_index) {
+      sub_v3_v3v3(vec[direction_index], vec[i], orig);
+      direction_index++;
+    }
+  }
 
-  /* Construct ortho-normal basis. */
+  /* Construct a right-handed native basis from the selected plane. */
   unit_m4(mat);
   if (plane == 0) { /* floor */
-    cross_v3_v3v3(mat[0], vec[1], vec[2]);
-    copy_v3_v3(mat[1], vec[1]);
+    /* X follows the first reference direction, Y is the floor normal, and Z is forward. */
+    copy_v3_v3(mat[0], vec[0]);
+    cross_v3_v3v3(mat[1], vec[1], vec[0]);
     cross_v3_v3v3(mat[2], mat[0], mat[1]);
   }
   else if (plane == 1) { /* wall */
-    cross_v3_v3v3(mat[2], vec[1], vec[2]);
-    copy_v3_v3(mat[1], vec[1]);
-    cross_v3_v3v3(mat[0], mat[1], mat[2]);
+    /* X follows the first reference direction, Z is the wall normal, and Y is up. */
+    copy_v3_v3(mat[0], vec[0]);
+    cross_v3_v3v3(mat[2], vec[0], vec[1]);
+    cross_v3_v3v3(mat[1], mat[2], mat[0]);
   }
 
   normalize_v3(mat[0]);
@@ -458,16 +403,21 @@ static wmOperatorStatus set_plane_exec(bContext *C, wmOperator *op)
     invert_m4(mat);
 
     BKE_object_to_mat4(object, obmat);
-    mul_m4_m4m4(mat, mat, obmat);
-    mul_m4_m4m4(newmat, rot, mat);
-    BKE_object_apply_mat4(object, newmat, false, false);
+    mul_m4_m4m4(newmat, mat, obmat);
 
-    /* Make camera have positive z-coordinate. */
-    if (object->loc[2] < 0) {
-      invert_m4(rot);
-      mul_m4_m4m4(newmat, rot, mat);
-      BKE_object_apply_mat4(object, newmat, false, false);
+    const int positive_side_axis = (plane == 0) ? 1 : 2;
+    if (newmat[3][positive_side_axis] < 0.0f) {
+      /* Rotate the solved world 180 degrees around X so the camera stays above the floor or in
+       * front of the wall without changing the selected plane. */
+      const float flip_yz[4][4] = {
+          {1.0f, 0.0f, 0.0f, 0.0f},
+          {0.0f, -1.0f, 0.0f, 0.0f},
+          {0.0f, 0.0f, -1.0f, 0.0f},
+          {0.0f, 0.0f, 0.0f, 1.0f},
+      };
+      mul_m4_m4m4(newmat, flip_yz, newmat);
     }
+    BKE_object_apply_mat4(object, newmat, false, false);
   }
   else {
     BKE_object_apply_mat4(object, mat, false, false);
@@ -479,8 +429,6 @@ static wmOperatorStatus set_plane_exec(bContext *C, wmOperator *op)
   BKE_object_transform_copy(object_eval, object);
   BKE_object_where_is_calc(depsgraph, scene_eval, object_eval);
   BKE_object_transform_copy(object, object_eval);
-
-  set_axis(scene, object, clip, tracking_object, axis_track, 'X');
 
   DEG_id_tag_update(&clip->id, 0);
   DEG_id_tag_update(&object->id, ID_RECALC_TRANSFORM);
@@ -550,7 +498,7 @@ static wmOperatorStatus set_axis_exec(bContext *C, wmOperator *op)
     track = track->next;
   }
 
-  set_axis(scene, object, clip, tracking_object, track, axis == 0 ? 'X' : 'Y');
+  set_axis(scene, object, clip, tracking_object, track, axis == 0 ? 'X' : 'Z');
 
   DEG_id_tag_update(&clip->id, 0);
   DEG_id_tag_update(&object->id, ID_RECALC_TRANSFORM);
@@ -565,7 +513,7 @@ void CLIP_OT_set_axis(wmOperatorType *ot)
 {
   static const EnumPropertyItem axis_actions[] = {
       {0, "X", 0, "X", "Align bundle to X axis"},
-      {1, "Y", 0, "Y", "Align bundle to Y axis"},
+      {1, "Z", 0, "Z", "Align bundle to Z axis"},
       {0, nullptr, 0, nullptr, nullptr},
   };
 

@@ -16,6 +16,7 @@ set(INC_SYS
 set(SRC
   clarity_event_dispatch.cc
   clarity_input.cc
+  clarity_live_surface.cc
   clarity_marking_menu.cc
   clarity_navigation.cc
   clarity_register.cc

@@ -22,9 +22,9 @@
 
 #include "GPU_state.hh"
 
+#include "ED_clarity.hh"
 #include "ED_clip.hh"
 #include "ED_image.hh"
-#include "ED_clarity.hh"
 #include "ED_screen.hh"
 #include "ED_space_api.hh"
 #include "ED_uvedit.hh"
@@ -1756,6 +1756,7 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 
   bool use_prop_edit = false;
   int prop_edit_flag = 0;
+  const bool use_maya_soft_selection = (t->flag & T_SOFT_SELECTION) != 0;
 
   /* Save proportional edit settings.
    * Skip saving proportional edit if it was not actually used.
@@ -1809,9 +1810,15 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
       }
 
       if ((prop = RNA_struct_find_property(op->ptr, "proportional_size"))) {
-        ts->proportional_size = RNA_property_is_set(op->ptr, prop) ?
-                                    RNA_property_float_get(op->ptr, prop) :
-                                    t->prop_size;
+        const float radius = RNA_property_is_set(op->ptr, prop) ?
+                                 RNA_property_float_get(op->ptr, prop) :
+                                 t->prop_size;
+        if (use_maya_soft_selection) {
+          ts->soft_selection.radius = radius;
+        }
+        else {
+          ts->proportional_size = radius;
+        }
       }
 
       if ((prop = RNA_struct_find_property(op->ptr, "proportional_edit_falloff")) &&

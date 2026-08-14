@@ -3496,8 +3496,8 @@ def save_single(operator, scene, depsgraph, filepath="",
                 apply_unit_scale=False,
                 global_scale=1.0,
                 apply_scale_options='FBX_SCALE_NONE',
-                axis_up="Z",
-                axis_forward="Y",
+                axis_up="Y",
+                axis_forward="Z",
                 context_objects=None,
                 object_types=None,
                 use_mesh_modifiers=True,
@@ -3647,11 +3647,16 @@ def save_single(operator, scene, depsgraph, filepath="",
 
 # defaults for applications, currently only unity but could add others.
 def defaults_unity3d():
+    from bpy_extras.io_utils import axis_conversion
+
     return {
         # These options seem to produce the same result as the old Ascii exporter in Unity3D:
         "axis_up": 'Y',
         "axis_forward": '-Z',
-        "global_matrix": Matrix.Rotation(-math.pi / 2.0, 4, 'X'),
+        "global_matrix": axis_conversion(from_forward='Z',
+                                         from_up='Y',
+                                         to_forward='-Z',
+                                         to_up='Y').to_4x4(),
         # Should really be True, but it can cause problems if a model is already in a scene or prefab
         # with the old transforms.
         "bake_space_transform": False,

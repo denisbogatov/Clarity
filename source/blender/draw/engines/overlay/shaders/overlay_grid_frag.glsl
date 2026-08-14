@@ -38,8 +38,11 @@ void main()
     out_color = float4(0.0f, 0.0f, 0.0f, 1.0f);
   }
   else if (flag_test(grid_flag, GRID_FINITE)) {
-    /* Linear-light equivalent of Clarity's sRGB #404040 grid color. */
-    out_color = float4(float3(0.05126946f), 1.0f);
+    /* Linear-light equivalents of Clarity's sRGB #404040 fine grid and #303030 emphasized grid. */
+    const float3 grid_color = float3(0.05126946f);
+    const float3 emphasized_grid_color = float3(0.02955683f);
+    out_color = float4(
+        mix(grid_color, emphasized_grid_color, vertex_out_flat.emphasis), 1.0f);
   }
   else if (axis_mask.x) {
     out_color = theme.colors.grid_axis_x;

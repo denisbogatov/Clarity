@@ -17,9 +17,15 @@ float sky_angle_between(float thetav, float phiv, float theta, float phi)
   return acos(cospsi);
 }
 
+vector sky_to_z_up_direction(vector dir)
+{
+  return vector(dir[0], -dir[2], dir[1]);
+}
+
 vector sky_spherical_coordinates(vector dir)
 {
-  return vector(acos(dir[2]), atan2(dir[0], dir[1]), 0);
+  vector sky_dir = sky_to_z_up_direction(dir);
+  return vector(acos(sky_dir[2]), atan2(sky_dir[0], sky_dir[1]), 0);
 }
 
 /* Preetham */
@@ -139,8 +145,9 @@ color sky_radiance_nishita(vector dir, float sky_data[11], string filename, stri
   float sun_intensity = sky_data[9];
   float earth_intersection_angle = sky_data[10];
   int sun_disc = angular_diameter > 0;
+  vector sky_dir = sky_to_z_up_direction(dir);
   vector sun_dir = spherical_to_direction(sun_elevation, sun_rotation + M_PI_2);
-  float sun_dir_angle = precise_angle(dir, sun_dir);
+  float sun_dir_angle = precise_angle(sky_dir, sun_dir);
   float half_angular = angular_diameter * 0.5;
   float alpha = 1.0;
   color rgb_sun = color(0.0, 0.0, 0.0);

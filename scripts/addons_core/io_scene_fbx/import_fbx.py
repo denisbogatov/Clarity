@@ -3159,7 +3159,10 @@ def load(operator, context, filepath="",
         axis_key = (axis_up, axis_forward, axis_coord)
         axis_up, axis_forward = {v: k for k, v in RIGHT_HAND_AXES.items()}.get(axis_key, ('Z', 'Y'))
     global_matrix = (Matrix.Scale(global_scale, 4) @
-                     axis_conversion(from_forward=axis_forward, from_up=axis_up).to_4x4())
+                     axis_conversion(from_forward=axis_forward,
+                                     from_up=axis_up,
+                                     to_forward='Z',
+                                     to_up='Y').to_4x4())
 
     # To cancel out unwanted rotation/scale on nodes.
     global_matrix_inv = global_matrix.inverted()

@@ -125,6 +125,15 @@ int gizmo_3d_translate_layout_twtype_get(bool use_clarity_style, int twtype);
  */
 int gizmo_3d_scale_center_style_get(bool use_clarity_style, bool is_dragging);
 
+/**
+ * Align a planar center handle to the complete view basis while preserving its location.
+ *
+ * Setting only the local Z normal leaves roll around the view direction undefined. That is
+ * invisible for a circular handle but makes Clarity's square center rotate while orbiting.
+ */
+void gizmo_3d_view_aligned_basis_rotation_set(float matrix_basis[4][4],
+                                              const float viewinv[4][4]);
+
 void gizmo_prepare_mat(const bContext *C, RegionView3D *rv3d, const TransformBounds *tbounds);
 void gizmo_xform_message_subscribe(wmGizmoGroup *gzgroup,
                                    wmMsgBus *mbus,

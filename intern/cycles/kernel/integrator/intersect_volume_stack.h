@@ -89,9 +89,9 @@ ccl_device void integrator_volume_stack_init(KernelGlobals kg, IntegratorState s
   Ray volume_ray ccl_optional_struct_init;
   integrator_state_read_ray(state, &volume_ray);
 
-  /* Trace ray in random direction. Any direction works, Z up is a guess to get the
+  /* Trace ray in random direction. Any direction works, Y up is a guess to get the
    * fewest hits. */
-  volume_ray.D = make_float3(0.0f, 0.0f, 1.0f);
+  volume_ray.D = make_float3(0.0f, 1.0f, 0.0f);
   volume_ray.tmin = 0.0f;
   volume_ray.tmax = FLT_MAX;
   volume_ray.self.object = OBJECT_NONE;

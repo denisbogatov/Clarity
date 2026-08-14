@@ -105,7 +105,7 @@ EditBone *ED_armature_ebone_add(bArmature *arm, const char *name)
 
 EditBone *ED_armature_ebone_add_primitive(Object *obedit_arm,
                                           const float length,
-                                          const bool view_aligned)
+                                          const bool /*view_aligned*/)
 {
   bArmature *arm = id_cast<bArmature *>(obedit_arm->data);
   EditBone *bone;
@@ -120,7 +120,9 @@ EditBone *ED_armature_ebone_add_primitive(Object *obedit_arm,
   zero_v3(bone->head);
   zero_v3(bone->tail);
 
-  bone->tail[view_aligned ? 1 : 2] = length;
+  /* A world-aligned primitive grows along native world Y. A view-aligned bone also uses its
+   * intrinsic local Y length axis, with the object rotation supplying the view orientation. */
+  bone->tail[1] = length;
 
   if (arm->runtime->active_collection) {
     ANIM_armature_bonecoll_assign_editbone(arm->runtime->active_collection, bone);
@@ -1900,8 +1902,8 @@ static wmOperatorStatus armature_bone_primitive_add_exec(bContext *C, wmOperator
           roll_vector = imat.z_axis();
           break;
         case BoneSpace::OBJECT:
-          /* Assumes Z=up for objects and Y=up for bones. */
-          bone_orient_mat = float3x3({1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f, 0.0f});
+          /* Bone and object axes already share Clarity's native basis. */
+          bone_orient_mat = float3x3::identity();
           break;
       }
       break;
@@ -1910,12 +1912,8 @@ static wmOperatorStatus armature_bone_primitive_add_exec(bContext *C, wmOperator
     case BoneAlign::UP: {
       switch (space) {
         case BoneSpace::WORLD:
-          /* Construct a matrix that points Y up, Z Forward and X left-right. */
-          bone_orient_mat = imat *
-                            float3x3({1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f});
-
-          /* Set roll reference for ED_armature_ebone_roll_to_vector. */
-          roll_vector = -imat.y_axis();
+          bone_orient_mat = imat;
+          roll_vector = imat.z_axis();
           break;
         case BoneSpace::OBJECT:
           bone_orient_mat = float3x3::identity();
@@ -1936,8 +1934,10 @@ static wmOperatorStatus armature_bone_primitive_add_exec(bContext *C, wmOperator
   ED_armature_edit_deselect_all(obedit);
 
   /* Create a bone. */
-  EditBone *bone = ED_armature_ebone_add(id_cast<bArmature *>(obedit->data), name);
-  ANIM_armature_bonecoll_assign_active(id_cast<bArmature *>(obedit->data), bone);
+  bArmature *arm = id_cast<bArmature *>(obedit->data);
+  EditBone *bone = ED_armature_ebone_add(arm, name);
+  arm->act_edbone = bone;
+  ANIM_armature_bonecoll_assign_active(arm, bone);
 
   /* Scale B-Bone display width and Bone Envelope based on length. */
   const float length = RNA_float_get(op->ptr, "length");
@@ -1949,7 +1949,6 @@ static wmOperatorStatus armature_bone_primitive_add_exec(bContext *C, wmOperator
   bone->rad_tail = 0.05f * length;
   bone->dist = 0.25f * length;
 
-  bArmature *arm = id_cast<bArmature *>(obedit->data);
   if (bone->bone_collections.is_empty() && (arm->flag & ARM_BCOLL_SOLO_ACTIVE)) {
     BKE_report(op->reports,
                RPT_WARNING,
@@ -1970,7 +1969,8 @@ static wmOperatorStatus armature_bone_primitive_add_exec(bContext *C, wmOperator
   /* Bone head to cursor position. */
   copy_v3_v3(bone->head, curs_objectspace);
 
-  const float3 tail_vector = bone_orient_mat * float3(0.0f, 0.0f, length);
+  /* A bone's intrinsic length axis is local Y. */
+  const float3 tail_vector = bone_orient_mat * float3(0.0f, length, 0.0f);
   add_v3_v3v3(bone->tail, bone->head, tail_vector);
 
   const bool needs_bone_roll = (ELEM(align, BoneAlign::CURSOR_3D, BoneAlign::VIEW_3D) ||
@@ -2045,7 +2045,7 @@ void ARMATURE_OT_bone_primitive_add(wmOperatorType *ot)
        0,
        "Up",
        "Make the bone visually point upwards so the long axis is aligned with the World/Object "
-       "positive Z axis (depending on the choice above)"},
+       "positive Y axis (depending on the choice above)"},
       {int(BoneAlign::AXES),
        "AXES",
        0,

@@ -26,7 +26,6 @@
 
 #include "BLI_listbase.h"
 #include "BLI_math_matrix.h"
-#include "BLI_math_rotation.h"
 #include "BLI_string.h"
 
 #include "Alembic/AbcGeom/Visibility.h"
@@ -263,12 +262,6 @@ void AbcObjectReader::setupObjectTransform(const chrono_t time)
   bool is_constant = false;
   float transform_from_alembic[4][4];
 
-  /* If the parent is a camera, apply the inverse rotation to make up for the from-Maya rotation.
-   * This assumes that the parent object also was imported from Alembic. */
-  if (m_object->parent != nullptr && m_object->parent->type == OB_CAMERA) {
-    axis_angle_to_mat4_single(m_object->parentinv, 'X', -M_PI_2);
-  }
-
   this->read_matrix(transform_from_alembic, time, m_settings->scale, is_constant);
 
   /* Apply the matrix to the object. */
@@ -347,15 +340,6 @@ void AbcObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
   const Imath::M44d matrix = get_matrix(schema, time);
   convert_matrix_datatype(matrix, r_mat);
   copy_m44_axis_swap(r_mat, r_mat, ABC_ZUP_FROM_YUP);
-
-  /* Convert from Maya to Blender camera orientation. Children of this camera
-   * will have the opposite transform as their Parent Inverse matrix.
-   * See AbcObjectReader::setupObjectTransform(). */
-  if (m_object->type == OB_CAMERA) {
-    float camera_rotation[4][4];
-    axis_angle_to_mat4_single(camera_rotation, 'X', M_PI_2);
-    mul_m4_m4m4(r_mat, r_mat, camera_rotation);
-  }
 
   if (!m_inherits_xform) {
     /* Only apply scaling to root objects, parenting will propagate it. */

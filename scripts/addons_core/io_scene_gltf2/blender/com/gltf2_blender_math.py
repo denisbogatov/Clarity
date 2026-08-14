@@ -47,13 +47,8 @@ def mathutils_to_gltf(x: typing.Union[Vector, Quaternion]) -> typing.List[float]
 
 
 def to_yup() -> Matrix:
-    """Transform to Yup."""
-    return Matrix(
-        ((1.0, 0.0, 0.0, 0.0),
-         (0.0, 0.0, 1.0, 0.0),
-         (0.0, -1.0, 0.0, 0.0),
-         (0.0, 0.0, 0.0, 1.0))
-    )
+    """Clarity is already Y-up."""
+    return Matrix.Identity(4)
 
 
 to_zup = to_yup
@@ -81,17 +76,17 @@ def swizzle_yup(v: typing.Union[Vector, Quaternion], data_path: str) -> typing.U
 
 def swizzle_yup_location(loc: Vector) -> Vector:
     """Manage Yup location."""
-    return Vector((loc[0], loc[2], -loc[1]))
+    return loc.copy()
 
 
 def swizzle_yup_rotation(rot: Quaternion) -> Quaternion:
     """Manage Yup rotation."""
-    return Quaternion((rot[0], rot[1], rot[3], -rot[2]))
+    return rot.copy()
 
 
 def swizzle_yup_scale(scale: Vector) -> Vector:
     """Manage Yup scale."""
-    return Vector((scale[0], scale[2], scale[1]))
+    return scale.copy()
 
 
 def swizzle_yup_value(value: typing.Any) -> typing.Any:

@@ -133,12 +133,12 @@ static void write_weights_for_drawing(const ModifierData &md,
   const VArray<float> influence_weights = modifier::greasepencil::get_influence_vertex_weights(
       curves, mmd.influence);
 
-  /* Use default Z up. */
+  /* Reference direction for measuring the user-selected axis angle. */
   const float3 z_up(0.0f, 0.0f, 1.0f);
   float3 axis(0.0f);
   axis[mmd.axis] = 1.0f;
   float3 vec_ref;
-  /* Apply modifier rotation (sub 90 degrees for Y axis due Z-Up vector). */
+  /* Apply modifier rotation (subtract 90 degrees for the default Y axis). */
   const float rot_angle = mmd.angle - ((mmd.axis == 1) ? M_PI_2 : 0.0f);
   rotate_normalized_v3_v3v3fl(vec_ref, z_up, axis, rot_angle);
 

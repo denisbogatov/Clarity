@@ -142,8 +142,9 @@ class BaseLimbRig(BaseRig):
         return bone.head + bone.vector * (seg / self.segments)
 
     @staticmethod
-    def vector_without_z(vector: Vector) -> Vector:
-        return Vector((vector.x, vector.y, 0))
+    def vector_without_y(vector: Vector) -> Vector:
+        """Project a vector onto Clarity's native X/Z ground plane."""
+        return Vector((vector.x, 0, vector.z))
 
     ####################################################
     # BONES

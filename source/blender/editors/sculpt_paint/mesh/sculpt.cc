@@ -5734,10 +5734,10 @@ void SculptPaintStroke::stroke_cache_init(const float mval[2])
   if (cache->supports_gravity) {
     if (sculpt_->gravity_object) {
       const Object *gravity_object = sculpt_->gravity_object;
-      cache->gravity_direction = gravity_object->object_to_world().z_axis();
+      cache->gravity_direction = gravity_object->object_to_world().y_axis();
     }
     else {
-      cache->gravity_direction = {0.0f, 0.0f, 1.0f};
+      cache->gravity_direction = {0.0f, 1.0f, 0.0f};
     }
 
     /* Transform to sculpted object space. */

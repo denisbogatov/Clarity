@@ -33,9 +33,9 @@
 
 #include "SEQ_transform.hh"
 
+#include "ED_clarity.hh"
 #include "ED_clip.hh"
 #include "ED_image.hh"
-#include "ED_clarity.hh"
 #include "ED_object.hh"
 #include "ED_screen.hh"
 #include "ED_space_api.hh"
@@ -52,6 +52,7 @@
 #include "transform_gizmo.hh"
 #include "transform_orientations.hh"
 #include "transform_snap.hh"
+#include "transform_soft_selection.hh"
 
 namespace blender::ed::transform {
 
@@ -206,9 +207,9 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
   unit_m3(t->mat);
 
-  /* Default to rotate on the Z axis. */
-  t->orient_axis = 2;
-  t->orient_axis_ortho = 1;
+  /* Clarity's unconstrained world rotation defaults to the native Y-up axis. */
+  t->orient_axis = 1;
+  t->orient_axis_ortho = 0;
 
   /* If there's an event, we're modal. */
   if (event) {
@@ -349,10 +350,10 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
     float clarity_pivot_matrix[4][4];
     if (ELEM(t->mode, TFM_ROTATION, TFM_TRACKBALL, TFM_RESIZE) &&
         ED_clarity_pivot_custom_matrix_get(C,
-                                        t->mode == TFM_RESIZE ?
-                                            ed::clarity::ClarityPivotUsage::Scale :
-                                            ed::clarity::ClarityPivotUsage::Rotate,
-                                        clarity_pivot_matrix))
+                                           t->mode == TFM_RESIZE ?
+                                               ed::clarity::ClarityPivotUsage::Scale :
+                                               ed::clarity::ClarityPivotUsage::Rotate,
+                                           clarity_pivot_matrix))
     {
       copy_v3_v3(t->center_global, clarity_pivot_matrix[3]);
       t->flag |= T_OVERRIDE_CENTER;
@@ -588,6 +589,15 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
   /* Setting proportional editing flag only if property exist in operator. Otherwise, assume it's
    * not supported. */
   if (op && (prop = RNA_struct_find_property(op->ptr, "use_proportional_edit"))) {
+    const bool use_maya_soft_selection = ELEM(t->spacetype, SPACE_VIEW3D, SPACE_EMPTY) &&
+                                         ELEM(object_mode, OB_MODE_EDIT, OB_MODE_OBJECT) &&
+                                         (object_mode == OB_MODE_OBJECT ||
+                                          t->obedit_type == OB_MESH);
+    if (use_maya_soft_selection) {
+      /* Keep Blender proportional editing as an implementation detail. Drawing and interaction
+       * code must be able to distinguish Clarity Soft Selection from the public Blender tool. */
+      t->flag |= T_SOFT_SELECTION;
+    }
     if (RNA_property_is_set(op->ptr, prop)) {
       if (RNA_property_boolean_get(op->ptr, prop)) {
         t->flag |= T_PROP_EDIT;
@@ -635,13 +645,26 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
       }
     }
 
+    if ((t->flag & T_PROP_EDIT) && (t->flag & T_SOFT_SELECTION) && object_mode == OB_MODE_EDIT) {
+      /* Operator properties still use Blender's generic proportional-edit vocabulary. In a mesh
+       * viewport Maya's explicit mode is authoritative, including for scripted transforms. */
+      t->flag &= ~(T_PROP_CONNECTED | T_PROP_PROJECTED | T_PROP_GLOBAL);
+      const eTool_SoftSelectionFalloffMode mode = ts->soft_selection.falloff_mode;
+      if (soft_selection_mode_uses_surface_distance(mode)) {
+        t->flag |= T_PROP_CONNECTED;
+      }
+      if (soft_selection_mode_affects_unselected_containers(mode)) {
+        t->flag |= T_PROP_GLOBAL;
+      }
+    }
+
     if (op && ((prop = RNA_struct_find_property(op->ptr, "proportional_size")) &&
                RNA_property_is_set(op->ptr, prop)))
     {
       t->prop_size = RNA_property_float_get(op->ptr, prop);
     }
     else {
-      t->prop_size = ts->proportional_size;
+      t->prop_size = use_maya_soft_selection ? ts->soft_selection.radius : ts->proportional_size;
     }
 
     /* TRANSFORM_FIX_ME rna restrictions. */
@@ -1306,6 +1329,8 @@ void calculatePropRatio(TransInfo *t)
   int i;
   float dist;
   const bool connected = (t->flag & T_PROP_CONNECTED) != 0;
+  const bool use_maya_soft_selection = (t->flag & T_SOFT_SELECTION) != 0;
+  const SoftSelectionCurve soft_selection_curve(t->settings->soft_selection);
 
   t->proptext[0] = '\0';
 
@@ -1337,76 +1362,86 @@ void calculatePropRatio(TransInfo *t)
            */
           dist = std::max(dist, 0.0f);
 
-          switch (t->prop_mode) {
-            case PROP_SHARP:
-              td->factor = dist * dist;
-              break;
-            case PROP_SMOOTH:
-              /* Float imprecision can cause a `dist` approaching 1.0
-               * to assign `td->factor` exceeding 1.0. See #147530. */
-              td->factor = std::min(1.0f, 3.0f * dist * dist - 2.0f * dist * dist * dist);
-              break;
-            case PROP_ROOT:
-              td->factor = sqrtf(dist);
-              break;
-            case PROP_LIN:
-              td->factor = dist;
-              break;
-            case PROP_CONST:
-              td->factor = 1.0f;
-              break;
-            case PROP_SPHERE:
-              td->factor = sqrtf(2 * dist - dist * dist);
-              break;
-            case PROP_RANDOM:
-              if (t->rng == nullptr) {
-                /* Lazy initialization. */
-                uint rng_seed = uint(BLI_time_now_seconds_i() & UINT_MAX);
-                t->rng = BLI_rng_new(rng_seed);
-              }
-              td->factor = BLI_rng_get_float(t->rng) * dist;
-              break;
-            case PROP_INVSQUARE:
-              td->factor = dist * (2.0f - dist);
-              break;
-            default:
-              td->factor = 1;
-              break;
+          if (use_maya_soft_selection) {
+            const float geometric_distance = connected ? td->dist : td->rdist;
+            td->factor = bke::soft_selection_weight(
+                soft_selection_curve, geometric_distance, t->prop_size, false);
           }
+          else
+            switch (t->prop_mode) {
+              case PROP_SHARP:
+                td->factor = dist * dist;
+                break;
+              case PROP_SMOOTH:
+                /* Float imprecision can cause a `dist` approaching 1.0
+                 * to assign `td->factor` exceeding 1.0. See #147530. */
+                td->factor = std::min(1.0f, 3.0f * dist * dist - 2.0f * dist * dist * dist);
+                break;
+              case PROP_ROOT:
+                td->factor = sqrtf(dist);
+                break;
+              case PROP_LIN:
+                td->factor = dist;
+                break;
+              case PROP_CONST:
+                td->factor = 1.0f;
+                break;
+              case PROP_SPHERE:
+                td->factor = sqrtf(2 * dist - dist * dist);
+                break;
+              case PROP_RANDOM:
+                if (t->rng == nullptr) {
+                  /* Lazy initialization. */
+                  uint rng_seed = uint(BLI_time_now_seconds_i() & UINT_MAX);
+                  t->rng = BLI_rng_new(rng_seed);
+                }
+                td->factor = BLI_rng_get_float(t->rng) * dist;
+                break;
+              case PROP_INVSQUARE:
+                td->factor = dist * (2.0f - dist);
+                break;
+              default:
+                td->factor = 1;
+                break;
+            }
           /* An assert here likely means clamping is needed. */
           BLI_assert(td->factor <= 1.0f);
         }
       }
     }
 
-    switch (t->prop_mode) {
-      case PROP_SHARP:
-        pet_id = N_("(Sharp)");
-        break;
-      case PROP_SMOOTH:
-        pet_id = N_("(Smooth)");
-        break;
-      case PROP_ROOT:
-        pet_id = N_("(Root)");
-        break;
-      case PROP_LIN:
-        pet_id = N_("(Linear)");
-        break;
-      case PROP_CONST:
-        pet_id = N_("(Constant)");
-        break;
-      case PROP_SPHERE:
-        pet_id = N_("(Sphere)");
-        break;
-      case PROP_RANDOM:
-        pet_id = N_("(Random)");
-        break;
-      case PROP_INVSQUARE:
-        pet_id = N_("(InvSquare)");
-        break;
-      default:
-        break;
+    if (use_maya_soft_selection) {
+      pet_id = N_("(Soft Selection)");
     }
+    else
+      switch (t->prop_mode) {
+        case PROP_SHARP:
+          pet_id = N_("(Sharp)");
+          break;
+        case PROP_SMOOTH:
+          pet_id = N_("(Smooth)");
+          break;
+        case PROP_ROOT:
+          pet_id = N_("(Root)");
+          break;
+        case PROP_LIN:
+          pet_id = N_("(Linear)");
+          break;
+        case PROP_CONST:
+          pet_id = N_("(Constant)");
+          break;
+        case PROP_SPHERE:
+          pet_id = N_("(Sphere)");
+          break;
+        case PROP_RANDOM:
+          pet_id = N_("(Random)");
+          break;
+        case PROP_INVSQUARE:
+          pet_id = N_("(InvSquare)");
+          break;
+        default:
+          break;
+      }
 
     if (pet_id) {
       STRNCPY_UTF8(t->proptext, IFACE_(pet_id));

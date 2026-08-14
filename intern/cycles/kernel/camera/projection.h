@@ -14,6 +14,24 @@
 
 CCL_NAMESPACE_BEGIN
 
+/* Environment projections use a conventional analytic Z-up sphere internally. Cycles scene
+ * directions are Clarity-native Y-up, so keep the basis change explicit at environment
+ * boundaries instead of changing camera-local panorama projection math. */
+ccl_device_inline float3 environment_z_up_from_native_y_up(const float3 dir)
+{
+  return make_float3(dir.x, -dir.z, dir.y);
+}
+
+ccl_device_inline dual3 environment_z_up_from_native_y_up(const dual3 dir)
+{
+  return make_float3(dir.x(), -dir.z(), dir.y());
+}
+
+ccl_device_inline float3 environment_native_y_up_from_z_up(const float3 dir)
+{
+  return make_float3(dir.x, dir.z, -dir.y);
+}
+
 /* Equirectangular coordinates <-> Cartesian direction */
 
 ccl_device float2 direction_to_equirectangular_range(const float3 dir, const float4 range)
@@ -340,7 +358,8 @@ ccl_device_inline float2 direction_to_panorama(ccl_constant KernelCamera *cam, c
 
 ccl_device_inline void spherical_stereo_transform(ccl_constant KernelCamera *cam,
                                                   ccl_private float3 *P,
-                                                  ccl_private float3 *D)
+                                                  ccl_private float3 *D,
+                                                  const float3 up)
 {
   float interocular_offset = cam->interocular_offset;
 
@@ -351,7 +370,7 @@ ccl_device_inline void spherical_stereo_transform(ccl_constant KernelCamera *cam
   if (cam->pole_merge_angle_to > 0.0f) {
     const float pole_merge_angle_from = cam->pole_merge_angle_from;
     const float pole_merge_angle_to = cam->pole_merge_angle_to;
-    const float altitude = fabsf(safe_asinf((*D).z));
+    const float altitude = fabsf(safe_asinf(dot(*D, up)));
     if (altitude > pole_merge_angle_to) {
       interocular_offset = 0.0f;
     }
@@ -363,7 +382,6 @@ ccl_device_inline void spherical_stereo_transform(ccl_constant KernelCamera *cam
     }
   }
 
-  const float3 up = make_float3(0.0f, 0.0f, 1.0f);
   const float3 side = normalize(cross(*D, up));
   const float3 stereo_offset = side * interocular_offset;
 

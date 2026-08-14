@@ -15,7 +15,7 @@ namespace nodes::node_shader_normal_cc {
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Vector>("Normal"_ustr)
-      .default_value({0.0f, 0.0f, 1.0f})
+      .default_value({0.0f, 1.0f, 0.0f})
       .min(-1.0f)
       .max(1.0f)
       .subtype(PROP_DIRECTION)
@@ -24,7 +24,7 @@ static void node_declare(NodeDeclarationBuilder &b)
           "\u2022 LMB click and drag on the sphere to set the direction of the normal.\n"
           "\u2022 Holding Ctrl while dragging snaps to 45 degree rotation increments");
   b.add_output<decl::Vector>("Normal"_ustr)
-      .default_value({0.0f, 0.0f, 1.0f})
+      .default_value({0.0f, 1.0f, 0.0f})
       .min(-1.0f)
       .max(1.0f)
       .subtype(PROP_DIRECTION);

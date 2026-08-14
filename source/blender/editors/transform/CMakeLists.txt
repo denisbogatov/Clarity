@@ -97,6 +97,7 @@ set(SRC
   transform_snap_object_lattice.cc
   transform_snap_object_mesh.cc
   transform_snap_sequencer.cc
+  transform_soft_selection.cc
 
   transform.hh
   transform_constraints.hh
@@ -109,6 +110,7 @@ set(SRC
   transform_snap.hh
   transform_snap_clarity.hh
   transform_snap_object.hh
+  transform_soft_selection.hh
 )
 
 set(LIB
@@ -140,6 +142,7 @@ if(WITH_GTESTS)
   set(TEST_SRC
     transform_gizmo_3d_test.cc
     transform_snap_test.cc
+    transform_soft_selection_test.cc
   )
   set(TEST_INC
   )

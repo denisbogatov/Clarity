@@ -606,7 +606,9 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
         if not self.filepath:
             raise Exception("filepath not set")
 
-        global_matrix = (axis_conversion(to_forward=self.axis_forward,
+        global_matrix = (axis_conversion(from_forward='Z',
+                                         from_up='Y',
+                                         to_forward=self.axis_forward,
                                          to_up=self.axis_up,
                                          ).to_4x4()
                          if self.use_space_transform else Matrix())

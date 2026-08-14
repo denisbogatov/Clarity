@@ -20,7 +20,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_TRANSLATION)
       .description("Position of the first control point");
   b.add_input<decl::Vector>("Middle"_ustr)
-      .default_value({0.0f, 2.0f, 0.0f})
+      .default_value({0.0f, 0.0f, -2.0f})
       .subtype(PROP_TRANSLATION)
       .description("Position of the middle control point");
   b.add_input<decl::Vector>("End"_ustr)

@@ -78,9 +78,9 @@ def prepare_sculpt_scene(context: any, mode: SculptMode, subdivision_level=3):
 
     grid_node = group.nodes.new('GeometryNodeMeshGrid')
     grid_node.inputs["Size X"].default_value = 2.0
-    grid_node.inputs["Size Y"].default_value = 2.0
+    grid_node.inputs["Size Z"].default_value = 2.0
     grid_node.inputs["Vertices X"].default_value = size
-    grid_node.inputs["Vertices Y"].default_value = size
+    grid_node.inputs["Vertices Z"].default_value = size
 
     group.links.new(grid_node.outputs["Mesh"], group_output_node.inputs[0])
 

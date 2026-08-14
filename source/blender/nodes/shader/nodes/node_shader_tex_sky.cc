@@ -76,8 +76,8 @@ static void node_shader_init_tex_sky(bNodeTree * /*ntree*/, bNode *node)
   BKE_texture_mapping_default(&tex->base.tex_mapping, TEXMAP_TYPE_POINT);
   BKE_texture_colormapping_default(&tex->base.color_mapping);
   tex->sun_direction[0] = 0.0f;
-  tex->sun_direction[1] = 0.0f;
-  tex->sun_direction[2] = 1.0f;
+  tex->sun_direction[1] = 1.0f;
+  tex->sun_direction[2] = 0.0f;
   tex->turbidity = 2.2f;
   tex->ground_albedo = 0.3f;
   tex->sun_disc = true;
@@ -194,8 +194,10 @@ static int node_shader_gpu_tex_sky(GPUMaterial *mat,
   node_shader_gpu_tex_mapping(mat, node, in, out);
   NodeTexSky *tex = static_cast<NodeTexSky *>(node->storage);
   float sun_angles[2]; /* [0]=theta=zenith angle  [1]=phi=azimuth */
-  sun_angles[0] = acosf(tex->sun_direction[2]);
-  sun_angles[1] = atan2f(tex->sun_direction[0], tex->sun_direction[1]);
+  /* The analytic models use a Z-up frame internally. Convert Clarity's native Y-up direction at
+   * this boundary so their published equations and lookup tables remain unchanged. */
+  sun_angles[0] = acosf(tex->sun_direction[1]);
+  sun_angles[1] = atan2f(tex->sun_direction[0], -tex->sun_direction[2]);
 
   if (tex->sky_model == SHD_SKY_PREETHAM) {
     /* Preetham */

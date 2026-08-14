@@ -24,6 +24,8 @@
 #include "DNA_windowmanager_types.h"
 
 #include "BLI_index_range.hh"
+#include "BLI_array.hh"
+#include "BLI_kdtree.hh"
 #include "BLI_listbase_iterator.hh"
 #include "BLI_map.hh"
 #include "BLI_math_matrix.h"
@@ -41,6 +43,7 @@
 #include "BKE_object.hh"
 #include "BKE_object_transform_clarity.hh"
 #include "BKE_report.hh"
+#include "BKE_wm_runtime.hh"
 
 #include "DEG_depsgraph.hh"
 #include "DEG_depsgraph_build.hh"
@@ -329,6 +332,278 @@ static Vector<Object *> edit_mesh_objects_get(const bContext *C)
       *bmain, scene, view_layer, v3d);
 }
 
+struct ClaritySymmetryObjectSelection {
+  Object *object = nullptr;
+  short selectmode = 0;
+  int totvert = 0;
+  int totedge = 0;
+  int totface = 0;
+  Array<uint8_t> vertex_selected;
+  Array<uint8_t> edge_selected;
+  Array<uint8_t> face_selected;
+};
+
+struct ClaritySymmetrySelectionState {
+  Vector<ClaritySymmetryObjectSelection> objects;
+};
+
+static ClaritySymmetryObjectSelection symmetry_object_selection_capture(Object &object)
+{
+  ClaritySymmetryObjectSelection state;
+  state.object = &object;
+  BMEditMesh *em = BKE_editmesh_from_object(&object);
+  if (em == nullptr || em->bm == nullptr) {
+    return state;
+  }
+  BMesh *bm = em->bm;
+  state.selectmode = em->selectmode;
+  state.totvert = bm->totvert;
+  state.totedge = bm->totedge;
+  state.totface = bm->totface;
+  state.vertex_selected = Array<uint8_t>(bm->totvert, 0);
+  state.edge_selected = Array<uint8_t>(bm->totedge, 0);
+  state.face_selected = Array<uint8_t>(bm->totface, 0);
+
+  BM_mesh_elem_index_ensure(bm, BM_VERT | BM_EDGE | BM_FACE);
+  BMIter iter;
+  BMVert *vert;
+  int index;
+  BM_ITER_MESH_INDEX (vert, &iter, bm, BM_VERTS_OF_MESH, index) {
+    state.vertex_selected[index] = BM_elem_flag_test(vert, BM_ELEM_SELECT);
+  }
+  BMEdge *edge;
+  BM_ITER_MESH_INDEX (edge, &iter, bm, BM_EDGES_OF_MESH, index) {
+    state.edge_selected[index] = BM_elem_flag_test(edge, BM_ELEM_SELECT);
+  }
+  BMFace *face;
+  BM_ITER_MESH_INDEX (face, &iter, bm, BM_FACES_OF_MESH, index) {
+    state.face_selected[index] = BM_elem_flag_test(face, BM_ELEM_SELECT);
+  }
+  return state;
+}
+
+static std::shared_ptr<ClaritySymmetrySelectionState> symmetry_selection_capture(
+    const bContext *C)
+{
+  const Object *edit_object = CTX_data_edit_object(C);
+  if (edit_object == nullptr || edit_object->type != OB_MESH ||
+      ED_clarity_symmetry_settings_get(C).mode == ClaritySymmetryMode::Off)
+  {
+    return nullptr;
+  }
+  auto state = std::make_shared<ClaritySymmetrySelectionState>();
+  for (Object *object : edit_mesh_objects_get(C)) {
+    state->objects.append(symmetry_object_selection_capture(*object));
+  }
+  return state;
+}
+
+static Array<int> symmetry_vertex_map_create(Object &object,
+                                             const ClaritySymmetrySettings &settings)
+{
+  BMEditMesh *em = BKE_editmesh_from_object(&object);
+  BMesh *bm = em->bm;
+  Array<int> candidates(bm->totvert, -1);
+  if (bm->totvert == 0) {
+    return candidates;
+  }
+  BM_mesh_elem_table_ensure(bm, BM_VERT);
+  BM_mesh_elem_index_ensure(bm, BM_VERT);
+
+  if (settings.mode != ClaritySymmetryMode::World) {
+    EDBM_verts_mirror_cache_begin_ex(em,
+                                     settings.axis,
+                                     true,
+                                     false,
+                                     true,
+                                     settings.mode == ClaritySymmetryMode::Topology,
+                                     settings.tolerance,
+                                     candidates.data());
+  }
+  else {
+    KDTree<float3> *tree = kdtree_new<float3>(bm->totvert);
+    const float(*object_to_world)[4] = object.object_to_world().ptr();
+    BMIter iter;
+    BMVert *vert;
+    int index;
+    BM_ITER_MESH_INDEX (vert, &iter, bm, BM_VERTS_OF_MESH, index) {
+      if (BM_elem_flag_test(vert, BM_ELEM_HIDDEN)) {
+        continue;
+      }
+      float world[3];
+      copy_v3_v3(world, vert->co);
+      mul_m4_v3(object_to_world, world);
+      kdtree_insert<float3>(tree, index, world);
+    }
+    kdtree_balance<float3>(tree);
+    const float tolerance_squared = square_f(std::max(settings.tolerance, 1e-7f));
+    BM_ITER_MESH_INDEX (vert, &iter, bm, BM_VERTS_OF_MESH, index) {
+      if (BM_elem_flag_test(vert, BM_ELEM_HIDDEN)) {
+        continue;
+      }
+      float reflected[3];
+      copy_v3_v3(reflected, vert->co);
+      mul_m4_v3(object_to_world, reflected);
+      reflected[settings.axis] *= -1.0f;
+      const int candidate = kdtree_find_nearest<float3>(tree, reflected, nullptr);
+      if (candidate == -1) {
+        continue;
+      }
+      BMVert *mirror = BM_vert_at_index(bm, candidate);
+      float mirror_world[3];
+      copy_v3_v3(mirror_world, mirror->co);
+      mul_m4_v3(object_to_world, mirror_world);
+      if (len_squared_v3v3(reflected, mirror_world) <= tolerance_squared) {
+        candidates[index] = candidate;
+      }
+    }
+    kdtree_free<float3>(tree);
+  }
+
+  /* A nearest-neighbor relation is a symmetry pair only when it is reciprocal. This prevents two
+   * nearby vertices from both claiming the same point on an imperfect mesh. */
+  Array<int> result(bm->totvert, -1);
+  for (const int index : IndexRange(bm->totvert)) {
+    const int candidate = candidates[index];
+    if (candidate >= 0 && candidate < bm->totvert && candidates[candidate] == index) {
+      result[index] = candidate;
+    }
+  }
+
+  if (settings.mode == ClaritySymmetryMode::Topology && !settings.allow_partial) {
+    BMIter iter;
+    BMVert *vert;
+    int index;
+    BM_ITER_MESH_INDEX (vert, &iter, bm, BM_VERTS_OF_MESH, index) {
+      if (!BM_elem_flag_test(vert, BM_ELEM_HIDDEN) && result[index] == -1) {
+        result.fill(-1);
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+static BMEdge *symmetry_mirror_edge_get(BMesh *bm, BMEdge *edge, const Span<int> vertex_map)
+{
+  const int first = vertex_map[BM_elem_index_get(edge->v1)];
+  const int second = vertex_map[BM_elem_index_get(edge->v2)];
+  if (first < 0 || second < 0) {
+    return nullptr;
+  }
+  return BM_edge_exists(BM_vert_at_index(bm, first), BM_vert_at_index(bm, second));
+}
+
+static BMFace *symmetry_mirror_face_get(BMesh *bm, BMFace *face, const Span<int> vertex_map)
+{
+  Vector<BMVert *, 8> vertices;
+  vertices.reserve(face->len);
+  BMLoop *loop = face->l_first;
+  do {
+    const int mirror_index = vertex_map[BM_elem_index_get(loop->v)];
+    if (mirror_index < 0) {
+      return nullptr;
+    }
+    vertices.append(BM_vert_at_index(bm, mirror_index));
+    loop = loop->next;
+  } while (loop != face->l_first);
+  return BM_face_exists(vertices.data(), vertices.size());
+}
+
+static bool symmetry_selection_propagate(bContext *C,
+                                         const ClaritySymmetrySelectionState &before)
+{
+  const ClaritySymmetrySettings settings = ED_clarity_symmetry_settings_get(C);
+  if (settings.mode == ClaritySymmetryMode::Off) {
+    return false;
+  }
+
+  bool changed_any = false;
+  for (const ClaritySymmetryObjectSelection &old : before.objects) {
+    BMEditMesh *em = old.object != nullptr ? BKE_editmesh_from_object(old.object) : nullptr;
+    if (em == nullptr || em->bm == nullptr || em->bm->totvert != old.totvert ||
+        em->bm->totedge != old.totedge || em->bm->totface != old.totface)
+    {
+      continue;
+    }
+    BMesh *bm = em->bm;
+    BM_mesh_elem_table_ensure(bm, BM_VERT | BM_EDGE | BM_FACE);
+    BM_mesh_elem_index_ensure(bm, BM_VERT | BM_EDGE | BM_FACE);
+    const ClaritySymmetryObjectSelection after = symmetry_object_selection_capture(*old.object);
+    const Array<int> vertex_map = symmetry_vertex_map_create(*old.object, settings);
+    bool changed = false;
+
+    if (old.selectmode & SCE_SELECT_VERTEX) {
+      for (const int index : IndexRange(bm->totvert)) {
+        if (old.vertex_selected[index] == after.vertex_selected[index]) {
+          continue;
+        }
+        const int mirror_index = vertex_map[index];
+        if (mirror_index >= 0) {
+          BMVert *mirror = BM_vert_at_index(bm, mirror_index);
+          const bool select = after.vertex_selected[index] != 0;
+          if (BM_elem_flag_test(mirror, BM_ELEM_SELECT) != select) {
+            BM_vert_select_set(bm, mirror, select);
+            changed = true;
+          }
+        }
+      }
+    }
+    if (old.selectmode & SCE_SELECT_EDGE) {
+      for (const int index : IndexRange(bm->totedge)) {
+        if (old.edge_selected[index] == after.edge_selected[index]) {
+          continue;
+        }
+        BMEdge *edge = BM_edge_at_index(bm, index);
+        if (BMEdge *mirror = symmetry_mirror_edge_get(bm, edge, vertex_map)) {
+          const bool select = after.edge_selected[index] != 0;
+          if (BM_elem_flag_test(mirror, BM_ELEM_SELECT) != select) {
+            BM_edge_select_set(bm, mirror, select);
+            changed = true;
+          }
+        }
+      }
+    }
+    if (old.selectmode & SCE_SELECT_FACE) {
+      for (const int index : IndexRange(bm->totface)) {
+        if (old.face_selected[index] == after.face_selected[index]) {
+          continue;
+        }
+        BMFace *face = BM_face_at_index(bm, index);
+        if (BMFace *mirror = symmetry_mirror_face_get(bm, face, vertex_map)) {
+          const bool select = after.face_selected[index] != 0;
+          if (BM_elem_flag_test(mirror, BM_ELEM_SELECT) != select) {
+            BM_face_select_set(bm, mirror, select);
+            changed = true;
+          }
+        }
+      }
+    }
+
+    if (changed) {
+      EDBM_selectmode_flush(em);
+      DEG_id_tag_update(static_cast<ID *>(old.object->data), ID_RECALC_SELECT);
+      WM_event_add_notifier(C, NC_GEOM | ND_SELECT, old.object->data);
+      changed_any = true;
+    }
+  }
+  return changed_any;
+}
+
+static bool symmetry_selection_extend(bContext *C)
+{
+  std::shared_ptr<ClaritySymmetrySelectionState> selected = symmetry_selection_capture(C);
+  if (!selected) {
+    return false;
+  }
+  for (ClaritySymmetryObjectSelection &object : selected->objects) {
+    object.vertex_selected.fill(0);
+    object.edge_selected.fill(0);
+    object.face_selected.fill(0);
+  }
+  return symmetry_selection_propagate(C, *selected);
+}
+
 static ClarityComponentMode component_mode_from_context(const bContext *C,
                                                      const ClarityWindowRuntime &runtime)
 {
@@ -429,6 +704,7 @@ static bool component_mode_set(bContext *C,
 
   runtime.component_mode = target_mode;
   runtime.last_component_mode = target_mode;
+  symmetry_selection_extend(C);
   WM_event_add_notifier(C, NC_SCENE | ND_TOOLSETTINGS, scene);
   WM_event_add_notifier(C, NC_GEOM | ND_SELECT, edit_object->data);
   return true;
@@ -475,6 +751,97 @@ static const EnumPropertyItem clarity_camera_based_selection_items[] = {
      "Use camera-depth filtering in shaded non-X-Ray views"},
     {0, nullptr, 0, nullptr, nullptr},
 };
+
+static const EnumPropertyItem clarity_symmetry_preset_items[] = {
+    {0, "OFF", 0, "Off", "Disable symmetric component selection and transforms"},
+    {1, "OBJECT_X", 0, "Object X", "Reflect across each object's local X plane"},
+    {2, "OBJECT_Y", 0, "Object Y", "Reflect across each object's local Y plane"},
+    {3, "OBJECT_Z", 0, "Object Z", "Reflect across each object's local Z plane"},
+    {4, "WORLD_X", 0, "World X", "Reflect across the world X plane"},
+    {5, "WORLD_Y", 0, "World Y", "Reflect across the world Y plane"},
+    {6, "WORLD_Z", 0, "World Z", "Reflect across the world Z plane"},
+    {7, "TOPOLOGY", 0, "Topology", "Pair matching components by mesh topology"},
+    {0, nullptr, 0, nullptr, nullptr},
+};
+
+static bool clarity_symmetry_poll(bContext *C)
+{
+  return ED_operator_view3d_active(C);
+}
+
+static wmOperatorStatus clarity_symmetry_set_exec(bContext *C, wmOperator *op)
+{
+  ClaritySymmetrySettings settings = ED_clarity_symmetry_settings_get(C);
+  const int preset = RNA_enum_get(op->ptr, "preset");
+  if (preset == 0) {
+    settings.mode = ClaritySymmetryMode::Off;
+  }
+  else if (preset <= 3) {
+    settings.mode = ClaritySymmetryMode::Object;
+    settings.axis = uint8_t(preset - 1);
+  }
+  else if (preset <= 6) {
+    settings.mode = ClaritySymmetryMode::World;
+    settings.axis = uint8_t(preset - 4);
+  }
+  else {
+    settings.mode = ClaritySymmetryMode::Topology;
+  }
+
+  if (!ED_clarity_symmetry_settings_set(C, settings)) {
+    return OPERATOR_CANCELLED;
+  }
+  if (settings.mode != ClaritySymmetryMode::Off) {
+    symmetry_selection_extend(C);
+  }
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+  return OPERATOR_FINISHED;
+}
+
+static void CLARITY_OT_symmetry_set(wmOperatorType *ot)
+{
+  ot->name = "Set Clarity Symmetry";
+  ot->description = "Set the global Maya-style symmetric-modeling space and axis";
+  ot->idname = "CLARITY_OT_symmetry_set";
+  ot->exec = clarity_symmetry_set_exec;
+  ot->poll = clarity_symmetry_poll;
+  ot->flag = 0;
+  RNA_def_enum(ot->srna, "preset", clarity_symmetry_preset_items, 1, "Symmetry", "");
+}
+
+static wmOperatorStatus clarity_symmetry_toggle_exec(bContext *C, wmOperator * /*op*/)
+{
+  wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm == nullptr || wm->runtime == nullptr) {
+    return OPERATOR_CANCELLED;
+  }
+  ClaritySymmetrySettings settings = ED_clarity_symmetry_settings_get(C);
+  if (settings.mode == ClaritySymmetryMode::Off) {
+    settings.mode = ClaritySymmetryMode(wm->runtime->clarity_symmetry_last_mode);
+    settings.axis = wm->runtime->clarity_symmetry_last_axis;
+  }
+  else {
+    settings.mode = ClaritySymmetryMode::Off;
+  }
+  if (!ED_clarity_symmetry_settings_set(C, settings)) {
+    return OPERATOR_CANCELLED;
+  }
+  if (settings.mode != ClaritySymmetryMode::Off) {
+    symmetry_selection_extend(C);
+  }
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+  return OPERATOR_FINISHED;
+}
+
+static void CLARITY_OT_symmetry_toggle(wmOperatorType *ot)
+{
+  ot->name = "Toggle Clarity Symmetry";
+  ot->description = "Toggle the most recently used symmetry mode without losing its axis";
+  ot->idname = "CLARITY_OT_symmetry_toggle";
+  ot->exec = clarity_symmetry_toggle_exec;
+  ot->poll = clarity_symmetry_poll;
+  ot->flag = 0;
+}
 
 static wmOperatorStatus clarity_component_mode_set_exec(bContext *C, wmOperator *op)
 {
@@ -796,6 +1163,8 @@ void register_tool_operators()
 {
   WM_operatortype_append(CLARITY_OT_component_mode_set);
   WM_operatortype_append(CLARITY_OT_selection_settings_set);
+  WM_operatortype_append(CLARITY_OT_symmetry_set);
+  WM_operatortype_append(CLARITY_OT_symmetry_toggle);
   WM_operatortype_append(CLARITY_OT_pivot_pin_toggle);
   WM_operatortype_append(CLARITY_OT_pivot_edit_toggle);
   WM_operatortype_append(CLARITY_OT_pivot_settings_set);
@@ -811,6 +1180,8 @@ void register_tool_operators()
   }
   WM_operatortype_append(REGISTER_MAYA_OPERATOR_COMPATIBILITY(component_mode_set));
   WM_operatortype_append(REGISTER_MAYA_OPERATOR_COMPATIBILITY(selection_settings_set));
+  WM_operatortype_append(REGISTER_MAYA_OPERATOR_COMPATIBILITY(symmetry_set));
+  WM_operatortype_append(REGISTER_MAYA_OPERATOR_COMPATIBILITY(symmetry_toggle));
   WM_operatortype_append(REGISTER_MAYA_OPERATOR_COMPATIBILITY(pivot_pin_toggle));
   WM_operatortype_append(REGISTER_MAYA_OPERATOR_COMPATIBILITY(pivot_edit_toggle));
   WM_operatortype_append(REGISTER_MAYA_OPERATOR_COMPATIBILITY(pivot_settings_set));
@@ -1631,9 +2002,13 @@ static bool selection_constraint_apply(bContext *C, const bool allow_growth = tr
     return false;
   }
 
+  const std::shared_ptr<ClaritySymmetrySelectionState> symmetry_before =
+      symmetry_selection_capture(C);
+  bool changed = false;
   switch (constraint) {
     case ClaritySelectionConstraint::Border:
-      return selection_filter_by_edge(C, edge_passes_border, 0.0f);
+      changed = selection_filter_by_edge(C, edge_passes_border, 0.0f);
+      break;
     case ClaritySelectionConstraint::Angle: {
       if (!allow_growth) {
         return false;
@@ -1642,16 +2017,21 @@ static bool selection_constraint_apply(bContext *C, const bool allow_growth = tr
       const float tolerance = wm != nullptr && wm->runtime != nullptr ?
                                   wm->runtime->clarity_selection_constraint_angle :
                                   DEG2RADF(45.0f);
-      return selection_propagate_by_angle(C, tolerance);
+      changed = selection_propagate_by_angle(C, tolerance);
+      break;
     }
     case ClaritySelectionConstraint::EdgeLoop:
     case ClaritySelectionConstraint::EdgeRing:
     case ClaritySelectionConstraint::Shell:
-      return allow_growth ? selection_grow_by_operator(C, constraint) : false;
+      changed = allow_growth ? selection_grow_by_operator(C, constraint) : false;
+      break;
     case ClaritySelectionConstraint::Off:
       break;
   }
-  return false;
+  if (changed && symmetry_before) {
+    symmetry_selection_propagate(C, *symmetry_before);
+  }
+  return changed;
 }
 
 /** \} */
@@ -1951,8 +2331,13 @@ ClarityDispatchResult selection_handle_action(bContext *C,
     /* Taken before the pick, which is about to move the active face onto whatever is clicked: the
      * double click that may follow needs to know where the selection was standing. */
     topology_anchor_store(C, runtime);
+    const std::shared_ptr<ClaritySymmetrySelectionState> symmetry_before =
+        symmetry_selection_capture(C);
     const int selected_before = select_op == SEL_OP_XOR ? edit_mesh_selected_count(C) : 0;
-    select_pick_call(C, action, select_op);
+    const wmOperatorStatus status = select_pick_call(C, action, select_op);
+    if ((status & OPERATOR_FINISHED) && symmetry_before) {
+      symmetry_selection_propagate(C, *symmetry_before);
+    }
     const bool allow_growth = ELEM(select_op, SEL_OP_SET, SEL_OP_ADD) ||
                               (select_op == SEL_OP_XOR &&
                                edit_mesh_selected_count(C) > selected_before);
@@ -1961,6 +2346,8 @@ ClarityDispatchResult selection_handle_action(bContext *C,
   }
 
   if (action.id == ClarityActionID::SelectTopology && is_mesh_component_context(C)) {
+    const std::shared_ptr<ClaritySymmetrySelectionState> symmetry_before =
+        symmetry_selection_capture(C);
     const ClarityTopologySelectOp op = topology_select_op_from_action(action);
     /* The first click has already made the face under the pointer the sole selection, so growing
      * from that seed gives Clarity's whole-shell result. Shift-double-clicking a neighboring face uses
@@ -1990,6 +2377,9 @@ ClarityDispatchResult selection_handle_action(bContext *C,
     else {
       status = select_loop_call(C, action, op);
     }
+    if ((status & OPERATOR_FINISHED) && symmetry_before) {
+      symmetry_selection_propagate(C, *symmetry_before);
+    }
     return (status & OPERATOR_CANCELLED) ? ClarityDispatchResult::PassThrough :
                                           ClarityDispatchResult::Handled;
   }
@@ -1997,10 +2387,15 @@ ClarityDispatchResult selection_handle_action(bContext *C,
   if (ELEM(action.id, ClarityActionID::SelectGrow, ClarityActionID::SelectShrink) &&
       is_mesh_component_context(C))
   {
+    const std::shared_ptr<ClaritySymmetrySelectionState> symmetry_before =
+        symmetry_selection_capture(C);
     const char *operator_id = action.id == ClarityActionID::SelectGrow ? "MESH_OT_select_more" :
                                                                      "MESH_OT_select_less";
     const wmOperatorStatus status = WM_operator_name_call(
         C, operator_id, wm::OpCallContext::ExecDefault, nullptr, nullptr);
+    if ((status & OPERATOR_FINISHED) && symmetry_before) {
+      symmetry_selection_propagate(C, *symmetry_before);
+    }
     return (status & OPERATOR_CANCELLED) ? ClarityDispatchResult::PassThrough :
                                           ClarityDispatchResult::Handled;
   }
@@ -2069,6 +2464,7 @@ bool left_mouse_marquee_drag_handle(bContext *C,
   /* The drag is consumed whatever the marquee answers: otherwise the tool keymap of Move, Rotate or
    * Scale inherits it and starts a transform where Clarity draws a selection rectangle. */
   runtime.selection_constraint_selected_before = edit_mesh_selected_count(C);
+  runtime.symmetry_selection_before = symmetry_selection_capture(C);
   select_marquee_call(C, drag);
   /* The marquee is modal, so there is nothing to constrain yet. */
   runtime.selection_constraint_pending = true;
@@ -2083,12 +2479,17 @@ bool selection_constraint_apply_pending(bContext *C, ClarityWindowRuntime &runti
     return false;
   }
   runtime.selection_constraint_pending = false;
+  bool changed = false;
+  if (runtime.symmetry_selection_before) {
+    changed = symmetry_selection_propagate(C, *runtime.symmetry_selection_before);
+    runtime.symmetry_selection_before.reset();
+  }
   bool allow_growth = runtime.selection_constraint_pending_allow_growth;
   if (runtime.selection_constraint_pending_toggle) {
     allow_growth = edit_mesh_selected_count(C) > runtime.selection_constraint_selected_before;
   }
   runtime.selection_constraint_pending_toggle = false;
-  return selection_constraint_apply(C, allow_growth);
+  return selection_constraint_apply(C, allow_growth) || changed;
 }
 
 void selection_constraint_click_track(bContext *C,
@@ -2103,8 +2504,10 @@ void selection_constraint_click_track(bContext *C,
   if (event->type == LEFTMOUSE) {
     if (left_mouse_click_press_arms(*event)) {
       const ARegion *region = CTX_wm_region(C);
-      const bool can_select_components =
-          runtime.selection_settings.selection_constraint != ClaritySelectionConstraint::Off &&
+      const bool needs_selection_postprocess =
+          runtime.selection_settings.selection_constraint != ClaritySelectionConstraint::Off ||
+          ED_clarity_symmetry_settings_get(C).mode != ClaritySymmetryMode::Off;
+      const bool can_select_components = needs_selection_postprocess &&
           is_mesh_component_context(C) && !runtime.transform_active &&
           runtime.pivot_edit.target == ClarityPivotEditTarget::None && region != nullptr &&
           region->regiontype == RGN_TYPE_WINDOW && !WM_gizmomap_region_is_highlighted(region);
@@ -2112,6 +2515,7 @@ void selection_constraint_click_track(bContext *C,
       if (can_select_components) {
         runtime.selection_constraint_click_modifier = uint8_t(event->modifier);
         runtime.selection_constraint_selected_before = edit_mesh_selected_count(C);
+        runtime.symmetry_selection_before = symmetry_selection_capture(C);
       }
       return;
     }
@@ -2139,6 +2543,7 @@ void selection_constraint_click_track(bContext *C,
 
     /* A double-click press belongs to topology selection and must not leave a click armed. */
     runtime.selection_constraint_click_press_pending = false;
+    runtime.symmetry_selection_before.reset();
     return;
   }
 
@@ -2562,6 +2967,46 @@ void shift_transform_end(bContext *C, ClarityWindowRuntime &runtime, const bool 
 }  // namespace blender::ed::clarity
 
 namespace blender {
+
+ed::clarity::ClaritySymmetrySettings ED_clarity_symmetry_settings_get(const bContext *C)
+{
+  ed::clarity::ClaritySymmetrySettings settings;
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm == nullptr || wm->runtime == nullptr) {
+    return settings;
+  }
+  settings.mode = ed::clarity::ClaritySymmetryMode(wm->runtime->clarity_symmetry_mode);
+  settings.axis = wm->runtime->clarity_symmetry_axis;
+  settings.tolerance = wm->runtime->clarity_symmetry_tolerance;
+  settings.preserve_seam = wm->runtime->clarity_symmetry_preserve_seam;
+  settings.seam_tolerance = wm->runtime->clarity_symmetry_seam_tolerance;
+  settings.allow_partial = wm->runtime->clarity_symmetry_allow_partial;
+  return settings;
+}
+
+bool ED_clarity_symmetry_settings_set(
+    const bContext *C, const ed::clarity::ClaritySymmetrySettings &settings)
+{
+  wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm == nullptr || wm->runtime == nullptr) {
+    return false;
+  }
+  bke::WindowManagerRuntime &runtime = *wm->runtime;
+  const uint8_t mode = uint8_t(settings.mode) <= uint8_t(ed::clarity::ClaritySymmetryMode::Topology) ?
+                           uint8_t(settings.mode) :
+                           uint8_t(ed::clarity::ClaritySymmetryMode::Off);
+  runtime.clarity_symmetry_mode = mode;
+  runtime.clarity_symmetry_axis = std::min<uint8_t>(settings.axis, uint8_t(2));
+  runtime.clarity_symmetry_tolerance = std::max(settings.tolerance, 1e-7f);
+  runtime.clarity_symmetry_preserve_seam = settings.preserve_seam;
+  runtime.clarity_symmetry_seam_tolerance = std::max(settings.seam_tolerance, 0.0f);
+  runtime.clarity_symmetry_allow_partial = settings.allow_partial;
+  if (mode != uint8_t(ed::clarity::ClaritySymmetryMode::Off)) {
+    runtime.clarity_symmetry_last_mode = mode;
+    runtime.clarity_symmetry_last_axis = runtime.clarity_symmetry_axis;
+  }
+  return true;
+}
 
 bool ED_clarity_shift_transform_prepare(bContext *C, wmOperator *op, const wmEvent *event)
 {

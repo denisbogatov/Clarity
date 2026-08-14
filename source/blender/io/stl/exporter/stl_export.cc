@@ -133,9 +133,9 @@ void export_frame(Depsgraph *depsgraph,
     float axes_transform[3][3];
     unit_m3(axes_transform);
     float xform[4][4];
-    /* +Y-forward and +Z-up are the default Blender axis settings. */
+    /* Clarity's native world uses +Z-forward and +Y-up. */
     mat3_from_axis_conversion(
-        export_params.forward_axis, export_params.up_axis, IO_AXIS_Y, IO_AXIS_Z, axes_transform);
+        export_params.forward_axis, export_params.up_axis, IO_AXIS_Z, IO_AXIS_Y, axes_transform);
     mul_m4_m3m4(xform, axes_transform, obj_eval->object_to_world().ptr());
     /* mul_m4_m3m4 does not transform last row of obmat, i.e. location data. */
     mul_v3_m3v3(xform[3], axes_transform, obj_eval->object_to_world().location());

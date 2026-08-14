@@ -49,7 +49,7 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Geometry>("Curve"_ustr)
       .supported_type({GeometryComponent::Type::Curve, GeometryComponent::Type::GreasePencil})
       .description(
-          "Curves to fill. All curves are treated as cyclic and projected to the XY plane");
+          "Curves to fill. All curves are treated as cyclic and projected to the XZ plane");
   b.add_input<decl::Int>("Group ID"_ustr)
       .evaluated_geometry_field()
       .hide_value()
@@ -93,7 +93,7 @@ static meshintersect::CDT_result<double> do_cdt(const bke::CurvesGeometry &curve
   Array<double2> positions_2d(positions.size());
   threading::parallel_for(positions.index_range(), 2048, [&](const IndexRange range) {
     for (const int i : range) {
-      positions_2d[i] = double2(positions[i].x, positions[i].y);
+      positions_2d[i] = double2(positions[i].x, -positions[i].z);
     }
   });
 
@@ -127,7 +127,7 @@ static meshintersect::CDT_result<double> do_cdt_with_mask(const bke::CurvesGeome
         for (const int i : src_points.index_range()) {
           const int src = src_points[i];
           const int dst = dst_points[i];
-          positions_2d[dst] = double2(positions[src].x, positions[src].y);
+          positions_2d[dst] = double2(positions[src].x, -positions[src].z);
         }
       },
       exec_mode::grain_size(1024));
@@ -236,7 +236,7 @@ static Mesh *cdts_to_mesh(const Span<meshintersect::CDT_result<double>> results)
 
       MutableSpan<float3> positions = all_positions.slice(verts_range);
       for (const int i : result.vert.index_range()) {
-        positions[i] = float3(float(result.vert[i].x), float(result.vert[i].y), 0.0f);
+        positions[i] = float3(float(result.vert[i].x), 0.0f, -float(result.vert[i].y));
       }
 
       MutableSpan<int2> edges = all_edges.slice(edges_range);
@@ -379,7 +379,7 @@ static void node_register()
   geo_node_type_base(&ntype, "GeometryNodeFillCurve"_ustr, GEO_NODE_FILL_CURVE);
   ntype.ui_name = "Fill Curve";
   ntype.ui_description =
-      "Generate a mesh on the XY plane with faces on the inside of input curves";
+      "Generate a mesh on the XZ plane with faces on the inside of input curves";
   ntype.enum_name_legacy = "FILL_CURVE";
   ntype.nclass = NODE_CLASS_GEOMETRY;
   ntype.initfunc = node_init;

@@ -164,8 +164,8 @@ def load_images(filenames, directory, force_reload=False, frame_start=1, find_se
 def offset_planes(planes, gap, axis):
     # Offset planes from each other by `gap` amount along a _local_ vector `axis`
     #
-    # For example, offset_planes([obj1, obj2], 0.5, Vector(0, 0, 1)) will place
-    # obj2 0.5 blender units away from obj1 along the local positive Z axis.
+    # For example, offset_planes([obj1, obj2], 0.5, Vector(0, 1, 0)) will place
+    # obj2 0.5 blender units away from obj1 along the native plane's local normal.
     #
     # This is in local space, not world space, so all planes should share
     # a common scale and rotation.
@@ -685,11 +685,11 @@ class IMAGE_OT_import_as_mesh_planes(
         default='+X',
         items=(
             ('+X', "+X", "Side by Side to the Left"),
-            ('+Y', "+Y", "Side by Side, Downward"),
-            ('+Z', "+Z", "Stacked Above"),
+            ('+Y', "+Y", "Stacked Above"),
+            ('+Z', "+Z", "Side by Side, Upward"),
             ('-X', "-X", "Side by Side to the Right"),
-            ('-Y', "-Y", "Side by Side, Upward"),
-            ('-Z', "-Z", "Stacked Below"),
+            ('-Y', "-Y", "Stacked Below"),
+            ('-Z', "-Z", "Side by Side, Downward"),
         ),
         description="How planes are oriented relative to each others' local axis",
     )
@@ -894,13 +894,22 @@ class IMAGE_OT_import_as_mesh_planes(
             offset_axis = self.axis_id_to_vector[self.offset_axis]
             offset_planes(planes, self.offset_amount, offset_axis)
 
-            if self.size_mode == 'CAMERA' and offset_axis.z:
+            if self.size_mode == 'CAMERA' and offset_axis.y:
                 for plane in planes:
-                    x, y = compute_camera_size(
-                        context, plane.location,
-                        self.fill_mode, plane.dimensions.x / plane.dimensions.y,
+                    local_width = max(vertex.co.x for vertex in plane.data.vertices) - min(
+                        vertex.co.x for vertex in plane.data.vertices
                     )
-                    plane.dimensions = x, y, 0.0
+                    local_height = max(vertex.co.z for vertex in plane.data.vertices) - min(
+                        vertex.co.z for vertex in plane.data.vertices
+                    )
+                    x, y = compute_camera_size(
+                        context,
+                        plane.location,
+                        self.fill_mode,
+                        local_width / local_height,
+                    )
+                    plane.scale.x = x / local_width
+                    plane.scale.z = y / local_height
 
         # Setup new selection.
         for plane in planes:
@@ -972,14 +981,14 @@ class IMAGE_OT_import_as_mesh_planes(
         # Why does mesh.primitive_plane_add leave the object in edit mode???
         if plane.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
-        plane.dimensions = width, height, 0.0
+        plane.dimensions = width, 0.0, height
         plane.data.name = plane.name = name
         bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
         # If sizing for camera, also insert into the camera's field of view.
         if self.size_mode == 'CAMERA':
             offset_axis = self.axis_id_to_vector[self.offset_axis]
-            translate_axis = [0 if offset_axis[i] else 1 for i in (0, 1)]
+            translate_axis = [0 if offset_axis[i] else 1 for i in (0, 2)]
             center_in_camera(context.scene.camera, plane, translate_axis)
 
         self.align_plane(context, plane)
@@ -1035,34 +1044,23 @@ class IMAGE_OT_import_as_mesh_planes(
                     for n in axis
                 ])
             else:
-                # No camera? Just face Z axis.
-                axis = Vector((0.0, 0.0, 1.0))
-                self.align_axis = '+Z'
+                # No camera? Keep the native plane facing world Y.
+                axis = Vector((0.0, 1.0, 0.0))
+                self.align_axis = '+Y'
         else:
             # Axis-aligned.
             axis = self.axis_id_to_vector[self.align_axis]
 
-        # Rotate accordingly for X/Y axis.
-        if not axis.z:
-            plane.rotation_euler.x = pi / 2
-
-            if axis.y > 0:
-                plane.rotation_euler.z = pi
-            elif axis.y < 0:
-                plane.rotation_euler.z = 0
-            elif axis.x > 0:
-                plane.rotation_euler.z = pi / 2
-            elif axis.x < 0:
-                plane.rotation_euler.z = -pi / 2
-
-        # Or flip 180 degrees for negative Z.
-        elif axis.z < 0:
-            plane.rotation_euler.y = pi
+        # Native planes lie in XZ with a +Y normal.
+        plane.rotation_euler = Vector((0.0, 1.0, 0.0)).rotation_difference(axis).to_euler()
 
         if self.align_axis == 'CAM':
+            # Camera objects use local +Z as their back direction.
+            plane.rotation_euler = (pi / 2, 0.0, 0.0)
             constraint = plane.constraints.new('COPY_ROTATION')
             constraint.target = camera
             constraint.use_x = constraint.use_y = constraint.use_z = True
+            constraint.mix_mode = 'AFTER'
             if not self.align_track:
                 bpy.ops.object.visual_transform_apply()
                 plane.constraints.clear()
@@ -1070,8 +1068,8 @@ class IMAGE_OT_import_as_mesh_planes(
         if self.align_axis == 'CAM_AX' and self.align_track:
             constraint = plane.constraints.new('LOCKED_TRACK')
             constraint.target = camera
-            constraint.track_axis = 'TRACK_Z'
-            constraint.lock_axis = 'LOCK_Y'
+            constraint.track_axis = 'TRACK_Y'
+            constraint.lock_axis = 'LOCK_Z'
 
 
 class IMAGE_OT_convert_to_mesh_plane(MaterialProperties_MixIn, TextureProperties_MixIn, Operator):

@@ -176,6 +176,18 @@ static Mutex vparent_lock;
 static_assert(sizeof(blender::bke::ObjectRuntime::contained_geometry_types) * 8 >=
               GEO_COMPONENT_TYPE_ENUM_SIZE);
 
+bool BKE_object_clarity_live_surface_get(const Object *object)
+{
+  return object != nullptr && object->runtime != nullptr && object->runtime->clarity_live_surface;
+}
+
+void BKE_object_clarity_live_surface_set(Object *object, const bool is_live)
+{
+  if (object != nullptr && object->runtime != nullptr) {
+    object->runtime->clarity_live_surface = is_live;
+  }
+}
+
 static void clarity_constraints_free(ListBaseT<ClarityConstraint> &constraints)
 {
   for (ClarityConstraint &constraint : constraints) {
@@ -212,8 +224,8 @@ static void object_init_data(ID *id)
 
   ob->type = OB_EMPTY;
 
-  ob->trackflag = OB_POSY;
-  ob->upflag = OB_POSZ;
+  ob->trackflag = OB_POSZ;
+  ob->upflag = OB_POSY;
   ob->runtime = MEM_new<bke::ObjectRuntime>(__func__);
 
   /* Animation Visualization defaults */
@@ -5393,10 +5405,12 @@ bool BKE_object_supports_material_slots(Object *ob)
 
 void BKE_object_runtime_reset(Object *object)
 {
+  const bool clarity_live_surface = object->runtime->clarity_live_surface;
   *object->runtime = {};
+  object->runtime->clarity_live_surface = clarity_live_surface;
 }
 
-void BKE_object_runtime_reset_on_copy(Object *object, const int /*flag*/)
+void BKE_object_runtime_reset_on_copy(Object *object, const int flag)
 {
   bke::ObjectRuntime *runtime = object->runtime;
   runtime->data_eval = nullptr;
@@ -5409,6 +5423,11 @@ void BKE_object_runtime_reset_on_copy(Object *object, const int /*flag*/)
   runtime->contained_geometry_types = 0;
   runtime->sculpt_session = nullptr;
   runtime->clarity_transform = {};
+  if ((flag & LIB_ID_COPY_SET_COPIED_ON_WRITE) == 0) {
+    /* Make Live belongs to the object ID, not to an ordinary duplicate. COW copies retain the
+     * presentation mirror so evaluated objects can be colored without depending on the editor. */
+    runtime->clarity_live_surface = false;
+  }
 
   runtime->crazyspace_deform_imats = {};
   runtime->crazyspace_deform_cos = {};

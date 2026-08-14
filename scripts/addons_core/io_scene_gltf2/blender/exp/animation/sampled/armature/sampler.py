@@ -142,12 +142,6 @@ def __convert_keyframes(armature_uuid, bone_name, channel, keyframes, action_nam
     if bone.parent is None:
         # bone at root of armature
         axis_basis_change = mathutils.Matrix.Identity(4)
-        if is_yup:
-            axis_basis_change = mathutils.Matrix(
-                ((1.0, 0.0, 0.0, 0.0),
-                    (0.0, 0.0, 1.0, 0.0),
-                    (0.0, -1.0, 0.0, 0.0),
-                    (0.0, 0.0, 0.0, 1.0)))
         correction_matrix_local = axis_basis_change @ bone.bone.matrix_local
     else:
         # Bone is not at root of armature
@@ -164,12 +158,6 @@ def __convert_keyframes(armature_uuid, bone_name, channel, keyframes, action_nam
         else:
             # exported bone (after filter) is at root of armature
             axis_basis_change = mathutils.Matrix.Identity(4)
-            if is_yup:
-                axis_basis_change = mathutils.Matrix(
-                    ((1.0, 0.0, 0.0, 0.0),
-                     (0.0, 0.0, 1.0, 0.0),
-                     (0.0, -1.0, 0.0, 0.0),
-                     (0.0, 0.0, 0.0, 1.0)))
             correction_matrix_local = axis_basis_change
     transform = correction_matrix_local
 

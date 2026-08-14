@@ -61,6 +61,7 @@
 #include "BKE_bpath.hh"
 #include "BKE_callbacks.hh"
 #include "BKE_collection.hh"
+#include "BKE_colorband.hh"
 #include "BKE_colortools.hh"
 #include "BKE_curveprofile.h"
 #include "BKE_duplilist.hh"
@@ -162,6 +163,37 @@ CurveMapping *BKE_paint_default_curve()
   return cumap;
 }
 
+void BKE_soft_selection_color_default_set(SoftSelectionSettings *settings)
+{
+  BLI_assert(settings != nullptr);
+
+  ColorBand &ramp = settings->falloff_color;
+  BKE_colorband_init(&ramp, true);
+  ramp.tot = 3;
+  ramp.cur = 1;
+  ramp.ipotype = COLBAND_INTERP_LINEAR;
+
+  ramp.data[0].pos = 0.0f;
+  ramp.data[0].r = 0.0f;
+  ramp.data[0].g = 0.0f;
+  ramp.data[0].b = 0.0f;
+  ramp.data[0].a = 1.0f;
+
+  ramp.data[1].pos = 0.5f;
+  ramp.data[1].r = 1.0f;
+  ramp.data[1].g = 0.0f;
+  ramp.data[1].b = 0.0f;
+  ramp.data[1].a = 1.0f;
+
+  ramp.data[2].pos = 1.0f;
+  ramp.data[2].r = 1.0f;
+  ramp.data[2].g = 1.0f;
+  ramp.data[2].b = 0.0f;
+  ramp.data[2].a = 1.0f;
+
+  settings->use_falloff_color = 1;
+}
+
 static void scene_init_data(ID *id)
 {
   Scene *scene = id_cast<Scene *>(id);
@@ -184,6 +216,8 @@ static void scene_init_data(ID *id)
   scene->toolsettings = MEM_new<ToolSettings>(__func__);
 
   scene->toolsettings->autokey_mode = U.autokey_mode;
+
+  BKE_soft_selection_color_default_set(&scene->toolsettings->soft_selection);
 
   scene->toolsettings->unified_paint_settings.curve_rand_hue = BKE_paint_default_curve();
   scene->toolsettings->unified_paint_settings.curve_rand_saturation = BKE_paint_default_curve();

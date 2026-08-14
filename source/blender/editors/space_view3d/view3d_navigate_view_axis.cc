@@ -34,6 +34,9 @@ namespace blender {
 
 static constexpr int VIEW3D_VIEW_DIAGONAL_BASE = 100;
 static constexpr int VIEW3D_VIEW_DIAGONAL_COUNT = 12;
+static constexpr int VIEW3D_VIEW_CORNER_BASE =
+    VIEW3D_VIEW_DIAGONAL_BASE + VIEW3D_VIEW_DIAGONAL_COUNT;
+static constexpr int VIEW3D_VIEW_CORNER_COUNT = 8;
 
 static const eRegionView3D_View diagonal_view_pairs[VIEW3D_VIEW_DIAGONAL_COUNT][2] = {
     {RV3D_VIEW_LEFT, RV3D_VIEW_FRONT},
@@ -49,6 +52,50 @@ static const eRegionView3D_View diagonal_view_pairs[VIEW3D_VIEW_DIAGONAL_COUNT][
     {RV3D_VIEW_BACK, RV3D_VIEW_BOTTOM},
     {RV3D_VIEW_BACK, RV3D_VIEW_TOP},
 };
+
+static const eRegionView3D_View corner_view_triples[VIEW3D_VIEW_CORNER_COUNT][3] = {
+    {RV3D_VIEW_LEFT, RV3D_VIEW_BOTTOM, RV3D_VIEW_BACK},
+    {RV3D_VIEW_LEFT, RV3D_VIEW_BOTTOM, RV3D_VIEW_FRONT},
+    {RV3D_VIEW_LEFT, RV3D_VIEW_TOP, RV3D_VIEW_BACK},
+    {RV3D_VIEW_LEFT, RV3D_VIEW_TOP, RV3D_VIEW_FRONT},
+    {RV3D_VIEW_RIGHT, RV3D_VIEW_BOTTOM, RV3D_VIEW_BACK},
+    {RV3D_VIEW_RIGHT, RV3D_VIEW_BOTTOM, RV3D_VIEW_FRONT},
+    {RV3D_VIEW_RIGHT, RV3D_VIEW_TOP, RV3D_VIEW_BACK},
+    {RV3D_VIEW_RIGHT, RV3D_VIEW_TOP, RV3D_VIEW_FRONT},
+};
+
+static void axis_view_direction(const eRegionView3D_View view, float r_direction[3])
+{
+  float quat[4];
+  ED_view3d_quat_from_axis_view(view, RV3D_VIEW_AXIS_ROLL_0, quat);
+  invert_qt_normalized(quat);
+  r_direction[0] = 0.0f;
+  r_direction[1] = 0.0f;
+  r_direction[2] = 1.0f;
+  mul_qt_v3(quat, r_direction);
+}
+
+static void view_quat_from_direction_y_up(const float direction[3], float r_quat[4])
+{
+  const float world_up[3] = {0.0f, 1.0f, 0.0f};
+  float camera_basis[3][3];
+
+  /* Keep the camera level like Maya's "Preserve scene up" ViewCube option. */
+  cross_v3_v3v3(camera_basis[0], world_up, direction);
+  if (normalize_v3(camera_basis[0]) == 0.0f) {
+    ED_view3d_quat_from_axis_view(direction[1] >= 0.0f ? RV3D_VIEW_TOP : RV3D_VIEW_BOTTOM,
+                                 RV3D_VIEW_AXIS_ROLL_0,
+                                 r_quat);
+    return;
+  }
+  cross_v3_v3v3(camera_basis[1], direction, camera_basis[0]);
+  normalize_v3(camera_basis[1]);
+  copy_v3_v3(camera_basis[2], direction);
+
+  /* The basis is camera-to-world; RegionView3D stores the inverse rotation. */
+  mat3_normalized_to_quat(r_quat, camera_basis);
+  invert_qt_normalized(r_quat);
+}
 
 /* -------------------------------------------------------------------- */
 /** \name View Axis Operator
@@ -73,6 +120,46 @@ static const EnumPropertyItem prop_view_items[] = {
     {VIEW3D_VIEW_DIAGONAL_BASE + 9, "FRONT_TOP", 0, "Front Top", "View from front top"},
     {VIEW3D_VIEW_DIAGONAL_BASE + 10, "BACK_BOTTOM", 0, "Back Bottom", "View from back bottom"},
     {VIEW3D_VIEW_DIAGONAL_BASE + 11, "BACK_TOP", 0, "Back Top", "View from back top"},
+    {VIEW3D_VIEW_CORNER_BASE + 0,
+     "LEFT_BOTTOM_BACK",
+     0,
+     "Left Bottom Back",
+     "View from left bottom back"},
+    {VIEW3D_VIEW_CORNER_BASE + 1,
+     "LEFT_BOTTOM_FRONT",
+     0,
+     "Left Bottom Front",
+     "View from left bottom front"},
+    {VIEW3D_VIEW_CORNER_BASE + 2,
+     "LEFT_TOP_BACK",
+     0,
+     "Left Top Back",
+     "View from left top back"},
+    {VIEW3D_VIEW_CORNER_BASE + 3,
+     "LEFT_TOP_FRONT",
+     0,
+     "Left Top Front",
+     "View from left top front"},
+    {VIEW3D_VIEW_CORNER_BASE + 4,
+     "RIGHT_BOTTOM_BACK",
+     0,
+     "Right Bottom Back",
+     "View from right bottom back"},
+    {VIEW3D_VIEW_CORNER_BASE + 5,
+     "RIGHT_BOTTOM_FRONT",
+     0,
+     "Right Bottom Front",
+     "View from right bottom front"},
+    {VIEW3D_VIEW_CORNER_BASE + 6,
+     "RIGHT_TOP_BACK",
+     0,
+     "Right Top Back",
+     "View from right top back"},
+    {VIEW3D_VIEW_CORNER_BASE + 7,
+     "RIGHT_TOP_FRONT",
+     0,
+     "Right Top Front",
+     "View from right top front"},
     {0, nullptr, 0, nullptr, nullptr},
 };
 
@@ -96,6 +183,9 @@ static wmOperatorStatus view_axis_exec(bContext *C, wmOperator *op)
   const bool is_diagonal_view = viewnum >= VIEW3D_VIEW_DIAGONAL_BASE &&
                                 viewnum < VIEW3D_VIEW_DIAGONAL_BASE +
                                               VIEW3D_VIEW_DIAGONAL_COUNT;
+  const bool is_corner_view = viewnum >= VIEW3D_VIEW_CORNER_BASE &&
+                              viewnum < VIEW3D_VIEW_CORNER_BASE + VIEW3D_VIEW_CORNER_COUNT;
+  const bool is_custom_axis_view = is_diagonal_view || is_corner_view;
 
   float align_quat_buf[4];
   float *align_quat = nullptr;
@@ -118,7 +208,7 @@ static wmOperatorStatus view_axis_exec(bContext *C, wmOperator *op)
     }
   }
 
-  if (RNA_boolean_get(op->ptr, "relative") && !is_diagonal_view) {
+  if (RNA_boolean_get(op->ptr, "relative") && !is_custom_axis_view) {
     float quat_rotate[4];
     float quat_test[4];
 
@@ -182,33 +272,42 @@ static wmOperatorStatus view_axis_exec(bContext *C, wmOperator *op)
     view_axis_roll = view_axis_roll_best;
   }
 
-  /* Use this to test if we started out with a camera */
-  const eRegionView3D_Persp nextperspo = (rv3d->persp == RV3D_CAMOB) ? rv3d->lpersp : perspo;
+  /* Maya's default ViewCube mode uses orthographic faces and perspective angled views. Never let
+   * an orthographic face click leak into the following edge or corner click. */
+  eRegionView3D_Persp nextperspo = RV3D_PERSP;
+  if (!is_custom_axis_view) {
+    nextperspo = (rv3d->persp == RV3D_CAMOB) ? rv3d->lpersp : perspo;
+  }
   float quat[4];
   eRegionView3D_View viewnum_enum;
   const eRegionView3D_ViewAxisRoll view_axis_roll_enum = eRegionView3D_ViewAxisRoll(
       view_axis_roll);
   if (is_diagonal_view) {
     const int diagonal_index = viewnum - VIEW3D_VIEW_DIAGONAL_BASE;
-    float quat_a[4], quat_b[4];
-    ED_view3d_quat_from_axis_view(
-        diagonal_view_pairs[diagonal_index][0], RV3D_VIEW_AXIS_ROLL_0, quat_a);
-    ED_view3d_quat_from_axis_view(
-        diagonal_view_pairs[diagonal_index][1], RV3D_VIEW_AXIS_ROLL_0, quat_b);
-
-    float direction_a[3] = {0.0f, 0.0f, 1.0f};
-    float direction_b[3] = {0.0f, 0.0f, 1.0f};
-    invert_qt_normalized(quat_a);
-    invert_qt_normalized(quat_b);
-    mul_qt_v3(quat_a, direction_a);
-    mul_qt_v3(quat_b, direction_b);
+    float direction_a[3];
+    float direction_b[3];
+    axis_view_direction(diagonal_view_pairs[diagonal_index][0], direction_a);
+    axis_view_direction(diagonal_view_pairs[diagonal_index][1], direction_b);
     add_v3_v3(direction_a, direction_b);
     normalize_v3(direction_a);
 
-    /* Aim exactly between the two neighboring face normals. */
-    vec_to_quat(quat, direction_a, OB_NEGZ, OB_POSY);
-    normalize_qt(quat);
-    invert_qt_normalized(quat);
+    /* Aim exactly between the two neighboring face normals without introducing view roll. */
+    view_quat_from_direction_y_up(direction_a, quat);
+    viewnum_enum = RV3D_VIEW_USER;
+  }
+  else if (is_corner_view) {
+    const int corner_index = viewnum - VIEW3D_VIEW_CORNER_BASE;
+    float direction[3];
+    float direction_next[3];
+    axis_view_direction(corner_view_triples[corner_index][0], direction);
+    axis_view_direction(corner_view_triples[corner_index][1], direction_next);
+    add_v3_v3(direction, direction_next);
+    axis_view_direction(corner_view_triples[corner_index][2], direction_next);
+    add_v3_v3(direction, direction_next);
+    normalize_v3(direction);
+
+    /* Aim through the selected corner, equally between all three neighboring faces. */
+    view_quat_from_direction_y_up(direction, quat);
     viewnum_enum = RV3D_VIEW_USER;
   }
   else {

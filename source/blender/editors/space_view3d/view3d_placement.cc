@@ -101,8 +101,8 @@ struct InteractivePlaceData {
      */
     bool is_centered, is_centered_init;
     /**
-     * When fixed, constrain the X/Y aspect for the initial #STEP_BASE drag.
-     * For #STEP_DEPTH match the maximum X/Y dimension.
+     * When fixed, constrain the two construction-plane axes for the initial #STEP_BASE drag.
+     * For #STEP_DEPTH match the maximum construction-plane dimension.
      * Toggling the setting flips the value from its initial state.
      */
     bool is_fixed_aspect, is_fixed_aspect_init;
@@ -113,7 +113,8 @@ struct InteractivePlaceData {
      * We can't project the mouse cursor onto `plane`,
      * in this case #view3d_win_to_3d_on_plane_maybe_fallback is used.
      *
-     * - For #STEP_BASE we're drawing from the side, where the X/Y axis can't be projected.
+     * - For #STEP_BASE we're drawing from the side, where a construction-plane axis can't be
+     *   projected.
      * - For #STEP_DEPTH we're drawing from the top (2D), where the depth can't be projected.
      */
     bool is_degenerate_view_align;
@@ -1130,32 +1131,27 @@ static wmOperatorStatus view3d_interactive_add_modal(bContext *C,
         float scale[3];
 
         float matrix_orient_axis[3][3];
-        copy_m3_m3(matrix_orient_axis, ipd->matrix_orient);
-        if (ipd->orient_axis != 2) {
-          swap_v3_v3(matrix_orient_axis[2], matrix_orient_axis[ipd->orient_axis]);
-          swap_v3_v3(matrix_orient_axis[0], matrix_orient_axis[1]);
-        }
+        const int base_x_axis = (ipd->orient_axis + 1) % 3;
+        copy_v3_v3(matrix_orient_axis[0], ipd->matrix_orient[base_x_axis]);
+        copy_v3_v3(matrix_orient_axis[1], ipd->matrix_orient[ipd->orient_axis]);
         /* Needed for shapes where the sign matters (cone for eg). */
         {
           float delta[3];
           sub_v3_v3v3(delta, bounds.vec[0], bounds.vec[4]);
           if (dot_v3v3(ipd->matrix_orient[ipd->orient_axis], delta) > 0.0f) {
-            negate_v3(matrix_orient_axis[2]);
-
-            /* Only flip Y so we don't flip a single axis which causes problems. */
             negate_v3(matrix_orient_axis[1]);
           }
         }
+        cross_v3_v3v3(matrix_orient_axis[2], matrix_orient_axis[0], matrix_orient_axis[1]);
 
         mat3_to_eul(rotation, matrix_orient_axis);
 
         mid_v3_v3v3(location, bounds.vec[0], bounds.vec[6]);
-        const int cube_verts[3] = {3, 1, 4};
-        for (int i = 0; i < 3; i++) {
-          scale[i] = len_v3v3(bounds.vec[0], bounds.vec[cube_verts[i]]);
-          /* Primitives have size 2 by default, compensate for this here. */
-          scale[i] /= 2.0f;
-        }
+        scale[0] = len_v3v3(bounds.vec[0], bounds.vec[3]);
+        scale[1] = len_v3v3(bounds.vec[0], bounds.vec[4]);
+        scale[2] = len_v3v3(bounds.vec[0], bounds.vec[1]);
+        /* Primitives have size 2 by default, compensate for this here. */
+        mul_v3_fl(scale, 0.5f);
 
         wmOperatorType *ot = nullptr;
         if (ipd->primitive_type == PLACE_PRIMITIVE_TYPE_CUBE) {

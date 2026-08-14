@@ -72,9 +72,6 @@ def __gather_inverse_bind_matrices(armature_uuid, export_settings):
     blender_armature_object = export_settings['vtree'].nodes[armature_uuid].blender_object
 
     axis_basis_change = mathutils.Matrix.Identity(4)
-    if export_settings['gltf_yup']:
-        axis_basis_change = mathutils.Matrix(
-            ((1.0, 0.0, 0.0, 0.0), (0.0, 0.0, 1.0, 0.0), (0.0, -1.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)))
 
     # store matrix_world of armature in case we need to add a neutral bone
     export_settings['vtree'].nodes[armature_uuid].matrix_world_armature = blender_armature_object.matrix_world.copy()

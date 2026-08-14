@@ -533,8 +533,8 @@ class EyeClusterControl(RigComponent):
         center /= self.rig_count
         length /= self.rig_count
 
-        # Create the matrix from the average Y and world Z
-        matrix = matrix_from_axis_pair((0, 0, 1), axis, 'z').to_4x4()
+        # Create the matrix from the average eye axis and Clarity's world Y-up direction.
+        matrix = matrix_from_axis_pair((0, 1, 0), axis, 'z').to_4x4()
         matrix.translation = center + axis * length * 5
 
         self.size = length * 3 / 4

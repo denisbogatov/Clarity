@@ -25,8 +25,8 @@ struct ReportList;
 struct STLImportParams {
   /** Full path to the source STL file to import. */
   char filepath[FILE_MAX] = "";
-  eIOAxis forward_axis = IO_AXIS_Y;
-  eIOAxis up_axis = IO_AXIS_Z;
+  eIOAxis forward_axis = IO_AXIS_Z;
+  eIOAxis up_axis = IO_AXIS_Y;
   bool use_facet_normal = false;
   bool use_scene_unit = false;
   float global_scale = 1.0f;
@@ -38,8 +38,8 @@ struct STLImportParams {
 struct STLExportParams {
   /** Full path to the to-be-saved STL file. */
   char filepath[FILE_MAX] = "";
-  eIOAxis forward_axis = IO_AXIS_Y;
-  eIOAxis up_axis = IO_AXIS_Z;
+  eIOAxis forward_axis = IO_AXIS_Z;
+  eIOAxis up_axis = IO_AXIS_Y;
   float global_scale = 1.0f;
   bool export_selected_objects = false;
   bool use_scene_unit = false;

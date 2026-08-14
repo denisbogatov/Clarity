@@ -109,7 +109,7 @@ ccl_device float3 background_map_sample(KernelGlobals kg,
   }
 
   /* compute direction */
-  return equirectangular_to_direction(u, v);
+  return environment_native_y_up_from_z_up(equirectangular_to_direction(u, v));
 }
 
 /* TODO(sergey): Same as above, after the release we should consider using
@@ -117,7 +117,8 @@ ccl_device float3 background_map_sample(KernelGlobals kg,
  */
 ccl_device float background_map_pdf(KernelGlobals kg, const float3 direction)
 {
-  const float2 uv = direction_to_equirectangular(direction);
+  const float2 uv = direction_to_equirectangular(
+      environment_z_up_from_native_y_up(direction));
   const int res_x = kernel_data.background.map_res_x;
   const int res_y = kernel_data.background.map_res_y;
   const int cdf_width = res_x + 1;

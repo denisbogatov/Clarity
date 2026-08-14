@@ -120,7 +120,8 @@ ccl_device Spectrum camera_sample_perspective(KernelGlobals kg,
   }
   else {
     /* Spherical stereo */
-    spherical_stereo_transform(&kernel_data.cam, &P, &D);
+    const float3 world_up = make_float3(0.0f, 1.0f, 0.0f);
+    spherical_stereo_transform(&kernel_data.cam, &P, &D, world_up);
     ray->P = P;
     ray->D = D;
 
@@ -134,13 +135,13 @@ ccl_device Spectrum camera_sample_perspective(KernelGlobals kg,
     float3 Pcenter = Pnostereo;
     float3 Dcenter = Pcamera;
     Dcenter = normalize(transform_direction(&cameratoworld, Dcenter));
-    spherical_stereo_transform(&kernel_data.cam, &Pcenter, &Dcenter);
+    spherical_stereo_transform(&kernel_data.cam, &Pcenter, &Dcenter, world_up);
 
     float3 Px = Pnostereo;
     float3 Dx = transform_perspective(&rastertocamera,
                                       make_float3(raster.x + 1.0f, raster.y, 0.0f));
     Dx = normalize(transform_direction(&cameratoworld, Dx));
-    spherical_stereo_transform(&kernel_data.cam, &Px, &Dx);
+    spherical_stereo_transform(&kernel_data.cam, &Px, &Dx, world_up);
 
     differential3 dP;
     differential3 dD;
@@ -152,7 +153,7 @@ ccl_device Spectrum camera_sample_perspective(KernelGlobals kg,
     float3 Dy = transform_perspective(&rastertocamera,
                                       make_float3(raster.x, raster.y + 1.0f, 0.0f));
     Dy = normalize(transform_direction(&cameratoworld, Dy));
-    spherical_stereo_transform(&kernel_data.cam, &Py, &Dy);
+    spherical_stereo_transform(&kernel_data.cam, &Py, &Dy, world_up);
 
     dP.dy = Py - Pcenter;
     dD.dy = Dy - Dcenter;
@@ -263,7 +264,9 @@ ccl_device_inline void camera_sample_to_ray(ccl_constant KernelCamera *cam,
   /* Stereo transform */
   const bool use_stereo = cam->interocular_offset != 0.0f;
   if (use_stereo) {
-    spherical_stereo_transform(cam, &P, &D);
+    /* Panorama and custom-camera rays are still expressed in camera-local coordinates here. */
+    const float3 camera_up = make_float3(0.0f, 0.0f, 1.0f);
+    spherical_stereo_transform(cam, &P, &D, camera_up);
   }
 
   P = transform_point(&cameratoworld, P);
@@ -274,9 +277,10 @@ ccl_device_inline void camera_sample_to_ray(ccl_constant KernelCamera *cam,
 
 #ifdef __RAY_DIFFERENTIALS__
   if (use_stereo) {
-    spherical_stereo_transform(cam, &Pcenter, &Dcenter);
-    spherical_stereo_transform(cam, &Px, &Dx);
-    spherical_stereo_transform(cam, &Py, &Dy);
+    const float3 camera_up = make_float3(0.0f, 0.0f, 1.0f);
+    spherical_stereo_transform(cam, &Pcenter, &Dcenter, camera_up);
+    spherical_stereo_transform(cam, &Px, &Dx, camera_up);
+    spherical_stereo_transform(cam, &Py, &Dy, camera_up);
 
     differential3 dP;
     Pcenter = transform_point(&cameratoworld, Pcenter);

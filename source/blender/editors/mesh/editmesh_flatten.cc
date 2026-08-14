@@ -57,7 +57,8 @@ static wmOperatorStatus edbm_flatten_exec(bContext *C, wmOperator *op)
   for (Object *obedit : objects) {
     BMEditMesh *em = BKE_editmesh_from_object(obedit);
 
-    float view_normal[3] = {0.0f, 0.0f, 1.0f};
+    /* Headless fallback for View mode; an actual region supplies its view-local normal below. */
+    float view_normal[3] = {0.0f, 1.0f, 0.0f};
     if (rv3d) {
       float3 vn = math::normalize(
           math::transform_direction(obedit->world_to_object(), float3(rv3d->viewinv[2])));

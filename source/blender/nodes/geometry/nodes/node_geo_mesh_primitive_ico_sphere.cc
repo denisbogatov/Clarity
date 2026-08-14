@@ -129,6 +129,7 @@ static void node_geo_exec(GeoNodeExecParams params)
       "UV Map"_ustr);
 
   Mesh *mesh = create_ico_sphere_mesh(subdivisions, radius, uv_map_id);
+  transform_legacy_z_up_mesh(*mesh);
   params.set_output("Mesh"_ustr, GeometrySet::from_mesh(mesh));
 }
 

@@ -35,7 +35,7 @@ static float3 compute_average_face_normal(Span<BMFace *> faces)
   for (BMFace *f : faces) {
     normal += float3(f->no) * BM_face_calc_area(f);
   }
-  return (normalize_v3(normal) != 0.0f) ? normal : float3(0.0f, 0.0f, 1.0f);
+  return (normalize_v3(normal) != 0.0f) ? normal : float3(0.0f, 1.0f, 0.0f);
 }
 
 static Vector<BMVert *> collect_verts_from_faces(Span<BMFace *> faces)
@@ -60,7 +60,7 @@ void bmo_flatten_exec(BMesh *bm, BMOperator *op)
   const bool lock_y = BMO_slot_bool_get(op->slots_in, "lock_y");
   const bool lock_z = BMO_slot_bool_get(op->slots_in, "lock_z");
 
-  float3 view_direction(0.0f, 0.0f, 1.0f);
+  float3 view_direction(0.0f, 1.0f, 0.0f);
   if (method == FLATTEN_VIEW) {
     BMO_slot_vec_get(op->slots_in, "view_normal", view_direction);
   }

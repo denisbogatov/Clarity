@@ -110,9 +110,7 @@ def __convert_keyframes(
 
     is_yup = export_settings['gltf_yup']
 
-    need_rotation_correction = (
-        export_settings['gltf_cameras'] and export_settings['vtree'].nodes[obj_uuid].blender_type == VExportNode.CAMERA) or (
-        export_settings['gltf_lights'] and export_settings['vtree'].nodes[obj_uuid].blender_type == VExportNode.LIGHT)
+    need_rotation_correction = False
 
     target_datapath = [c for c in channel_group if c is not None][0].data_path
 
@@ -121,12 +119,6 @@ def __convert_keyframes(
         if bone.parent is None:
             # bone at root of armature
             axis_basis_change = mathutils.Matrix.Identity(4)
-            if is_yup:
-                axis_basis_change = mathutils.Matrix(
-                    ((1.0, 0.0, 0.0, 0.0),
-                        (0.0, 0.0, 1.0, 0.0),
-                        (0.0, -1.0, 0.0, 0.0),
-                        (0.0, 0.0, 0.0, 1.0)))
             correction_matrix_local = axis_basis_change @ bone.bone.matrix_local
         else:
             # Bone is not at root of armature
@@ -143,12 +135,6 @@ def __convert_keyframes(
             else:
                 # exported bone (after filter) is at root of armature
                 axis_basis_change = mathutils.Matrix.Identity(4)
-                if is_yup:
-                    axis_basis_change = mathutils.Matrix(
-                        ((1.0, 0.0, 0.0, 0.0),
-                         (0.0, 0.0, 1.0, 0.0),
-                         (0.0, -1.0, 0.0, 0.0),
-                         (0.0, 0.0, 0.0, 1.0)))
                 correction_matrix_local = axis_basis_change
 
         transform = correction_matrix_local

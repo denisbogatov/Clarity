@@ -936,8 +936,8 @@ bool bone_autoside_name(
    * - If head is non-zero, extension is added from perspective of object based on side head is on
    */
   const char *extension = nullptr;
-  if (axis == 2) {
-    /* z-axis - vertical (top/bottom) */
+  if (axis == 1) {
+    /* Native Y axis - vertical (top/bottom). */
     if (IS_EQF(head, 0.0f)) {
       if (tail < 0) {
         extension = "Bot";
@@ -955,22 +955,22 @@ bool bone_autoside_name(
       }
     }
   }
-  else if (axis == 1) {
-    /* y-axis - depth (front/back) */
+  else if (axis == 2) {
+    /* Native Z axis - depth. Positive Z points forward. */
     if (IS_EQF(head, 0.0f)) {
       if (tail < 0) {
-        extension = "Fr";
+        extension = "Bk";
       }
       else if (tail > 0) {
-        extension = "Bk";
+        extension = "Fr";
       }
     }
     else {
       if (head < 0) {
-        extension = "Fr";
+        extension = "Bk";
       }
       else {
-        extension = "Bk";
+        extension = "Fr";
       }
     }
   }

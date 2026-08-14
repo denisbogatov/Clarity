@@ -8,7 +8,6 @@
 
 #include "BLI_math_matrix.h"
 #include "BLI_math_rotation.h"
-#include "BLI_math_vector.h"
 
 #include "GPU_batch_utils.hh"
 #include "IMB_imbuf_types.hh"
@@ -53,10 +52,12 @@ static float4x4 get_world_shading_rotation_matrix(float studiolight_rot_z)
 {
   float4x4 V = draw::View::default_get().viewmat();
   float R[4][4];
-  axis_angle_to_mat4_single(R, 'Z', -studiolight_rot_z);
+  /* The DNA/RNA field keeps its legacy name, but world-space rotation follows native Y-up. */
+  axis_angle_to_mat4_single(R, 'Y', -studiolight_rot_z);
   mul_m4_m4m4(R, V.ptr(), R);
-  swap_v3_v3(R[2], R[1]);
-  negate_v3(R[2]);
+  /* Studio-light vectors use the same X-right/Y-up/Z-forward basis as Clarity. The former
+   * Y/Z swap converted those vectors into Blender's legacy Z-up world and would now rotate
+   * world-oriented lighting a second time. */
   return float4x4(R);
 }
 

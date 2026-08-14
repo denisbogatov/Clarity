@@ -105,7 +105,7 @@ static wmOperatorStatus edbm_screw_exec(bContext *C, wmOperator *op)
       continue;
     }
 
-    copy_v3_v3(nor, obedit->object_to_world().ptr()[2]);
+    copy_v3_v3(nor, obedit->object_to_world().ptr()[1]);
 
     /* calculate dvec */
     mul_v3_m4v3(v1_co_global, obedit->object_to_world().ptr(), v1->co);

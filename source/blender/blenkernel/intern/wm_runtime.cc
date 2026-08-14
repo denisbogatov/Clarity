@@ -33,6 +33,8 @@ WindowManagerRuntime::WindowManagerRuntime()
   this->clarity_transform_orientation = 1;
   this->clarity_snap_mode = 0;
   this->clarity_snap_temporary_mode = 0;
+  /* Maya Move Snap Settings defaults to projecting onto the live surface itself. */
+  this->clarity_live_surface_snap_mode = 0;
   /* Clarity's own defaults: relative steps of one unit and of 15 degrees. */
   this->clarity_snap_step_mode = 0;
   this->clarity_snap_step_size = 1.0f;
@@ -44,6 +46,16 @@ WindowManagerRuntime::WindowManagerRuntime()
   /* Clarity's own default angle tolerance for the Angle selection constraint. */
   this->clarity_selection_constraint_angle_active = false;
   this->clarity_selection_constraint_angle = DEG2RADF(45.0f);
+  /* Maya symmetric-modeling defaults. Keep the last non-off choice separately so the header's
+   * quick toggle never resets the user's space or axis. */
+  this->clarity_symmetry_mode = 0;
+  this->clarity_symmetry_axis = 0;
+  this->clarity_symmetry_last_mode = 1;
+  this->clarity_symmetry_last_axis = 0;
+  this->clarity_symmetry_tolerance = 0.001f;
+  this->clarity_symmetry_preserve_seam = true;
+  this->clarity_symmetry_seam_tolerance = 0.001f;
+  this->clarity_symmetry_allow_partial = true;
   this->clarity_interaction_revision = 0;
   BKE_reports_init(&this->reports, RPT_STORE);
 }

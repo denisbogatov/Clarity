@@ -299,10 +299,9 @@ void ShadowPass::init(const SceneState &scene_state, SceneResources &resources)
   }
   const Scene &scene = *scene_state.scene;
 
-  float3 direction_ws = scene.display.light_direction;
-  /* Turn the light in a way where it's more user friendly to control. */
-  std::swap(direction_ws.y, direction_ws.z);
-  direction_ws *= float3(-1, 1, -1);
+  /* SceneDisplay stores the user-facing direction in Y-up coordinates. Clarity's world now uses
+   * that basis directly; only reverse it from direction-to-light to the shadow-ray direction. */
+  const float3 direction_ws = -float3(scene.display.light_direction);
 
   std::array<float4, 6> planes = View::default_get().frustum_planes_get();
 

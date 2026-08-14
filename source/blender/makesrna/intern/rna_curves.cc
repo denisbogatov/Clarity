@@ -62,11 +62,11 @@ const EnumPropertyItem rna_enum_curve_normal_mode_items[] = {
      N_("Minimum Twist"),
      N_("Calculate normals with the smallest twist around the curve tangent across the whole "
         "curve")},
-    {NORMAL_MODE_Z_UP,
-     "Z_UP",
+    {NORMAL_MODE_Y_UP,
+     "Y_UP",
      ICON_NONE,
-     N_("Z Up"),
-     N_("Calculate normals perpendicular to the Z axis and the curve tangent. If a series of "
+     N_("Y Up"),
+     N_("Calculate normals perpendicular to the Y axis and the curve tangent. If a series of "
         "points is vertical, the X axis is used.")},
     {NORMAL_MODE_FREE,
      "FREE",

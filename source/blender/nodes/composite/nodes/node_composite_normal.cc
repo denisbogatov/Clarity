@@ -21,7 +21,7 @@ static void node_declare(NodeDeclarationBuilder &b)
 {
   b.is_function_node();
   b.add_output<decl::Vector>("Normal"_ustr)
-      .default_value({0.0f, 0.0f, 1.0f})
+      .default_value({0.0f, 1.0f, 0.0f})
       .min(-1.0f)
       .max(1.0f)
       .subtype(PROP_DIRECTION);

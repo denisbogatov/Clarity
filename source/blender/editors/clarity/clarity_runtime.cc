@@ -67,6 +67,7 @@
 #include "ED_view3d.hh"
 
 #include "DEG_depsgraph.hh"
+#include "DEG_depsgraph_query.hh"
 
 #include "bmesh.hh"
 
@@ -122,6 +123,7 @@ std::FILE *navigation_trace_file_open()
 }
 
 struct ClarityPivotUndoSnapshot {
+  ClarityLiveSurfaceRegistry live_surfaces;
   uint32_t scene_session_uid = 0;
   uint32_t object_session_uid = 0;
   ClarityObjectRuntimeRef manipulator_object;
@@ -592,9 +594,218 @@ static bool object_runtime_ref_is_empty(const ClarityObjectRuntimeRef &reference
   return reference.session_uid == 0;
 }
 
+static bool object_runtime_ref_equal(const ClarityObjectRuntimeRef &a,
+                                     const ClarityObjectRuntimeRef &b)
+{
+  return a.session_uid == b.session_uid && a.session_uid != 0;
+}
+
+static bool object_runtime_ref_set_equal(const Span<ClarityObjectRuntimeRef> a,
+                                         const Span<ClarityObjectRuntimeRef> b)
+{
+  if (a.size() != b.size()) {
+    return false;
+  }
+  for (const int64_t i : a.index_range()) {
+    if (!object_runtime_ref_equal(a[i], b[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+Span<ClarityObjectRuntimeRef> ClarityLiveSurfaceRegistry::active() const
+{
+  return active_;
+}
+
+Span<Vector<ClarityObjectRuntimeRef>> ClarityLiveSurfaceRegistry::history() const
+{
+  return history_;
+}
+
+bool ClarityLiveSurfaceRegistry::contains(const ClarityObjectRuntimeRef &reference) const
+{
+  return contains_session_uid(reference.session_uid);
+}
+
+bool ClarityLiveSurfaceRegistry::contains_session_uid(const uint32_t session_uid) const
+{
+  return session_uid != 0 &&
+         std::any_of(active_.begin(),
+                     active_.end(),
+                     [&](const ClarityObjectRuntimeRef &candidate) {
+                       return candidate.session_uid == session_uid;
+                     });
+}
+
+void ClarityLiveSurfaceRegistry::record_active()
+{
+  if (active_.is_empty()) {
+    return;
+  }
+  for (int64_t i = history_.size() - 1; i >= 0; i--) {
+    if (object_runtime_ref_set_equal(history_[i], active_)) {
+      history_.remove(i);
+    }
+  }
+  history_.insert(0, active_);
+  if (history_.size() > history_capacity) {
+    history_.resize(history_capacity);
+  }
+}
+
+bool ClarityLiveSurfaceRegistry::set(const Span<ClarityObjectRuntimeRef> references)
+{
+  Vector<ClarityObjectRuntimeRef> unique;
+  for (const ClarityObjectRuntimeRef &reference : references) {
+    if (object_runtime_ref_is_empty(reference)) {
+      continue;
+    }
+    if (!std::any_of(unique.begin(), unique.end(), [&](const ClarityObjectRuntimeRef &candidate) {
+          return object_runtime_ref_equal(candidate, reference);
+        }))
+    {
+      unique.append(reference);
+    }
+  }
+  if (object_runtime_ref_set_equal(active_, unique)) {
+    return false;
+  }
+  active_ = std::move(unique);
+  record_active();
+  return true;
+}
+
+bool ClarityLiveSurfaceRegistry::add(const Span<ClarityObjectRuntimeRef> references)
+{
+  Vector<ClarityObjectRuntimeRef> combined = active_;
+  for (const ClarityObjectRuntimeRef &reference : references) {
+    if (!object_runtime_ref_is_empty(reference) &&
+        !std::any_of(combined.begin(),
+                     combined.end(),
+                     [&](const ClarityObjectRuntimeRef &candidate) {
+                       return object_runtime_ref_equal(candidate, reference);
+                     }))
+    {
+      combined.append(reference);
+    }
+  }
+  return set(combined);
+}
+
+bool ClarityLiveSurfaceRegistry::remove(const Span<ClarityObjectRuntimeRef> references)
+{
+  Vector<ClarityObjectRuntimeRef> remaining;
+  for (const ClarityObjectRuntimeRef &candidate : active_) {
+    const bool remove = std::any_of(
+        references.begin(), references.end(), [&](const ClarityObjectRuntimeRef &reference) {
+          return object_runtime_ref_equal(candidate, reference);
+        });
+    if (!remove) {
+      remaining.append(candidate);
+    }
+  }
+  return set(remaining);
+}
+
+bool ClarityLiveSurfaceRegistry::deactivate()
+{
+  if (active_.is_empty()) {
+    return false;
+  }
+  active_.clear();
+  return true;
+}
+
+bool ClarityLiveSurfaceRegistry::reactivate()
+{
+  if (!active_.is_empty() || history_.is_empty()) {
+    return false;
+  }
+  active_ = history_.first();
+  return true;
+}
+
+bool ClarityLiveSurfaceRegistry::activate_history(const int index)
+{
+  if (index < 0 || index >= history_.size()) {
+    return false;
+  }
+  Vector<ClarityObjectRuntimeRef> selected = history_[index];
+  if (object_runtime_ref_set_equal(active_, selected)) {
+    return false;
+  }
+  active_ = std::move(selected);
+  record_active();
+  return true;
+}
+
+bool ClarityLiveSurfaceRegistry::prune_invalid(Main &bmain)
+{
+  bool changed = false;
+  auto prune_set = [&](Vector<ClarityObjectRuntimeRef> &set) {
+    for (int64_t i = set.size() - 1; i >= 0; i--) {
+      const Object *object = ED_clarity_object_runtime_ref_resolve(bmain, set[i]);
+      if (object == nullptr || !ELEM(object->type, OB_MESH, OB_SURF)) {
+        set.remove(i);
+        changed = true;
+      }
+    }
+  };
+  prune_set(active_);
+  for (int64_t i = history_.size() - 1; i >= 0; i--) {
+    prune_set(history_[i]);
+    if (history_[i].is_empty()) {
+      history_.remove(i);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 static void object_runtime_ref_clear(ClarityObjectRuntimeRef &reference)
 {
   reference = {};
+}
+
+static Map<const wmWindowManager *, ClarityLiveSurfaceRegistry> &live_surface_registries()
+{
+  static Map<const wmWindowManager *, ClarityLiveSurfaceRegistry> registry_by_manager;
+  return registry_by_manager;
+}
+
+ClarityLiveSurfaceRegistry *live_surface_registry_get(const bContext *C)
+{
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  return wm != nullptr ? live_surface_registries().lookup_ptr(wm) : nullptr;
+}
+
+ClarityLiveSurfaceRegistry *live_surface_registry_ensure(const bContext *C)
+{
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  return wm != nullptr ? &live_surface_registries().lookup_or_add_default(wm) : nullptr;
+}
+
+void live_surface_registry_changed(bContext *C)
+{
+  Main *bmain = CTX_data_main(C);
+  const ClarityLiveSurfaceRegistry *registry = live_surface_registry_get(C);
+  if (bmain == nullptr) {
+    return;
+  }
+  for (Object &object : bmain->objects) {
+    BKE_lib_libblock_session_uid_ensure(&object.id);
+    const bool is_live = registry != nullptr &&
+                         registry->contains_session_uid(object.id.session_uid);
+    if (BKE_object_clarity_live_surface_get(&object) != is_live) {
+      BKE_object_clarity_live_surface_set(&object, is_live);
+      DEG_id_tag_update(&object.id, ID_RECALC_SYNC_TO_EVAL);
+    }
+  }
+  WM_main_add_notifier(NC_OBJECT | ND_DRAW, nullptr);
+  WM_main_add_notifier(NC_SPACE | ND_SPACE_OUTLINER, nullptr);
+  WM_main_add_notifier(NC_SPACE | ND_SPACE_VIEW3D, nullptr);
 }
 
 ClarityWindowRuntime *runtime_get(const bContext *C)
@@ -649,18 +860,25 @@ static UndoStep *pivot_undo_active_step_get(const bContext *C)
 }
 
 static std::optional<ClarityPivotUndoSnapshot> pivot_undo_snapshot_create(
-    const bContext *C, const ClarityWindowRuntime &runtime)
+    const bContext *C, const ClarityWindowRuntime &runtime, const bool force = false)
 {
   const ClarityCustomPivotData *custom = runtime.pivot_edit.custom.get();
   const bool has_custom = custom != nullptr && custom->scene != nullptr &&
                           custom->object != nullptr && custom->scene == CTX_data_scene(C);
-  if (!has_custom && runtime.pivot_edit.target == ClarityPivotEditTarget::None &&
-      object_runtime_ref_is_empty(runtime.tool.manipulator_pivot.last_object))
+  const ClarityLiveSurfaceRegistry *live_surfaces = live_surface_registry_get(C);
+  const bool has_live_state = live_surfaces != nullptr &&
+                              (!live_surfaces->active().is_empty() ||
+                               !live_surfaces->history().is_empty());
+  if (!force && !has_custom && runtime.pivot_edit.target == ClarityPivotEditTarget::None &&
+      object_runtime_ref_is_empty(runtime.tool.manipulator_pivot.last_object) && !has_live_state)
   {
     return std::nullopt;
   }
 
   ClarityPivotUndoSnapshot snapshot;
+  if (live_surfaces != nullptr) {
+    snapshot.live_surfaces = *live_surfaces;
+  }
   snapshot.has_custom = has_custom;
   if (has_custom) {
     BKE_lib_libblock_session_uid_ensure(&custom->scene->id);
@@ -695,13 +913,16 @@ static std::optional<ClarityPivotUndoSnapshot> pivot_undo_snapshot_create(
   return snapshot;
 }
 
-static void pivot_undo_step_begin(const bContext *C, ClarityWindowRuntime &runtime)
+static void pivot_undo_step_begin(const bContext *C,
+                                  ClarityWindowRuntime &runtime,
+                                  const bool force = false)
 {
   manipulator_pivot_last_object_resolve(C, runtime);
   if (runtime.pivot_undo) {
     runtime.pivot_undo->pending_before.reset();
   }
-  const std::optional<ClarityPivotUndoSnapshot> snapshot = pivot_undo_snapshot_create(C, runtime);
+  const std::optional<ClarityPivotUndoSnapshot> snapshot = pivot_undo_snapshot_create(
+      C, runtime, force);
   if (!snapshot) {
     return;
   }
@@ -740,6 +961,11 @@ static bool pivot_undo_snapshot_restore(bContext *C,
   ClarityWindowRuntime *runtime = runtimes().lookup_ptr(payload.owner_window);
   if (runtime == nullptr || runtime->instance_id != payload.owner_runtime_id) {
     return false;
+  }
+
+  if (ClarityLiveSurfaceRegistry *live_surfaces = live_surface_registry_ensure(C)) {
+    *live_surfaces = snapshot.live_surfaces;
+    live_surface_registry_changed(C);
   }
 
   Main *bmain = CTX_data_main(C);
@@ -2611,6 +2837,146 @@ Object *ED_clarity_object_runtime_ref_resolve(
   return id != nullptr ? id_cast<Object *>(id) : nullptr;
 }
 
+static Object *clarity_live_surface_ref_resolve(
+    Main &bmain, const ed::clarity::ClarityObjectRuntimeRef &reference)
+{
+  Object *object = ED_clarity_object_runtime_ref_resolve(bmain, reference);
+  return object != nullptr && ELEM(object->type, OB_MESH, OB_SURF) ? object : nullptr;
+}
+
+bool ED_clarity_live_surface_active(const bContext *C)
+{
+  const ed::clarity::ClarityLiveSurfaceRegistry *registry =
+      ed::clarity::live_surface_registry_get(C);
+  Main *bmain = CTX_data_main(C);
+  if (registry == nullptr) {
+    return false;
+  }
+  if (bmain == nullptr) {
+    return !registry->active().is_empty();
+  }
+  return std::any_of(registry->active().begin(),
+                     registry->active().end(),
+                     [&](const ed::clarity::ClarityObjectRuntimeRef &reference) {
+                       return clarity_live_surface_ref_resolve(*bmain, reference) != nullptr;
+                     });
+}
+
+bool ED_clarity_live_surface_object_is_live(const bContext *C, const Object *object)
+{
+  if (object == nullptr) {
+    return false;
+  }
+  ed::clarity::ClarityLiveSurfaceRegistry *registry = ed::clarity::live_surface_registry_get(C);
+  if (registry == nullptr) {
+    return false;
+  }
+  Object *original = DEG_get_original(const_cast<Object *>(object));
+  return original != nullptr && ELEM(original->type, OB_MESH, OB_SURF) &&
+         registry->contains_session_uid(original->id.session_uid);
+}
+
+bool ED_clarity_live_surface_object_filter(const Object *object, void *context)
+{
+  return ED_clarity_live_surface_object_is_live(static_cast<const bContext *>(context), object);
+}
+
+ed::clarity::ClarityLiveSurfaceSnapMode ED_clarity_live_surface_snap_mode_get(const bContext *C)
+{
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm == nullptr || wm->runtime == nullptr) {
+    return ed::clarity::ClarityLiveSurfaceSnapMode::Surface;
+  }
+  return ed::clarity::ClarityLiveSurfaceSnapMode(
+      std::min<uint8_t>(wm->runtime->clarity_live_surface_snap_mode, 2));
+}
+
+void ED_clarity_live_surface_snap_mode_set(
+    const bContext *C, const ed::clarity::ClarityLiveSurfaceSnapMode mode)
+{
+  wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm != nullptr && wm->runtime != nullptr) {
+    wm->runtime->clarity_live_surface_snap_mode = uint8_t(mode);
+    WM_main_add_notifier(NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+  }
+}
+
+int ED_clarity_live_surface_count(const bContext *C)
+{
+  const ed::clarity::ClarityLiveSurfaceRegistry *registry =
+      ed::clarity::live_surface_registry_get(C);
+  Main *bmain = CTX_data_main(C);
+  if (registry == nullptr) {
+    return 0;
+  }
+  if (bmain == nullptr) {
+    return int(registry->active().size());
+  }
+  return int(std::count_if(registry->active().begin(),
+                           registry->active().end(),
+                           [&](const ed::clarity::ClarityObjectRuntimeRef &reference) {
+                             return clarity_live_surface_ref_resolve(*bmain, reference) != nullptr;
+                           }));
+}
+
+int ED_clarity_live_surface_history_count(const bContext *C)
+{
+  const ed::clarity::ClarityLiveSurfaceRegistry *registry =
+      ed::clarity::live_surface_registry_get(C);
+  Main *bmain = CTX_data_main(C);
+  if (registry == nullptr) {
+    return 0;
+  }
+  if (bmain == nullptr) {
+    return int(registry->history().size());
+  }
+  return int(std::count_if(
+      registry->history().begin(),
+      registry->history().end(),
+      [&](const Vector<ed::clarity::ClarityObjectRuntimeRef> &set) {
+        return std::any_of(set.begin(),
+                           set.end(),
+                           [&](const ed::clarity::ClarityObjectRuntimeRef &reference) {
+                             return clarity_live_surface_ref_resolve(*bmain, reference) != nullptr;
+                           });
+      }));
+}
+
+void ED_clarity_live_surface_label_get(const bContext *C, char *value, const int value_maxncpy)
+{
+  if (value_maxncpy <= 0) {
+    return;
+  }
+  value[0] = '\0';
+  const ed::clarity::ClarityLiveSurfaceRegistry *registry =
+      ed::clarity::live_surface_registry_get(C);
+  if (registry == nullptr || registry->active().is_empty()) {
+    return;
+  }
+  Main *bmain = CTX_data_main(C);
+  const ed::clarity::ClarityObjectRuntimeRef *first_valid = nullptr;
+  int valid_num = 0;
+  for (const ed::clarity::ClarityObjectRuntimeRef &reference : registry->active()) {
+    if (bmain == nullptr || clarity_live_surface_ref_resolve(*bmain, reference) != nullptr) {
+      first_valid = first_valid == nullptr ? &reference : first_valid;
+      valid_num++;
+    }
+  }
+  if (first_valid == nullptr) {
+    return;
+  }
+  const Object *object = bmain != nullptr ?
+                             clarity_live_surface_ref_resolve(*bmain, *first_valid) :
+                             nullptr;
+  const char *name = object != nullptr ? object->id.name + 2 : first_valid->id_name + 2;
+  if (valid_num > 1) {
+    BLI_snprintf(value, value_maxncpy, "<%s...>", name);
+  }
+  else {
+    BLI_strncpy(value, name, value_maxncpy);
+  }
+}
+
 int ED_clarity_interaction_frame_rate_limit(const bContext *C)
 {
   ed::clarity::ClarityWindowRuntime *runtime = ed::clarity::runtime_get(C);
@@ -2960,6 +3326,13 @@ void ED_clarity_pivot_undo_begin(const bContext *C)
 {
   if (ed::clarity::ClarityWindowRuntime *runtime = ed::clarity::runtime_ensure(C)) {
     ed::clarity::pivot_undo_step_begin(C, *runtime);
+  }
+}
+
+void ED_clarity_live_surface_undo_begin(const bContext *C)
+{
+  if (ed::clarity::ClarityWindowRuntime *runtime = ed::clarity::runtime_ensure(C)) {
+    ed::clarity::pivot_undo_step_begin(C, *runtime, true);
   }
 }
 
@@ -3650,6 +4023,9 @@ void ED_clarity_undo_steps_restore(bContext *C,
         ed::clarity::pivot_undo_snapshot_restore(C, *payload, payload->before);
       }
     }
+    if (ed::clarity::live_surface_registry_get(C) != nullptr) {
+      ed::clarity::live_surface_registry_changed(C);
+    }
     return;
   }
 
@@ -3664,6 +4040,9 @@ void ED_clarity_undo_steps_restore(bContext *C,
     if (step == step_to) {
       break;
     }
+  }
+  if (ed::clarity::live_surface_registry_get(C) != nullptr) {
+    ed::clarity::live_surface_registry_changed(C);
   }
 }
 
@@ -3742,6 +4121,13 @@ void ED_clarity_runtime_free(bContext *C, const wmWindow *win)
     }
   }
   ed::clarity::runtimes().remove(win);
+  if (C != nullptr) {
+    if (wmWindowManager *wm = CTX_wm_manager(C)) {
+      if (wm->windows.first == win && wm->windows.last == win) {
+        ed::clarity::live_surface_registries().remove(wm);
+      }
+    }
+  }
 }
 
 }  // namespace blender

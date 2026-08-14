@@ -5217,7 +5217,8 @@ static wmOperatorStatus spin_invoke(bContext *C, wmOperator *op, const wmEvent *
 {
   Scene *scene = CTX_data_scene(C);
   RegionView3D *rv3d = ED_view3d_context_rv3d(C);
-  float axis[3] = {0.0f, 0.0f, 1.0f};
+  /* Without a 3D region, fall back to Clarity's native world-up axis. */
+  float axis[3] = {0.0f, 1.0f, 0.0f};
 
   if (rv3d) {
     copy_v3_v3(axis, rv3d->viewinv[2]);

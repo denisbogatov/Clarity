@@ -726,6 +726,10 @@ set(GLSL_SRC
   engines/overlay/shaders/overlay_sculpt_curves_selection_vert.glsl
   engines/overlay/shaders/overlay_sculpt_mask_frag.glsl
   engines/overlay/shaders/overlay_sculpt_mask_vert.glsl
+  engines/overlay/shaders/overlay_soft_selection_point_frag.glsl
+  engines/overlay/shaders/overlay_soft_selection_point_vert.glsl
+  engines/overlay/shaders/overlay_soft_selection_wire_frag.glsl
+  engines/overlay/shaders/overlay_soft_selection_wire_vert.glsl
   engines/overlay/shaders/overlay_uniform_color_frag.glsl
   engines/overlay/shaders/overlay_varying_color.glsl
   engines/overlay/shaders/overlay_viewer_attribute_curve_vert.glsl

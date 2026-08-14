@@ -20,6 +20,12 @@ CCL_NAMESPACE_BEGIN
 
 /* Sky texture */
 
+ccl_device float3 sky_to_z_up_direction(const float3 dir)
+{
+  /* Keep the analytic sky implementation in its published Z-up frame. */
+  return make_float3(dir.x, -dir.z, dir.y);
+}
+
 ccl_device float sky_angle_between(const float thetav,
                                    const float phiv,
                                    const float theta,
@@ -56,7 +62,7 @@ ccl_device float3 sky_radiance_preetham(KernelGlobals kg,
                                         ccl_private float *config_z)
 {
   /* convert vector to spherical coordinates */
-  const float2 spherical = direction_to_spherical(dir);
+  const float2 spherical = direction_to_spherical(sky_to_z_up_direction(dir));
   float theta = spherical.x;
   const float phi = -spherical.y + M_PI_2_F;
 
@@ -111,7 +117,7 @@ ccl_device float3 sky_radiance_hosek(KernelGlobals kg,
                                      ccl_private float *config_z)
 {
   /* convert vector to spherical coordinates */
-  const float2 spherical = direction_to_spherical(dir);
+  const float2 spherical = direction_to_spherical(sky_to_z_up_direction(dir));
   float theta = spherical.x;
   const float phi = -spherical.y + M_PI_2_F;
 
@@ -153,9 +159,10 @@ ccl_device float3 sky_radiance_nishita(KernelGlobals kg,
   const float earth_intersection_angle = sky_data[4];
   const bool sun_disc = (angular_diameter >= 0.0f);
   float3 xyz = zero_float3();
-  const float2 direction = direction_to_spherical(dir);
+  const float3 sky_dir = sky_to_z_up_direction(dir);
+  const float2 direction = direction_to_spherical(sky_dir);
   const float3 sun_dir = spherical_to_direction(sun_elevation - M_PI_2_F, sun_rotation - M_PI_2_F);
-  const float sun_dir_angle = precise_angle(dir, sun_dir);
+  const float sun_dir_angle = precise_angle(sky_dir, sun_dir);
   const float half_angular = angular_diameter * 0.5f;
   const float dir_elevation = M_PI_2_F - direction.x;
 

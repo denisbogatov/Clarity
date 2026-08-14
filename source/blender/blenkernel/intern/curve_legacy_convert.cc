@@ -54,9 +54,9 @@ static HandleType handle_type_from_legacy(const uint8_t handle_type_legacy)
 static NormalMode normal_mode_from_legacy(const short twist_mode)
 {
   switch (twist_mode) {
-    case CU_TWIST_Z_UP:
+    case CU_TWIST_Y_UP:
     case CU_TWIST_TANGENT:
-      return NORMAL_MODE_Z_UP;
+      return NORMAL_MODE_Y_UP;
     case CU_TWIST_MINIMUM:
       return NORMAL_MODE_MINIMUM_TWIST;
   }

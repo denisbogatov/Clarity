@@ -623,10 +623,10 @@ void calculate_tangents(Span<float3> positions, bool is_cyclic, MutableSpan<floa
 void calculate_normals_minimum(Span<float3> tangents, bool cyclic, MutableSpan<float3> normals);
 
 /**
- * Calculate a vector perpendicular to every tangent on the X-Y plane (unless the tangent is
- * vertical, in that case use the X direction).
+ * Calculate a vector perpendicular to every tangent on the X-Z plane (unless the tangent is
+ * vertical in the native Y-up world, in that case use the X direction).
  */
-void calculate_normals_z_up(Span<float3> tangents, MutableSpan<float3> normals);
+void calculate_normals_y_up(Span<float3> tangents, MutableSpan<float3> normals);
 
 }  // namespace poly
 

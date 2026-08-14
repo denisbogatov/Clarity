@@ -2358,10 +2358,10 @@ static wmOperatorStatus sculpt_cloth_filter_modal(bContext *C,
 
   float3 gravity(0.0f);
   if (sd.gravity_object) {
-    gravity = sd.gravity_object->object_to_world().ptr()[2];
+    gravity = sd.gravity_object->object_to_world().ptr()[1];
   }
   else {
-    gravity[2] = -1.0f;
+    gravity[1] = -1.0f;
   }
   gravity *= sd.gravity_factor * filter_strength;
 

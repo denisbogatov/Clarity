@@ -8,6 +8,8 @@
 [[node]]
 void node_tex_environment_equirectangular(float3 co, float3 &uv)
 {
+  /* Clarity-native Y-up to the environment projection's analytic Z-up sphere. */
+  co = float3(co.x, -co.z, co.y);
   float3 nco = vector_math_safe_normalize(co);
   if (nco.x == 0.0f || nco.y == 0.0f) {
     uv = float3(0.0f);
@@ -20,6 +22,8 @@ void node_tex_environment_equirectangular(float3 co, float3 &uv)
 [[node]]
 void node_tex_environment_mirror_ball(float3 co, float3 &uv)
 {
+  /* Clarity-native Y-up to the environment projection's analytic Z-up sphere. */
+  co = float3(co.x, -co.z, co.y);
   float3 nco = vector_math_safe_normalize(co);
   nco.y -= 1.0f;
 

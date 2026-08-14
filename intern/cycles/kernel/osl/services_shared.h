@@ -843,7 +843,8 @@ ccl_device bool osl_shared_environment(KernelGlobals kg,
     ccl_private ShaderData *sd = sg->sd;
     const dual3 R_dual(R, dRdx, dRdy);
     /* Environment call is always equirectangular. */
-    const dual2 uv(direction_to_equirectangular(R_dual.val));
+    const dual2 uv(
+        direction_to_equirectangular(environment_z_up_from_native_y_up(R_dual.val)));
     const float4 rgba = kernel_image_interp_with_udim(kg, sd, image_texture_or_udim_id, uv);
     rgba_to_nchannels(rgba, nchannels, result);
     return true;

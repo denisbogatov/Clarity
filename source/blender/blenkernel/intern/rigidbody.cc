@@ -408,7 +408,7 @@ static rbCollisionShape *rigidbody_validate_sim_shape_helper(RigidBodyWorld *rbw
   }
 
   /* if automatically determining dimensions, use the Object's boundbox
-   * - assume that all quadrics are standing upright on local z-axis
+   * - assume that all quadrics are standing upright on local Y
    * - assume even distribution of mass around the Object's pivot
    *   (i.e. Object pivot is centralized in boundbox)
    */
@@ -420,9 +420,9 @@ static rbCollisionShape *rigidbody_validate_sim_shape_helper(RigidBodyWorld *rbw
   mul_v3_fl(size, 0.5f);
 
   if (ELEM(rbo->shape, RB_SHAPE_CAPSULE, RB_SHAPE_CYLINDER, RB_SHAPE_CONE)) {
-    /* take radius as largest x/y dimension, and height as z-dimension */
-    radius = std::max(size[0], size[1]);
-    height = size[2];
+    /* Radius lies in XZ and height follows local Y. */
+    radius = std::max(size[0], size[2]);
+    height = size[1];
   }
   else if (rbo->shape == RB_SHAPE_SPHERE) {
     /* take radius to the largest dimension to try and encompass everything */
@@ -551,7 +551,7 @@ void BKE_rigidbody_calc_volume(Object *ob, float *r_vol)
   float volume = 0.0f;
 
   /* if automatically determining dimensions, use the Object's boundbox
-   * - assume that all quadrics are standing upright on local z-axis
+   * - assume that all quadrics are standing upright on local Y
    * - assume even distribution of mass around the Object's pivot
    *   (i.e. Object pivot is centralized in boundbox)
    * - boundbox gives full width
@@ -560,9 +560,9 @@ void BKE_rigidbody_calc_volume(Object *ob, float *r_vol)
   BKE_object_dimensions_get(ob, size);
 
   if (ELEM(rbo->shape, RB_SHAPE_CAPSULE, RB_SHAPE_CYLINDER, RB_SHAPE_CONE)) {
-    /* take radius as largest x/y dimension, and height as z-dimension */
-    radius = std::max(size[0], size[1]) * 0.5f;
-    height = size[2];
+    /* Radius lies in XZ and height follows local Y. */
+    radius = std::max(size[0], size[2]) * 0.5f;
+    height = size[1];
   }
   else if (rbo->shape == RB_SHAPE_SPHERE) {
     /* take radius to the largest dimension to try and encompass everything */
@@ -640,7 +640,7 @@ void BKE_rigidbody_calc_center_of_mass(Object *ob, float r_center[3])
   zero_v3(r_center);
 
   /* if automatically determining dimensions, use the Object's boundbox
-   * - assume that all quadrics are standing upright on local z-axis
+   * - assume that all quadrics are standing upright on local Y
    * - assume even distribution of mass around the Object's pivot
    *   (i.e. Object pivot is centralized in boundbox)
    * - boundbox gives full width
@@ -658,12 +658,12 @@ void BKE_rigidbody_calc_center_of_mass(Object *ob, float r_center[3])
       break;
 
     case RB_SHAPE_CONE:
-      /* take radius as largest x/y dimension, and height as z-dimension */
-      height = size[2];
+      /* Height follows local Y. */
+      height = size[1];
       /* cone is geometrically centered on the median,
        * center of mass is 1/4 up from the base
        */
-      r_center[2] = -0.25f * height;
+      r_center[1] = -0.25f * height;
       break;
 
     case RB_SHAPE_CONVEXH:

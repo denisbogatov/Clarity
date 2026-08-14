@@ -31,6 +31,7 @@
 #include "BKE_object_types.hh"
 #include "BKE_scene.hh"
 
+#include "ED_clarity.hh"
 #include "ED_particle.hh"
 #include "ED_screen.hh"
 #include "ED_screen_types.hh"
@@ -818,6 +819,11 @@ static void init_TransDataContainers(TransInfo *t, Object *obact, Span<Object *>
 
   const eObjectMode object_mode = obact ? obact->mode : OB_MODE_OBJECT;
   const short object_type = obact ? obact->type : -1;
+  const bool use_clarity_symmetry = (object_mode & OB_MODE_EDIT) != 0 &&
+                                    ED_clarity_interaction_preset_enabled(t->context);
+  const ed::clarity::ClaritySymmetrySettings clarity_symmetry =
+      use_clarity_symmetry ? ED_clarity_symmetry_settings_get(t->context) :
+                             ed::clarity::ClaritySymmetrySettings{};
 
   if ((object_mode & OB_MODE_EDIT) ||
       (t->data_type == &greasepencil::TransConvertType_GreasePencil) ||
@@ -847,13 +853,39 @@ static void init_TransDataContainers(TransInfo *t, Object *obact, Span<Object *>
 
     for (int i = 0; i < objects.size(); i++) {
       TransDataContainer *tc = &t->data_container[i];
-      if (!(t->flag & T_NO_MIRROR) && (objects[i]->type == OB_MESH)) {
-        tc->use_mirror_axis_x = ((id_cast<Mesh *>(objects[i]->data))->symmetry & ME_SYMMETRY_X) !=
-                                0;
-        tc->use_mirror_axis_y = ((id_cast<Mesh *>(objects[i]->data))->symmetry & ME_SYMMETRY_Y) !=
-                                0;
-        tc->use_mirror_axis_z = ((id_cast<Mesh *>(objects[i]->data))->symmetry & ME_SYMMETRY_Z) !=
-                                0;
+      if (!(t->flag & T_NO_MIRROR) && objects[i]->type == OB_MESH) {
+        const Mesh *mesh = id_cast<Mesh *>(objects[i]->data);
+        if (use_clarity_symmetry) {
+          if (clarity_symmetry.mode != ed::clarity::ClaritySymmetryMode::Off) {
+            if (clarity_symmetry.axis == 0) {
+              tc->use_mirror_axis_x = true;
+            }
+            else if (clarity_symmetry.axis == 1) {
+              tc->use_mirror_axis_y = true;
+            }
+            else {
+              tc->use_mirror_axis_z = true;
+            }
+          }
+          tc->use_mirror_world = clarity_symmetry.mode ==
+                                 ed::clarity::ClaritySymmetryMode::World;
+          tc->use_mirror_topology = clarity_symmetry.mode ==
+                                    ed::clarity::ClaritySymmetryMode::Topology;
+          tc->use_mirror_preserve_seam = clarity_symmetry.preserve_seam;
+          tc->use_mirror_allow_partial = clarity_symmetry.allow_partial;
+          tc->mirror_tolerance = clarity_symmetry.tolerance;
+          tc->mirror_seam_tolerance = clarity_symmetry.seam_tolerance;
+        }
+        else {
+          tc->use_mirror_axis_x = (mesh->symmetry & ME_SYMMETRY_X) != 0;
+          tc->use_mirror_axis_y = (mesh->symmetry & ME_SYMMETRY_Y) != 0;
+          tc->use_mirror_axis_z = (mesh->symmetry & ME_SYMMETRY_Z) != 0;
+          tc->use_mirror_topology = (mesh->editflag & ME_EDIT_MIRROR_TOPO) != 0;
+          tc->use_mirror_preserve_seam = true;
+          tc->use_mirror_allow_partial = true;
+          tc->mirror_tolerance = 0.00002f;
+          tc->mirror_seam_tolerance = 0.00002f;
+        }
       }
 
       if (object_mode & OB_MODE_EDIT) {

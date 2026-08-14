@@ -82,7 +82,7 @@ void calculate_tangents(const Span<float3> positions,
   }
 
   if (positions.size() == 1) {
-    tangents.first() = float3(0.0f, 0.0f, 1.0f);
+    tangents.first() = float3(0.0f, 1.0f, 0.0f);
     return;
   }
 
@@ -98,7 +98,7 @@ void calculate_tangents(const Span<float3> positions,
   if (first_valid_index == -1) {
     /* If all tangents used the fallback, it means that all positions are (almost) the same. Just
      * use the up-vector as default tangent. */
-    const float3 up_vector{0.0f, 0.0f, 1.0f};
+    const float3 up_vector{0.0f, 1.0f, 0.0f};
     tangents.fill(up_vector);
     return;
   }
@@ -123,7 +123,7 @@ void calculate_tangents(const Span<float3> positions,
   }
 }
 
-void calculate_normals_z_up(const Span<float3> tangents, MutableSpan<float3> normals)
+void calculate_normals_y_up(const Span<float3> tangents, MutableSpan<float3> normals)
 {
   BLI_assert(normals.size() == tangents.size());
 
@@ -131,11 +131,11 @@ void calculate_normals_z_up(const Span<float3> tangents, MutableSpan<float3> nor
   const float epsilon = 1e-4f;
   for (const int i : normals.index_range()) {
     const float3 &tangent = tangents[i];
-    if (std::abs(tangent.x) + std::abs(tangent.y) < epsilon) {
+    if (std::abs(tangent.x) + std::abs(tangent.z) < epsilon) {
       normals[i] = {1.0f, 0.0f, 0.0f};
     }
     else {
-      normals[i] = math::normalize(float3(tangent.y, -tangent.x, 0.0f));
+      normals[i] = math::normalize(float3(-tangent.z, 0.0f, tangent.x));
     }
   }
 }
@@ -177,11 +177,11 @@ void calculate_normals_minimum(const Span<float3> tangents,
 
   /* Set initial normal. */
   const float3 &first_tangent = tangents.first();
-  if (UNLIKELY(fabs(first_tangent.x) + fabs(first_tangent.y) < epsilon)) {
+  if (UNLIKELY(fabs(first_tangent.x) + fabs(first_tangent.z) < epsilon)) {
     normals.first() = {1.0f, 0.0f, 0.0f};
   }
   else {
-    normals.first() = math::normalize(float3(first_tangent.y, -first_tangent.x, 0.0f));
+    normals.first() = math::normalize(float3(-first_tangent.z, 0.0f, first_tangent.x));
   }
 
   /* Forward normal with minimum twist along the entire curve. */

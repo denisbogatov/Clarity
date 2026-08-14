@@ -36,6 +36,7 @@
 #include "transform_gizmo.hh"
 #include "transform_orientations.hh"
 #include "transform_snap.hh"
+#include "transform_soft_selection.hh"
 
 /* Own include. */
 #include "transform_constraints.hh"
@@ -850,7 +851,7 @@ void drawConstraint(TransInfo *t)
 
 void drawPropCircle(TransInfo *t)
 {
-  if (t->flag & T_PROP_EDIT) {
+  if (transform_should_draw_proportional_circle(t->flag)) {
     const RegionView3D *rv3d = nullptr;
     float tmat[4][4], imat[4][4];
 

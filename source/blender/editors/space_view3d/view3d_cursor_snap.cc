@@ -30,6 +30,7 @@
 #include "GPU_state.hh"
 
 #include "ED_screen.hh"
+#include "ED_clarity.hh"
 #include "ED_transform.hh"
 #include "ED_transform_snap_object_context.hh"
 #include "ED_view3d.hh"
@@ -617,10 +618,17 @@ static void v3d_cursor_snap_update(V3DSnapCursorState *state,
   ToolSettings *tool_settings = scene->toolsettings;
 
   eSnapMode snap_elements = v3d_cursor_snap_elements(tool_settings);
+  const bool use_live_surface = ED_clarity_interaction_enabled(C) &&
+                                ED_clarity_live_surface_active(C);
+  if (use_live_surface) {
+    /* Live projection is automatic in Maya; it does not depend on Blender's magnet or the
+     * creation tool's ordinary snap-element settings. */
+    snap_elements = SCE_SNAP_TO_FACE;
+  }
   const bool calc_plane_omat = v3d_cursor_snap_calc_plane();
 
   snap_data->is_enabled = true;
-  if (!(state->flag & V3D_SNAPCURSOR_TOGGLE_ALWAYS_TRUE)) {
+  if (!use_live_surface && !(state->flag & V3D_SNAPCURSOR_TOGGLE_ALWAYS_TRUE)) {
 #ifdef USE_SNAP_DETECT_FROM_KEYMAP_HACK
     snap_data->is_snap_invert = v3d_cursor_is_snap_invert(data_intern, event_modifier);
 #endif
@@ -635,8 +643,9 @@ static void v3d_cursor_snap_update(V3DSnapCursorState *state,
     }
   }
 
-  const bool use_surface_nor = tool_settings->plane_orient == V3D_PLACE_ORIENT_SURFACE;
-  const bool use_surface_co = snap_data->is_enabled ||
+  const bool use_surface_nor = use_live_surface ||
+                               tool_settings->plane_orient == V3D_PLACE_ORIENT_SURFACE;
+  const bool use_surface_co = use_live_surface || snap_data->is_enabled ||
                               tool_settings->plane_depth == V3D_PLACE_DEPTH_SURFACE;
 
   float co[3], no[3], face_nor[3], obmat[4][4], omat[3][3];
@@ -680,6 +689,12 @@ static void v3d_cursor_snap_update(V3DSnapCursorState *state,
       params.occlusion_test = (state->flag & V3D_SNAPCURSOR_OCCLUSION_ALWAYS_TRUE) ?
                                   ed::transform::SNAP_OCCLUSION_ALWAYS :
                                   ed::transform::SNAP_OCCLUSION_AS_SEEM;
+      if (use_live_surface) {
+        params.include_hidden = true;
+        params.occlusion_test = ed::transform::SNAP_OCCLUSION_NEVER;
+        params.object_filter_fn = ED_clarity_live_surface_object_filter;
+        params.object_filter_user_data = const_cast<bContext *>(C);
+      }
       snap_elem = ed::transform::snap_object_project_view3d_ex(data_intern->snap_context_v3d,
                                                                depsgraph,
                                                                region,
@@ -696,6 +711,33 @@ static void v3d_cursor_snap_update(V3DSnapCursorState *state,
                                                                nullptr,
                                                                obmat,
                                                                face_nor);
+      if (use_live_surface && snap_elem == SCE_SNAP_TO_NONE) {
+        /* Match MPxSurfaceShape::closestPoint(findClosestOnMiss=true): when the view ray misses,
+         * project to the nearest visible silhouette of the live set. */
+        dist_px = float(region->winx + region->winy);
+        snap_elem = ed::transform::snap_object_project_view3d_ex(
+            data_intern->snap_context_v3d,
+            depsgraph,
+            region,
+            v3d,
+            SCE_SNAP_TO_EDGE,
+            &params,
+            nullptr,
+            mval_fl,
+            prev_co,
+            &dist_px,
+            co,
+            no,
+            &index,
+            nullptr,
+            obmat,
+            face_nor);
+        if (snap_elem != SCE_SNAP_TO_NONE) {
+          snap_elem = SCE_SNAP_TO_FACE;
+          zero_v3(no);
+          zero_v3(face_nor);
+        }
+      }
       if ((snap_elem & data_intern->snap_elem_hidden) && (snap_elements & SCE_SNAP_TO_GRID)) {
         BLI_assert(snap_elem != SCE_SNAP_TO_GRID);
         params.occlusion_test = ed::transform::SNAP_OCCLUSION_NEVER;

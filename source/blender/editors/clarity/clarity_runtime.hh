@@ -15,6 +15,7 @@
 #include "BLI_math_matrix_types.hh"
 #include "BLI_math_quaternion_types.hh"
 #include "BLI_math_vector_types.hh"
+#include "BLI_span.hh"
 #include "BLI_vector.hh"
 
 #include "clarity_marking_menu.hh"
@@ -27,6 +28,7 @@ struct bContext;
 struct ARegion;
 struct Depsgraph;
 struct ID;
+struct Main;
 struct Object;
 struct ScrArea;
 struct Scene;
@@ -43,6 +45,7 @@ class ClarityInteractionSession;
 struct ClarityInputAction;
 struct ClarityPivotUndoState;
 struct ClaritySelectionMemory;
+struct ClaritySymmetrySelectionState;
 struct ClarityShiftTransformState;
 struct ClarityTransformDebugState;
 
@@ -271,6 +274,37 @@ class ClaritySnapOverride {
   Vector<HeldKey, 5> held_;
 };
 
+/**
+ * Maya-compatible Make Live state.
+ *
+ * This is pure value state so it can be copied into an undo payload and tested without a window
+ * manager. Object references use session UIDs, never raw pointers: deleting an object or reusing an
+ * address cannot silently turn another object live.
+ */
+class ClarityLiveSurfaceRegistry {
+ public:
+  static constexpr int history_capacity = 10;
+
+  Span<ClarityObjectRuntimeRef> active() const;
+  Span<Vector<ClarityObjectRuntimeRef>> history() const;
+  bool contains(const ClarityObjectRuntimeRef &reference) const;
+  bool contains_session_uid(uint32_t session_uid) const;
+  bool set(Span<ClarityObjectRuntimeRef> references);
+  bool add(Span<ClarityObjectRuntimeRef> references);
+  bool remove(Span<ClarityObjectRuntimeRef> references);
+  bool deactivate();
+  bool reactivate();
+  bool activate_history(int index);
+  /** Remove references whose IDs no longer exist after deletion or file/undo changes. */
+  bool prune_invalid(Main &bmain);
+
+ private:
+  Vector<ClarityObjectRuntimeRef> active_;
+  Vector<Vector<ClarityObjectRuntimeRef>> history_;
+
+  void record_active();
+};
+
 struct ClarityTemporaryOverrides {
   ClaritySnapOverride snap;
   bool edit_pivot = false;
@@ -314,6 +348,9 @@ struct ClarityWindowRuntime {
 
   std::unique_ptr<ClarityInteractionSession> active_session;
   std::shared_ptr<ClaritySelectionMemory> selection_memory;
+  /** Selection state at the start of a modal marquee. Used to apply the same add/remove/toggle
+   * delta to the paired components when the gesture finishes. */
+  std::shared_ptr<ClaritySymmetrySelectionState> symmetry_selection_before;
   std::shared_ptr<ClarityShiftTransformState> shift_transform;
   std::unique_ptr<ClarityTransformDebugState> transform_debug;
   /** Cursor overlay that previews subtract/add while `Ctrl`/`Ctrl+Shift` is held in this window. */
@@ -385,6 +422,10 @@ class ClarityTransformTransaction {
 
 ClarityWindowRuntime *runtime_get(const bContext *C);
 ClarityWindowRuntime *runtime_ensure(const bContext *C);
+ClarityLiveSurfaceRegistry *live_surface_registry_get(const bContext *C);
+ClarityLiveSurfaceRegistry *live_surface_registry_ensure(const bContext *C);
+/** Rebuild object runtime mirrors and redraw every consumer after a registry mutation. */
+void live_surface_registry_changed(bContext *C);
 bool navigation_debug_logging_enabled(const bContext *C);
 int navigation_frame_rate_limit_setting(const bContext *C);
 /**

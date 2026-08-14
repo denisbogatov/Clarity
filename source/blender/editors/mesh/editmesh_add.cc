@@ -52,6 +52,21 @@ struct MakePrimitiveData {
   eContextObjectMode original_mode;
 };
 
+/** Convert legacy BMesh primitives from their Z-axis basis to Clarity's native Y-up basis. */
+static void make_prim_apply_y_up_axis(MakePrimitiveData &creation_data)
+{
+  /* Maps (x, y, z) to (x, z, -y), i.e. a -90 degree rotation around X. */
+  const float y_up_from_z_up[4][4] = {
+      {1.0f, 0.0f, 0.0f, 0.0f},
+      {0.0f, 0.0f, -1.0f, 0.0f},
+      {0.0f, 1.0f, 0.0f, 0.0f},
+      {0.0f, 0.0f, 0.0f, 1.0f},
+  };
+  float native_mat[4][4];
+  mul_m4_m4m4(native_mat, creation_data.mat, y_up_from_z_up);
+  copy_m4_m4(creation_data.mat, native_mat);
+}
+
 static Object *make_prim_init(bContext *C,
                               wmOperator *op,
                               const char *idname,
@@ -237,7 +252,7 @@ static wmOperatorStatus add_primitive_plane_exec(bContext *C, wmOperator *op)
 
   WM_operator_view3d_unit_defaults(C, op);
   ed::object::add_generic_get_opts(
-      C, op, 'Z', loc, rot, nullptr, &enter_editmode, &local_view_bits, nullptr);
+      C, op, 'Y', loc, rot, nullptr, &enter_editmode, &local_view_bits, nullptr);
   obedit = make_prim_init(C,
                           op,
                           CTX_DATA_(BLT_I18NCONTEXT_ID_MESH, "Plane"),
@@ -246,6 +261,7 @@ static wmOperatorStatus add_primitive_plane_exec(bContext *C, wmOperator *op)
                           nullptr,
                           local_view_bits,
                           &creation_data);
+  make_prim_apply_y_up_axis(creation_data);
 
   if (!make_prim_from_bmo_args(C,
                                op,
@@ -298,7 +314,7 @@ static wmOperatorStatus add_primitive_cube_exec(bContext *C, wmOperator *op)
 
   WM_operator_view3d_unit_defaults(C, op);
   ed::object::add_generic_get_opts(
-      C, op, 'Z', loc, rot, scale, &enter_editmode, &local_view_bits, nullptr);
+      C, op, 'Y', loc, rot, scale, &enter_editmode, &local_view_bits, nullptr);
   obedit = make_prim_init(C,
                           op,
                           CTX_DATA_(BLT_I18NCONTEXT_ID_MESH, "Cube"),
@@ -368,7 +384,7 @@ static wmOperatorStatus add_primitive_circle_exec(bContext *C, wmOperator *op)
 
   WM_operator_view3d_unit_defaults(C, op);
   ed::object::add_generic_get_opts(
-      C, op, 'Z', loc, rot, nullptr, &enter_editmode, &local_view_bits, nullptr);
+      C, op, 'Y', loc, rot, nullptr, &enter_editmode, &local_view_bits, nullptr);
   obedit = make_prim_init(C,
                           op,
                           CTX_DATA_(BLT_I18NCONTEXT_ID_MESH, "Circle"),
@@ -377,6 +393,7 @@ static wmOperatorStatus add_primitive_circle_exec(bContext *C, wmOperator *op)
                           nullptr,
                           local_view_bits,
                           &creation_data);
+  make_prim_apply_y_up_axis(creation_data);
 
   if (!make_prim_from_bmo_args(
           C,
@@ -437,7 +454,7 @@ static wmOperatorStatus add_primitive_cylinder_exec(bContext *C, wmOperator *op)
 
   WM_operator_view3d_unit_defaults(C, op);
   ed::object::add_generic_get_opts(
-      C, op, 'Z', loc, rot, scale, &enter_editmode, &local_view_bits, nullptr);
+      C, op, 'Y', loc, rot, scale, &enter_editmode, &local_view_bits, nullptr);
   obedit = make_prim_init(C,
                           op,
                           CTX_DATA_(BLT_I18NCONTEXT_ID_MESH, "Cylinder"),
@@ -446,6 +463,7 @@ static wmOperatorStatus add_primitive_cylinder_exec(bContext *C, wmOperator *op)
                           scale,
                           local_view_bits,
                           &creation_data);
+  make_prim_apply_y_up_axis(creation_data);
 
   if (!make_prim_from_bmo_args(C,
                                op,
@@ -510,7 +528,7 @@ static wmOperatorStatus add_primitive_cone_exec(bContext *C, wmOperator *op)
 
   WM_operator_view3d_unit_defaults(C, op);
   ed::object::add_generic_get_opts(
-      C, op, 'Z', loc, rot, scale, &enter_editmode, &local_view_bits, nullptr);
+      C, op, 'Y', loc, rot, scale, &enter_editmode, &local_view_bits, nullptr);
   obedit = make_prim_init(C,
                           op,
                           CTX_DATA_(BLT_I18NCONTEXT_ID_MESH, "Cone"),
@@ -519,6 +537,7 @@ static wmOperatorStatus add_primitive_cone_exec(bContext *C, wmOperator *op)
                           scale,
                           local_view_bits,
                           &creation_data);
+  make_prim_apply_y_up_axis(creation_data);
 
   if (!make_prim_from_bmo_args(C,
                                op,
@@ -583,7 +602,7 @@ static wmOperatorStatus add_primitive_grid_exec(bContext *C, wmOperator *op)
 
   WM_operator_view3d_unit_defaults(C, op);
   ed::object::add_generic_get_opts(
-      C, op, 'Z', loc, rot, nullptr, &enter_editmode, &local_view_bits, nullptr);
+      C, op, 'Y', loc, rot, nullptr, &enter_editmode, &local_view_bits, nullptr);
   obedit = make_prim_init(C,
                           op,
                           CTX_DATA_(BLT_I18NCONTEXT_ID_MESH, "Grid"),
@@ -592,6 +611,7 @@ static wmOperatorStatus add_primitive_grid_exec(bContext *C, wmOperator *op)
                           nullptr,
                           local_view_bits,
                           &creation_data);
+  make_prim_apply_y_up_axis(creation_data);
 
   if (!make_prim_from_bmo_args(C,
                                op,
@@ -665,6 +685,7 @@ static wmOperatorStatus add_primitive_monkey_exec(bContext *C, wmOperator *op)
                           &creation_data);
   dia = RNA_float_get(op->ptr, "size") / 2.0f;
   mul_mat3_m4_fl(creation_data.mat, dia);
+  make_prim_apply_y_up_axis(creation_data);
 
   if (!make_prim_from_bmo_args(C,
                                op,
@@ -714,7 +735,7 @@ static wmOperatorStatus add_primitive_uvsphere_exec(bContext *C, wmOperator *op)
 
   WM_operator_view3d_unit_defaults(C, op);
   ed::object::add_generic_get_opts(
-      C, op, 'Z', loc, rot, scale, &enter_editmode, &local_view_bits, nullptr);
+      C, op, 'Y', loc, rot, scale, &enter_editmode, &local_view_bits, nullptr);
   obedit = make_prim_init(C,
                           op,
                           CTX_DATA_(BLT_I18NCONTEXT_ID_MESH, "Sphere"),
@@ -723,6 +744,7 @@ static wmOperatorStatus add_primitive_uvsphere_exec(bContext *C, wmOperator *op)
                           scale,
                           local_view_bits,
                           &creation_data);
+  make_prim_apply_y_up_axis(creation_data);
 
   if (!make_prim_from_bmo_args(
           C,
@@ -781,7 +803,7 @@ static wmOperatorStatus add_primitive_icosphere_exec(bContext *C, wmOperator *op
 
   WM_operator_view3d_unit_defaults(C, op);
   ed::object::add_generic_get_opts(
-      C, op, 'Z', loc, rot, scale, &enter_editmode, &local_view_bits, nullptr);
+      C, op, 'Y', loc, rot, scale, &enter_editmode, &local_view_bits, nullptr);
   obedit = make_prim_init(C,
                           op,
                           CTX_DATA_(BLT_I18NCONTEXT_ID_MESH, "Icosphere"),

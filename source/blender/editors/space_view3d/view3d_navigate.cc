@@ -377,7 +377,8 @@ void ViewOpsData::init_navigation(bContext *C,
   copy_qt_qt(this->curr.viewquat, rv3d->viewquat);
 
   this->reverse = 1.0f;
-  if (rv3d->persmat[2][1] < 0.0f) {
+  /* Reverse horizontal turntable input only when native world-up points down on screen. */
+  if (rv3d->persmat[1][1] < 0.0f) {
     this->reverse = -1.0f;
   }
 

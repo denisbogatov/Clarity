@@ -157,6 +157,11 @@ void main()
     rim_col = wire_col = float3(0.0f, 1.0f, 0.5f);
   }
 
+  if (flag_test(drw_object_infos().flag, OBJECT_CLARITY_LIVE_SURFACE)) {
+    /* Maya's default Modeling > Live color: a dark green that remains distinct from selection. */
+    rim_col = wire_col = float3(0.06f, 0.32f, 0.10f);
+  }
+
 #if defined(POINTS)
   final_color = float4(wire_col * wire_opacity, wire_opacity);
   final_color_inner = float4(rim_col * wire_opacity, wire_opacity);

@@ -3460,7 +3460,8 @@ static void rna_def_modifier_wave(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "use_y", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, nullptr, "flag", MOD_WAVE_Y);
-  RNA_def_property_ui_text(prop, "Y", "Y axis motion");
+  RNA_def_property_ui_text(
+      prop, "Z", "Z axis motion (legacy RNA identifier retained for compatibility)");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   prop = RNA_def_property(srna, "use_cyclic", PROP_BOOLEAN, PROP_NONE);
@@ -3529,7 +3530,9 @@ static void rna_def_modifier_wave(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, nullptr, "starty");
   RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
   RNA_def_property_ui_range(prop, -100, 100, 100, 2);
-  RNA_def_property_ui_text(prop, "Start Position Y", "Y coordinate of the start position");
+  RNA_def_property_ui_text(prop,
+                           "Start Position Z",
+                           "Z coordinate of the start position (legacy RNA identifier retained)");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   prop = RNA_def_property(srna, "start_position_object", PROP_POINTER, PROP_NONE);
@@ -6777,7 +6780,8 @@ static void rna_def_modifier_ocean(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_range(prop, 1, 1024);
   RNA_def_property_ui_range(prop, 1, 100, 1, -1);
-  RNA_def_property_ui_text(prop, "Repeat Y", "Repetitions of the generated surface in Y");
+  /* Keep the RNA identifier for file/API compatibility; it controls native horizontal Z. */
+  RNA_def_property_ui_text(prop, "Repeat Z", "Repetitions of the generated surface in Z");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   prop = RNA_def_property(srna, "use_normals", PROP_BOOLEAN, PROP_NONE);

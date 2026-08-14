@@ -671,17 +671,14 @@ static void get_angular_velocity_vector(short avemode, ParticleKey *state, float
       copy_v3_v3(vec, state->vel);
       break;
     case PART_AVE_HORIZONTAL: {
-      float zvec[3];
-      zvec[0] = zvec[1] = 0;
-      zvec[2] = 1.0f;
-      cross_v3_v3v3(vec, state->vel, zvec);
+      const float upvec[3] = {0.0f, 1.0f, 0.0f};
+      cross_v3_v3v3(vec, state->vel, upvec);
       break;
     }
     case PART_AVE_VERTICAL: {
-      float zvec[3], temp[3];
-      zvec[0] = zvec[1] = 0;
-      zvec[2] = 1.0f;
-      cross_v3_v3v3(temp, state->vel, zvec);
+      const float upvec[3] = {0.0f, 1.0f, 0.0f};
+      float temp[3];
+      cross_v3_v3v3(temp, state->vel, upvec);
       cross_v3_v3v3(vec, temp, state->vel);
       break;
     }
@@ -1076,13 +1073,12 @@ void reset_particle(ParticleSimulationData *sim, ParticleData *pa, float dtime, 
   if (part->phystype == PART_PHYS_BOIDS && pa->boid) {
     BoidParticle *bpa = pa->boid;
 
-    /* and gravity in r_ve */
-    bpa->gravity[0] = bpa->gravity[1] = 0.0f;
-    bpa->gravity[2] = -1.0f;
+    /* Initial down vector for banking. */
+    copy_v3_fl3(bpa->gravity, 0.0f, -1.0f, 0.0f);
     if ((sim->scene->physics_settings.flag & PHYS_GLOBAL_GRAVITY) &&
-        (sim->scene->physics_settings.gravity[2] != 0.0f))
+        !is_zero_v3(sim->scene->physics_settings.gravity))
     {
-      bpa->gravity[2] = sim->scene->physics_settings.gravity[2];
+      copy_v3_v3(bpa->gravity, sim->scene->physics_settings.gravity);
     }
 
     bpa->data.health = part->boids->health;
@@ -3041,9 +3037,9 @@ static int collision_response(ParticleSimulationData *sim,
   if (col->boid) {
     /* keep boids above ground */
     BoidParticle *bpa = pa->boid;
-    if (bpa->data.mode == eBoidMode_OnLand || co[2] <= col->boid_z) {
-      co[2] = col->boid_z;
-      v0[2] = 0.0f;
+    if (bpa->data.mode == eBoidMode_OnLand || co[1] <= col->boid_height) {
+      co[1] = col->boid_height;
+      v0[1] = 0.0f;
     }
   }
 
@@ -3154,7 +3150,7 @@ static void collision_check(ParticleSimulationData *sim, int p, float dfra, floa
   /* override for boids */
   if (part->phystype == PART_PHYS_BOIDS && part->boids->options & BOID_ALLOW_LAND) {
     col.boid = 1;
-    col.boid_z = pa->state.co[2];
+    col.boid_height = pa->state.co[1];
     col.skip[col.skip_count++] = pa->boid->ground;
   }
 

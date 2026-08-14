@@ -363,7 +363,7 @@ ccl_device_forceinline void guiding_record_volume_bounce(
   assert((INTEGRATOR_STATE(state, path, flag) & PATH_RAY_SHADOW_CATCHER_PASS) == 0);
 
   const float3 weight_rgb = spectrum_to_rgb(weight);
-  const float3 normal = make_float3(0.0f, 0.0f, 1.0f);
+  const float3 normal = make_float3(0.0f, 1.0f, 0.0f);
 
   kernel_assert(state->guiding.path_segment != nullptr);
   if (state->guiding.path_segment != nullptr) {
@@ -501,7 +501,7 @@ ccl_device_forceinline void guiding_record_background(ccl_attr_maybe_unused Kern
   float3 P = ray_P + GUIDING_MAX_LIGHT_DISTANCE * ray_D;
   kernel_assert(is_guiding_valid(P));
   P = clamp_guiding_position(P);
-  const float3 normal = make_float3(0.0f, 0.0f, 1.0f);
+  const float3 normal = make_float3(0.0f, 1.0f, 0.0f);
 
   openpgl::cpp::PathSegment background_segment;
   openpgl::cpp::SetPosition(&background_segment, guiding_vec3f(P));

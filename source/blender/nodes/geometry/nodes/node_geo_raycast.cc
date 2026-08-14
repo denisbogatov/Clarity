@@ -63,7 +63,7 @@ static void node_declare(NodeDeclarationBuilder &b)
                                   .structure_type(StructureType::Dynamic)
                                   .index();
   const int ray_direction = b.add_input<decl::Vector>("Ray Direction"_ustr)
-                                .default_value({0.0f, 0.0f, -1.0f})
+                                .default_value({0.0f, -1.0f, 0.0f})
                                 .structure_type(StructureType::Dynamic)
                                 .index();
   const int ray_length = b.add_input<decl::Float>("Ray Length"_ustr)

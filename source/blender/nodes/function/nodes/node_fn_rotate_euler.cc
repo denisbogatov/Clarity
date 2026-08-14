@@ -28,7 +28,7 @@ static void node_declare(NodeDeclarationBuilder &b)
         b.add_input<decl::Vector>("Rotate By"_ustr).subtype(PROP_EULER);
         break;
       case FN_NODE_ROTATE_EULER_TYPE_AXIS_ANGLE: {
-        b.add_input<decl::Vector>("Axis"_ustr).default_value({0.0, 0.0, 1.0}).subtype(PROP_XYZ);
+        b.add_input<decl::Vector>("Axis"_ustr).default_value({0.0, 1.0, 0.0}).subtype(PROP_XYZ);
         b.add_input<decl::Float>("Angle"_ustr).subtype(PROP_ANGLE);
         break;
       }

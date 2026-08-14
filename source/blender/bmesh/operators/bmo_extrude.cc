@@ -452,7 +452,7 @@ void bmo_extrude_face_region_exec(BMesh *bm, BMOperator *op)
       add_v3_v3(average_normal, f->no);
     }
     if (normalize_v3(average_normal) == 0.0f) {
-      average_normal[2] = 1.0f;
+      average_normal[1] = 1.0f;
     }
 
     /* Allocate array to store possible vertices that will be dissolved. */

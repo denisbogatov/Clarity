@@ -1381,7 +1381,7 @@ static wmOperatorStatus object_armature_add_exec(bContext *C, wmOperator *op)
   bool view_aligned = rv3d && (U.flag & USER_ADD_VIEWALIGNED);
 
   WM_operator_view3d_unit_defaults(C, op);
-  add_generic_get_opts(C, op, 'Z', loc, rot, nullptr, &enter_editmode, &local_view_bits, nullptr);
+  add_generic_get_opts(C, op, 'Y', loc, rot, nullptr, &enter_editmode, &local_view_bits, nullptr);
 
   if ((obedit == nullptr) || (obedit->type != OB_ARMATURE)) {
     obedit = add_type(C, OB_ARMATURE, nullptr, loc, rot, true, local_view_bits);
@@ -1648,7 +1648,7 @@ static wmOperatorStatus object_grease_pencil_add_exec(bContext *C, wmOperator *o
   ushort local_view_bits;
   float loc[3], rot[3];
 
-  /* NOTE: We use 'Y' here (not 'Z'), as. */
+  /* Grease Pencil primitives are authored on Clarity's native X/Z construction plane. */
   WM_operator_view3d_unit_defaults(C, op);
   add_generic_get_opts(C, op, 'Y', loc, rot, nullptr, nullptr, &local_view_bits, nullptr);
 

@@ -8,17 +8,25 @@
 
 #pragma once
 
+#include <cfloat>
+#include <cmath>
 #include <optional>
 #include <string>
 
+#include "BLI_array.hh"
+#include "BLI_math_matrix.h"
 #include "BLI_math_matrix.hh"
+#include "BLI_vector.hh"
 
+#include "BKE_colorband.hh"
 #include "BKE_customdata.hh"
 #include "BKE_editmesh.hh"
+#include "BKE_layer.hh"
 #include "BKE_mask.hh"
 #include "BKE_mesh.hh"
 #include "BKE_mesh_types.hh"
 #include "BKE_paint.hh"
+#include "BKE_soft_selection.hh"
 #include "BKE_subdiv_modifier.hh"
 
 #include "DEG_depsgraph_query.hh"
@@ -58,14 +66,14 @@ class ClarityPivotSnapPreview : Overlay {
   PassSimple ps_ = {"Clarity Pivot Snap Preview"};
   LinePrimitiveBuf lines_;
   /** Clarity fills a highlighted face as well as outlining it. */
-  TrianglePrimitiveBuf faces_ = {SelectionType::DISABLED,
-                                 "clarity_pivot_snap_preview_faces"};
+  TrianglePrimitiveBuf faces_ = {SelectionType::DISABLED, "clarity_pivot_snap_preview_faces"};
   StorageVectorBuffer<VertexData> points_ = {"clarity_pivot_snap_preview_points"};
 
   ed::clarity::ClarityPivotSnapResult target_;
   /**
-   * Clarity's pre-highlight orange, measured off a 2025 capture: the vertex marker, the edge and the
-   * face outline are all `239, 99, 5`, and the face is filled with the same colour at low alpha.
+   * Clarity's pre-highlight orange, measured off a 2025 capture: the vertex marker, the edge and
+   * the face outline are all `239, 99, 5`, and the face is filled with the same colour at low
+   * alpha.
    *
    * Held linear, because that is what the overlay pipeline writes: handing it the sRGB numbers
    * displayed them as `237, 164, 52`, an amber that is not the colour Clarity uses.
@@ -169,14 +177,13 @@ class ClarityPivotSnapPreview : Overlay {
 
     Object *object_orig = DEG_get_original(ob_ref.object);
     BMEditMesh *edit_mesh = object_orig != nullptr ? BKE_editmesh_from_object(object_orig) :
-                                                    nullptr;
+                                                     nullptr;
     if (edit_mesh != nullptr) {
       if (target_.type == ed::clarity::ClarityPivotSnapTargetType::Edge) {
         const BMEdge *edge = BM_edge_at_index_find(edit_mesh->bm, target_.component_index);
         if (edge != nullptr) {
-          lines_.append(position_world(float3(edge->v1->co)),
-                        position_world(float3(edge->v2->co)),
-                        color_);
+          lines_.append(
+              position_world(float3(edge->v1->co)), position_world(float3(edge->v2->co)), color_);
         }
         return;
       }
@@ -230,8 +237,7 @@ class ClarityPivotSnapPreview : Overlay {
     for (const int i : IndexRange(face.size())) {
       const int vert = corner_verts[face[i]];
       const int vert_next = corner_verts[face[(i + 1) % face.size()]];
-      if (!positions.index_range().contains(vert) ||
-          !positions.index_range().contains(vert_next))
+      if (!positions.index_range().contains(vert) || !positions.index_range().contains(vert_next))
       {
         continue;
       }
@@ -274,8 +280,7 @@ class ClarityPivotSnapPreview : Overlay {
     }
     {
       PassSimple::Sub &sub = ps_.sub("snap_position");
-      sub.state_set(DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ALPHA,
-                    state.clipping_plane_count);
+      sub.state_set(DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ALPHA, state.clipping_plane_count);
       sub.shader_set(res.shaders->extra_point.get());
       points_.push_update();
       sub.bind_ssbo("data_buf", &points_);
@@ -296,6 +301,286 @@ class ClarityPivotSnapPreview : Overlay {
   bool is_in_front() const
   {
     return in_front_;
+  }
+};
+
+/**
+ * Maya softSelect's false-color component feedback.
+ *
+ * The CPU values intentionally use the same distance and curve implementation as Transform.
+ * Edges are always drawn, as Maya documents; point markers are added only in vertex-select mode.
+ */
+class SoftSelectionFalseColor : Overlay {
+ private:
+  PassSimple ps_ = {"Soft Selection False Color"};
+  LinePrimitiveBuf edges_ = {SelectionType::DISABLED, "soft_selection_false_color_edges"};
+  PointPrimitiveBuf vertices_ = {SelectionType::DISABLED, "soft_selection_false_color_vertices"};
+
+  SoftSelectionSettings settings_{};
+  std::optional<bke::SoftSelectionCurve> curve_;
+  bke::SoftSelectionSpatialIndex *global_selected_index_ = nullptr;
+  bool show_vertices_ = false;
+  bool xray_flag_enabled_ = false;
+
+  void free_global_index()
+  {
+    bke::soft_selection_spatial_index_free(global_selected_index_);
+    global_selected_index_ = nullptr;
+  }
+
+  static bool selected_visible(const BMVert &vert)
+  {
+    return BM_elem_flag_test(&vert, BM_ELEM_SELECT) && !BM_elem_flag_test(&vert, BM_ELEM_HIDDEN);
+  }
+
+  void build_global_selected_index(const State &state)
+  {
+    BKE_view_layer_synced_ensure(
+        *DEG_get_bmain(state.depsgraph), state.scene, const_cast<ViewLayer *>(state.view_layer));
+    const Vector<Object *> objects = BKE_view_layer_array_from_objects_in_edit_mode_unique_data(
+        *DEG_get_bmain(state.depsgraph),
+        state.scene,
+        const_cast<ViewLayer *>(state.view_layer),
+        state.v3d);
+
+    Vector<float3> selected_positions;
+    for (Object *object : objects) {
+      if (object->type != OB_MESH) {
+        continue;
+      }
+      const BMEditMesh *edit_mesh = BKE_editmesh_from_object(object);
+      if (edit_mesh == nullptr) {
+        continue;
+      }
+      const float4x4 object_to_world = object->object_to_world();
+      BMIter iter;
+      BMVert *vert;
+      BM_ITER_MESH (vert, &iter, edit_mesh->bm, BM_VERTS_OF_MESH) {
+        if (selected_visible(*vert)) {
+          selected_positions.append(math::transform_point(object_to_world, float3(vert->co)));
+        }
+      }
+    }
+    global_selected_index_ = bke::soft_selection_spatial_index_create(selected_positions);
+  }
+
+  static bke::SoftSelectionSpatialIndex *build_object_selected_index(
+      BMesh &bm, const Span<float3> world_positions)
+  {
+    Vector<float3> selected_positions;
+    selected_positions.reserve(bm.totvertsel);
+    BMIter iter;
+    BMVert *vert;
+    BM_ITER_MESH (vert, &iter, &bm, BM_VERTS_OF_MESH) {
+      if (selected_visible(*vert)) {
+        selected_positions.append(world_positions[BM_elem_index_get(vert)]);
+      }
+    }
+    return bke::soft_selection_spatial_index_create(selected_positions);
+  }
+
+  float4 color_from_weight(const float weight) const
+  {
+    float color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    BKE_colorband_evaluate(&settings_.falloff_color, weight, color);
+    /* Maya's softSelectColorCurve is RGB-only; alpha must not weaken component feedback. */
+    return float4(color[0], color[1], color[2], 1.0f);
+  }
+
+ public:
+  ~SoftSelectionFalseColor()
+  {
+    free_global_index();
+  }
+
+  void begin_sync(Resources &res, const State &state) final
+  {
+    edges_.clear();
+    vertices_.clear();
+    free_global_index();
+    curve_.reset();
+
+    const ToolSettings *tool_settings = state.scene != nullptr ? state.scene->toolsettings :
+                                                                 nullptr;
+    enabled_ = state.is_space_v3d() && state.ctx_mode == CTX_MODE_EDIT_MESH &&
+               !state.hide_overlays && !state.is_depth_only_drawing && !res.is_selection() &&
+               tool_settings != nullptr &&
+               (tool_settings->proportional_edit & PROP_EDIT_USE) != 0 &&
+               tool_settings->soft_selection.use_falloff_color != 0;
+    if (!enabled_) {
+      return;
+    }
+
+    settings_ = tool_settings->soft_selection;
+    if (!std::isfinite(settings_.radius) || settings_.radius <= 0.0f ||
+        settings_.falloff_color.tot <= 0)
+    {
+      enabled_ = false;
+      return;
+    }
+    curve_.emplace(settings_);
+    show_vertices_ = (tool_settings->selectmode & SCE_SELECT_VERTEX) != 0;
+    xray_flag_enabled_ = state.xray_flag_enabled;
+
+    if (settings_.falloff_mode == SOFT_SELECT_FALLOFF_GLOBAL) {
+      build_global_selected_index(state);
+      enabled_ = global_selected_index_ != nullptr;
+    }
+  }
+
+  void edit_object_sync(Manager & /*manager*/,
+                        const ObjectRef &ob_ref,
+                        Resources & /*res*/,
+                        const State & /*state*/) final
+  {
+    if (!enabled_ || ob_ref.object->type != OB_MESH || !curve_.has_value()) {
+      return;
+    }
+
+    Object *object_orig = DEG_get_original(ob_ref.object);
+    BMEditMesh *edit_mesh = object_orig != nullptr ? BKE_editmesh_from_object(object_orig) :
+                                                     nullptr;
+    if (edit_mesh == nullptr || edit_mesh->bm == nullptr || edit_mesh->bm->totvert == 0) {
+      return;
+    }
+
+    BMesh &bm = *edit_mesh->bm;
+    const float4x4 object_to_world = ob_ref.object_to_world(0);
+    BM_mesh_elem_index_ensure(&bm, BM_VERT);
+    Array<float3> world_positions(bm.totvert);
+    BMIter position_iter;
+    BMVert *position_vert;
+    BM_ITER_MESH (position_vert, &position_iter, &bm, BM_VERTS_OF_MESH) {
+      if (!BM_elem_flag_test(position_vert, BM_ELEM_HIDDEN)) {
+        world_positions[BM_elem_index_get(position_vert)] = math::transform_point(
+            object_to_world, float3(position_vert->co));
+      }
+    }
+    Array<float> distances(bm.totvert, FLT_MAX);
+
+    bke::SoftSelectionSpatialIndex *object_index = nullptr;
+    if (settings_.falloff_mode == SOFT_SELECT_FALLOFF_SURFACE) {
+      if (bm.totvertsel == 0) {
+        return;
+      }
+      float distance_matrix[3][3];
+      copy_m3_m4(distance_matrix, object_to_world.ptr());
+      bke::soft_selection_mesh_surface_distances(&bm, distance_matrix, distances.data(), nullptr);
+    }
+    else {
+      const bke::SoftSelectionSpatialIndex *spatial_index = global_selected_index_;
+      if (settings_.falloff_mode == SOFT_SELECT_FALLOFF_VOLUME) {
+        object_index = build_object_selected_index(bm, world_positions);
+        spatial_index = object_index;
+      }
+      if (spatial_index == nullptr) {
+        return;
+      }
+
+      BMIter iter;
+      BMVert *vert;
+      BM_ITER_MESH (vert, &iter, &bm, BM_VERTS_OF_MESH) {
+        if (BM_elem_flag_test(vert, BM_ELEM_HIDDEN)) {
+          continue;
+        }
+        const int index = BM_elem_index_get(vert);
+        if (selected_visible(*vert)) {
+          distances[index] = 0.0f;
+          continue;
+        }
+        bke::soft_selection_spatial_index_nearest_distance(
+            spatial_index, world_positions[index], distances[index]);
+      }
+    }
+
+    Array<float4> colors(bm.totvert);
+    Array<bool> affected(bm.totvert, false);
+    BMIter viter;
+    BMVert *vert;
+    BM_ITER_MESH (vert, &viter, &bm, BM_VERTS_OF_MESH) {
+      const int index = BM_elem_index_get(vert);
+      if (BM_elem_flag_test(vert, BM_ELEM_HIDDEN) || distances[index] > settings_.radius) {
+        continue;
+      }
+      affected[index] = true;
+      const float weight = bke::soft_selection_weight(
+          *curve_, distances[index], settings_.radius, selected_visible(*vert));
+      colors[index] = color_from_weight(weight);
+      if (show_vertices_) {
+        vertices_.append(world_positions[index], colors[index]);
+      }
+    }
+
+    /* Autodesk explicitly documents colored edges in every component-selection mode. */
+    const float4 zero_weight_color = color_from_weight(0.0f);
+    BMIter eiter;
+    BMEdge *edge;
+    BM_ITER_MESH (edge, &eiter, &bm, BM_EDGES_OF_MESH) {
+      if (BM_elem_flag_test(edge, BM_ELEM_HIDDEN) || BM_elem_flag_test(edge->v1, BM_ELEM_HIDDEN) ||
+          BM_elem_flag_test(edge->v2, BM_ELEM_HIDDEN))
+      {
+        continue;
+      }
+      const int index_1 = BM_elem_index_get(edge->v1);
+      const int index_2 = BM_elem_index_get(edge->v2);
+      if (!affected[index_1] && !affected[index_2]) {
+        continue;
+      }
+
+      const float4 color_1 = affected[index_1] ? colors[index_1] : zero_weight_color;
+      const float4 color_2 = affected[index_2] ? colors[index_2] : zero_weight_color;
+      edges_.append(world_positions[index_1], world_positions[index_2], color_1, color_2);
+    }
+
+    bke::soft_selection_spatial_index_free(object_index);
+  }
+
+  void end_sync(Resources &res, const State &state) final
+  {
+    free_global_index();
+    if (!enabled_) {
+      return;
+    }
+
+    ps_.init();
+    ps_.bind_ubo(OVERLAY_GLOBALS_SLOT, &res.globals_buf);
+    ps_.bind_ubo(DRW_CLIPPING_UBO_SLOT, &res.clip_planes_buf);
+    const DRWState pass_state = DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_LESS_EQUAL |
+                                DRW_STATE_BLEND_ALPHA;
+    {
+      PassSimple::Sub &sub = ps_.sub("colored_edges");
+      sub.state_set(pass_state, state.clipping_plane_count);
+      sub.shader_set(res.shaders->soft_selection_wire.get());
+      sub.push_constant("ndc_offset_factor", &state.ndc_offset_factor);
+      sub.push_constant("ndc_offset", 1.25f);
+      edges_.end_sync(sub);
+    }
+    {
+      PassSimple::Sub &sub = ps_.sub("colored_vertices");
+      sub.state_set(pass_state, state.clipping_plane_count);
+      sub.shader_set(res.shaders->soft_selection_point.get());
+      sub.push_constant("ndc_offset_factor", &state.ndc_offset_factor);
+      sub.push_constant("ndc_offset", 1.5f);
+      vertices_.end_sync(sub);
+    }
+  }
+
+  void draw_line(Framebuffer &framebuffer, Manager &manager, View &view) final
+  {
+    if (!enabled_ || xray_flag_enabled_) {
+      return;
+    }
+    GPU_framebuffer_bind(framebuffer);
+    manager.submit(ps_, view);
+  }
+
+  void draw_color_only(Framebuffer &framebuffer, Manager &manager, View &view) final
+  {
+    if (!enabled_ || !xray_flag_enabled_) {
+      return;
+    }
+    GPU_framebuffer_bind(framebuffer);
+    manager.submit(ps_, view);
   }
 };
 

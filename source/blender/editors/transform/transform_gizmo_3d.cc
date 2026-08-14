@@ -246,6 +246,17 @@ int gizmo_3d_scale_center_style_get(const bool use_clarity_style, const bool is_
   return is_dragging ? ED_GIZMO_PRIMITIVE_STYLE_CIRCLE : ED_GIZMO_PRIMITIVE_STYLE_ANNULUS;
 }
 
+void gizmo_3d_view_aligned_basis_rotation_set(float matrix_basis[4][4],
+                                              const float viewinv[4][4])
+{
+  /* Both operands are 4x4 matrices. Copy only the three rotation columns so the gizmo keeps its
+   * existing translation. #copy_m3_m4 cannot be used because its destination must be a 3x3
+   * matrix. */
+  copy_v3_v3(matrix_basis[0], viewinv[0]);
+  copy_v3_v3(matrix_basis[1], viewinv[1]);
+  copy_v3_v3(matrix_basis[2], viewinv[2]);
+}
+
 static uint gizmo_orientation_axis(const int axis_idx, bool *r_is_plane)
 {
   switch (axis_idx) {
@@ -2532,6 +2543,13 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
       /* Align to view. */
       switch (axis_idx) {
         case MAN_AXIS_TRANS_C:
+          if (use_clarity_palette) {
+            gizmo_3d_view_aligned_basis_rotation_set(axis->matrix_basis, rv3d->viewinv);
+          }
+          else {
+            WM_gizmo_set_matrix_rotation_from_z_axis(axis, rv3d->viewinv[2]);
+          }
+          break;
         case MAN_AXIS_ROT_C:
         case MAN_AXIS_ROT_T:
           WM_gizmo_set_matrix_rotation_from_z_axis(axis, rv3d->viewinv[2]);
@@ -2545,6 +2563,13 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
           }
           break;
       }
+    }
+
+    /* Modal refreshes copy the transform orientation back to every visible handle. Restore the
+     * complete view basis so the Clarity center square remains locked to the screen during a
+     * drag. */
+    if (is_modal && use_clarity_palette && axis_idx == MAN_AXIS_TRANS_C) {
+      gizmo_3d_view_aligned_basis_rotation_set(axis->matrix_basis, rv3d->viewinv);
     }
 
     float color[4], color_hi[4];
@@ -2601,13 +2626,20 @@ static void gizmo_3d_draw_invoke(wmGizmoGroup *gzgroup,
 
   if (use_clarity_style) {
     gizmogroup_refresh_from_matrix(gzgroup, rv3d->twmat, nullptr, true);
+    gizmo_3d_view_aligned_basis_rotation_set(ggd->gizmos[MAN_AXIS_TRANS_C]->matrix_basis,
+                                            rv3d->viewinv);
   }
   else {
     gizmo_refresh_from_matrix(axis_active, axis_idx_active, ggd->twtype, rv3d->twmat, nullptr);
   }
 
   if (ELEM(axis_idx_active, MAN_AXIS_TRANS_C, MAN_AXIS_SCALE_C, MAN_AXIS_ROT_C, MAN_AXIS_ROT_T)) {
-    WM_gizmo_set_matrix_rotation_from_z_axis(axis_active, rv3d->viewinv[2]);
+    if (use_clarity_style && axis_idx_active == MAN_AXIS_TRANS_C) {
+      gizmo_3d_view_aligned_basis_rotation_set(axis_active->matrix_basis, rv3d->viewinv);
+    }
+    else {
+      WM_gizmo_set_matrix_rotation_from_z_axis(axis_active, rv3d->viewinv[2]);
+    }
   }
 
   gizmo_3d_setup_draw_modal(axis_active, axis_idx_active, ggd->twtype);

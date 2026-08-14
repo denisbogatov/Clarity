@@ -125,6 +125,8 @@ static void waveModifier_do(WaveModifierData *wmd,
   float minfac = float(1.0 / exp(wmd->width * wmd->narrow * wmd->width * wmd->narrow));
   float lifefac = wmd->height;
   float (*tex_co)[3] = nullptr;
+  /* MOD_WAVE_Y and the corresponding RNA/storage names are retained for compatibility, but the
+   * second horizontal motion axis is native Z in Clarity's X/Z ground plane. */
   const int wmd_axis = wmd->flag & (MOD_WAVE_X | MOD_WAVE_Y);
   const float falloff = wmd->falloff;
   float falloff_fac = 1.0f; /* when falloff == 0.0f this stays at 1.0f */
@@ -142,7 +144,7 @@ static void waveModifier_do(WaveModifierData *wmd,
     mul_m4_m4m4(mat, ob->world_to_object().ptr(), wmd->objectcenter->object_to_world().ptr());
 
     wmd->startx = mat[3][0];
-    wmd->starty = mat[3][1];
+    wmd->starty = mat[3][2];
   }
 
   /* get the index of the deform group */
@@ -184,7 +186,7 @@ static void waveModifier_do(WaveModifierData *wmd,
     for (i = 0; i < verts_num; i++) {
       float *co = vertexCos[i];
       float x = co[0] - wmd->startx;
-      float y = co[1] - wmd->starty;
+      float z = co[2] - wmd->starty;
       float amplit = 0.0f;
       float def_weight = 1.0f;
 
@@ -201,13 +203,13 @@ static void waveModifier_do(WaveModifierData *wmd,
 
       switch (wmd_axis) {
         case MOD_WAVE_X | MOD_WAVE_Y:
-          amplit = sqrtf(x * x + y * y);
+          amplit = sqrtf(x * x + z * z);
           break;
         case MOD_WAVE_X:
           amplit = x;
           break;
         case MOD_WAVE_Y:
-          amplit = y;
+          amplit = z;
           break;
       }
 
@@ -223,13 +225,13 @@ static void waveModifier_do(WaveModifierData *wmd,
 
         switch (wmd_axis) {
           case MOD_WAVE_X | MOD_WAVE_Y:
-            dist = sqrtf(x * x + y * y);
+            dist = sqrtf(x * x + z * z);
             break;
           case MOD_WAVE_X:
             dist = fabsf(x);
             break;
           case MOD_WAVE_Y:
-            dist = fabsf(y);
+            dist = fabsf(z);
             break;
         }
 
@@ -265,8 +267,8 @@ static void waveModifier_do(WaveModifierData *wmd,
           }
         }
         else {
-          /* move along local z axis */
-          co[2] += lifefac * amplit;
+          /* Move along the native local up axis. */
+          co[1] += lifefac * amplit;
         }
       }
     }
@@ -302,7 +304,7 @@ static void panel_draw(const bContext * /*C*/, Panel *panel)
   row->prop(
       ptr, "use_x", ui::ITEM_R_TOGGLE | ui::ITEM_R_FORCE_BLANK_DECORATE, std::nullopt, ICON_NONE);
   row->prop(
-      ptr, "use_y", ui::ITEM_R_TOGGLE | ui::ITEM_R_FORCE_BLANK_DECORATE, std::nullopt, ICON_NONE);
+      ptr, "use_y", ui::ITEM_R_TOGGLE | ui::ITEM_R_FORCE_BLANK_DECORATE, IFACE_("Z"), ICON_NONE);
 
   layout.prop(ptr, "use_cyclic", UI_ITEM_NONE, std::nullopt, ICON_NONE);
 
@@ -337,7 +339,7 @@ static void position_panel_draw(const bContext * /*C*/, Panel *panel)
 
   ui::Layout &col = layout.column(true);
   col.prop(ptr, "start_position_x", UI_ITEM_NONE, IFACE_("Start Position X"), ICON_NONE);
-  col.prop(ptr, "start_position_y", UI_ITEM_NONE, IFACE_("Y"), ICON_NONE);
+  col.prop(ptr, "start_position_y", UI_ITEM_NONE, IFACE_("Z"), ICON_NONE);
 }
 
 static void time_panel_draw(const bContext * /*C*/, Panel *panel)

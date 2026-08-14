@@ -77,6 +77,8 @@ struct SnapObjectParams {
   bool curve_targets_only : 1;
   /** Include object origins as point snapping candidates. */
   bool include_object_pivots : 1;
+  /** Include objects hidden in the current view layer. Used by Maya-compatible live surfaces. */
+  bool include_hidden : 1;
   /**
    * Allow snapping to include all objects even when a mesh is in edit mode.
    *
@@ -86,6 +88,9 @@ struct SnapObjectParams {
   bool ignore_editmode_filtering : 1;
   /** Optional world-space point to exclude from object-pivot candidates. */
   const float *excluded_object_pivot_location;
+  /** Optional object-level filter, evaluated before any geometry is visited. */
+  bool (*object_filter_fn)(const Object *object, void *user_data);
+  void *object_filter_user_data;
 };
 
 struct SnapObjectContext;

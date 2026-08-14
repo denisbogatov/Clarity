@@ -3555,9 +3555,9 @@ static void GREASE_PENCIL_OT_reproject(wmOperatorType *ot)
        "FRONT",
        0,
        "Front",
-       "Reproject the strokes using the X-Z plane"},
+       "Reproject the strokes using the X-Y plane"},
       {int(ReprojectMode::Side), "SIDE", 0, "Side", "Reproject the strokes using the Y-Z plane"},
-      {int(ReprojectMode::Top), "TOP", 0, "Top", "Reproject the strokes using the X-Y plane"},
+      {int(ReprojectMode::Top), "TOP", 0, "Top", "Reproject the strokes using the X-Z plane"},
       {int(ReprojectMode::View),
        "VIEW",
        0,
@@ -4613,10 +4613,7 @@ static wmOperatorStatus grease_pencil_outline_exec(bContext *C, wmOperator *op)
       break;
     }
     case OutlineMode::Front:
-      viewinv = float4x4({1.0f, 0.0f, 0.0f, 0.0f},
-                         {0.0f, 0.0f, 1.0f, 0.0f},
-                         {0.0f, 1.0f, 0.0f, 0.0f},
-                         {0.0f, 0.0f, 0.0f, 1.0f});
+      viewinv = float4x4::identity();
       break;
     case OutlineMode::Side:
       viewinv = float4x4({0.0f, 0.0f, 1.0f, 0.0f},
@@ -4625,10 +4622,18 @@ static wmOperatorStatus grease_pencil_outline_exec(bContext *C, wmOperator *op)
                          {0.0f, 0.0f, 0.0f, 1.0f});
       break;
     case OutlineMode::Top:
-      viewinv = float4x4::identity();
+      viewinv = float4x4({1.0f, 0.0f, 0.0f, 0.0f},
+                         {0.0f, 0.0f, 1.0f, 0.0f},
+                         {0.0f, 1.0f, 0.0f, 0.0f},
+                         {0.0f, 0.0f, 0.0f, 1.0f});
       break;
     case OutlineMode::Cursor: {
-      viewinv = scene->cursor.matrix<float4x4>();
+      const float4x4 cursor_to_world = scene->cursor.matrix<float4x4>();
+      const float4x4 top_to_outline({1.0f, 0.0f, 0.0f, 0.0f},
+                                    {0.0f, 0.0f, 1.0f, 0.0f},
+                                    {0.0f, 1.0f, 0.0f, 0.0f},
+                                    {0.0f, 0.0f, 0.0f, 1.0f});
+      viewinv = top_to_outline * math::invert(cursor_to_world);
       break;
     }
     case OutlineMode::Camera:

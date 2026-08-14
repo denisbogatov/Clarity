@@ -54,7 +54,7 @@ static void node_geo_exec(GeoNodeExecParams params)
         STLImportParams import_params;
         STRNCPY(import_params.filepath, path->c_str());
 
-        import_params.forward_axis = IO_AXIS_NEGATIVE_Z;
+        import_params.forward_axis = IO_AXIS_Z;
         import_params.up_axis = IO_AXIS_Y;
 
         ReportList reports;

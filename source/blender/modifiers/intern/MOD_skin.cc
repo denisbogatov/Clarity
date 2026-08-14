@@ -694,17 +694,17 @@ static SkinNode *build_frames(const Span<float3> vert_positions,
 
 static void calc_edge_mat(float mat[3][3], const float a[3], const float b[3])
 {
-  const float z_up[3] = {0, 0, 1};
+  const float y_up[3] = {0, 1, 0};
   float dot;
 
   /* X = edge direction */
   sub_v3_v3v3(mat[0], b, a);
   normalize_v3(mat[0]);
 
-  dot = dot_v3v3(mat[0], z_up);
+  dot = dot_v3v3(mat[0], y_up);
   if (dot > -1 + FLT_EPSILON && dot < 1 - FLT_EPSILON) {
-    /* Y = Z cross x */
-    cross_v3_v3v3(mat[1], z_up, mat[0]);
+    /* Choose a stable side axis from Clarity's native world-up direction. */
+    cross_v3_v3v3(mat[1], y_up, mat[0]);
     normalize_v3(mat[1]);
 
     /* Z = x cross y */
@@ -716,8 +716,8 @@ static void calc_edge_mat(float mat[3][3], const float a[3], const float b[3])
     mat[1][1] = 0;
     mat[1][2] = 0;
     mat[2][0] = 0;
-    mat[2][1] = 1;
-    mat[2][2] = 0;
+    mat[2][1] = 0;
+    mat[2][2] = -1;
   }
 }
 

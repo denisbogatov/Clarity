@@ -491,9 +491,9 @@ class QuickSmoke(ObjectModeOperator, Operator):
         obj = context.active_object
         obj.name = data_("Smoke Domain")
 
-        # give the smoke some room above the flows
-        obj.location = 0.5 * (max_co + min_co) + Vector((0.0, 0.0, 1.0))
-        obj.scale = 0.5 * (max_co - min_co) + Vector((1.0, 1.0, 2.0))
+        # Give the smoke some room above the flows in Clarity's Y-up world.
+        obj.location = 0.5 * (max_co + min_co) + Vector((0.0, 1.0, 0.0))
+        obj.scale = 0.5 * (max_co - min_co) + Vector((1.0, 2.0, 1.0))
 
         # setup smoke domain
         fluid = obj.modifiers.new(name=data_("Fluid"), type='FLUID')
@@ -600,9 +600,9 @@ class QuickLiquid(Operator):
         obj = context.active_object
         obj.name = data_("Liquid Domain")
 
-        # give the liquid some room above the flows
-        obj.location = 0.5 * (max_co + min_co) + Vector((0.0, 0.0, -1.0))
-        obj.scale = 0.5 * (max_co - min_co) + Vector((1.0, 1.0, 2.0))
+        # Give falling liquid extra room below the flows in Clarity's Y-up world.
+        obj.location = 0.5 * (max_co + min_co) + Vector((0.0, -1.0, 0.0))
+        obj.scale = 0.5 * (max_co - min_co) + Vector((1.0, 2.0, 1.0))
 
         # setup liquid domain
         fluid = obj.modifiers.new(name=data_("Fluid"), type='FLUID')

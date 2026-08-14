@@ -556,8 +556,8 @@ void POSE_OT_autoside_names(wmOperatorType *ot)
 {
   static const EnumPropertyItem axis_items[] = {
       {0, "XAXIS", 0, "X-Axis", "Left/Right"},
-      {1, "YAXIS", 0, "Y-Axis", "Front/Back"},
-      {2, "ZAXIS", 0, "Z-Axis", "Top/Bottom"},
+      {1, "YAXIS", 0, "Y-Axis", "Top/Bottom"},
+      {2, "ZAXIS", 0, "Z-Axis", "Front/Back"},
       {0, nullptr, 0, nullptr, nullptr},
   };
 

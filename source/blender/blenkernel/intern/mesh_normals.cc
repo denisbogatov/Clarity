@@ -134,7 +134,7 @@ static float3 normal_calc_ngon(const Span<float3> vert_positions, const Span<int
 
   if (UNLIKELY(normalize_v3(normal) == 0.0f)) {
     /* Other axis are already set to zero. */
-    normal[2] = 1.0f;
+    normal[1] = 1.0f;
   }
 
   return normal;
@@ -161,7 +161,7 @@ float3 face_normal_calc(const Span<float3> vert_positions, const Span<int> face_
   }
 
   if (UNLIKELY(math::is_zero(normal))) {
-    normal.z = 1.0f;
+    normal.y = 1.0f;
   }
 
   BLI_ASSERT_UNIT_V3(normal);

@@ -328,8 +328,8 @@ static void initShear(TransInfo *t, wmOperator *op)
   t->mode = TFM_SHEAR;
 
   if (t->orient_axis == t->orient_axis_ortho) {
-    t->orient_axis = 2;
-    t->orient_axis_ortho = 1;
+    t->orient_axis = 1;
+    t->orient_axis_ortho = 0;
   }
 
   initShear_mouseInputMode(t);

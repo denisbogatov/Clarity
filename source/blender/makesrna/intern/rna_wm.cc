@@ -1616,6 +1616,87 @@ static int rna_WindowManager_clarity_snap_temporary_mode_get(PointerRNA *ptr)
   return wm->runtime->clarity_snap_temporary_mode;
 }
 
+static int rna_WindowManager_clarity_symmetry_mode_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->clarity_symmetry_mode;
+}
+
+static void rna_WindowManager_clarity_symmetry_mode_set(PointerRNA *ptr, const int value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  const uint8_t mode = uint8_t(clamp_i(value, 0, 3));
+  wm->runtime->clarity_symmetry_mode = mode;
+  if (mode != 0) {
+    wm->runtime->clarity_symmetry_last_mode = mode;
+    wm->runtime->clarity_symmetry_last_axis = wm->runtime->clarity_symmetry_axis;
+  }
+}
+
+static int rna_WindowManager_clarity_symmetry_axis_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->clarity_symmetry_axis;
+}
+
+static void rna_WindowManager_clarity_symmetry_axis_set(PointerRNA *ptr, const int value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  wm->runtime->clarity_symmetry_axis = uint8_t(clamp_i(value, 0, 2));
+  if (wm->runtime->clarity_symmetry_mode != 0) {
+    wm->runtime->clarity_symmetry_last_axis = wm->runtime->clarity_symmetry_axis;
+  }
+}
+
+static float rna_WindowManager_clarity_symmetry_tolerance_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->clarity_symmetry_tolerance;
+}
+
+static void rna_WindowManager_clarity_symmetry_tolerance_set(PointerRNA *ptr, const float value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  wm->runtime->clarity_symmetry_tolerance = value < 1e-7f ? 1e-7f : value;
+}
+
+static bool rna_WindowManager_clarity_symmetry_preserve_seam_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->clarity_symmetry_preserve_seam;
+}
+
+static void rna_WindowManager_clarity_symmetry_preserve_seam_set(PointerRNA *ptr, const bool value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  wm->runtime->clarity_symmetry_preserve_seam = value;
+}
+
+static float rna_WindowManager_clarity_symmetry_seam_tolerance_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->clarity_symmetry_seam_tolerance;
+}
+
+static void rna_WindowManager_clarity_symmetry_seam_tolerance_set(PointerRNA *ptr,
+                                                                   const float value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  wm->runtime->clarity_symmetry_seam_tolerance = value < 0.0f ? 0.0f : value;
+}
+
+static bool rna_WindowManager_clarity_symmetry_allow_partial_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime->clarity_symmetry_allow_partial;
+}
+
+static void rna_WindowManager_clarity_symmetry_allow_partial_set(PointerRNA *ptr, const bool value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  wm->runtime->clarity_symmetry_allow_partial = value;
+}
+
 static int rna_WindowManager_clarity_snap_step_mode_get(PointerRNA *ptr)
 {
   const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
@@ -1674,6 +1755,83 @@ static void rna_WindowManager_clarity_snap_tolerance_set(PointerRNA *ptr, const 
 {
   wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
   wm->runtime->clarity_snap_tolerance = value < 1 ? 1 : value;
+}
+
+static int rna_WindowManager_clarity_live_surface_snap_mode_get(PointerRNA *ptr)
+{
+  const wmWindowManager *wm = static_cast<const wmWindowManager *>(ptr->data);
+  return wm->runtime != nullptr ? wm->runtime->clarity_live_surface_snap_mode : 0;
+}
+
+static void rna_WindowManager_clarity_live_surface_snap_mode_set(PointerRNA *ptr, const int value)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  if (wm->runtime != nullptr) {
+    wm->runtime->clarity_live_surface_snap_mode = uint8_t(clamp_i(value, 0, 2));
+  }
+}
+
+static bContext *rna_WindowManager_clarity_active_context_create(PointerRNA *ptr)
+{
+  wmWindowManager *wm = static_cast<wmWindowManager *>(ptr->data);
+  if (wm->runtime == nullptr || wm->runtime->winactive == nullptr) {
+    return nullptr;
+  }
+  bContext *C = CTX_create();
+  CTX_wm_manager_set(C, wm);
+  CTX_wm_window_set(C, wm->runtime->winactive);
+  return C;
+}
+
+static bool rna_WindowManager_clarity_live_surface_active_get(PointerRNA *ptr)
+{
+  bContext *C = rna_WindowManager_clarity_active_context_create(ptr);
+  const bool active = C != nullptr && ED_clarity_live_surface_active(C);
+  if (C != nullptr) {
+    CTX_free(C);
+  }
+  return active;
+}
+
+static int rna_WindowManager_clarity_live_surface_count_get(PointerRNA *ptr)
+{
+  bContext *C = rna_WindowManager_clarity_active_context_create(ptr);
+  const int count = C != nullptr ? ED_clarity_live_surface_count(C) : 0;
+  if (C != nullptr) {
+    CTX_free(C);
+  }
+  return count;
+}
+
+static int rna_WindowManager_clarity_live_surface_history_count_get(PointerRNA *ptr)
+{
+  bContext *C = rna_WindowManager_clarity_active_context_create(ptr);
+  const int count = C != nullptr ? ED_clarity_live_surface_history_count(C) : 0;
+  if (C != nullptr) {
+    CTX_free(C);
+  }
+  return count;
+}
+
+static void rna_WindowManager_clarity_live_surface_label_get(PointerRNA *ptr, char *value)
+{
+  bContext *C = rna_WindowManager_clarity_active_context_create(ptr);
+  if (C != nullptr) {
+    ED_clarity_live_surface_label_get(C, value, MAX_ID_NAME + 8);
+  }
+  else {
+    value[0] = '\0';
+  }
+  if (C != nullptr) {
+    CTX_free(C);
+  }
+}
+
+static int rna_WindowManager_clarity_live_surface_label_length(PointerRNA *ptr)
+{
+  char value[MAX_ID_NAME + 8];
+  rna_WindowManager_clarity_live_surface_label_get(ptr, value);
+  return int(strlen(value));
 }
 
 static bool rna_WindowManager_clarity_selection_constraint_angle_active_get(PointerRNA *ptr)
@@ -3190,6 +3348,28 @@ static void rna_def_windowmanager(BlenderRNA *brna)
       {0, nullptr, 0, nullptr, nullptr},
   };
 
+  static const EnumPropertyItem clarity_live_surface_snap_mode_items[] = {
+      {0, "SURFACE", 0, "Surface", "Project continuously onto the live surface"},
+      {1, "FACE_CENTER", 0, "Face Center", "Snap to live polygon face centers"},
+      {2, "VERTEX", 0, "Vertex", "Snap to live polygon vertices"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
+  static const EnumPropertyItem clarity_symmetry_mode_items[] = {
+      {0, "OFF", 0, "Off", "Do not reflect component selection or transforms"},
+      {1, "OBJECT", 0, "Object", "Reflect across an axis of each object's local space"},
+      {2, "WORLD", 0, "World", "Reflect across an axis through the world origin"},
+      {3, "TOPOLOGY", 0, "Topology", "Pair components by matching mesh topology"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
+  static const EnumPropertyItem clarity_symmetry_axis_items[] = {
+      {0, "X", 0, "X", "Reflect across the plane perpendicular to X"},
+      {1, "Y", 0, "Y", "Reflect across the plane perpendicular to Y"},
+      {2, "Z", 0, "Z", "Reflect across the plane perpendicular to Z"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
   StructRNA *srna;
   PropertyRNA *prop;
 
@@ -3284,6 +3464,102 @@ static void rna_def_windowmanager(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop, "Clarity Interaction", "Enable Clarity viewport interaction and transform snapping");
   RNA_def_property_update(prop, NC_WINDOW, nullptr);
+
+  prop = RNA_def_property(srna, "clarity_symmetry_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, clarity_symmetry_mode_items);
+  RNA_def_property_enum_funcs(prop,
+                              "rna_WindowManager_clarity_symmetry_mode_get",
+                              "rna_WindowManager_clarity_symmetry_mode_set",
+                              nullptr);
+  RNA_def_property_ui_text(
+      prop, "Symmetry", "Coordinate system used to reflect mesh components and their transforms");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+
+  prop = RNA_def_property(srna, "clarity_live_surface_active", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_boolean_funcs(
+      prop, "rna_WindowManager_clarity_live_surface_active_get", nullptr);
+  RNA_def_property_ui_text(prop, "Live Surface Active", "A Maya-compatible live set is active");
+
+  prop = RNA_def_property(srna, "clarity_live_surface_count", PROP_INT, PROP_UNSIGNED);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_int_funcs(
+      prop, "rna_WindowManager_clarity_live_surface_count_get", nullptr, nullptr);
+  RNA_def_property_ui_text(prop, "Live Surface Count", "Number of active live surfaces");
+
+  prop = RNA_def_property(srna, "clarity_live_surface_history_count", PROP_INT, PROP_UNSIGNED);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_int_funcs(
+      prop, "rna_WindowManager_clarity_live_surface_history_count_get", nullptr, nullptr);
+  RNA_def_property_ui_text(prop, "Live Surface History Count", "Number of recent live sets");
+
+  prop = RNA_def_property(srna, "clarity_live_surface_label", PROP_STRING, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_string_maxlength(prop, MAX_ID_NAME + 8);
+  RNA_def_property_string_funcs(prop,
+                                "rna_WindowManager_clarity_live_surface_label_get",
+                                "rna_WindowManager_clarity_live_surface_label_length",
+                                nullptr);
+  RNA_def_property_ui_text(prop, "Live Surface", "Name of the current live surface set");
+
+  prop = RNA_def_property(srna, "clarity_live_surface_snap_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, clarity_live_surface_snap_mode_items);
+  RNA_def_property_enum_funcs(prop,
+                              "rna_WindowManager_clarity_live_surface_snap_mode_get",
+                              "rna_WindowManager_clarity_live_surface_snap_mode_set",
+                              nullptr);
+  RNA_def_property_ui_text(
+      prop, "Live Surface Snap", "Target used by Move while a live surface is active");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+
+  prop = RNA_def_property(srna, "clarity_symmetry_axis", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, clarity_symmetry_axis_items);
+  RNA_def_property_enum_funcs(prop,
+                              "rna_WindowManager_clarity_symmetry_axis_get",
+                              "rna_WindowManager_clarity_symmetry_axis_set",
+                              nullptr);
+  RNA_def_property_ui_text(prop, "Symmetry Axis", "Axis normal to the reflection plane");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+
+  prop = RNA_def_property(srna, "clarity_symmetry_tolerance", PROP_FLOAT, PROP_DISTANCE);
+  RNA_def_property_float_funcs(prop,
+                               "rna_WindowManager_clarity_symmetry_tolerance_get",
+                               "rna_WindowManager_clarity_symmetry_tolerance_set",
+                               nullptr);
+  RNA_def_property_range(prop, 1e-7f, 10000.0f);
+  RNA_def_property_ui_range(prop, 1e-5f, 1.0f, 0.01f, 5);
+  RNA_def_property_ui_text(
+      prop, "Tolerance", "Maximum distance between a reflected point and its matching component");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+
+  prop = RNA_def_property(srna, "clarity_symmetry_preserve_seam", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_WindowManager_clarity_symmetry_preserve_seam_get",
+                                 "rna_WindowManager_clarity_symmetry_preserve_seam_set");
+  RNA_def_property_ui_text(
+      prop, "Preserve Seam", "Keep components on the symmetry plane from leaving the seam");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+
+  prop = RNA_def_property(srna, "clarity_symmetry_seam_tolerance", PROP_FLOAT, PROP_DISTANCE);
+  RNA_def_property_float_funcs(prop,
+                               "rna_WindowManager_clarity_symmetry_seam_tolerance_get",
+                               "rna_WindowManager_clarity_symmetry_seam_tolerance_set",
+                               nullptr);
+  RNA_def_property_range(prop, 0.0f, 10000.0f);
+  RNA_def_property_ui_range(prop, 0.0f, 10.0f, 0.01f, 4);
+  RNA_def_property_ui_text(
+      prop, "Seam Tolerance", "Width around the reflection plane treated as the symmetry seam");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
+
+  prop = RNA_def_property(srna, "clarity_symmetry_allow_partial", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_WindowManager_clarity_symmetry_allow_partial_get",
+                                 "rna_WindowManager_clarity_symmetry_allow_partial_set");
+  RNA_def_property_ui_text(prop,
+                           "Allow Partial Symmetry",
+                           "Use the topologically paired parts of a mesh even when the whole mesh "
+                           "cannot be paired");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
 
   static const EnumPropertyItem clarity_transform_orientation_items[] = {
       /* Values follow #ed::clarity::ClarityMoveOrientation. */
@@ -3507,6 +3783,41 @@ static void rna_def_windowmanager(BlenderRNA *brna)
                              "rna_WindowManager_clarity_snap_tolerance_get",
                              "rna_WindowManager_clarity_snap_tolerance_set",
                              nullptr);
+  RNA_def_property_flag(prop, PROP_HIDDEN);
+
+  prop = RNA_def_property(srna, "maya_live_surface_active", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(
+      prop, "rna_WindowManager_clarity_live_surface_active_get", nullptr);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_flag(prop, PROP_HIDDEN);
+
+  prop = RNA_def_property(srna, "maya_live_surface_count", PROP_INT, PROP_UNSIGNED);
+  RNA_def_property_int_funcs(
+      prop, "rna_WindowManager_clarity_live_surface_count_get", nullptr, nullptr);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_flag(prop, PROP_HIDDEN);
+
+  prop = RNA_def_property(srna, "maya_live_surface_history_count", PROP_INT, PROP_UNSIGNED);
+  RNA_def_property_int_funcs(
+      prop, "rna_WindowManager_clarity_live_surface_history_count_get", nullptr, nullptr);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_flag(prop, PROP_HIDDEN);
+
+  prop = RNA_def_property(srna, "maya_live_surface_label", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_maxlength(prop, MAX_ID_NAME + 8);
+  RNA_def_property_string_funcs(prop,
+                                "rna_WindowManager_clarity_live_surface_label_get",
+                                "rna_WindowManager_clarity_live_surface_label_length",
+                                nullptr);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_flag(prop, PROP_HIDDEN);
+
+  prop = RNA_def_property(srna, "maya_live_surface_snap_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, clarity_live_surface_snap_mode_items);
+  RNA_def_property_enum_funcs(prop,
+                              "rna_WindowManager_clarity_live_surface_snap_mode_get",
+                              "rna_WindowManager_clarity_live_surface_snap_mode_set",
+                              nullptr);
   RNA_def_property_flag(prop, PROP_HIDDEN);
 
   prop = RNA_def_property(srna, "maya_selection_constraint_angle", PROP_FLOAT, PROP_ANGLE);

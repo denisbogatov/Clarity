@@ -365,9 +365,7 @@ void dome_light_to_world_material(const USDImportParams &params,
     return;
   }
 
-  /* Note: This logic tries to produce identical results to `usdview` as of USD 25.05.
-   * However, `usdview` seems to handle Y-Up stages differently; some scenes match while others
-   * do not unless we keep the second conditional below (+90 on x-axis). */
+  /* Match USD's pole-axis convention before converting the stage basis. */
   const pxr::TfToken stage_up = pxr::UsdGeomGetStageUpAxis(stage);
   const bool needs_stage_z_adjust = stage_up == pxr::UsdGeomTokens->z &&
                                     ELEM(dome_light_data.pole_axis,
@@ -378,14 +376,18 @@ void dome_light_to_world_material(const USDImportParams &params,
   if (needs_stage_z_adjust || needs_stage_y_adjust) {
     xf *= pxr::GfMatrix4d().SetRotate(pxr::GfRotation(pxr::GfVec3d(0.0, 1.0, 0.0), 90.0));
   }
-  else if (stage_up == pxr::UsdGeomTokens->y) {
-    /* Convert from Y-up to Z-up with a 90 degree rotation about the X-axis. */
-    xf *= pxr::GfMatrix4d().SetRotate(pxr::GfRotation(pxr::GfVec3d(1.0, 0.0, 0.0), 90.0));
+
+  if (stage_up == pxr::UsdGeomTokens->z) {
+    /* Express a Z-up stage rotation in Clarity's native Y-up basis. */
+    const pxr::GfMatrix4d native_from_stage = pxr::GfMatrix4d().SetRotate(
+        pxr::GfRotation(pxr::GfVec3d(1.0, 0.0, 0.0), -90.0));
+    const pxr::GfMatrix4d stage_from_native = pxr::GfMatrix4d().SetRotate(
+        pxr::GfRotation(pxr::GfVec3d(1.0, 0.0, 0.0), 90.0));
+    xf = native_from_stage * xf * stage_from_native;
   }
 
-  /* Rotate into Blender's frame of reference. */
-  xf = pxr::GfMatrix4d().SetRotate(pxr::GfRotation(pxr::GfVec3d(0.0, 0.0, 1.0), -90.0)) *
-       pxr::GfMatrix4d().SetRotate(pxr::GfRotation(pxr::GfVec3d(1.0, 0.0, 0.0), -90.0)) * xf;
+  /* Account for the environment-texture frame; no world-axis conversion is needed for Y-up. */
+  xf = pxr::GfMatrix4d().SetRotate(pxr::GfRotation(pxr::GfVec3d(0.0, 0.0, 1.0), -90.0)) * xf;
 
   pxr::GfVec3d angles = xf.DecomposeRotation(
       pxr::GfVec3d::XAxis(), pxr::GfVec3d::YAxis(), pxr::GfVec3d::ZAxis());

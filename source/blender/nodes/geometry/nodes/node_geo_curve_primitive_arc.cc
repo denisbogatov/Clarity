@@ -40,7 +40,7 @@ static void node_declare(NodeDeclarationBuilder &b)
                     .description("Position of the first control point")
                     .make_available(enable_points);
   auto &middle = b.add_input<decl::Vector>("Middle"_ustr)
-                     .default_value({0.0f, 2.0f, 0.0f})
+                     .default_value({0.0f, 0.0f, -2.0f})
                      .subtype(PROP_TRANSLATION)
                      .description("Position of the middle control point")
                      .make_available(enable_points);
@@ -86,7 +86,7 @@ static void node_declare(NodeDeclarationBuilder &b)
   auto &normal_out = b.add_output<decl::Vector>("Normal"_ustr)
                          .description(
                              "The normal direction of the plane described by the three points, "
-                             "pointing towards the positive Z axis")
+                             "pointing towards the positive Y axis")
                          .make_available(enable_points);
   auto &radius_out = b.add_output<decl::Float>("Radius"_ustr)
                          .description("The radius of the circle described by the three points")
@@ -256,8 +256,8 @@ static Curves *create_arc_curve_from_points(const int resolution,
     positions[centerpoint] = center;
   }
 
-  /* Ensure normal is relative to Z-up. */
-  if (math::dot(float3(0, 0, 1), normal) < 0) {
+  /* Ensure the output normal is relative to Clarity's native Y-up axis. */
+  if (math::dot(float3(0, 1, 0), normal) < 0) {
     normal = -normal;
   }
 
@@ -288,8 +288,8 @@ static Curves *create_arc_curve_from_radius(const int resolution,
   for (const int i : IndexRange(resolution)) {
     const float theta = theta_step * i + start_angle;
     const float x = radius * cos(theta);
-    const float y = radius * sin(theta);
-    positions[i] = float3(x, y, 0.0f);
+    const float z = -radius * sin(theta);
+    positions[i] = float3(x, 0.0f, z);
   }
 
   if (connect_center) {

@@ -47,6 +47,8 @@ shader node_environment_texture(
   if (use_mapping)
     p = transform(mapping, p);
 
+  /* Clarity-native Y-up to the environment projection's analytic Z-up sphere. */
+  p = vector(p[0], -p[2], p[1]);
   p = normalize(p);
 
   if (projection == "equirectangular")

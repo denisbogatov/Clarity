@@ -84,6 +84,64 @@ def _view3d_area_region(window):
     raise Exception("the 3D viewport has no window region")
 
 
+def viewcube_angled_presets_preserve_y_up_and_perspective():
+    """All Maya-style edge and corner presets remain level and perspective."""
+    import bpy
+    from mathutils import Vector
+
+    _, t, window = ui.test_window()
+    preferences = bpy.context.preferences
+    preferences.inputs.interaction_preset = 'CLARITY'
+    yield
+
+    area, region = _view3d_area_region(window)
+    region_3d = area.spaces.active.region_3d
+    view_axis_items = bpy.ops.view3d.view_axis.get_rna_type().properties["type"].enum_items
+    angled_views = [
+        item.identifier for item in view_axis_items if 100 <= item.value < 120
+    ]
+    t.assertEqual(len(angled_views), 20, "the ViewCube must expose 12 edge and 8 corner views")
+
+    direction_by_name = {
+        "LEFT": Vector((-1.0, 0.0, 0.0)),
+        "RIGHT": Vector((1.0, 0.0, 0.0)),
+        "BOTTOM": Vector((0.0, -1.0, 0.0)),
+        "TOP": Vector((0.0, 1.0, 0.0)),
+        "BACK": Vector((0.0, 0.0, -1.0)),
+        "FRONT": Vector((0.0, 0.0, 1.0)),
+    }
+    smooth_view = preferences.view.smooth_view
+    use_auto_perspective = preferences.inputs.use_auto_perspective
+    preferences.view.smooth_view = 0
+    preferences.inputs.use_auto_perspective = True
+    try:
+        with bpy.context.temp_override(window=window, area=area, region=region):
+            for view_name in angled_views:
+                expected_direction = sum(
+                    (direction_by_name[name] for name in view_name.split("_")),
+                    Vector((0.0, 0.0, 0.0)),
+                ).normalized()
+                expected_up = (
+                    Vector((0.0, 1.0, 0.0))
+                    - expected_direction * expected_direction.y
+                ).normalized()
+
+                # Reproduce the failure sequence: face views leave the viewport orthographic.
+                region_3d.view_perspective = 'ORTHO'
+                t.assertEqual(bpy.ops.view3d.view_axis(type=view_name), {'FINISHED'})
+
+                camera_rotation = region_3d.view_rotation.inverted()
+                actual_direction = camera_rotation @ Vector((0.0, 0.0, 1.0))
+                actual_up = camera_rotation @ Vector((0.0, 1.0, 0.0))
+                t.assertEqual(region_3d.view_perspective, 'PERSP', view_name)
+                t.assertGreater(actual_direction.dot(expected_direction), 0.9999, view_name)
+                t.assertGreater(actual_up.dot(expected_up), 0.9999, view_name)
+    finally:
+        preferences.view.smooth_view = smooth_view
+        preferences.inputs.use_auto_perspective = use_auto_perspective
+    yield
+
+
 def _visible_edge_picks(object, region, region_3d):
     """
     The cube edges that face the viewer, best first, each with the alignment its click should

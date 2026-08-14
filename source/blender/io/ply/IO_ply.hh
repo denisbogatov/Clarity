@@ -39,8 +39,8 @@ struct PLYExportParams {
   bool ascii_format = false;
 
   /* Geometry Transform options. */
-  eIOAxis forward_axis = IO_AXIS_Y;
-  eIOAxis up_axis = IO_AXIS_Z;
+  eIOAxis forward_axis = IO_AXIS_Z;
+  eIOAxis up_axis = IO_AXIS_Y;
   float global_scale = 1.0f;
 
   /* File Write Options. */
@@ -59,8 +59,8 @@ struct PLYExportParams {
 struct PLYImportParams {
   /** Full path to the source PLY file to import. */
   char filepath[FILE_MAX] = "";
-  eIOAxis forward_axis = IO_AXIS_Y;
-  eIOAxis up_axis = IO_AXIS_Z;
+  eIOAxis forward_axis = IO_AXIS_Z;
+  eIOAxis up_axis = IO_AXIS_Y;
   bool use_scene_unit = false;
   float global_scale = 1.0f;
   ePLYVertexColorMode vertex_colors = ePLYVertexColorMode::sRGB;

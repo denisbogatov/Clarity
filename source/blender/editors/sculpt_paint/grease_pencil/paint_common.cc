@@ -253,7 +253,7 @@ DeltaProjectionFunc get_screen_projection_fn(const GreasePencilStrokeParams &par
       break;
     }
     case GP_LOCKAXIS_CURSOR: {
-      world_normal = params.scene.cursor.matrix<float3x3>().z_axis();
+      world_normal = params.scene.cursor.matrix<float3x3>().y_axis();
       break;
     }
     default: {

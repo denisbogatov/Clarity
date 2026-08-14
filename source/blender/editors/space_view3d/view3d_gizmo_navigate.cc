@@ -45,8 +45,11 @@ namespace blender {
 /* Margin around the smaller buttons. */
 #define GIZMO_MINI_OFFSET 2.0f
 
-/* Must match the diagonal enum range in view3d_navigate_view_axis.cc. */
+/* Must match the custom view enum ranges in view3d_navigate_view_axis.cc. */
 static constexpr int VIEW3D_VIEW_DIAGONAL_BASE = 100;
+static constexpr int VIEW3D_VIEW_DIAGONAL_COUNT = 12;
+static constexpr int VIEW3D_VIEW_CORNER_BASE =
+    VIEW3D_VIEW_DIAGONAL_BASE + VIEW3D_VIEW_DIAGONAL_COUNT;
 
 namespace {
 
@@ -246,13 +249,14 @@ static void WIDGETGROUP_navigate_setup(const bContext *C, wmGizmoGroup *gzgroup)
   {
     wmGizmo *gz = navgroup->gz_array[GZ_INDEX_ROTATE];
     gz->scale_basis = GIZMO_SIZE / 2.0f;
+    /* View-cube geometry parts are -X, +X, -Y, +Y, -Z, +Z. */
     const char mapping[6] = {
         RV3D_VIEW_LEFT,
         RV3D_VIEW_RIGHT,
-        RV3D_VIEW_FRONT,
-        RV3D_VIEW_BACK,
         RV3D_VIEW_BOTTOM,
         RV3D_VIEW_TOP,
+        RV3D_VIEW_BACK,
+        RV3D_VIEW_FRONT,
     };
 
     for (int part_index = 0; part_index < 6; part_index += 1) {
@@ -260,9 +264,17 @@ static void WIDGETGROUP_navigate_setup(const bContext *C, wmGizmoGroup *gzgroup)
       RNA_enum_set(ptr, "type", mapping[part_index]);
     }
 
+    /* Map the physical XY, XZ and YZ bevel order to semantic Y-up diagonal views. */
+    const int bevel_mapping[12] = {4, 5, 6, 7, 1, 0, 3, 2, 10, 8, 11, 9};
     for (int bevel_index = 0; bevel_index < 12; bevel_index++) {
       PointerRNA *ptr = WM_gizmo_operator_set(gz, bevel_index + 7, ot_view_axis, nullptr);
-      RNA_enum_set(ptr, "type", VIEW3D_VIEW_DIAGONAL_BASE + bevel_index);
+      RNA_enum_set(ptr, "type", VIEW3D_VIEW_DIAGONAL_BASE + bevel_mapping[bevel_index]);
+    }
+
+    /* Corner geometry order is -/+X, -/+Y, -/+Z, matching the corner enum order. */
+    for (int corner_index = 0; corner_index < 8; corner_index++) {
+      PointerRNA *ptr = WM_gizmo_operator_set(gz, corner_index + 19, ot_view_axis, nullptr);
+      RNA_enum_set(ptr, "type", VIEW3D_VIEW_CORNER_BASE + corner_index);
     }
 
     /* When dragging an axis, use this instead. */

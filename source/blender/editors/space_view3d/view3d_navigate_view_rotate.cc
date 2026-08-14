@@ -11,6 +11,7 @@
 #include "BLI_math_matrix.h"
 #include "BLI_math_rotation.h"
 #include "BLI_math_vector.h"
+#include "BLI_math_world.hh"
 
 #include "WM_api.hh"
 
@@ -204,10 +205,10 @@ static void viewrotate_apply(ViewOpsData *vod, const int event_xy[2])
     viewrotate_apply_dyn_ofs(vod, vod->curr.viewquat);
   }
   else {
-    float quat_local_x[4], quat_global_z[4];
+    float quat_local_x[4], quat_global_up[4];
     float m[3][3];
     float m_inv[3][3];
-    const float zvec_global[3] = {0.0f, 0.0f, 1.0f};
+    const float3 upvec_global = math::world::up;
     float xaxis[3];
 
     /* Radians per-pixel. */
@@ -230,7 +231,7 @@ static void viewrotate_apply(ViewOpsData *vod, const int event_xy[2])
      * which would be disorienting.
      *
      * This works by blending two horizons:
-     * - Rotated-horizon: `cross_v3_v3v3(xaxis, zvec_global, m_inv[2])`
+     * - Rotated-horizon: `cross_v3_v3v3(xaxis, upvec_global, m_inv[2])`
      *   When only this is used, this turntable rotation works - but it's side-ways
      *   (as if the entire turn-table has been placed on its side)
      *   While there is no gimbal lock, it's also awkward to use.
@@ -241,16 +242,16 @@ static void viewrotate_apply(ViewOpsData *vod, const int event_xy[2])
      * so the severity of the gimbal lock is used to blend the rotated horizon.
      * Blending isn't essential, it just makes the transition smoother.
      *
-     * This allows sideways turn-table rotation on a Z axis that isn't world-space Z,
+     * This allows sideways turn-table rotation on an up axis that isn't world-space Y,
      * While up-down turntable rotation eventually corrects gimbal lock. */
 #if 1
-    if (len_squared_v3v3(zvec_global, m_inv[2]) > 0.001f) {
+    if (len_squared_v3v3(upvec_global, m_inv[2]) > 0.001f) {
       float fac;
-      cross_v3_v3v3(xaxis, zvec_global, m_inv[2]);
+      cross_v3_v3v3(xaxis, upvec_global, m_inv[2]);
       if (dot_v3v3(xaxis, m_inv[0]) < 0) {
         negate_v3(xaxis);
       }
-      fac = angle_normalized_v3v3(zvec_global, m_inv[2]) / float(M_PI);
+      fac = angle_normalized_v3v3(upvec_global, m_inv[2]) / float(M_PI);
       fac = fabsf(fac - 0.5f) * 2;
       fac = fac * fac;
       interp_v3_v3v3(xaxis, xaxis, m_inv[0], fac);
@@ -271,8 +272,8 @@ static void viewrotate_apply(ViewOpsData *vod, const int event_xy[2])
 
     /* Perform the orbital rotation */
     axis_angle_to_quat_single(
-        quat_global_z, 'Z', sensitivity * vod->reverse * (event_xy[0] - vod->prev.event_xy[0]));
-    mul_qt_qtqt(vod->curr.viewquat, quat_local_x, quat_global_z);
+        quat_global_up, 'Y', sensitivity * vod->reverse * (event_xy[0] - vod->prev.event_xy[0]));
+    mul_qt_qtqt(vod->curr.viewquat, quat_local_x, quat_global_up);
 
     viewrotate_apply_dyn_ofs(vod, vod->curr.viewquat);
   }

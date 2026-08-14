@@ -85,9 +85,8 @@ class PrimitiveCreator:
 
     @classmethod
     def zup2yup(cls, array):
-        # x,y,z -> x,z,-y
-        array[:, [1, 2]] = array[:, [2, 1]]  # x,z,y
-        array[:, 2] *= -1  # x,z,-y
+        # Clarity mesh data is already in glTF's Y-up basis.
+        return
 
     def prepare_data(self):
         self.blender_object = None
@@ -1546,7 +1545,7 @@ class PrimitiveCreator:
             if flipped:
                 self.signs *= -1
 
-        # No change for Zup -> Yup
+        # Clarity and glTF already share Y-up handedness.
 
     def __get_bone_data(self):
 

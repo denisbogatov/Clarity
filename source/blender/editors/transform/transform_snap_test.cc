@@ -127,6 +127,38 @@ TEST(transform_snap_clarity_plan, NothingSnapsWithoutAClarityMode)
   EXPECT_EQ(plan.increment, 0.0f);
 }
 
+TEST(transform_snap_clarity_plan, LiveSurfaceAutomaticallyOwnsTranslation)
+{
+  ClaritySnapPlanInput input = clarity_translate_input(clarity::ClaritySnapMode::None);
+  input.live_surface_active = true;
+
+  ClaritySnapPlan plan = transform_snap_clarity_plan_get(input);
+  EXPECT_TRUE(plan.use_snap);
+  EXPECT_TRUE(plan.live_surface);
+  EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_FACE);
+  EXPECT_TRUE(plan.source_is_center);
+
+  input.live_surface_snap_mode = clarity::ClarityLiveSurfaceSnapMode::FaceCenter;
+  plan = transform_snap_clarity_plan_get(input);
+  EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_FACE_MIDPOINT);
+
+  input.live_surface_snap_mode = clarity::ClarityLiveSurfaceSnapMode::Vertex;
+  plan = transform_snap_clarity_plan_get(input);
+  EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_VERTEX);
+}
+
+TEST(transform_snap_clarity_plan, CurveSnapFallsBackToLiveSurface)
+{
+  ClaritySnapPlanInput input = clarity_translate_input(clarity::ClaritySnapMode::Curve);
+  input.live_surface_active = true;
+  const ClaritySnapPlan plan = transform_snap_clarity_plan_get(input);
+
+  EXPECT_EQ(plan.snap_to, SCE_SNAP_TO_EDGE);
+  EXPECT_TRUE(plan.curve_targets_only);
+  EXPECT_FALSE(plan.live_surface);
+  EXPECT_TRUE(plan.live_surface_fallback);
+}
+
 /** The Move Tool marking menu holds components on the edges they were moved along. */
 TEST(transform_snap_clarity_plan, EdgeConstraintKeepsComponentsOnEdges)
 {

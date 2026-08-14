@@ -666,7 +666,7 @@ BoundBox Camera::viewplane_bounds_get()
           extend);
 
       bounds.grow(
-          make_float3(cameratoworld.z.w, cameratoworld.y.w + half_eye_distance, cameratoworld.z.w),
+          make_float3(cameratoworld.x.w, cameratoworld.y.w, cameratoworld.z.w + half_eye_distance),
           extend);
 
       bounds.grow(
@@ -674,7 +674,7 @@ BoundBox Camera::viewplane_bounds_get()
           extend);
 
       bounds.grow(
-          make_float3(cameratoworld.x.w, cameratoworld.y.w - half_eye_distance, cameratoworld.z.w),
+          make_float3(cameratoworld.x.w, cameratoworld.y.w, cameratoworld.z.w - half_eye_distance),
           extend);
     }
   }

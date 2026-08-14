@@ -699,7 +699,7 @@ void WM_OT_usd_export(wmOperatorType *ot)
   prop = RNA_def_enum(ot->srna,
                       "export_global_forward_selection",
                       io_transform_axis,
-                      IO_AXIS_NEGATIVE_Z,
+                      IO_AXIS_Z,
                       "Forward Axis",
                       "");
   RNA_def_property_update_runtime(prop, forward_axis_update);

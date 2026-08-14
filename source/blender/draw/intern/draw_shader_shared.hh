@@ -441,6 +441,8 @@ enum [[host_shared]] eObjectInfoFlag : uint32_t {
   /* Implies all objects that match the current active object's mode and able to be edited
    * simultaneously. Currently only applicable for edit mode. */
   OBJECT_ACTIVE_EDIT_MODE = (1u << 6u),
+  /** Object belongs to the active Maya-compatible Make Live set. */
+  OBJECT_CLARITY_LIVE_SURFACE = (1u << 7u),
   /* Avoid skipped info to change culling. */
   OBJECT_NO_INFO = ~OBJECT_HOLDOUT
 };

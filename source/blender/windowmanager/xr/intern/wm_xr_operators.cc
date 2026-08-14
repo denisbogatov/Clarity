@@ -213,20 +213,20 @@ static void wm_xr_grab_update(wmOperator *op, const wmXrActionData *actiondata)
   }
 }
 
-static void orient_mat_z_normalized(float R[4][4], const float z_axis[3])
+static void orient_mat_y_normalized(float R[4][4], const float y_axis[3])
 {
   const float scale = len_v3(R[0]);
-  float x_axis[3], y_axis[3];
+  float x_axis[3], z_axis[3];
 
-  cross_v3_v3v3(y_axis, z_axis, R[0]);
-  normalize_v3(y_axis);
-  mul_v3_v3fl(R[1], y_axis, scale);
+  cross_v3_v3v3(z_axis, R[0], y_axis);
+  normalize_v3(z_axis);
+  mul_v3_v3fl(R[2], z_axis, scale);
 
-  cross_v3_v3v3(x_axis, R[1], z_axis);
+  cross_v3_v3v3(x_axis, y_axis, R[2]);
   normalize_v3(x_axis);
   mul_v3_v3fl(R[0], x_axis, scale);
 
-  mul_v3_v3fl(R[2], z_axis, scale);
+  mul_v3_v3fl(R[1], y_axis, scale);
 }
 
 static void wm_xr_navlocks_apply(const float nav_mat[4][4],
@@ -244,16 +244,17 @@ static void wm_xr_navlocks_apply(const float nav_mat[4][4],
   mul_m4_m4m4(curr_base, nav_inv, r_curr);
 
   if (rotz_lock) {
-    const float z_axis[3] = {0.0f, 0.0f, 1.0f};
-    orient_mat_z_normalized(prev_base, z_axis);
-    orient_mat_z_normalized(curr_base, z_axis);
+    const float y_axis[3] = {0.0f, 1.0f, 0.0f};
+    orient_mat_y_normalized(prev_base, y_axis);
+    orient_mat_y_normalized(curr_base, y_axis);
   }
 
   if (loc_lock) {
     copy_v3_v3(curr_base[3], prev_base[3]);
   }
   else if (locz_lock) {
-    curr_base[3][2] = prev_base[3][2];
+    /* The RNA property keeps its legacy name for API compatibility; it locks elevation. */
+    curr_base[3][1] = prev_base[3][1];
   }
 
   mul_m4_m4m4(r_prev, nav_mat, prev_base);
@@ -693,10 +694,10 @@ static void wm_xr_fly_compute_move(eXrFlyMode mode,
   switch (mode) {
     /* Navigation space reference. */
     case XR_FLY_FORWARD:
-      madd_v3_v3fl(r_delta[3], ref_axes[1], speed);
+      madd_v3_v3fl(r_delta[3], ref_axes[2], speed);
       return;
     case XR_FLY_BACK:
-      madd_v3_v3fl(r_delta[3], ref_axes[1], -speed);
+      madd_v3_v3fl(r_delta[3], ref_axes[2], -speed);
       return;
     case XR_FLY_LEFT:
       madd_v3_v3fl(r_delta[3], ref_axes[0], -speed);
@@ -707,7 +708,7 @@ static void wm_xr_fly_compute_move(eXrFlyMode mode,
     case XR_FLY_UP:
     case XR_FLY_DOWN:
       if (!locz_lock) {
-        madd_v3_v3fl(r_delta[3], ref_axes[2], (mode == XR_FLY_UP) ? speed : -speed);
+        madd_v3_v3fl(r_delta[3], ref_axes[1], (mode == XR_FLY_UP) ? speed : -speed);
       }
       return;
     /* Viewer/controller space reference. */
@@ -733,10 +734,10 @@ static void wm_xr_fly_compute_move(eXrFlyMode mode,
 
   if (locz_lock) {
     /* Lock elevation in navigation space. */
-    float z_axis[3], projected[3];
+    float up_axis[3], projected[3];
 
-    normalize_v3_v3(z_axis, nav_mat[2]);
-    project_v3_v3v3_normalized(projected, r_delta[3], z_axis);
+    normalize_v3_v3(up_axis, nav_mat[1]);
+    project_v3_v3v3_normalized(projected, r_delta[3], up_axis);
     sub_v3_v3(r_delta[3], projected);
 
     normalize_v3(r_delta[3]);
@@ -754,11 +755,11 @@ static void wm_xr_fly_compute_turn(eXrFlyMode mode,
 {
   BLI_assert(ELEM(mode, XR_FLY_TURNLEFT, XR_FLY_TURNRIGHT));
 
-  float z_axis[3], m[3][3], prev[4][4], curr[4][4];
+  float up_axis[3], m[3][3], prev[4][4], curr[4][4];
 
-  /* Turn around Z-axis in navigation space. */
-  normalize_v3_v3(z_axis, nav_mat[2]);
-  axis_angle_normalized_to_mat3(m, z_axis, (mode == XR_FLY_TURNLEFT) ? speed : -speed);
+  /* Turn around the native Y-up axis in navigation space. */
+  normalize_v3_v3(up_axis, nav_mat[1]);
+  axis_angle_normalized_to_mat3(m, up_axis, (mode == XR_FLY_TURNLEFT) ? speed : -speed);
   copy_m4_m3(r_delta, m);
 
   copy_m4_m4(prev, viewer_mat);
@@ -775,11 +776,16 @@ static void wm_xr_basenav_rotation_calc(const wmXrData *xr,
                                         const float nav_rotation[4],
                                         float r_rotation[4])
 {
-  /* Apply nav rotation to base pose Z-rotation. */
-  float base_eul[3], base_quatz[4];
-  quat_to_eul(base_eul, xr->runtime->session_state.prev_base_pose.orientation_quat);
-  axis_angle_to_quat_single(base_quatz, 'Z', base_eul[2]);
-  mul_qt_qtqt(r_rotation, nav_rotation, base_quatz);
+  /* Apply navigation rotation to the base pose's Y-up heading. */
+  float base_forward[3] = {0.0f, 0.0f, -1.0f};
+  float base_quaty[4];
+  mul_qt_v3(xr->runtime->session_state.prev_base_pose.orientation_quat, base_forward);
+  base_forward[1] = 0.0f;
+  const float heading = normalize_v3(base_forward) != 0.0f ?
+                            atan2f(-base_forward[0], -base_forward[2]) :
+                            0.0f;
+  axis_angle_to_quat_single(base_quaty, 'Y', heading);
+  mul_qt_qtqt(r_rotation, nav_rotation, base_quaty);
 }
 
 static wmOperatorStatus wm_xr_navigation_fly_invoke(bContext *C,
@@ -1414,7 +1420,7 @@ static void wm_xr_navigation_teleport_generate_arc(wmOperator *op, XrTeleportDat
     const float t = i * time_step;
 
     const float3 velocity_offset = direction * (velocity * t);
-    const float3 gravity_offset = float3(0, 0, -0.5f * gravity * t * t);
+    const float3 gravity_offset = float3(0, -0.5f * gravity * t * t, 0);
 
     const float3 offset = (velocity_offset + gravity_offset) * data->teleportation_scale;
 
@@ -1425,7 +1431,7 @@ static void wm_xr_navigation_teleport_generate_arc(wmOperator *op, XrTeleportDat
 static bool wm_xr_navigation_teleport_is_wall_hit(float3 &hit_normal)
 {
   /* Check if the hit surface is a wall. */
-  const float3 up_vector = {0.0f, 0.0f, 1.0f};
+  const float3 up_vector = {0.0f, 1.0f, 0.0f};
   const float min_ground_dot = M_SQRT3 / 2.0f; /* Cosine of 30 degrees. */
 
   if (math::dot(hit_normal, up_vector) < min_ground_dot) {
@@ -1437,18 +1443,18 @@ static bool wm_xr_navigation_teleport_is_wall_hit(float3 &hit_normal)
 
 static bool wm_xr_navigation_teleport_arc_clip_to_ground(Array<float3> &points, int &end_point_idx)
 {
-  /* Truncate the arc to the ground plane (Z=0). */
+  /* Truncate the arc to Clarity's native ground plane (Y=0). */
   for (int i = 1; i < g_xr_teleportation_arc_num_control_points; ++i) {
     const float3 &startpoint = points[i - 1];
     const float3 &endpoint = points[i];
 
     /* Iterate until we find the point where we cross the ground plane downward. */
-    if (!(startpoint.z > 0 && endpoint.z < 0)) {
+    if (!(startpoint.y > 0 && endpoint.y < 0)) {
       continue;
     }
 
     /* Adjust the last point to intersect with the ground plane. */
-    const float alpha = math::safe_divide(startpoint.z, (startpoint.z - endpoint.z));
+    const float alpha = math::safe_divide(startpoint.y, (startpoint.y - endpoint.y));
     points[i] = math::interpolate(startpoint, endpoint, alpha);
 
     /* Terminate the arc at the adjusted point. */
@@ -1537,7 +1543,7 @@ static float3 wm_xr_navigation_teleport_get_nav_destination(const wmXrData *xr,
   const float view_height_offset = xr_head_height * viewer_scale;
 
   const float3 ray_destination = data->arc_points[data->endpoint_idx];
-  const float3 view_destination = ray_destination + float3(0.0f, 0.0f, view_height_offset);
+  const float3 view_destination = ray_destination + float3(0.0f, view_height_offset, 0.0f);
 
   float3 nav_location, viewer_location;
   WM_xr_session_state_nav_location_get(xr, nav_location);
@@ -1813,7 +1819,7 @@ static wmOperatorStatus wm_xr_navigation_reset_exec(bContext *C, wmOperator *op)
 
       /* Reset elevation to base pose value. */
       quat_to_mat3(nav_axes, nav_rotation);
-      project_v3_v3v3_normalized(v, nav_location, nav_axes[2]);
+      project_v3_v3v3_normalized(v, nav_location, nav_axes[1]);
       sub_v3_v3(nav_location, v);
 
       WM_xr_session_state_nav_location_set(xr, nav_location);

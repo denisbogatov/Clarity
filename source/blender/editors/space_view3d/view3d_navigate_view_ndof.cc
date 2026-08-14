@@ -177,7 +177,7 @@ static void view3d_ndof_pan_zoom(const wmNDOFMotionData &ndof,
       float zvec[3] = {0, 0, 1};
       mul_qt_v3(view_inv, zvec);
 
-      if (std::abs(zvec[2]) > (1.0f - eps_yz_swap)) {
+      if (std::abs(zvec[1]) > (1.0f - eps_yz_swap)) {
         std::swap(pan_vec.z, pan_vec.y);
         pan_vec.y *= -1.0f;
         mul_qt_v3(view_inv, pan_vec);
@@ -188,16 +188,16 @@ static void view3d_ndof_pan_zoom(const wmNDOFMotionData &ndof,
         const float pan_vec_y_prev = pan_vec.y;
         pan_vec.y = 0.0f;
 
-        /* Calculate the `pan_vec` in view space, and set Z to an absolute value afterwards. */
+        /* Calculate in view space, then set world Y to an absolute value. */
         mul_qt_v3(view_inv, pan_vec);
-        pan_vec.z = pan_vec_y_prev;
+        pan_vec.y = pan_vec_y_prev;
 
-        /* If the view is turned upside down, then invert the pan Z value. */
+        /* If the view is turned upside down, then invert the vertical pan value. */
         float yvec[3] = {0, 1, 0};
         mul_qt_v3(view_inv, yvec);
 
-        if (yvec[2] < 0.0f) {
-          pan_vec.z *= -1.0f;
+        if (yvec[1] < 0.0f) {
+          pan_vec.y *= -1.0f;
         }
       }
     }
@@ -233,15 +233,15 @@ static float view3d_ndof_calc_leveling_angle(const float view_x_axis[3],
                                              const float view_z_axis[3])
 {
   /* Check if view is already leveled. */
-  const bool view_not_leveled = std::abs(view_x_axis[2]) > 0.001f;
+  const bool view_not_leveled = std::abs(view_x_axis[1]) > 0.001f;
 
   if (view_not_leveled) {
 
     float isect_vec[3] = {0, 0, 0};
     float isect_pt[3] = {0, 0, 0};
 
-    /* Find the intersection vector between horizon (XY) plane and view plane. */
-    const float horizon_normal[3] = {0, 0, 1};
+    /* Find the intersection vector between the horizon (XZ) and view planes. */
+    const float horizon_normal[3] = {0, 1, 0};
     if (!isect_plane_plane_v3(horizon_normal, view_z_axis, isect_pt, isect_vec)) {
       /* NOTE: this is highly unlikely to fail as `view_not_leveled`
        * is expected to rule out the possibility of intersection failing. */
@@ -254,20 +254,20 @@ static float view3d_ndof_calc_leveling_angle(const float view_x_axis[3],
     normalize_v3(isect_vec);
 
     /* Invert the direction of intersection vector if view is oriented upside down. */
-    if (view_y_axis[2] < 0.0f) {
+    if (view_y_axis[1] < 0.0f) {
       negate_v3(isect_vec);
     }
 
     /* Determine the angle to rotate the view over it's Y axis,
-     * to make view's X axis lie on the horizon plane (world XY). */
+     * to make view's X axis lie on the horizon plane (world XZ). */
     const float cosine = dot_v3v3(view_x_axis, isect_vec);
     float x_to_horizon_angle = acos(cosine);
 
     /* Invert the leveling rotation direction if the view is tilted clockwise
      * with Y axis pointing up, or it is tilted counter-clockwise
      * with Y axis pointing down. */
-    if (((view_x_axis[2] < 0.0f) && (view_y_axis[2] > 0.0f)) ||
-        ((view_x_axis[2] > 0.0f) && (view_y_axis[2] < 0.0f)))
+    if (((view_x_axis[1] < 0.0f) && (view_y_axis[1] > 0.0f)) ||
+        ((view_x_axis[1] > 0.0f) && (view_y_axis[1] < 0.0f)))
     {
       x_to_horizon_angle *= -1.0f;
     }
@@ -327,21 +327,21 @@ static void view3d_ndof_orbit(const wmNDOFMotionData &ndof,
     axis_angle_to_quat(quat, xvec, angle);
     mul_qt_qtqt(rv3d->viewquat, rv3d->viewquat, quat);
 
-    /* Perform the Z rotation. */
+    /* Perform the world-up rotation. */
     angle = ndof.time_delta * rot[1];
 
     /* Flip the turntable angle when the view is upside down. */
-    if (yvec[2] < 0.0f) {
+    if (yvec[1] < 0.0f) {
       angle *= -1.0f;
     }
 
     /* Update the onscreen axis-angle indicator. */
     rv3d->ndof_rot_angle = angle;
     rv3d->ndof_rot_axis[0] = 0;
-    rv3d->ndof_rot_axis[1] = 0;
-    rv3d->ndof_rot_axis[2] = 1;
+    rv3d->ndof_rot_axis[1] = 1;
+    rv3d->ndof_rot_axis[2] = 0;
 
-    axis_angle_to_quat_single(quat, 'Z', angle);
+    axis_angle_to_quat_single(quat, 'Y', angle);
     mul_qt_qtqt(rv3d->viewquat, rv3d->viewquat, quat);
   }
   else {
@@ -417,8 +417,8 @@ void view3d_ndof_fly(const wmNDOFMotionData &ndof,
     mul_qt_v3(view_inv, trans);
 
     if (U.ndof_flag & NDOF_FLY_HELICOPTER) {
-      /* replace world z component with device y (yes it makes sense) */
-      trans[2] = trans_orig_y;
+      /* Replace world Y (up) with device Y. */
+      trans[1] = trans_orig_y;
     }
 
     if (rv3d->persp == RV3D_CAMOB) {
@@ -479,8 +479,8 @@ void view3d_ndof_fly(const wmNDOFMotionData &ndof,
         mul_qt_v3(view_inv, view_direction);
 
         /* find difference between view & world horizons
-         * true horizon lives in world xy plane, so look only at difference in z */
-        angle = -asinf(view_horizon[2]);
+         * true horizon lives in world XZ, so look only at the difference in Y */
+        angle = -asinf(view_horizon[1]);
 
         /* rotate view so view horizon = world horizon */
         axis_angle_to_quat(rotation, view_direction, angle);

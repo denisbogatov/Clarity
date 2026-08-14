@@ -119,7 +119,7 @@ void fly_modal_keymap(wmKeyConfig *keyconf)
       {FLY_MODAL_DECELERATE, "DECELERATE", 0, "Decelerate", ""},
 
       {FLY_MODAL_AXIS_LOCK_X, "AXIS_LOCK_X", 0, "X Axis Correction", "X axis correction (toggle)"},
-      {FLY_MODAL_AXIS_LOCK_Z, "AXIS_LOCK_Z", 0, "Z Axis Correction", "Z axis correction (toggle)"},
+      {FLY_MODAL_AXIS_LOCK_Z, "AXIS_LOCK_Z", 0, "Y Axis Correction", "Y-up axis correction (toggle)"},
 
       {FLY_MODAL_PRECISION_ENABLE, "PRECISION_ENABLE", 0, "Precision", ""},
       {FLY_MODAL_PRECISION_DISABLE, "PRECISION_DISABLE", 0, "Precision (Off)", ""},
@@ -382,11 +382,11 @@ static bool initFlyInfo(bContext *C, FlyInfo *fly, wmOperator *op, const wmEvent
 
   fly->rv3d->rflag |= RV3D_NAVIGATING;
 
-  /* Detect whether to start with Z locking. */
+  /* Detect whether to start with world-up locking. */
   copy_v3_fl3(upvec, 1.0f, 0.0f, 0.0f);
   copy_m3_m4(mat, fly->rv3d->viewinv);
   mul_m3_v3(mat, upvec);
-  if (fabsf(upvec[2]) < 0.1f) {
+  if (fabsf(upvec[1]) < 0.1f) {
     fly->zlock = FLY_AXISLOCK_STATE_IDLE;
   }
 
@@ -881,7 +881,7 @@ static int flyApply(bContext *C, FlyInfo *fly, bool is_confirm)
       mul_v3_fl(dvec_tmp, time_redraw * 200.0f * fly->grid);
     }
     else {
-      /* Similar to the angle between the camera's up and the Z-up,
+      /* Similar to the angle between the camera's up and world Y-up,
        * but its very rough so just roll. */
       float roll;
 
@@ -911,13 +911,13 @@ static int flyApply(bContext *C, FlyInfo *fly, bool is_confirm)
         copy_v3_fl3(upvec, 0.0f, 1.0f, 0.0f);
         mul_m3_v3(mat, upvec);
 
-        if (upvec[2] < 0.0f) {
+        if (upvec[1] < 0.0f) {
           moffset[0] = -moffset[0];
         }
 
         /* Make the lock vectors. */
         if (fly->zlock) {
-          copy_v3_fl3(upvec, 0.0f, 0.0f, 1.0f);
+          copy_v3_fl3(upvec, 0.0f, 1.0f, 0.0f);
         }
         else {
           copy_v3_fl3(upvec, 0.0f, 1.0f, 0.0f);
@@ -942,9 +942,9 @@ static int flyApply(bContext *C, FlyInfo *fly, bool is_confirm)
         copy_v3_fl3(upvec, 1.0f, 0.0f, 0.0f);
         mul_m3_v3(mat, upvec);
 
-        /* Make sure we have some Z rolling. */
-        if (fabsf(upvec[2]) > 0.00001f) {
-          roll = upvec[2] * 5.0f;
+        /* Measure roll against world Y-up. */
+        if (fabsf(upvec[1]) > 0.00001f) {
+          roll = upvec[1] * 5.0f;
           /* Rotate the view about this axis. */
           copy_v3_fl3(upvec, 0.0f, 0.0f, 1.0f);
           mul_m3_v3(mat, upvec);
@@ -970,9 +970,9 @@ static int flyApply(bContext *C, FlyInfo *fly, bool is_confirm)
         float upvec[3];
         copy_v3_fl3(upvec, 0.0f, 0.0f, 1.0f);
         mul_m3_v3(mat, upvec);
-        /* Make sure we have some Z rolling. */
-        if (fabsf(upvec[2]) > 0.00001f) {
-          roll = upvec[2] * -5.0f;
+        /* Measure the view direction against world Y-up. */
+        if (fabsf(upvec[1]) > 0.00001f) {
+          roll = upvec[1] * -5.0f;
           /* Rotate the view about this axis. */
           copy_v3_fl3(upvec, 1.0f, 0.0f, 0.0f);
           mul_m3_v3(mat, upvec);

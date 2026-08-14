@@ -158,7 +158,7 @@ struct USDExportParams {
   int ngon_method = MOD_TRIANGULATE_NGON_BEAUTY;
 
   bool convert_orientation = false;
-  enum eIOAxis forward_axis = eIOAxis::IO_AXIS_NEGATIVE_Z;
+  enum eIOAxis forward_axis = eIOAxis::IO_AXIS_Z;
   enum eIOAxis up_axis = eIOAxis::IO_AXIS_Y;
   XformOpMode xform_op_mode = XformOpMode::TRS;
 

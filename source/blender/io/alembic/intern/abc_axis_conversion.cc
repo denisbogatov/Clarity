@@ -25,26 +25,10 @@ void create_swapped_rotation_matrix(float rot_x_mat[3][3],
                                     const float euler[3],
                                     AbcAxisSwapMode mode)
 {
+  BLI_assert(mode == ABC_ZUP_FROM_YUP || mode == ABC_YUP_FROM_ZUP);
   const float rx = euler[0];
-  float ry;
-  float rz;
-
-  /* Apply transformation */
-  switch (mode) {
-    case ABC_ZUP_FROM_YUP:
-      ry = -euler[2];
-      rz = euler[1];
-      break;
-    case ABC_YUP_FROM_ZUP:
-      ry = euler[2];
-      rz = -euler[1];
-      break;
-    default:
-      ry = 0.0f;
-      rz = 0.0f;
-      BLI_assert(false);
-      break;
-  }
+  const float ry = euler[1];
+  const float rz = euler[2];
 
   unit_m3(rot_x_mat);
   unit_m3(rot_y_mat);
@@ -64,69 +48,12 @@ void create_swapped_rotation_matrix(float rot_x_mat[3][3],
   rot_z_mat[1][0] = -sin(rz);
   rot_z_mat[0][1] = sin(rz);
   rot_z_mat[1][1] = cos(rz);
-}  // namespace
-   // alembicvoidcreate_swapped_rotation_matrix(floatrot_x_mat[3][3],floatrot_y_mat[3][3],floatrot_z_mat[3][3],constfloateuler[3],AbcAxisSwapModemode)
+}
 
 void copy_m44_axis_swap(float dst_mat[4][4], float src_mat[4][4], AbcAxisSwapMode mode)
 {
-  float dst_rot[3][3], src_rot[3][3], dst_scale_mat[4][4];
-  float rot_x_mat[3][3], rot_y_mat[3][3], rot_z_mat[3][3];
-  float src_trans[3], dst_scale[3], src_scale[3], euler[3];
-
-  zero_v3(src_trans);
-  zero_v3(dst_scale);
-  zero_v3(src_scale);
-  zero_v3(euler);
-  unit_m3(src_rot);
-  unit_m3(dst_rot);
-  unit_m4(dst_scale_mat);
-
-  /* TODO(Sybren): This code assumes there is no sheer component and no
-   * homogeneous scaling component, which is not always true when writing
-   * non-hierarchical (e.g. flat) objects (e.g. when parent has non-uniform
-   * scale and the child rotates). This is currently not taken into account
-   * when axis-swapping. */
-
-  /* Extract translation, rotation, and scale form matrix. */
-  mat4_to_loc_rot_size(src_trans, src_rot, src_scale, src_mat);
-
-  /* Get euler angles from rotation matrix. */
-  mat3_to_eulO(euler, ROT_MODE_XZY, src_rot);
-
-  /* Create X, Y, Z rotation matrices from euler angles. */
-  create_swapped_rotation_matrix(rot_x_mat, rot_y_mat, rot_z_mat, euler, mode);
-
-  /* Concatenate rotation matrices. */
-  mul_m3_m3m3(dst_rot, dst_rot, rot_z_mat);
-  mul_m3_m3m3(dst_rot, dst_rot, rot_y_mat);
-  mul_m3_m3m3(dst_rot, dst_rot, rot_x_mat);
-
-  mat3_to_eulO(euler, ROT_MODE_XZY, dst_rot);
-
-  /* Start construction of dst_mat from rotation matrix */
-  unit_m4(dst_mat);
-  copy_m4_m3(dst_mat, dst_rot);
-
-  /* Apply translation */
-  switch (mode) {
-    case ABC_ZUP_FROM_YUP:
-      copy_zup_from_yup(dst_mat[3], src_trans);
-      break;
-    case ABC_YUP_FROM_ZUP:
-      copy_yup_from_zup(dst_mat[3], src_trans);
-      break;
-    default:
-      BLI_assert(false);
-  }
-
-  /* Apply scale matrix. Swaps y and z, but does not
-   * negate like translation does. */
-  dst_scale[0] = src_scale[0];
-  dst_scale[1] = src_scale[2];
-  dst_scale[2] = src_scale[1];
-
-  size_to_mat4(dst_scale_mat, dst_scale);
-  mul_m4_m4m4(dst_mat, dst_mat, dst_scale_mat);
+  BLI_assert(mode == ABC_ZUP_FROM_YUP || mode == ABC_YUP_FROM_ZUP);
+  copy_m4_m4(dst_mat, src_mat);
 }
 
 void create_transform_matrix(Object *obj,
@@ -134,7 +61,7 @@ void create_transform_matrix(Object *obj,
                              AbcMatrixMode mode,
                              Object *proxy_from)
 {
-  float zup_mat[4][4];
+  float internal_mat[4][4];
 
   /* get local or world matrix. */
   if (mode == ABC_MATRIX_LOCAL && obj->parent) {
@@ -142,17 +69,18 @@ void create_transform_matrix(Object *obj,
      * constraints and modifiers as well as the obj->parentinv matrix. */
     invert_m4_m4(obj->parent->runtime->world_to_object.ptr(),
                  obj->parent->object_to_world().ptr());
-    mul_m4_m4m4(zup_mat, obj->parent->world_to_object().ptr(), obj->object_to_world().ptr());
+    mul_m4_m4m4(
+        internal_mat, obj->parent->world_to_object().ptr(), obj->object_to_world().ptr());
   }
   else {
-    copy_m4_m4(zup_mat, obj->object_to_world().ptr());
+    copy_m4_m4(internal_mat, obj->object_to_world().ptr());
   }
 
   if (proxy_from) {
-    mul_m4_m4m4(zup_mat, proxy_from->object_to_world().ptr(), zup_mat);
+    mul_m4_m4m4(internal_mat, proxy_from->object_to_world().ptr(), internal_mat);
   }
 
-  copy_m44_axis_swap(r_yup_mat, zup_mat, ABC_YUP_FROM_ZUP);
+  copy_m4_m4(r_yup_mat, internal_mat);
 }
 
 }  // namespace blender::io::alembic

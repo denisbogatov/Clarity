@@ -87,8 +87,8 @@ void USDTransformWriter::do_write(HierarchyContext &context)
     if (usd_export_context_.export_params.convert_orientation) {
       float3x3 mrot;
       float4x4 mat = float4x4::identity();
-      mat3_from_axis_conversion(IO_AXIS_Y,
-                                IO_AXIS_Z,
+      mat3_from_axis_conversion(IO_AXIS_Z,
+                                IO_AXIS_Y,
                                 usd_export_context_.export_params.forward_axis,
                                 usd_export_context_.export_params.up_axis,
                                 mrot.ptr());

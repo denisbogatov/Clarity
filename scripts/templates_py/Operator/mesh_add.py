@@ -35,7 +35,7 @@ def add_box(width, height, depth):
 
     # Apply size.
     for i, v in enumerate(verts):
-        verts[i] = v[0] * width, v[1] * depth, v[2] * height
+        verts[i] = v[0] * width, v[1] * height, v[2] * depth
 
     return verts, faces
 

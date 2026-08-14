@@ -1126,7 +1126,7 @@ static void mesh_tessface_calc(Mesh &mesh)
         co_prev = co_curr;
       }
       if (UNLIKELY(normalize_v3(normal) == 0.0f)) {
-        normal[2] = 1.0f;
+        normal[1] = 1.0f;
       }
 
       /* Project verts to 2D. */

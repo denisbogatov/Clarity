@@ -1260,14 +1260,14 @@ static void vectomat(const float vec[3],
 
   /* n specifies the transformation of the track axis */
   if (flags & TARGET_Z_UP) {
-    /* target Z axis is the global up axis */
+    /* Use the target's requested up vector. The legacy flag name is serialized. */
     copy_v3_v3(u, target_up);
   }
   else {
-    /* world Z axis is the global up axis */
+    /* World Y is Clarity's global up axis. */
     u[0] = 0;
-    u[1] = 0;
-    u[2] = 1;
+    u[1] = 1;
+    u[2] = 0;
   }
 
   /* NOTE: even though 'n' is normalized, don't use 'project_v3_v3v3_normalized' below
@@ -1480,8 +1480,8 @@ static void followpath_new_data(void *cdata)
 {
   bFollowPathConstraint *data = static_cast<bFollowPathConstraint *>(cdata);
 
-  data->trackflag = TRACK_Y;
-  data->upflag = UP_Z;
+  data->trackflag = TRACK_Z;
+  data->upflag = UP_Y;
   data->offset = 0;
   data->followflag = eFollowPath_Flags{};
 }
@@ -3026,8 +3026,8 @@ static void locktrack_new_data(void *cdata)
 {
   bLockTrackConstraint *data = static_cast<bLockTrackConstraint *>(cdata);
 
-  data->trackflag = TRACK_Y;
-  data->lockflag = LOCK_Z;
+  data->trackflag = TRACK_Z;
+  data->lockflag = LOCK_Y;
 }
 
 static void locktrack_id_looper(bConstraint *con, ConstraintIDFunc func, void *userdata)
@@ -3705,7 +3705,7 @@ static void minmax_new_data(void *cdata)
 {
   bMinMaxConstraint *data = static_cast<bMinMaxConstraint *>(cdata);
 
-  data->minmaxflag = TRACK_Z;
+  data->minmaxflag = TRACK_Y;
   data->offset = 0.0f;
   data->flag = eFloor_Flags{};
 }
@@ -4245,7 +4245,7 @@ static void shrinkwrap_new_data(void *cdata)
 {
   bShrinkwrapConstraint *data = static_cast<bShrinkwrapConstraint *>(cdata);
 
-  data->projAxis = OB_POSZ;
+  data->projAxis = OB_POSY;
   data->projAxisSpace = CONSTRAINT_SPACE_LOCAL;
 }
 
@@ -4478,7 +4478,7 @@ static void damptrack_new_data(void *cdata)
 {
   bDampTrackConstraint *data = static_cast<bDampTrackConstraint *>(cdata);
 
-  data->trackflag = TRACK_Y;
+  data->trackflag = TRACK_Z;
 }
 
 static void damptrack_id_looper(bConstraint *con, ConstraintIDFunc func, void *userdata)

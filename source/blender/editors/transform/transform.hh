@@ -31,7 +31,7 @@ struct Depsgraph;
  * \{ */
 
 #define T_ALL_RESTRICTIONS (T_NO_CONSTRAINT | T_NULL_ONE)
-#define T_PROP_EDIT_ALL (T_PROP_EDIT | T_PROP_CONNECTED | T_PROP_PROJECTED)
+#define T_PROP_EDIT_ALL (T_PROP_EDIT | T_PROP_CONNECTED | T_PROP_PROJECTED | T_PROP_GLOBAL)
 
 /* Hard min/max for proportional size. */
 #define T_PROP_SIZE_MIN 1e-6f
@@ -195,6 +195,12 @@ enum eTFlag {
 
   /** Transform origin. */
   T_ORIGIN = 1 << 27,
+
+  /** Maya Global soft selection may include mesh containers with no explicit selection. */
+  T_PROP_GLOBAL = 1 << 28,
+
+  /** Clarity Soft Selection owns the interaction; proportional editing is only its backend. */
+  T_SOFT_SELECTION = 1 << 29,
 };
 ENUM_OPERATORS(eTFlag);
 
@@ -553,6 +559,10 @@ struct TransSnap {
   bool clarity_curve_targets_only;
   /** Include object transform pivots as discrete Clarity Point Snap targets. */
   bool clarity_include_object_pivots;
+  /** Restrict target geometry to Maya-compatible live surfaces. */
+  bool clarity_live_surface;
+  /** Query live surfaces after an explicit Curve Snap query misses. */
+  bool clarity_live_surface_fallback;
   /** Constrain translation to the view plane captured when the mode became active. */
   bool clarity_view_plane;
   float clarity_view_plane_normal[3];
@@ -764,6 +774,14 @@ struct TransDataContainer {
     /* For easy checking. */
     char use_mirror_axis_any;
   };
+  /** Clarity symmetry additions. Standard Blender mirror editing leaves these at local-space
+   * defaults, so its behavior is unchanged. */
+  bool use_mirror_world;
+  bool use_mirror_topology;
+  bool use_mirror_preserve_seam;
+  bool use_mirror_allow_partial;
+  float mirror_tolerance;
+  float mirror_seam_tolerance;
 
   TransCustomDataContainer custom;
 

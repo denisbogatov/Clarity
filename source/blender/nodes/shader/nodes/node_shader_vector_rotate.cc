@@ -36,7 +36,7 @@ static void sh_node_vector_rotate_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Vector>("Axis"_ustr)
       .min(-1.0f)
       .max(1.0f)
-      .default_value({0.0f, 0.0f, 1.0f})
+      .default_value({0.0f, 1.0f, 0.0f})
       .make_available([](bNode &node) { node.custom1 = NODE_VECTOR_ROTATE_TYPE_AXIS; })
       .description("Axis to rotate around");
   b.add_input<decl::Float>("Angle"_ustr)

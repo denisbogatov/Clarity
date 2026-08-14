@@ -13,7 +13,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_array.hh"
-#include "BLI_linklist_stack.h"
+#include "BLI_kdtree.hh"
 #include "BLI_math_geom.h"
 #include "BLI_math_matrix.h"
 #include "BLI_math_rotation.h"
@@ -27,6 +27,7 @@
 #include "BKE_mesh.hh"
 #include "BKE_modifier.hh"
 #include "BKE_scene.hh"
+#include "BKE_soft_selection.hh"
 
 #include "ED_mesh.hh"
 #include "ED_object.hh"
@@ -929,247 +930,12 @@ void transform_convert_mesh_islanddata_free(TransIslandData *island_data)
 /** \name Connectivity Distance for Proportional Editing
  * \{ */
 
-/* Propagate distance from v1 and v2 to v0. */
-static bool bmesh_test_dist_add(BMVert *v0,
-                                BMVert *v1,
-                                BMVert *v2,
-                                float *dists, /* Optionally track original index. */
-                                int *index,
-                                const float mtx[3][3])
-{
-  if ((BM_elem_flag_test(v0, BM_ELEM_SELECT) == 0) && (BM_elem_flag_test(v0, BM_ELEM_HIDDEN) == 0))
-  {
-    const int i0 = BM_elem_index_get(v0);
-    const int i1 = BM_elem_index_get(v1);
-
-    BLI_assert(dists[i1] != FLT_MAX);
-    if (dists[i0] <= dists[i1]) {
-      return false;
-    }
-
-    float dist0;
-
-    if (v2) {
-      /* Distance across triangle. */
-      const int i2 = BM_elem_index_get(v2);
-      BLI_assert(dists[i2] != FLT_MAX);
-      if (dists[i0] <= dists[i2]) {
-        return false;
-      }
-
-      float vm0[3], vm1[3], vm2[3];
-      mul_v3_m3v3(vm0, mtx, v0->co);
-      mul_v3_m3v3(vm1, mtx, v1->co);
-      mul_v3_m3v3(vm2, mtx, v2->co);
-
-      dist0 = geodesic_distance_propagate_across_triangle(vm0, vm1, vm2, dists[i1], dists[i2]);
-    }
-    else {
-      /* Distance along edge. */
-      float vec[3];
-      sub_v3_v3v3(vec, v1->co, v0->co);
-      mul_m3_v3(mtx, vec);
-
-      dist0 = dists[i1] + len_v3(vec);
-    }
-
-    if (dist0 < dists[i0]) {
-      dists[i0] = dist0;
-      if (index != nullptr) {
-        index[i0] = index[i1];
-      }
-      return true;
-    }
-  }
-
-  return false;
-}
-
-static bool bmesh_test_loose_edge(BMEdge *edge)
-{
-  /* Actual loose edge. */
-  if (edge->l == nullptr) {
-    return true;
-  }
-
-  /* Loose edge due to hidden adjacent faces. */
-  BMIter iter;
-  BMFace *face;
-  BM_ITER_ELEM (face, &iter, edge, BM_FACES_OF_EDGE) {
-    if (BM_elem_flag_test(face, BM_ELEM_HIDDEN) == 0) {
-      return false;
-    }
-  }
-  return true;
-}
-
 void transform_convert_mesh_connectivity_distance(BMesh *bm,
                                                   const float mtx[3][3],
                                                   float *dists,
                                                   int *index)
 {
-  BLI_LINKSTACK_DECLARE(queue, BMEdge *);
-
-  /* Any BM_ELEM_TAG'd edge is in 'queue_next', so we don't add in twice. */
-  const int tag_queued = BM_ELEM_TAG;
-  const int tag_loose = BM_ELEM_TAG_ALT;
-
-  BLI_LINKSTACK_DECLARE(queue_next, BMEdge *);
-
-  BLI_LINKSTACK_INIT(queue);
-  BLI_LINKSTACK_INIT(queue_next);
-
-  {
-    /* Set indexes and initial distances for selected vertices. */
-    BMIter viter;
-    BMVert *v;
-    int i;
-
-    BM_ITER_MESH_INDEX (v, &viter, bm, BM_VERTS_OF_MESH, i) {
-      float dist;
-      BM_elem_index_set(v, i); /* set_inline */
-
-      if (BM_elem_flag_test(v, BM_ELEM_SELECT) == 0 || BM_elem_flag_test(v, BM_ELEM_HIDDEN)) {
-        dist = FLT_MAX;
-        if (index != nullptr) {
-          index[i] = i;
-        }
-      }
-      else {
-        dist = 0.0f;
-        if (index != nullptr) {
-          index[i] = i;
-        }
-      }
-
-      dists[i] = dist;
-    }
-    bm->elem_index_dirty &= ~BM_VERT;
-  }
-
-  {
-    /* Add edges with at least one selected vertex to the queue. */
-    BMIter eiter;
-    BMEdge *e;
-
-    BM_ITER_MESH (e, &eiter, bm, BM_EDGES_OF_MESH) {
-
-      /* Always clear to satisfy the assert, also predictable to leave in cleared state. */
-      BM_elem_flag_disable(e, tag_queued);
-
-      if (BM_elem_flag_test(e, BM_ELEM_HIDDEN)) {
-        continue;
-      }
-
-      BMVert *v1 = e->v1;
-      BMVert *v2 = e->v2;
-      int i1 = BM_elem_index_get(v1);
-      int i2 = BM_elem_index_get(v2);
-
-      if (dists[i1] != FLT_MAX || dists[i2] != FLT_MAX) {
-        BLI_LINKSTACK_PUSH(queue, e);
-      }
-      BM_elem_flag_set(e, tag_loose, bmesh_test_loose_edge(e));
-    }
-  }
-
-  do {
-    BMEdge *e;
-
-    while ((e = BLI_LINKSTACK_POP(queue))) {
-      BMVert *v1 = e->v1;
-      BMVert *v2 = e->v2;
-      int i1 = BM_elem_index_get(v1);
-      int i2 = BM_elem_index_get(v2);
-
-      if (BM_elem_flag_test(e, tag_loose) || (dists[i1] == FLT_MAX || dists[i2] == FLT_MAX)) {
-        /* Propagate along edge from vertex with smallest to largest distance. */
-        if (dists[i1] > dists[i2]) {
-          std::swap(i1, i2);
-          std::swap(v1, v2);
-        }
-
-        if (bmesh_test_dist_add(v2, v1, nullptr, dists, index, mtx)) {
-          /* Add adjacent edges to the queue if:
-           * - Adjacent edge is loose
-           * - Edge itself is loose
-           * - Edge has vertex that was originally selected
-           * In all these cases a direct distance along the edge is accurate and
-           * required to make sure we visit all edges.
-           *
-           * Additionally re-add edges whose other vertex already has a known
-           * distance, so that propagation across their adjacent faces can happen
-           * now that this vertex distance is known too. Other edges are handled
-           * by propagation across edges below. */
-          const bool need_direct_distance = BM_elem_flag_test(e, tag_loose) ||
-                                            BM_elem_flag_test(v1, BM_ELEM_SELECT) ||
-                                            BM_elem_flag_test(v2, BM_ELEM_SELECT);
-          BMEdge *e_other;
-          BMIter eiter;
-          BM_ITER_ELEM (e_other, &eiter, v2, BM_EDGES_OF_VERT) {
-            if (e_other != e && BM_elem_flag_test(e_other, tag_queued) == 0 &&
-                !BM_elem_flag_test(e_other, BM_ELEM_HIDDEN) &&
-                (need_direct_distance || BM_elem_flag_test(e_other, tag_loose) ||
-                 dists[BM_elem_index_get(BM_edge_other_vert(e_other, v2))] != FLT_MAX))
-            {
-              BM_elem_flag_enable(e_other, tag_queued);
-              BLI_LINKSTACK_PUSH(queue_next, e_other);
-            }
-          }
-        }
-      }
-
-      if (!BM_elem_flag_test(e, tag_loose)) {
-        /* Propagate across edge to vertices in adjacent faces. */
-        BMLoop *l;
-        BMIter liter;
-        BM_ITER_ELEM (l, &liter, e, BM_LOOPS_OF_EDGE) {
-          if (BM_elem_flag_test(l->f, BM_ELEM_HIDDEN)) {
-            continue;
-          }
-          /* Don't check hidden edges or vertices in this loop
-           * since any hidden edge causes the face to be hidden too. */
-          for (BMLoop *l_other = l->next->next; l_other != l; l_other = l_other->next) {
-            BMVert *v_other = l_other->v;
-            BLI_assert(!ELEM(v_other, v1, v2));
-
-            if (bmesh_test_dist_add(v_other, v1, v2, dists, index, mtx)) {
-              /* Add adjacent edges to the queue, if they are ready to propagate across/along.
-               * Always propagate along loose edges, and for other edges only propagate across
-               * if both vertices have a known distances. */
-              BMEdge *e_other;
-              BMIter eiter;
-              BM_ITER_ELEM (e_other, &eiter, v_other, BM_EDGES_OF_VERT) {
-                if (e_other != e && BM_elem_flag_test(e_other, tag_queued) == 0 &&
-                    !BM_elem_flag_test(e_other, BM_ELEM_HIDDEN) &&
-                    (BM_elem_flag_test(e_other, tag_loose) ||
-                     dists[BM_elem_index_get(BM_edge_other_vert(e_other, v_other))] != FLT_MAX))
-                {
-                  BM_elem_flag_enable(e_other, tag_queued);
-                  BLI_LINKSTACK_PUSH(queue_next, e_other);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    /* Clear for the next loop. */
-    for (LinkNode *lnk = queue_next; lnk; lnk = lnk->next) {
-      BMEdge *e_link = static_cast<BMEdge *>(lnk->link);
-
-      BM_elem_flag_disable(e_link, tag_queued);
-    }
-
-    BLI_LINKSTACK_SWAP(queue, queue_next);
-
-    /* None should be tagged now since 'queue_next' is empty. */
-    BLI_assert(BM_iter_mesh_count_flag(BM_EDGES_OF_MESH, bm, tag_queued, true) == 0);
-  } while (BLI_LINKSTACK_SIZE(queue));
-
-  BLI_LINKSTACK_FREE(queue);
-  BLI_LINKSTACK_FREE(queue_next);
+  bke::soft_selection_mesh_surface_distances(bm, mtx, dists, index);
 }
 
 /** \} */
@@ -1177,9 +943,6 @@ void transform_convert_mesh_connectivity_distance(BMesh *bm,
 /* -------------------------------------------------------------------- */
 /** \name TransDataMirror Creation
  * \{ */
-
-/* Used for both mirror epsilon and TD_MIRROR_EDGE_ */
-#define TRANSFORM_MAXDIST_MIRROR 0.00002f
 
 static bool is_in_quadrant_v3(const float co[3], const int quadrant[3], const float epsilon)
 {
@@ -1195,9 +958,67 @@ static bool is_in_quadrant_v3(const float co[3], const int quadrant[3], const fl
   return true;
 }
 
+static void mesh_mirror_world_indices_calc(BMEditMesh *em,
+                                           const float object_to_world[4][4],
+                                           const int axis,
+                                           const bool selected_only,
+                                           const float tolerance,
+                                           int *r_index)
+{
+  BMesh *bm = em->bm;
+  if (bm->totvert == 0) {
+    return;
+  }
+  KDTree<float3> *tree = kdtree_new<float3>(bm->totvert);
+  BMIter iter;
+  BMVert *vert;
+  int index;
+
+  BM_ITER_MESH_INDEX (vert, &iter, bm, BM_VERTS_OF_MESH, index) {
+    r_index[index] = -1;
+    if (BM_elem_flag_test(vert, BM_ELEM_HIDDEN)) {
+      continue;
+    }
+    float world[3];
+    copy_v3_v3(world, vert->co);
+    mul_m4_v3(object_to_world, world);
+    kdtree_insert<float3>(tree, index, world);
+  }
+  kdtree_balance<float3>(tree);
+
+  const float tolerance_squared = square_f(std::max(tolerance, 1e-7f));
+  BM_ITER_MESH_INDEX (vert, &iter, bm, BM_VERTS_OF_MESH, index) {
+    if (BM_elem_flag_test(vert, BM_ELEM_HIDDEN) ||
+        (selected_only && !BM_elem_flag_test(vert, BM_ELEM_SELECT)))
+    {
+      continue;
+    }
+    float reflected_world[3];
+    copy_v3_v3(reflected_world, vert->co);
+    mul_m4_v3(object_to_world, reflected_world);
+    reflected_world[axis] *= -1.0f;
+    const int mirror_index = kdtree_find_nearest<float3>(tree, reflected_world, nullptr);
+    if (mirror_index == -1 || mirror_index == index) {
+      continue;
+    }
+    BMVert *mirror = BM_vert_at_index(bm, mirror_index);
+    float mirror_world[3];
+    copy_v3_v3(mirror_world, mirror->co);
+    mul_m4_v3(object_to_world, mirror_world);
+    if (len_squared_v3v3(reflected_world, mirror_world) <= tolerance_squared) {
+      r_index[index] = mirror_index;
+    }
+  }
+  kdtree_free<float3>(tree);
+}
+
 void transform_convert_mesh_mirrordata_calc(BMEditMesh *em,
                                             const bool use_select,
                                             const bool use_topology,
+                                            const bool allow_partial,
+                                            const bool use_world,
+                                            const float object_to_world[4][4],
+                                            const float tolerance,
                                             const bool mirror_axis[3],
                                             TransMirrorData *r_mirror_data)
 {
@@ -1217,7 +1038,12 @@ void transform_convert_mesh_mirrordata_calc(BMEditMesh *em,
       continue;
     }
     if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
-      add_v3_v3(select_sum, eve->co);
+      float co[3];
+      copy_v3_v3(co, eve->co);
+      if (use_world) {
+        mul_m4_v3(object_to_world, co);
+      }
+      add_v3_v3(select_sum, co);
     }
   }
 
@@ -1235,15 +1061,36 @@ void transform_convert_mesh_mirrordata_calc(BMEditMesh *em,
   uint mirror_elem_len = 0;
   int *index[3] = {nullptr, nullptr, nullptr};
   bool is_single_mirror_axis = (mirror_axis[0] + mirror_axis[1] + mirror_axis[2]) == 1;
-  bool test_selected_only = use_select && is_single_mirror_axis;
+  bool test_selected_only = use_select && is_single_mirror_axis &&
+                            !(use_topology && !allow_partial);
   for (int a = 0; a < 3; a++) {
     if (!mirror_axis[a]) {
       continue;
     }
 
     index[a] = MEM_new_array_uninitialized<int>(totvert, __func__);
-    EDBM_verts_mirror_cache_begin_ex(
-        em, a, false, test_selected_only, true, use_topology, TRANSFORM_MAXDIST_MIRROR, index[a]);
+    std::fill_n(index[a], totvert, -1);
+    if (use_world) {
+      mesh_mirror_world_indices_calc(
+          em, object_to_world, a, test_selected_only, tolerance, index[a]);
+    }
+    else {
+      EDBM_verts_mirror_cache_begin_ex(
+          em, a, false, test_selected_only, true, use_topology, tolerance, index[a]);
+    }
+
+    if (use_topology && !allow_partial) {
+      bool complete = true;
+      BM_ITER_MESH_INDEX (eve, &iter, bm, BM_VERTS_OF_MESH, i) {
+        if (!BM_elem_flag_test(eve, BM_ELEM_HIDDEN) && index[a][i] < 0) {
+          complete = false;
+          break;
+        }
+      }
+      if (!complete) {
+        std::fill_n(index[a], totvert, -1);
+      }
+    }
 
     flag = TD_MIRROR_X << a;
     BM_ITER_MESH_INDEX (eve, &iter, bm, BM_VERTS_OF_MESH, i) {
@@ -1257,7 +1104,12 @@ void transform_convert_mesh_mirrordata_calc(BMEditMesh *em,
       if (use_select && !BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
         continue;
       }
-      if (!is_in_quadrant_v3(eve->co, quadrant, TRANSFORM_MAXDIST_MIRROR)) {
+      float co[3];
+      copy_v3_v3(co, eve->co);
+      if (use_world) {
+        mul_m4_v3(object_to_world, co);
+      }
+      if (!is_in_quadrant_v3(co, quadrant, tolerance)) {
         continue;
       }
       if (vert_map[i_mirr].flag != 0) {
@@ -1510,9 +1362,9 @@ static void createTransEditVerts(bContext * /*C*/, TransInfo *t)
      * transform data is created by selected vertices.
      */
 
-    /* Support other objects using proportional editing to adjust these, unless connected is
-     * enabled. */
-    if ((!prop_mode || (prop_mode & T_PROP_CONNECTED)) && (bm->totvertsel == 0)) {
+    /* Maya Volume and Surface are confined to objects containing an explicit component selection.
+     * Only Global admits every mesh in the current multi-object Edit Mode. */
+    if ((!prop_mode || !(prop_mode & T_PROP_GLOBAL)) && (bm->totvertsel == 0)) {
       continue;
     }
 
@@ -1579,12 +1431,18 @@ static void createTransEditVerts(bContext * /*C*/, TransInfo *t)
 
     /* Create TransDataMirror. */
     if (tc->use_mirror_axis_any) {
-      bool use_topology = (mesh->editflag & ME_EDIT_MIRROR_TOPO) != 0;
       bool use_select = (t->flag & T_PROP_EDIT) == 0;
       const bool mirror_axis[3] = {
           bool(tc->use_mirror_axis_x), bool(tc->use_mirror_axis_y), bool(tc->use_mirror_axis_z)};
-      transform_convert_mesh_mirrordata_calc(
-          em, use_select, use_topology, mirror_axis, &mirror_data);
+      transform_convert_mesh_mirrordata_calc(em,
+                                             use_select,
+                                             tc->use_mirror_topology,
+                                             tc->use_mirror_allow_partial,
+                                             tc->use_mirror_world,
+                                             tc->mat,
+                                             tc->mirror_tolerance,
+                                             mirror_axis,
+                                             &mirror_data);
 
       if (mirror_data.vert_map) {
         tc->data_mirror_len = mirror_data.mirror_elem_len;
@@ -1679,14 +1537,19 @@ static void createTransEditVerts(bContext * /*C*/, TransInfo *t)
                 nullptr,
             tob);
 
-        if (tc->use_mirror_axis_any) {
-          if (tc->use_mirror_axis_x && fabsf(tob->loc[0]) < TRANSFORM_MAXDIST_MIRROR) {
+        if (tc->use_mirror_axis_any && tc->use_mirror_preserve_seam) {
+          float symmetry_co[3];
+          copy_v3_v3(symmetry_co, tob->loc);
+          if (tc->use_mirror_world) {
+            mul_m4_v3(tc->mat, symmetry_co);
+          }
+          if (tc->use_mirror_axis_x && fabsf(symmetry_co[0]) <= tc->mirror_seam_tolerance) {
             tob->flag |= TD_MIRROR_EDGE_X;
           }
-          if (tc->use_mirror_axis_y && fabsf(tob->loc[1]) < TRANSFORM_MAXDIST_MIRROR) {
+          if (tc->use_mirror_axis_y && fabsf(symmetry_co[1]) <= tc->mirror_seam_tolerance) {
             tob->flag |= TD_MIRROR_EDGE_Y;
           }
-          if (tc->use_mirror_axis_z && fabsf(tob->loc[2]) < TRANSFORM_MAXDIST_MIRROR) {
+          if (tc->use_mirror_axis_z && fabsf(symmetry_co[2]) <= tc->mirror_seam_tolerance) {
             tob->flag |= TD_MIRROR_EDGE_Z;
           }
         }
@@ -2034,29 +1897,65 @@ static void mesh_transdata_mirror_apply(TransDataContainer *tc)
     TransData *td;
     for (i = 0, td = tc->data; i < tc->data_len; i++, td++) {
       if (td->flag & (TD_MIRROR_EDGE_X | TD_MIRROR_EDGE_Y | TD_MIRROR_EDGE_Z)) {
-        if (td->flag & TD_MIRROR_EDGE_X) {
-          td->loc[0] = 0.0f;
+        if (tc->use_mirror_world) {
+          float world[3];
+          copy_v3_v3(world, td->loc);
+          mul_m4_v3(tc->mat, world);
+          if (td->flag & TD_MIRROR_EDGE_X) {
+            world[0] = 0.0f;
+          }
+          if (td->flag & TD_MIRROR_EDGE_Y) {
+            world[1] = 0.0f;
+          }
+          if (td->flag & TD_MIRROR_EDGE_Z) {
+            world[2] = 0.0f;
+          }
+          mul_m4_v3(tc->imat, world);
+          copy_v3_v3(td->loc, world);
         }
-        if (td->flag & TD_MIRROR_EDGE_Y) {
-          td->loc[1] = 0.0f;
-        }
-        if (td->flag & TD_MIRROR_EDGE_Z) {
-          td->loc[2] = 0.0f;
+        else {
+          if (td->flag & TD_MIRROR_EDGE_X) {
+            td->loc[0] = 0.0f;
+          }
+          if (td->flag & TD_MIRROR_EDGE_Y) {
+            td->loc[1] = 0.0f;
+          }
+          if (td->flag & TD_MIRROR_EDGE_Z) {
+            td->loc[2] = 0.0f;
+          }
         }
       }
     }
 
     TransDataMirror *td_mirror = tc->data_mirror;
     for (i = 0; i < tc->data_mirror_len; i++, td_mirror++) {
-      copy_v3_v3(td_mirror->loc, td_mirror->loc_src);
-      if (td_mirror->flag & TD_MIRROR_X) {
-        td_mirror->loc[0] *= -1;
+      if (tc->use_mirror_world) {
+        float world[3];
+        copy_v3_v3(world, td_mirror->loc_src);
+        mul_m4_v3(tc->mat, world);
+        if (td_mirror->flag & TD_MIRROR_X) {
+          world[0] *= -1.0f;
+        }
+        if (td_mirror->flag & TD_MIRROR_Y) {
+          world[1] *= -1.0f;
+        }
+        if (td_mirror->flag & TD_MIRROR_Z) {
+          world[2] *= -1.0f;
+        }
+        mul_m4_v3(tc->imat, world);
+        copy_v3_v3(td_mirror->loc, world);
       }
-      if (td_mirror->flag & TD_MIRROR_Y) {
-        td_mirror->loc[1] *= -1;
-      }
-      if (td_mirror->flag & TD_MIRROR_Z) {
-        td_mirror->loc[2] *= -1;
+      else {
+        copy_v3_v3(td_mirror->loc, td_mirror->loc_src);
+        if (td_mirror->flag & TD_MIRROR_X) {
+          td_mirror->loc[0] *= -1;
+        }
+        if (td_mirror->flag & TD_MIRROR_Y) {
+          td_mirror->loc[1] *= -1;
+        }
+        if (td_mirror->flag & TD_MIRROR_Z) {
+          td_mirror->loc[2] *= -1;
+        }
       }
     }
   }

@@ -615,6 +615,9 @@ int BKE_object_scenes_users_get(Main *bmain, Object *ob);
 MovieClip *BKE_object_movieclip_get(Scene *scene, const Object *ob, bool use_default);
 
 void BKE_object_runtime_reset(Object *object);
+/** Runtime presentation mirror for Maya-compatible Make Live. */
+bool BKE_object_clarity_live_surface_get(const Object *object);
+void BKE_object_clarity_live_surface_set(Object *object, bool is_live);
 /**
  * Reset all pointers which we don't want to be shared when copying the object.
  */

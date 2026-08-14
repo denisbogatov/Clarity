@@ -133,7 +133,7 @@ static Mesh *create_circle_mesh(const float radius,
   const float angle_delta = 2.0f * (M_PI / float(verts_num));
   for (const int i : IndexRange(verts_num)) {
     const float angle = i * angle_delta;
-    positions[i] = float3(std::cos(angle) * radius, std::sin(angle) * radius, 0.0f);
+    positions[i] = float3(std::cos(angle) * radius, 0.0f, -std::sin(angle) * radius);
   }
   if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
     positions.last() = float3(0);
@@ -183,7 +183,9 @@ static Mesh *create_circle_mesh(const float radius,
 
   mesh->tag_loose_verts_none();
   mesh->tag_overlapping_none();
-  mesh->bounds_set_eager(calculate_bounds_circle(radius, verts_num));
+  const Bounds<float3> legacy_bounds = calculate_bounds_circle(radius, verts_num);
+  mesh->bounds_set_eager({float3(legacy_bounds.min.x, 0.0f, -legacy_bounds.max.y),
+                          float3(legacy_bounds.max.x, 0.0f, -legacy_bounds.min.y)});
 
   return mesh;
 }

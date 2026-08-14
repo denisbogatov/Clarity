@@ -19,6 +19,8 @@
 
 #include "node_util.hh"  // IWYU pragma: export
 
+struct Mesh;
+
 namespace blender {
 
 namespace bke {
@@ -43,6 +45,13 @@ void geo_cmp_node_type_base(bke::bNodeType *ntype,
                             std::optional<int16_t> legacy_type = std::nullopt);
 
 namespace nodes {
+
+/**
+ * Rotate geometry produced by legacy Z-up primitive generators into Clarity's native Y-up world
+ * basis. Keep this conversion at the generator boundary; arbitrary user vectors and local math
+ * must stay coordinate-independent.
+ */
+void transform_legacy_z_up_mesh(Mesh &mesh);
 
 bool check_tool_context_and_error(GeoNodeExecParams &params);
 void search_link_ops_for_tool_node(GatherLinkSearchOpParams &params);

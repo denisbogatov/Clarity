@@ -1602,11 +1602,11 @@ static void rna_def_curve(BlenderRNA *brna)
   PropertyRNA *prop;
 
   static const EnumPropertyItem curve_twist_mode_items[] = {
-      {CU_TWIST_Z_UP,
-       "Z_UP",
+      {CU_TWIST_Y_UP,
+       "Y_UP",
        0,
-       "Z-Up",
-       "Use Z-Up axis to calculate the curve twist at each point"},
+       "Y-Up",
+       "Use Y-Up axis to calculate the curve twist at each point"},
       {CU_TWIST_MINIMUM, "MINIMUM", 0, "Minimum", "Use the least twist over the entire curve"},
       {CU_TWIST_TANGENT, "TANGENT", 0, "Tangent", "Use the tangent to calculate twist"},
       {0, nullptr, 0, nullptr, nullptr},

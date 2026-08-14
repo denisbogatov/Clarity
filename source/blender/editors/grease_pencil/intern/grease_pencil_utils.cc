@@ -60,7 +60,7 @@ DrawingPlacement::DrawingPlacement(const Scene &scene,
       plane_ = DrawingPlacementPlane::View;
       break;
     case GP_LOCKAXIS_Y:
-      plane_ = DrawingPlacementPlane::Front;
+      plane_ = DrawingPlacementPlane::Top;
       placement_normal_ = float3(0, 1, 0);
       break;
     case GP_LOCKAXIS_X:
@@ -68,12 +68,12 @@ DrawingPlacement::DrawingPlacement(const Scene &scene,
       placement_normal_ = float3(1, 0, 0);
       break;
     case GP_LOCKAXIS_Z:
-      plane_ = DrawingPlacementPlane::Top;
+      plane_ = DrawingPlacementPlane::Front;
       placement_normal_ = float3(0, 0, 1);
       break;
     case GP_LOCKAXIS_CURSOR: {
       plane_ = DrawingPlacementPlane::Cursor;
-      placement_normal_ = scene.cursor.matrix<float3x3>() * float3(0, 0, 1);
+      placement_normal_ = scene.cursor.matrix<float3x3>() * float3(0, 1, 0);
       break;
     }
   }
@@ -149,7 +149,7 @@ DrawingPlacement::DrawingPlacement(const Scene &scene,
       break;
     case ReprojectMode::Front:
       plane_ = DrawingPlacementPlane::Front;
-      placement_normal_ = float3(0, 1, 0);
+      placement_normal_ = float3(0, 0, 1);
       break;
     case ReprojectMode::Side:
       plane_ = DrawingPlacementPlane::Side;
@@ -157,11 +157,11 @@ DrawingPlacement::DrawingPlacement(const Scene &scene,
       break;
     case ReprojectMode::Top:
       plane_ = DrawingPlacementPlane::Top;
-      placement_normal_ = float3(0, 0, 1);
+      placement_normal_ = float3(0, 1, 0);
       break;
     case ReprojectMode::Cursor: {
       plane_ = DrawingPlacementPlane::Cursor;
-      placement_normal_ = scene.cursor.matrix<float3x3>() * float3(0, 0, 1);
+      placement_normal_ = scene.cursor.matrix<float3x3>() * float3(0, 1, 0);
       break;
     }
     default:
@@ -1799,7 +1799,7 @@ float4x2 calculate_texture_space(const Scene *scene,
     case GP_LOCKAXIS_CURSOR: {
       const float3x3 mat = scene->cursor.matrix<float3x3>();
       u_dir = mat * float3(1.0f, 0.0f, 0.0f);
-      v_dir = mat * float3(0.0f, 1.0f, 0.0f);
+      v_dir = mat * float3(0.0f, 0.0f, 1.0f);
       origin = float3(scene->cursor.location);
       break;
     }
@@ -1837,7 +1837,7 @@ void add_single_curve(bke::greasepencil::Drawing &drawing, const bool at_end)
      * `curve_texture_matrices` are expected to have the same size as the number of curves in the
      * drawing. */
     drawing.runtime->curve_plane_normals_cache.update(
-        [&](Vector<float3> &normals) { normals.append(float3(0, 0, 1)); });
+        [&](Vector<float3> &normals) { normals.append(float3(0, 1, 0)); });
     drawing.runtime->curve_texture_matrices.update([&](Vector<float4x2> &texture_matrices) {
       texture_matrices.append(float4x2::identity());
     });

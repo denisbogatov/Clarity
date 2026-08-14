@@ -6,11 +6,16 @@
  * \ingroup edinterface
  */
 
+#include <algorithm>
+#include <cfloat>
+#include <memory>
+
 #include "BKE_colortools.hh"
 #include "BKE_context.hh"
 #include "BKE_library.hh"
 
 #include "BLI_bounds.hh"
+#include "BLI_map.hh"
 #include "BLI_math_base.h"
 #include "BLI_math_vector_types.hh"
 #include "BLI_rect.h"
@@ -18,11 +23,15 @@
 
 #include "BLT_translation.hh"
 
+#include "DNA_scene_types.h"
+
 #include "ED_screen.hh"
 #include "ED_undo.hh"
 
 #include "RNA_access.hh"
 #include "RNA_prototypes.hh"
+
+#include "WM_api.hh"
 
 #include "UI_interface_layout.hh"
 #include "interface_intern.hh"
@@ -895,6 +904,270 @@ void template_curve_mapping(Layout *layout,
       layout, &cptr, type, levels, brush, neg_slope, tone, presets, RNAUpdateCb{*ptr, prop});
 
   block_lock_clear(block);
+}
+
+namespace {
+
+struct SoftSelectionDisplayPoint {
+  SoftSelectionCurvePoint point;
+  int source_index;
+};
+
+/* Must exceed CurveMapping's 1% duplicate-removal threshold on mouse release. */
+constexpr float soft_selection_duplicate_display_epsilon = 0.012f;
+constexpr float soft_selection_duplicate_restore_epsilon = 0.02f;
+
+static std::shared_ptr<CurveMapping> soft_selection_mapping_create(
+    const SoftSelectionSettings &settings)
+{
+  std::shared_ptr<CurveMapping> mapping(
+      BKE_curvemapping_add(1, 0.0f, 0.0f, 1.0f, 1.0f), BKE_curvemapping_free);
+  mapping->flag |= CUMA_DO_CLIP;
+  mapping->flag &= ~CUMA_EXTEND_EXTRAPOLATE;
+
+  Vector<SoftSelectionDisplayPoint> points;
+  const int source_count = std::clamp(
+      settings.curve_point_count, 0, int(SOFT_SELECTION_CURVE_POINT_MAX));
+  points.reserve(std::max(source_count, 2));
+  for (int index = 0; index < source_count; index++) {
+    points.append({settings.curve_points[index], index});
+  }
+  std::stable_sort(points.begin(),
+                   points.end(),
+                   [](const SoftSelectionDisplayPoint &a, const SoftSelectionDisplayPoint &b) {
+                     return a.point.position < b.point.position;
+                   });
+
+  if (points.is_empty()) {
+    SoftSelectionCurvePoint first;
+    first.position = 0.0f;
+    first.value = 1.0f;
+    SoftSelectionCurvePoint last;
+    last.position = 1.0f;
+    last.value = 0.0f;
+    points.append({first, -1});
+    points.append({last, -1});
+  }
+  else if (points.size() == 1) {
+    SoftSelectionCurvePoint proxy = points.first().point;
+    proxy.position = (proxy.position < 0.5f) ? 1.0f : 0.0f;
+    points.append({proxy, -1});
+    std::stable_sort(points.begin(),
+                     points.end(),
+                     [](const SoftSelectionDisplayPoint &a, const SoftSelectionDisplayPoint &b) {
+                       return a.point.position < b.point.position;
+                     });
+  }
+
+  /* CurveMapping requires a strictly increasing X domain for stable endpoint handles. Maya ramps
+   * intentionally allow duplicate positions (Linear and Stairs use them), so separate duplicates
+   * by a small editor-only offset. The exact persistent positions are restored below. */
+  for (int group_start = 0; group_start < points.size();) {
+    int group_end = group_start + 1;
+    while (group_end < points.size() &&
+           points[group_end].point.position == points[group_start].point.position)
+    {
+      group_end++;
+    }
+    const int group_size = group_end - group_start;
+    if (group_size > 1) {
+      const float span = soft_selection_duplicate_display_epsilon * float(group_size - 1);
+      const float first_position = std::clamp(
+          points[group_start].point.position - span * 0.5f, 0.0f, 1.0f - span);
+      for (int index = group_start; index < group_end; index++) {
+        points[index].point.position = first_position +
+                                       soft_selection_duplicate_display_epsilon *
+                                           float(index - group_start);
+      }
+    }
+    group_start = group_end;
+  }
+
+  BKE_curvemapping_free_data_single(mapping.get(), 0);
+  CurveMap &curve = mapping->cm[0];
+  curve.totpoint = short(points.size());
+  curve.curve = MEM_new_array<CurveMapPoint>(points.size(), "soft selection curve editor");
+  curve.default_handle_type = CUMA_HANDLE_AUTO_ANIM;
+
+  for (const int index : points.index_range()) {
+    const SoftSelectionDisplayPoint &source = points[index];
+    CurveMapPoint &target = curve.curve[index];
+    target.x = std::clamp(source.point.position, 0.0f, 1.0f);
+    target.y = std::clamp(source.point.value, 0.0f, 1.0f);
+    if (ELEM(source.point.interpolation, SOFT_SELECT_INTERP_NONE, SOFT_SELECT_INTERP_LINEAR)) {
+      target.flag |= CUMA_HANDLE_VECTOR;
+    }
+    else if (source.point.interpolation == SOFT_SELECT_INTERP_SMOOTH) {
+      target.flag |= CUMA_HANDLE_AUTO_ANIM;
+    }
+    if (source.source_index == settings.active_curve_point) {
+      target.flag |= CUMA_SELECT | CUMA_ACTIVE;
+    }
+  }
+
+  BKE_curvemapping_changed(mapping.get(), false);
+  BKE_curvemapping_init(mapping.get());
+  return mapping;
+}
+
+static void soft_selection_mapping_store(const CurveMapping &mapping,
+                                         SoftSelectionSettings &settings)
+{
+  const CurveMap &curve = mapping.cm[0];
+  const int old_count = std::clamp(
+      settings.curve_point_count, 0, int(SOFT_SELECTION_CURVE_POINT_MAX));
+  const int new_count = std::clamp(
+      int(curve.totpoint), 1, int(SOFT_SELECTION_CURVE_POINT_MAX));
+  SoftSelectionCurvePoint old_points[SOFT_SELECTION_CURVE_POINT_MAX];
+  bool matched[SOFT_SELECTION_CURVE_POINT_MAX] = {};
+  for (int index = 0; index < old_count; index++) {
+    old_points[index] = settings.curve_points[index];
+  }
+
+  int active_index = 0;
+  for (int index = 0; index < new_count; index++) {
+    const CurveMapPoint &source = curve.curve[index];
+    int nearest = -1;
+    float nearest_distance = FLT_MAX;
+    for (int candidate = 0; candidate < old_count; candidate++) {
+      if (matched[candidate]) {
+        continue;
+      }
+      const float dx = source.x - old_points[candidate].position;
+      const float dy = source.y - old_points[candidate].value;
+      const float distance = dx * dx + dy * dy;
+      if (distance < nearest_distance) {
+        nearest = candidate;
+        nearest_distance = distance;
+      }
+    }
+
+    SoftSelectionCurvePoint &target = settings.curve_points[index];
+    const float editor_position = std::clamp(source.x, 0.0f, 1.0f);
+    target.position = (nearest >= 0 &&
+                       fabsf(editor_position - old_points[nearest].position) <=
+                           soft_selection_duplicate_restore_epsilon) ?
+                          old_points[nearest].position :
+                          editor_position;
+    target.value = std::clamp(source.y, 0.0f, 1.0f);
+    target.interpolation = (nearest >= 0) ? old_points[nearest].interpolation :
+                                           SOFT_SELECT_INTERP_SMOOTH;
+    if (nearest >= 0) {
+      matched[nearest] = true;
+    }
+    if (source.flag & CUMA_ACTIVE) {
+      active_index = index;
+    }
+  }
+
+  settings.curve_point_count = new_count;
+  settings.active_curve_point = std::min(active_index, new_count - 1);
+}
+
+struct SoftSelectionCurveEditorState {
+  std::shared_ptr<CurveMapping> mapping;
+  int curve_point_count = 0;
+  int active_curve_point = 0;
+  SoftSelectionCurvePoint curve_points[SOFT_SELECTION_CURVE_POINT_MAX];
+
+  void snapshot(const SoftSelectionSettings &settings)
+  {
+    curve_point_count = std::clamp(
+        settings.curve_point_count, 0, int(SOFT_SELECTION_CURVE_POINT_MAX));
+    active_curve_point = settings.active_curve_point;
+    for (int index = 0; index < curve_point_count; index++) {
+      curve_points[index] = settings.curve_points[index];
+    }
+  }
+
+  bool matches(const SoftSelectionSettings &settings) const
+  {
+    const int count = std::clamp(
+        settings.curve_point_count, 0, int(SOFT_SELECTION_CURVE_POINT_MAX));
+    if (curve_point_count != count || active_curve_point != settings.active_curve_point) {
+      return false;
+    }
+    for (int index = 0; index < count; index++) {
+      const SoftSelectionCurvePoint &a = curve_points[index];
+      const SoftSelectionCurvePoint &b = settings.curve_points[index];
+      if (a.position != b.position || a.value != b.value ||
+          a.interpolation != b.interpolation)
+      {
+        return false;
+      }
+    }
+    return true;
+  }
+};
+
+static std::shared_ptr<SoftSelectionCurveEditorState> soft_selection_editor_state_ensure(
+    SoftSelectionSettings &settings)
+{
+  /* UI blocks are rebuilt while a button is being dragged. A weak cache lets the replacement
+   * block reuse the same temporary CurveMapping without turning editor-only data into DNA. */
+  static Map<SoftSelectionSettings *, std::weak_ptr<SoftSelectionCurveEditorState>> cache;
+  cache.remove_if([](const auto item) { return item.value.expired(); });
+
+  std::shared_ptr<SoftSelectionCurveEditorState> state;
+  if (std::weak_ptr<SoftSelectionCurveEditorState> *cached = cache.lookup_ptr(&settings)) {
+    state = cached->lock();
+  }
+  if (!state) {
+    state = std::make_shared<SoftSelectionCurveEditorState>();
+    cache.add_overwrite(&settings, state);
+  }
+  if (!state->mapping || !state->matches(settings)) {
+    state->mapping = soft_selection_mapping_create(settings);
+    state->snapshot(settings);
+  }
+  return state;
+}
+
+}  // namespace
+
+void template_soft_selection_curve(Layout *layout, PointerRNA *ptr)
+{
+  if (!ptr || !ptr->data || !RNA_struct_is_a(ptr->type, RNA_SoftSelectionSettings)) {
+    RNA_warning("expected SoftSelectionSettings");
+    return;
+  }
+
+  SoftSelectionSettings *settings = ptr->data_as<SoftSelectionSettings>();
+  std::shared_ptr<SoftSelectionCurveEditorState> state = soft_selection_editor_state_ensure(
+      *settings);
+  std::shared_ptr<CurveMapping> mapping = state->mapping;
+
+  Block *block = layout->block();
+  const int width = max_ii(layout->width(), UI_UNIT_X);
+  ButtonCurveMapping *curve_button = static_cast<ButtonCurveMapping *>(
+      uiDefBut(block,
+               ButtonType::Curve,
+               IFACE_("Edit Soft Selection Falloff"),
+               0,
+               0,
+               width,
+               6.0f * UI_UNIT_X,
+               mapping.get(),
+               0.0f,
+               1.0f,
+               TIP_("Drag points to edit the Maya soft-selection falloff; click the curve to add "
+                    "a point")));
+  curve_button->gradient_type = GRAD_NONE;
+  curve_button->rnapoin = *ptr;
+  button_func_set(curve_button, [state, mapping, settings](bContext &C) {
+    soft_selection_mapping_store(*mapping, *settings);
+    if (mapping->cm[0].totpoint > SOFT_SELECTION_CURVE_POINT_MAX) {
+      /* The native curve widget can add more points than Maya's fixed 32-entry ramp. Rebuild the
+       * editor proxy from the clamped persistent data on the next block redraw. */
+      state->mapping = soft_selection_mapping_create(*settings);
+    }
+    state->snapshot(*settings);
+    WM_event_add_notifier(&C, NC_SCENE | ND_TOOLSETTINGS, nullptr);
+    ED_region_tag_redraw(CTX_wm_region(&C));
+  });
+  if (!layout->active()) {
+    button_flag_enable(curve_button, BUT_INACTIVE);
+  }
 }
 
 }  // namespace blender::ui

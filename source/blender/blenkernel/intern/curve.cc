@@ -2198,7 +2198,21 @@ static void bevel_list_smooth(BevList *bl, int smooth_iter)
   }
 }
 
-static void make_bevel_list_3D_zup(BevList *bl)
+/** Use the legacy curve-local frame while resolving its roll against native world Y-up. */
+static void vec_to_quat_y_up(float quat[4], const float direction[3], short axis, short upflag)
+{
+  const float native_from_legacy[4] = {M_SQRT1_2, -M_SQRT1_2, 0.0f, 0.0f};
+  const float legacy_from_native[4] = {M_SQRT1_2, M_SQRT1_2, 0.0f, 0.0f};
+  float legacy_direction[3];
+  float legacy_quat[4];
+
+  copy_v3_v3(legacy_direction, direction);
+  mul_qt_v3(legacy_from_native, legacy_direction);
+  vec_to_quat(legacy_quat, legacy_direction, axis, upflag);
+  mul_qt_qtqt(quat, native_from_legacy, legacy_quat);
+}
+
+static void make_bevel_list_3D_yup(BevList *bl)
 {
   BevPoint *bevp = bl->bevpoints;
   int nr = bl->nr;
@@ -2206,7 +2220,7 @@ static void make_bevel_list_3D_zup(BevList *bl)
   bevel_list_calc_bisect(bl);
 
   while (nr--) {
-    vec_to_quat(bevp->quat, bevp->dir, 5, 1);
+    vec_to_quat_y_up(bevp->quat, bevp->dir, 5, 1);
     bevp++;
   }
 }
@@ -2257,7 +2271,7 @@ static void make_bevel_list_3D_minimum_twist(BevList *bl)
 
     if (nr >= nr_init) {
       /* Initialize the rotation, otherwise propagate the previous rotation forward. */
-      vec_to_quat(bevp1->quat, bevp1->dir, 5, 1);
+      vec_to_quat_y_up(bevp1->quat, bevp1->dir, 5, 1);
     }
     else {
       minimum_twist_between_two_points(bevp1, bevp0);
@@ -2407,8 +2421,8 @@ static void make_bevel_list_3D(BevList *bl, int smooth_iter, int twist_mode)
     case CU_TWIST_MINIMUM:
       make_bevel_list_3D_minimum_twist(bl);
       break;
-    default: /* CU_TWIST_Z_UP default, pre 2.49c */
-      make_bevel_list_3D_zup(bl);
+    default: /* CU_TWIST_Y_UP */
+      make_bevel_list_3D_yup(bl);
       break;
   }
 
@@ -2431,13 +2445,13 @@ static void make_bevel_list_segment_3D(BevList *bl)
   sub_v3_v3v3(bevp1->dir, bevp1->vec, bevp2->vec);
   normalize_v3(bevp1->dir);
 
-  vec_to_quat(bevp1->quat, bevp1->dir, 5, 1);
+  vec_to_quat_y_up(bevp1->quat, bevp1->dir, 5, 1);
   axis_angle_to_quat(q, bevp1->dir, bevp1->tilt);
   mul_qt_qtqt(bevp1->quat, q, bevp1->quat);
   normalize_qt(bevp1->quat);
 
   copy_v3_v3(bevp2->dir, bevp1->dir);
-  vec_to_quat(bevp2->quat, bevp2->dir, 5, 1);
+  vec_to_quat_y_up(bevp2->quat, bevp2->dir, 5, 1);
   axis_angle_to_quat(q, bevp2->dir, bevp2->tilt);
   mul_qt_qtqt(bevp2->quat, q, bevp2->quat);
   normalize_qt(bevp2->quat);
@@ -2490,11 +2504,9 @@ static void make_bevel_list_2D(BevList *bl)
 
     calc_bevel_sin_cos(x1, y1, x2, y2, &(bevp1->sina), &(bevp1->cosa));
 
-    /* from: make_bevel_list_3D_zup, could call but avoid a second loop.
-     * no need for tricky tilt calculation as with 3D curves */
+    /* 2D curves retain their legacy local XY/Z frame; this is not a world-up choice. */
     bisect_v3_v3v3v3(bevp1->dir, bevp0->vec, bevp1->vec, bevp2->vec);
     vec_to_quat(bevp1->quat, bevp1->dir, 5, 1);
-    /* done with inline make_bevel_list_3D_zup */
 
     bevp0 = bevp1;
     bevp1 = bevp2;

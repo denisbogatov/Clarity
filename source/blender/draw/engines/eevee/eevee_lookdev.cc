@@ -55,7 +55,9 @@ LookdevWorld::LookdevWorld()
 
   node_add_link(ntree, coordinate, generated_sock, transform, transform_in);
 
-  /* Flip Y axis because of compatibility axis flipping inside the vector transform node. */
+  /* Optional compatibility transform kept as an explicit node. Environment Texture now owns the
+   * native Y-up to analytic equirectangular conversion, so camera-space lookdev needs no extra
+   * basis rotation here. */
   bNode &flip_y_mul = *node_add_static_node(nullptr, ntree, SH_NODE_VECTOR_MATH);
   flip_y_mul.custom1 = NODE_VECTOR_MATH_MULTIPLY;
   auto &flip_y_value_out = *node_find_socket(flip_y_mul, SOCK_OUT, "Vector"_ustr);
@@ -79,7 +81,8 @@ LookdevWorld::LookdevWorld()
   node_add_link(ntree, flip_y_mul, flip_y_value_out, rotate_x, rotate_x_vector_in);
 
   bNode &rotate_z = *node_add_static_node(nullptr, ntree, SH_NODE_VECTOR_ROTATE);
-  rotate_z.custom1 = NODE_VECTOR_ROTATE_TYPE_AXIS_Z;
+  /* Keep local variable/socket names for compatibility; lookdev rotates around native world Y. */
+  rotate_z.custom1 = NODE_VECTOR_ROTATE_TYPE_AXIS_Y;
   auto &rotate_z_vector_in = *node_find_socket(rotate_z, SOCK_IN, "Vector"_ustr);
   auto &rotate_z_vector_angle = *node_find_socket(rotate_z, SOCK_IN, "Angle"_ustr);
   auto &rotate_z_out = *node_find_socket(rotate_z, SOCK_OUT, "Vector"_ustr);
@@ -174,9 +177,9 @@ bool LookdevWorld::sync(const LookdevParameters &new_parameters)
     if (parameters_.camera_space) {
       *xform_socket_ = SHD_VECT_TRANSFORM_SPACE_CAMERA;
       flip_y_socket_->value[0] = 1.0f;
-      flip_y_socket_->value[1] = -1.0f;
+      flip_y_socket_->value[1] = 1.0f;
       flip_y_socket_->value[2] = 1.0f;
-      *rotation_x_socket_ = -M_PI / 2.0f;
+      *rotation_x_socket_ = 0.0f;
     }
     else {
       *xform_socket_ = SHD_VECT_TRANSFORM_SPACE_WORLD;
@@ -468,10 +471,12 @@ void LookdevModule::rotate_world()
     return;
   }
 
-  AxisAngle axis_angle_rotation(AxisSigned::Z_NEG, studio_light_rotation_z_);
+  /* The persisted setting keeps its legacy name, but rotates around native world-up. */
+  AxisAngle axis_angle_rotation(AxisSigned::Y_NEG, studio_light_rotation_z_);
   float4x4 rotation = math::from_rotation<float4x4>(axis_angle_rotation);
   if (use_viewspace_lighting_) {
-    CartesianBasis target(AxisSigned::X_POS, AxisSigned::Z_NEG, AxisSigned::Y_POS);
+    /* Native X-right/Y-up/Z-forward already matches the viewport camera-space basis. */
+    CartesianBasis target(AxisSigned::X_POS, AxisSigned::Y_POS, AxisSigned::Z_POS);
     rotation = inst_.camera.data_get().viewinv * math::from_rotation<float4x4>(target) * rotation;
   }
 

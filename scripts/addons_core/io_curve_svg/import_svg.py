@@ -32,6 +32,10 @@ def SVGCreateCurve(context):
     cu = bpy.data.curves.new("Curve", 'CURVE')
     obj = bpy.data.objects.new("Curve", cu)
 
+    # SVG and legacy 2D Curve data are authored in local XY. Rotate that local plane into
+    # Clarity's native XZ ground plane while retaining 2D Curve filling behavior.
+    obj.rotation_euler.x = -pi / 2
+
     context['collection'].objects.link(obj)
 
     return obj

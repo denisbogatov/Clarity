@@ -26,6 +26,7 @@ struct Object;
 struct RenderData;
 struct Scene;
 struct SceneRenderView;
+struct SoftSelectionSettings;
 struct ToolSettings;
 struct TransformOrientation;
 struct TransformOrientationSlot;
@@ -124,6 +125,9 @@ Scene *BKE_scene_set_name(Main *bmain, const char *name);
  */
 ToolSettings *BKE_toolsettings_copy(ToolSettings *toolsettings, int flag);
 void BKE_toolsettings_free(ToolSettings *toolsettings);
+
+/** Restore the Maya factory black-red-yellow soft-selection display ramp. */
+void BKE_soft_selection_color_default_set(SoftSelectionSettings *settings);
 
 Scene *BKE_scene_duplicate(Main *bmain,
                            Scene *sce,

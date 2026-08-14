@@ -262,6 +262,18 @@ add_blender_test(
   --python ${CMAKE_CURRENT_LIST_DIR}/clarity_pivot_lifecycle.py
 )
 
+add_blender_test(
+  clarity_soft_selection
+  --factory-startup
+  --python ${CMAKE_CURRENT_LIST_DIR}/clarity_soft_selection.py
+)
+
+add_blender_test(
+  clarity_symmetry
+  --factory-startup
+  --python ${CMAKE_CURRENT_LIST_DIR}/clarity_symmetry.py
+)
+
 # test running operators doesn't segfault under various conditions
 if(WITH_TESTS_EXPERIMENTAL)
   add_blender_test(
@@ -1757,6 +1769,14 @@ if(WITH_UI_TESTS)
     test_clarity_pivot.pivot_frame_goes_with_the_selection
     test_clarity_pivot.pivot_snap_drag_lands_on_the_target
     test_clarity_pivot.pivot_axis_handle_drags_the_pivot_along_one_axis
+    test_clarity_pivot.viewcube_angled_presets_preserve_y_up_and_perspective
+
+    # Maya Soft Selection. These must drive actual press/move/release ordering through the window
+    # manager; calling the operator directly cannot verify tap-versus-drag arbitration.
+    test_clarity_soft_selection.soft_selection_b_tap_toggles_one_shared_state
+    test_clarity_soft_selection.soft_selection_b_left_drag_is_relative_and_does_not_toggle
+    test_clarity_soft_selection.soft_selection_b_middle_drag_is_absolute_from_zero
+    test_clarity_soft_selection.soft_selection_b_drag_cancel_restores_radius
   )
   foreach(ui_test ${_ui_tests})
     add_blender_test_ui(

@@ -24,11 +24,11 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Float>("Start Radius"_ustr)
       .default_value(1.0f)
       .subtype(PROP_DISTANCE)
-      .description("Horizontal Distance from the Z axis at the start of the spiral");
+      .description("Horizontal distance from the Y axis at the start of the spiral");
   b.add_input<decl::Float>("End Radius"_ustr)
       .default_value(2.0f)
       .subtype(PROP_DISTANCE)
-      .description("Horizontal Distance from the Z axis at the end of the spiral");
+      .description("Horizontal distance from the Y axis at the end of the spiral");
   b.add_input<decl::Float>("Height"_ustr)
       .default_value(2.0f)
       .subtype(PROP_DISTANCE)
@@ -60,8 +60,8 @@ static Curves *create_spiral_curve(const float rotations,
     const float theta = i * delta_theta;
     const float radius = start_radius + i * delta_radius;
     const float x = radius * cos(theta);
-    const float y = radius * sin(theta);
-    const float z = delta_height * i;
+    const float y = delta_height * i;
+    const float z = -radius * sin(theta);
 
     positions[i] = {x, y, z};
   }

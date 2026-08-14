@@ -185,7 +185,7 @@ static void ensure_root_prim(pxr::UsdStageRefPtr stage, const USDExportParams &p
   if (params.convert_orientation) {
     float3x3 mrot;
     mat3_from_axis_conversion(
-        IO_AXIS_Y, IO_AXIS_Z, params.forward_axis, params.up_axis, mrot.ptr());
+        IO_AXIS_Z, IO_AXIS_Y, params.forward_axis, params.up_axis, mrot.ptr());
 
     const math::EulerXYZ eul = math::to_euler(math::transpose(mrot));
     xf_api.SetRotate(pxr::GfVec3f(eul.x().degree(), eul.y().degree(), eul.z().degree()));
@@ -549,7 +549,7 @@ pxr::UsdStageRefPtr export_to_stage(const USDExportParams &params,
   /* Ensure Python types for invoking hooks are registered. */
   register_hook_converters();
 
-  pxr::VtValue upAxis = pxr::VtValue(pxr::UsdGeomTokens->z);
+  pxr::VtValue upAxis = pxr::VtValue(pxr::UsdGeomTokens->y);
   if (params.convert_orientation) {
     if (params.up_axis == IO_AXIS_X) {
       upAxis = pxr::VtValue(pxr::UsdGeomTokens->x);

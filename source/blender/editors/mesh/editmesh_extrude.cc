@@ -14,6 +14,7 @@
 #include "BLI_math_matrix.h"
 #include "BLI_math_rotation.h"
 #include "BLI_math_vector.h"
+#include "BLI_math_world.hh"
 
 #include "BKE_context.hh"
 #include "BKE_editmesh.hh"
@@ -276,8 +277,7 @@ static wmOperatorStatus edbm_extrude_repeat_exec(bContext *C, wmOperator *op)
       normalize_v3_v3(offset, rv3d->persinv[2]);
     }
     else {
-      const float up[3] = {0, 0, 1};
-      copy_v3_v3(offset, up);
+      copy_v3_v3(offset, math::world::up);
     }
     RNA_property_float_set_array(op->ptr, prop, offset);
   }

@@ -2565,8 +2565,7 @@ def km_object_mode(params):
          {"properties": [("direction", 'CHILD'), ("extend", True)]}),
         ("object.parent_set", {"type": 'P', "value": 'PRESS'}, None),
 
-        ("wm.context_toggle", {"type": 'B', "value": 'PRESS'},
-         {"properties": [("data_path", "tool_settings.use_proportional_edit_objects")]}),
+        ("view3d.soft_selection_hotkey", {"type": 'B', "value": 'PRESS'}, None),
         ("object.parent_clear", {"type": 'P', "value": 'PRESS', "shift": True}, None),
         ("object.location_clear", {"type": 'W', "value": 'PRESS', "alt": True},
          {"properties": [("clear_delta", False)]}),
@@ -3140,8 +3139,7 @@ def km_mesh(params):
         op_menu("VIEW3D_MT_edit_mesh_delete", {"type": 'DEL', "value": 'PRESS'}),
         ("mesh.dissolve_mode", {"type": 'BACK_SPACE', "value": 'PRESS', "ctrl": True}, None),
         ("mesh.dissolve_mode", {"type": 'DEL', "value": 'PRESS', "ctrl": True}, None),
-        ("wm.context_toggle", {"type": 'B', "value": 'PRESS'},
-         {"properties": [("data_path", "tool_settings.use_proportional_edit")]}),
+        ("view3d.soft_selection_hotkey", {"type": 'B', "value": 'PRESS'}, None),
         # Menus.
         *_template_items_context_menu("VIEW3D_MT_edit_mesh_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
         # Tools

@@ -3412,6 +3412,13 @@ static void outliner_draw_tree_element(ui::Block *block,
             text_color[3] = 255;
           }
         }
+        if (BKE_object_clarity_live_surface_get(ob)) {
+          /* Keep the same semantic color as the viewport wire, including while selected. */
+          text_color[0] = 15;
+          text_color[1] = 82;
+          text_color[2] = 26;
+          text_color[3] = 255;
+        }
       }
       else if (is_object_data_in_editmode(tselem->id, tvc.obact)) {
         /* Objects being edited. */

@@ -38,6 +38,21 @@
 
 namespace blender {
 
+/** Convert legacy curve/surface primitives from Z-up coordinates to native Y-up coordinates. */
+static void curve_prim_apply_y_up_axis(float matrix[4][4])
+{
+  /* Maps (x, y, z) to (x, z, -y), i.e. a -90 degree rotation around X. */
+  const float y_up_from_z_up[4][4] = {
+      {1.0f, 0.0f, 0.0f, 0.0f},
+      {0.0f, 0.0f, -1.0f, 0.0f},
+      {0.0f, 1.0f, 0.0f, 0.0f},
+      {0.0f, 0.0f, 0.0f, 1.0f},
+  };
+  float native_matrix[4][4];
+  mul_m4_m4m4(native_matrix, matrix, y_up_from_z_up);
+  copy_m4_m4(matrix, native_matrix);
+}
+
 static const float nurbcircle[8][2] = {
     {0.0, -1.0},
     {-1.0, -1.0},
@@ -113,7 +128,8 @@ Nurb *ED_curve_add_nurbs_primitive(
   BezTriple *bezt;
   BPoint *bp;
   Curve *cu = id_cast<Curve *>(obedit->data);
-  float vec[3], zvec[3] = {0.0f, 0.0f, 1.0f};
+  /* Used only as a view-axis fallback when no RegionView3D is available. */
+  float vec[3], zvec[3] = {0.0f, 1.0f, 0.0f};
   float umat[4][4], viewmat[4][4];
   float fac;
   int a, b;
@@ -389,7 +405,7 @@ Nurb *ED_curve_add_nurbs_primitive(
     case CU_PRIM_SPHERE: /* sphere */
       if (cutype == CU_NURBS) {
         const float tmp_cent[3] = {0.0f, 0.0f, 0.0f};
-        const float tmp_vec[3] = {0.0f, 0.0f, 1.0f};
+        const float tmp_vec[3] = {0.0f, 1.0f, 0.0f};
 
         nu->pntsu = 5;
         nu->pntsv = 1;
@@ -443,7 +459,7 @@ Nurb *ED_curve_add_nurbs_primitive(
     case CU_PRIM_DONUT: /* torus */
       if (cutype == CU_NURBS) {
         const float tmp_cent[3] = {0.0f, 0.0f, 0.0f};
-        const float tmp_vec[3] = {0.0f, 0.0f, 1.0f};
+        const float tmp_vec[3] = {0.0f, 1.0f, 0.0f};
 
         xzproj = 1;
         nu = ED_curve_add_nurbs_primitive(C, obedit, mat, CU_NURBS | CU_PRIM_CIRCLE, 0);
@@ -513,7 +529,7 @@ static wmOperatorStatus curvesurf_prim_add(bContext *C, wmOperator *op, int type
   WM_operator_view3d_unit_defaults(C, op);
 
   ed::object::add_generic_get_opts(
-      C, op, 'Z', loc, rot, nullptr, &enter_editmode, &local_view_bits, nullptr);
+      C, op, 'Y', loc, rot, nullptr, &enter_editmode, &local_view_bits, nullptr);
 
   if (!isSurf) { /* adding curve */
     if (obedit == nullptr || obedit->type != OB_CURVES_LEGACY) {
@@ -525,8 +541,12 @@ static wmOperatorStatus curvesurf_prim_add(bContext *C, wmOperator *op, int type
 
       cu = id_cast<Curve *>(obedit->data);
 
+      /* Clarity primitives are authored directly in the native X/Z construction plane. Keeping
+       * the curve 3D avoids projecting their Z coordinate back into the legacy local XY plane. */
+      cu->flag |= CU_3D;
+
       if (type & CU_PRIM_PATH) {
-        cu->flag |= CU_PATH | CU_3D;
+        cu->flag |= CU_PATH;
       }
     }
     else {
@@ -548,6 +568,11 @@ static wmOperatorStatus curvesurf_prim_add(bContext *C, wmOperator *op, int type
   float scale[3];
   copy_v3_fl(scale, radius);
   ed::object::new_primitive_matrix(C, obedit, loc, rot, scale, mat);
+
+  const Curve *cu = id_cast<const Curve *>(obedit->data);
+  if (isSurf || !CU_IS_2D(cu)) {
+    curve_prim_apply_y_up_axis(mat);
+  }
 
   nu = ED_curve_add_nurbs_primitive(C, obedit, mat, type, newob);
   editnurb = object_editcurve_get(obedit);

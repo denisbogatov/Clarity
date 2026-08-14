@@ -10,15 +10,13 @@
  * Orthonormal rotation and orientation.
  *
  * A practical reminder:
- * - Forward is typically the positive Y direction in Blender.
- * - Up is typically the positive Z direction in Blender.
- * - Right is typically the positive X direction in Blender.
- * - Blender uses right handedness.
- * - For cross product, forward = thumb, up = index, right = middle finger.
+ * - Clarity world-space uses X-right, Y-up, Z-forward and right handedness.
+ * - Object-local conventions remain type-dependent; many legacy Blender object types use
+ *   Y-forward and Z-up.
  *
  * The basis changes for each space:
  * - Object: X-right, Y-forward, Z-up
- * - World: X-right, Y-forward, Z-up
+ * - World: X-right, Y-up, Z-forward
  * - Armature Bone: X-right, Y-forward, Z-up (with forward being the root to tip direction)
  * - Curve Tangent-Space: X-left, Y-up, Z-forward
  */

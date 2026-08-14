@@ -66,14 +66,17 @@ ccl_device void kernel_background_evaluate(KernelGlobals kg,
   /* Setup ray */
   const KernelShaderEvalInput in = input[offset];
   const float3 ray_P = zero_float3();
-  const float3 ray_D = equirectangular_to_direction(in.u, in.v);
+  const float3 ray_D = environment_native_y_up_from_z_up(
+      equirectangular_to_direction(in.u, in.v));
   const float ray_time = 0.5f;
 
   /* Compute ray differential from resolution passed via object and prim fields. */
   const float du = 1.0f / in.object;
   const float dv = 1.0f / in.prim;
-  const float3 ray_D_du = equirectangular_to_direction(in.u + du, in.v);
-  const float3 ray_D_dv = equirectangular_to_direction(in.u, in.v + dv);
+  const float3 ray_D_du = environment_native_y_up_from_z_up(
+      equirectangular_to_direction(in.u + du, in.v));
+  const float3 ray_D_dv = environment_native_y_up_from_z_up(
+      equirectangular_to_direction(in.u, in.v + dv));
   const float ray_dD = 0.5f * (len(ray_D_du - ray_D) + len(ray_D_dv - ray_D));
 
   /* Setup shader data. */

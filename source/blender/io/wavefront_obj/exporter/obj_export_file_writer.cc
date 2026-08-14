@@ -470,9 +470,9 @@ static float4x4 compute_world_axes_transform(const OBJExportParams &export_param
   float4x4 world_axes_transform;
   float axes_transform[3][3];
   unit_m3(axes_transform);
-  /* +Y-forward and +Z-up are the Blender's default axis settings. */
+  /* Clarity's native world uses +Z-forward and +Y-up. */
   mat3_from_axis_conversion(
-      export_params.forward_axis, export_params.up_axis, IO_AXIS_Y, IO_AXIS_Z, axes_transform);
+      export_params.forward_axis, export_params.up_axis, IO_AXIS_Z, IO_AXIS_Y, axes_transform);
   mul_m4_m3m4(world_axes_transform.ptr(), axes_transform, object_to_world.ptr());
   /* #mul_m4_m3m4 does not transform last row of #Object.object_to_world, i.e. location data. */
   mul_v3_m3v3(world_axes_transform[3], axes_transform, object_to_world.location());

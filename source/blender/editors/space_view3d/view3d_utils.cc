@@ -835,21 +835,22 @@ static void view3d_boxview_clip(ScrArea *area)
           }
 
           if (region.winx > region.winy) {
-            y1 = region.winy * rv3d->dist / region.winx;
-          }
-          else {
-            y1 = rv3d->dist;
-          }
-          copy_v2_v2(ofs, rv3d->ofs);
-        }
-        else if (ELEM(rv3d->view, RV3D_VIEW_FRONT, RV3D_VIEW_BACK)) {
-          ofs[2] = rv3d->ofs[2];
-
-          if (region.winx > region.winy) {
             z1 = region.winy * rv3d->dist / region.winx;
           }
           else {
             z1 = rv3d->dist;
+          }
+          ofs[0] = rv3d->ofs[0];
+          ofs[2] = rv3d->ofs[2];
+        }
+        else if (ELEM(rv3d->view, RV3D_VIEW_FRONT, RV3D_VIEW_BACK)) {
+          ofs[1] = rv3d->ofs[1];
+
+          if (region.winx > region.winy) {
+            y1 = region.winy * rv3d->dist / region.winx;
+          }
+          else {
+            y1 = rv3d->dist;
           }
         }
       }
@@ -1437,50 +1438,25 @@ bool ED_view3d_distance_set_from_location(RegionView3D *rv3d,
 /** \name View Axis Utilities
  * \{ */
 
-/**
- * Lookup by axis-view, axis-roll.
- */
-static float view3d_quat_axis[6][4][4] = {
-    /* RV3D_VIEW_FRONT */
-    {
-        {M_SQRT1_2, -M_SQRT1_2, 0.0f, 0.0f},
-        {0.5f, -0.5f, -0.5f, 0.5f},
-        {0, 0, -M_SQRT1_2, M_SQRT1_2},
-        {-0.5f, 0.5f, -0.5f, 0.5f},
-    }, /* RV3D_VIEW_BACK */
-    {
-        {0.0f, 0.0f, -M_SQRT1_2, -M_SQRT1_2},
-        {0.5f, 0.5f, -0.5f, -0.5f},
-        {M_SQRT1_2, M_SQRT1_2, 0, 0},
-        {0.5f, 0.5f, 0.5f, 0.5f},
-    }, /* RV3D_VIEW_LEFT */
-    {
-        {0.5f, -0.5f, 0.5f, 0.5f},
-        {0, -M_SQRT1_2, 0.0f, M_SQRT1_2},
-        {-0.5f, -0.5f, -0.5f, 0.5f},
-        {-M_SQRT1_2, 0, -M_SQRT1_2, 0},
-    },
+/** Maya-compatible Y-up axis views, ordered like #eRegionView3D_View. */
+static const float view3d_quat_axis_base[6][4] = {
+    /* Front (+Z), Back (-Z). */
+    {1.0f, 0.0f, 0.0f, 0.0f},
+    {0.0f, 0.0f, 1.0f, 0.0f},
+    /* Left (-X), Right (+X). */
+    {M_SQRT1_2, 0.0f, M_SQRT1_2, 0.0f},
+    {M_SQRT1_2, 0.0f, -M_SQRT1_2, 0.0f},
+    /* Top (+Y), Bottom (-Y). */
+    {M_SQRT1_2, M_SQRT1_2, 0.0f, 0.0f},
+    {M_SQRT1_2, -M_SQRT1_2, 0.0f, 0.0f},
+};
 
-    /* RV3D_VIEW_RIGHT */
-    {
-        {0.5f, -0.5f, -0.5f, -0.5f},
-        {M_SQRT1_2, 0, -M_SQRT1_2, 0},
-        {0.5f, 0.5f, -0.5f, 0.5f},
-        {0, M_SQRT1_2, 0, M_SQRT1_2},
-    }, /* RV3D_VIEW_TOP */
-    {
-        {1.0f, 0.0f, 0.0f, 0.0f},
-        {M_SQRT1_2, 0, 0, M_SQRT1_2},
-        {0, 0, 0, 1},
-        {-M_SQRT1_2, 0, 0, M_SQRT1_2},
-    }, /* RV3D_VIEW_BOTTOM */
-    {
-        {0.0f, -1.0f, 0.0f, 0.0f},
-        {0, -M_SQRT1_2, -M_SQRT1_2, 0},
-        {0, 0, -1, 0},
-        {0, M_SQRT1_2, -M_SQRT1_2, 0},
-    },
-
+/** Roll around the view direction, applied in view space. */
+static const float view3d_quat_axis_roll[4][4] = {
+    {1.0f, 0.0f, 0.0f, 0.0f},
+    {M_SQRT1_2, 0.0f, 0.0f, M_SQRT1_2},
+    {0.0f, 0.0f, 0.0f, 1.0f},
+    {-M_SQRT1_2, 0.0f, 0.0f, M_SQRT1_2},
 };
 
 bool ED_view3d_quat_from_axis_view(const eRegionView3D_View view,
@@ -1489,7 +1465,9 @@ bool ED_view3d_quat_from_axis_view(const eRegionView3D_View view,
 {
   BLI_assert(view_axis_roll <= RV3D_VIEW_AXIS_ROLL_270);
   if (RV3D_VIEW_IS_AXIS(view)) {
-    copy_qt_qt(r_quat, view3d_quat_axis[view - RV3D_VIEW_FRONT][view_axis_roll]);
+    mul_qt_qtqt(r_quat,
+                view3d_quat_axis_roll[view_axis_roll],
+                view3d_quat_axis_base[view - RV3D_VIEW_FRONT]);
     return true;
   }
   return false;
@@ -1511,9 +1489,11 @@ bool ED_view3d_quat_to_axis_view(const float quat[4],
       for (int view_axis_roll = RV3D_VIEW_AXIS_ROLL_0; view_axis_roll <= RV3D_VIEW_AXIS_ROLL_270;
            view_axis_roll++)
       {
-        if (fabsf(angle_signed_qtqt(
-                quat, view3d_quat_axis[view - RV3D_VIEW_FRONT][view_axis_roll])) < epsilon)
-        {
+        float axis_quat[4];
+        ED_view3d_quat_from_axis_view(eRegionView3D_View(view),
+                                     eRegionView3D_ViewAxisRoll(view_axis_roll),
+                                     axis_quat);
+        if (fabsf(angle_signed_qtqt(quat, axis_quat)) < epsilon) {
           *r_view = eRegionView3D_View(view);
           *r_view_axis_roll = eRegionView3D_ViewAxisRoll(view_axis_roll);
           return true;
@@ -1528,8 +1508,11 @@ bool ED_view3d_quat_to_axis_view(const float quat[4],
       for (int view_axis_roll = RV3D_VIEW_AXIS_ROLL_0; view_axis_roll <= RV3D_VIEW_AXIS_ROLL_270;
            view_axis_roll++)
       {
-        const float delta_test = fabsf(
-            angle_signed_qtqt(quat, view3d_quat_axis[view - RV3D_VIEW_FRONT][view_axis_roll]));
+        float axis_quat[4];
+        ED_view3d_quat_from_axis_view(eRegionView3D_View(view),
+                                     eRegionView3D_ViewAxisRoll(view_axis_roll),
+                                     axis_quat);
+        const float delta_test = fabsf(angle_signed_qtqt(quat, axis_quat));
         if (delta_best > delta_test) {
           delta_best = delta_test;
           *r_view = eRegionView3D_View(view);

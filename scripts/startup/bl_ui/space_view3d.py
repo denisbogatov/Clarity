@@ -9,7 +9,7 @@ from bpy.types import (
     Menu,
     Operator,
     Panel,
-    SurfaceCurve
+    SurfaceCurve,
 )
 from bl_ui.properties_paint_common import (
     UnifiedPaintPanel,
@@ -53,6 +53,51 @@ def _transform_orientation_slot(context):
         index = {'MOVE': 1, 'ROTATE': 2, 'SCALE': 3}.get(window_manager.clarity_tool, 1)
     slot = slots[index]
     return slot if (index != 0 and slot.use) else slots[0]
+
+
+def _draw_soft_selection_header_button(layout, context, tool_settings, enabled_property):
+    """Draw one Soft Selection control: a state toggle plus its settings arrow."""
+    enabled = getattr(tool_settings, enabled_property)
+    icon = 'PROP_OFF'
+    if enabled:
+        icon = (
+            'PROP_CON' if (
+                context.mode == 'EDIT_MESH' and
+                tool_settings.soft_selection.falloff_mode == 'SURFACE'
+            ) else
+            'PROP_ON'
+        )
+
+    layout.operator(
+        "view3d.soft_selection_toggle",
+        text="",
+        icon=icon,
+        depress=enabled,
+    )
+    layout.popover(
+        panel="VIEW3D_PT_soft_selection",
+        text="",
+    )
+
+
+def _draw_clarity_symmetry_header(layout, context):
+    """Draw Maya's global ``Symmetry: …`` status control before transform orientation."""
+    window_manager = context.window_manager
+    mode = window_manager.clarity_symmetry_mode
+    axis = window_manager.clarity_symmetry_axis
+    label = {
+        'OFF': "Off",
+        'OBJECT': "Object " + axis,
+        'WORLD': "World " + axis,
+        'TOPOLOGY': "Topology",
+    }[mode]
+
+    layout.popover(
+        panel="VIEW3D_PT_clarity_symmetry",
+        text="Symmetry  ·  " + label,
+        icon='MOD_MIRROR',
+        translate=False,
+    )
 
 
 def _toggle_xray_operator(layout, context, text=None):
@@ -198,10 +243,17 @@ class VIEW3D_HT_tool_header(Header):
         elif mode_string in {'EDIT_MESH', 'PAINT_WEIGHT', 'SCULPT', 'PAINT_VERTEX', 'PAINT_TEXTURE'}:
             # Mesh Modes, Use Mesh Symmetry
             ob = context.object
-            row, sub = row_for_mirror()
-            sub.prop(ob, "use_mesh_mirror_x", text="X", toggle=True)
-            sub.prop(ob, "use_mesh_mirror_y", text="Y", toggle=True)
-            sub.prop(ob, "use_mesh_mirror_z", text="Z", toggle=True)
+            if (
+                    mode_string == 'EDIT_MESH' and
+                    context.window_manager.clarity_interaction_enabled):
+                # Clarity owns one global symmetry mode in the main 3D View header, immediately
+                # before transform orientation. Do not duplicate it in the tool-specific header.
+                row = None
+            else:
+                row, sub = row_for_mirror()
+                sub.prop(ob, "use_mesh_mirror_x", text="X", toggle=True)
+                sub.prop(ob, "use_mesh_mirror_y", text="Y", toggle=True)
+                sub.prop(ob, "use_mesh_mirror_z", text="Z", toggle=True)
             if mode_string == 'EDIT_MESH':
                 layout.prop(tool_settings, "use_mesh_automerge", text="")
             elif mode_string == 'PAINT_WEIGHT':
@@ -749,8 +801,16 @@ class VIEW3D_HT_header(Header):
         # Mode & Transform Settings
         scene = context.scene
 
+        # Maya keeps symmetric modeling in its global status line. Keep Clarity's equivalent in
+        # the same stable part of the 3D View header, immediately to the left of Global/Local/etc.
+        # Show it wherever transform orientation is available, so selection and mode changes do
+        # not move or hide the global setting.
+        show_orientation = has_pose_mode or object_mode in {'OBJECT', 'EDIT', 'EDIT_GPENCIL'}
+        if context.window_manager.clarity_interaction_enabled and show_orientation:
+            _draw_clarity_symmetry_header(layout, context)
+
         # Orientation
-        if has_pose_mode or object_mode in {'OBJECT', 'EDIT', 'EDIT_GPENCIL'}:
+        if show_orientation:
             orient_slot = _transform_orientation_slot(context)
             row = layout.row(align=True)
 
@@ -822,7 +882,7 @@ class VIEW3D_HT_header(Header):
                     props.mode = mode
                     if mode == 'STEP' and effective_mode == 'STEP':
                         # Step values stay next to their mode and only occupy header space while
-                        # Step Snap is active, matching Selection by Angle below.
+                        # Step Snap is active.
                         sub_size = sub.row(align=True)
                         sub_size.ui_units_x = 3.0
                         sub_size.prop(window_manager, "clarity_snap_step_size", text="")
@@ -830,13 +890,38 @@ class VIEW3D_HT_header(Header):
                         sub_angle.ui_units_x = 3.0
                         sub_angle.prop(window_manager, "clarity_snap_step_angle", text="")
 
-                # Selection by Angle stays visible beside the precision controls in every object
-                # mode, like snapping itself. The constraint takes effect when mesh components are
-                # selected, but keeping the control in one place avoids a jumping header.
+                # Live Surface changes the target used by snapping, so keep it in the same visual
+                # group instead of placing it beside transform orientation and pivot controls.
+                if object_mode == 'OBJECT':
+                    row.separator()
+                    live_surface = row.row(align=True)
+                    props = live_surface.operator(
+                        "clarity.make_live",
+                        text="",
+                        icon='SNAP_FACE',
+                        depress=window_manager.clarity_live_surface_active,
+                    )
+                    props.action = 'SET'
+                    if window_manager.clarity_live_surface_active:
+                        live_surface.label(text=window_manager.clarity_live_surface_label)
+                    if window_manager.clarity_live_surface_history_count:
+                        live_surface.operator(
+                            "clarity.live_surface_history",
+                            text="",
+                            icon='DOWNARROW_HLT',
+                        )
+                    live_surface.popover(
+                        panel="VIEW3D_PT_clarity_live_surface",
+                        text="",
+                        icon='PREFERENCES',
+                    )
+
+                # Selection by Angle is a selection constraint, not a snapping mode. Keep it in a
+                # separate header group so its ownership is unambiguous.
+                angle_row = layout.row(align=True)
                 angle_active = window_manager.clarity_selection_constraint_angle_active
-                sub = row.row(align=True)
-                sub.alert = angle_active
-                props = sub.operator(
+                angle_row.alert = angle_active
+                props = angle_row.operator(
                     "clarity.selection_constraint_set",
                     text="",
                     icon='DRIVER_ROTATIONAL_DIFFERENCE',
@@ -844,7 +929,7 @@ class VIEW3D_HT_header(Header):
                 )
                 props.constraint = 'OFF' if angle_active else 'ANGLE'
                 if angle_active:
-                    sub_angle = sub.row(align=True)
+                    sub_angle = angle_row.row(align=True)
                     sub_angle.ui_units_x = 3.0
                     sub_angle.prop(
                         window_manager,
@@ -876,7 +961,7 @@ class VIEW3D_HT_header(Header):
                     translate=False,
                 )
 
-        # Proportional editing
+        # Maya Soft Selection in mesh/object workflows; proportional editing elsewhere.
         if object_mode in {
             'EDIT',
             'PARTICLE_EDIT',
@@ -892,7 +977,8 @@ class VIEW3D_HT_header(Header):
                 attr = "use_proportional_edit"
 
                 if tool_settings.use_proportional_edit:
-                    if tool_settings.use_proportional_connected:
+                    if context.mode == 'EDIT_MESH' and (
+                            tool_settings.soft_selection.falloff_mode == 'SURFACE'):
                         kw["icon"] = 'PROP_CON'
                     elif tool_settings.use_proportional_projected:
                         kw["icon"] = 'PROP_PROJECTED'
@@ -901,16 +987,20 @@ class VIEW3D_HT_header(Header):
                 else:
                     kw["icon"] = 'PROP_OFF'
 
-            row.prop(tool_settings, attr, icon_only=True, **kw)
-            sub = row.row(align=True)
-            sub.active = getattr(tool_settings, attr)
-            sub.prop_with_popover(
-                tool_settings,
-                "proportional_edit_falloff",
-                text="",
-                icon_only=True,
-                panel="VIEW3D_PT_proportional_edit",
-            )
+            maya_soft_selection = context.mode in {'EDIT_MESH', 'OBJECT'}
+            if maya_soft_selection:
+                # One compound control: the bullseye toggles Soft Select and the adjacent arrow
+                # opens its complete settings. This avoids the old pair of identical bullseyes.
+                _draw_soft_selection_header_button(row, context, tool_settings, attr)
+            else:
+                row.prop(tool_settings, attr, icon_only=True, **kw)
+                sub = row.row(align=True)
+                sub.active = getattr(tool_settings, attr)
+                sub.popover(
+                    panel="VIEW3D_PT_proportional_edit",
+                    text="",
+                    icon='PROP_ON',
+                )
 
         if object_mode == 'EDIT' and obj.type == 'GREASEPENCIL':
             draw_topbar_grease_pencil_layer_panel(context, layout)
@@ -2927,6 +3017,10 @@ class VIEW3D_MT_object(Menu):
         layout.menu("VIEW3D_MT_object_apply")
         layout.menu("VIEW3D_MT_snap")
 
+        if context.window_manager.clarity_interaction_enabled:
+            props = layout.operator("clarity.make_live", text="Make Live", icon='SNAP_FACE')
+            props.action = 'SET'
+
         layout.separator()
 
         layout.operator("object.duplicate_move")
@@ -3063,6 +3157,11 @@ class VIEW3D_MT_object_context_menu(Menu):
         obj = context.object
 
         selected_objects_len = len(context.selected_objects)
+
+        if context.window_manager.clarity_interaction_enabled:
+            props = layout.operator("clarity.make_live", text="Make Live", icon='SNAP_FACE')
+            props.action = 'SET'
+            layout.separator()
 
         # If nothing is selected
         # (disabled for now until it can be made more useful).
@@ -4491,8 +4590,8 @@ class VIEW3D_MT_pose_names(Menu):
 
         layout.operator_context = 'EXEC_REGION_WIN'
         layout.operator("pose.autoside_names", text="Auto-Name Left/Right").axis = 'XAXIS'
-        layout.operator("pose.autoside_names", text="Auto-Name Front/Back").axis = 'YAXIS'
-        layout.operator("pose.autoside_names", text="Auto-Name Top/Bottom").axis = 'ZAXIS'
+        layout.operator("pose.autoside_names", text="Auto-Name Top/Bottom").axis = 'YAXIS'
+        layout.operator("pose.autoside_names", text="Auto-Name Front/Back").axis = 'ZAXIS'
         layout.operator("pose.flip_names")
 
 
@@ -5831,8 +5930,8 @@ class VIEW3D_MT_edit_armature_names(Menu):
 
         layout.operator_context = 'EXEC_REGION_WIN'
         layout.operator("armature.autoside_names", text="Auto-Name Left/Right").type = 'XAXIS'
-        layout.operator("armature.autoside_names", text="Auto-Name Front/Back").type = 'YAXIS'
-        layout.operator("armature.autoside_names", text="Auto-Name Top/Bottom").type = 'ZAXIS'
+        layout.operator("armature.autoside_names", text="Auto-Name Top/Bottom").type = 'YAXIS'
+        layout.operator("armature.autoside_names", text="Auto-Name Front/Back").type = 'ZAXIS'
         layout.operator("armature.flip_names", text="Flip Names")
 
 
@@ -7581,8 +7680,6 @@ class VIEW3D_PT_overlay_guides(Panel):
         layout = self.layout
 
         view = context.space_data
-        scene = context.scene
-
         overlay = view.overlay
         shading = view.shading
         display_all = overlay.show_overlays
@@ -7610,8 +7707,6 @@ class VIEW3D_PT_overlay_guides(Panel):
                 (overlay.show_ortho_grid and grid_active)
             )
             sub.prop(overlay, "grid_scale", text="Scale")
-            sub = sub.row(align=True)
-            sub.active = scene.unit_settings.system == 'NONE'
             sub.prop(overlay, "grid_subdivisions", text="Subdivisions")
 
         sub = split.column()
@@ -8318,16 +8413,7 @@ class VIEW3D_PT_snapping(Panel):
             sub.active = window_manager.clarity_snap_use_tolerance
             sub.prop(window_manager, "clarity_snap_tolerance", text="Tolerance")
 
-            col.separator()
-
-            col.label(text="Selection")
-            col.prop(
-                window_manager,
-                "clarity_selection_constraint_angle",
-                text="Angle",
-                slider=True,
-            )
-
+            # Selection constraints intentionally live outside the snapping controls.
             layout.separator()
 
         col = layout.column()
@@ -8420,6 +8506,36 @@ class VIEW3D_PT_snapping(Panel):
         row.prop(tool_settings, "snap_angle_increment_3d_precision", text="")
 
 
+class VIEW3D_PT_clarity_live_surface(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'HEADER'
+    bl_label = "Live Surface"
+
+    def draw(self, context):
+        layout = self.layout
+        window_manager = context.window_manager
+
+        col = layout.column(align=True)
+        props = col.operator("clarity.make_live", text="Make Selected Live")
+        props.action = 'SET'
+        props = col.operator("clarity.make_live", text="Add Selected")
+        props.action = 'ADD'
+        props = col.operator("clarity.make_live", text="Remove Selected")
+        props.action = 'REMOVE'
+
+        col.separator()
+        props = col.operator("clarity.make_live", text="Make Not Live")
+        props.action = 'DEACTIVATE'
+        props = col.operator("clarity.make_live", text="Make Live Again")
+        props.action = 'REACTIVATE'
+        if window_manager.clarity_live_surface_history_count:
+            col.operator("clarity.live_surface_history", text="Recent Live Surfaces")
+
+        col.separator()
+        col.label(text="Move Snap Settings")
+        col.prop(window_manager, "clarity_live_surface_snap_mode", expand=True)
+
+
 class VIEW3D_PT_sculpt_snapping(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'HEADER'
@@ -8433,6 +8549,684 @@ class VIEW3D_PT_sculpt_snapping(Panel):
         col.label(text="Rotation Increment")
         row = col.row(align=True)
         row.prop(tool_settings, "snap_angle_increment_3d", text="")
+
+
+_MAYA_SOFT_SELECTION_PRESETS = {
+    # Exact strings from Maya 2025's softSelectProperties.mel. Tuples are
+    # (output value, normalized distance, outgoing interpolation).
+    'SOFT': "1,0,2,0,1,2",
+    'MEDIUM': "1,0.5,2,0,1,2,1,0,2",
+    'LINEAR': "0,1,0,1,0,1,0,1,1",
+    'HARD': "1,0,0,0,1,2",
+    'CRATER': "0,0,2,1,0.8,2,0,1,2",
+    'WAVE': "1,0,2,0,0.16,2,0.75,0.32,2,0,0.48,2,0.25,0.64,2,0,0.8,2,0,1,2",
+    'STAIRS': "1,0,1,0.75,0.25,1,0.5,0.5,1,0.75,0.25,1,0.25,0.75,1,1,0.249,1,0.749,0.499,1,0.499,0.749,1",
+    'RING': "0,0.25,2,1,0.5,2,0,0.75,2",
+    'SINE': "1,0,2,0,0.16,2,1,0.32,2,0,0.48,2,1,0.64,2,0,0.8,2,0,1,2",
+}
+
+
+def _soft_selection_curve_decode(encoded):
+    values = [float(value) for value in encoded.split(',')]
+    if len(values) % 3:
+        raise ValueError("Maya soft-selection ramp must contain value/position/interpolation triples")
+    return [
+        (values[index], values[index + 1], int(values[index + 2]))
+        for index in range(0, len(values), 3)
+    ]
+
+
+def _soft_selection_curve_set(settings, encoded):
+    points = _soft_selection_curve_decode(encoded)
+    if not 1 <= len(points) <= 32:
+        raise ValueError("Maya soft-selection ramp must contain between 1 and 32 points")
+
+    # Increase the RNA collection length before indexing new entries. Unused fixed-array entries
+    # remain private and therefore cannot accidentally influence evaluation.
+    settings.curve_point_count = len(points)
+    for point, (value, position, interpolation) in zip(settings.curve_points, points):
+        point.value = min(max(value, 0.0), 1.0)
+        point.position = min(max(position, 0.0), 1.0)
+        point.interpolation = ('NONE', 'LINEAR', 'SMOOTH', 'SPLINE')[
+            min(max(interpolation, 0), 3)
+        ]
+    settings.active_curve_point = min(settings.active_curve_point, len(points) - 1)
+
+
+def _soft_selection_curve_evaluate(settings, normalized_distance):
+    """Evaluate the Maya per-segment ramp for viewport-only B-drag feedback."""
+    from math import isfinite
+
+    def finite_unit(value, fallback):
+        value = float(value)
+        return min(max(value, 0.0), 1.0) if isfinite(value) else fallback
+
+    position = float(normalized_distance)
+    position = min(max(position, 0.0), 1.0) if isfinite(position) else 1.0
+    points = sorted(
+        [
+            (
+                finite_unit(point.position, 0.0),
+                finite_unit(point.value, 0.0),
+                point.interpolation,
+            )
+            for point in settings.curve_points
+        ],
+        key=lambda point: point[0],
+    )
+    if not points:
+        return 1.0 if position == 0.0 else 0.0
+    if len(points) == 1 or position < points[0][0]:
+        return points[0][1]
+
+    left_index = 0
+    while left_index + 1 < len(points) and points[left_index + 1][0] <= position:
+        left_index += 1
+    if left_index + 1 == len(points):
+        return points[left_index][1]
+
+    left = points[left_index]
+    right = points[left_index + 1]
+    width = right[0] - left[0]
+    if width <= 0.0:
+        return right[1]
+    factor = (position - left[0]) / width
+
+    if left[2] == 'NONE':
+        value = left[1]
+    elif left[2] == 'LINEAR':
+        value = left[1] + factor * (right[1] - left[1])
+    elif left[2] == 'SMOOTH':
+        factor = factor * factor * (3.0 - 2.0 * factor)
+        value = left[1] + factor * (right[1] - left[1])
+    else:
+        previous = points[max(left_index - 1, 0)]
+        following = points[min(left_index + 2, len(points) - 1)]
+        linear_slope = (right[1] - left[1]) / width
+        left_span = right[0] - previous[0]
+        right_span = following[0] - left[0]
+        left_slope = (
+            (right[1] - previous[1]) / left_span if left_span > 0.0 else linear_slope
+        )
+        right_slope = (
+            (following[1] - left[1]) / right_span if right_span > 0.0 else linear_slope
+        )
+        factor_squared = factor * factor
+        factor_cubed = factor_squared * factor
+        value = (
+            (2.0 * factor_cubed - 3.0 * factor_squared + 1.0) * left[1] +
+            (factor_cubed - 2.0 * factor_squared + factor) * width * left_slope +
+            (-2.0 * factor_cubed + 3.0 * factor_squared) * right[1] +
+            (factor_cubed - factor_squared) * width * right_slope
+        )
+    return min(max(value, 0.0), 1.0) if isfinite(value) else 0.0
+
+
+def _soft_selection_color_reset(settings):
+    ramp = settings.falloff_color
+    elements = ramp.elements
+    while len(elements) > 2:
+        elements.remove(elements[len(elements) - 2])
+
+    first = elements[0]
+    last = elements[len(elements) - 1]
+    first.position = 0.0
+    first.color = (0.0, 0.0, 0.0, 1.0)
+    last.position = 1.0
+    last.color = (1.0, 1.0, 0.0, 1.0)
+    middle = elements.new(0.5)
+    middle.color = (1.0, 0.0, 0.0, 1.0)
+    ramp.interpolation = 'LINEAR'
+    ramp.color_mode = 'RGB'
+    settings.use_falloff_color = True
+
+
+class VIEW3D_OT_soft_selection_toggle(Operator):
+    bl_idname = "view3d.soft_selection_toggle"
+    bl_label = "Toggle Soft Selection"
+    bl_description = "Toggle Maya Soft Select in both component and object workflows"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        tool_settings = context.tool_settings
+        current = (
+            tool_settings.use_proportional_edit_objects if context.mode == 'OBJECT' else
+            tool_settings.use_proportional_edit
+        )
+        enabled = not current
+        # Maya exposes one state. Blender's two proportional-edit flags are only an internal
+        # implementation detail and must never become mode-dependent user state.
+        tool_settings.use_proportional_edit = enabled
+        tool_settings.use_proportional_edit_objects = enabled
+        return {'FINISHED'}
+
+
+class VIEW3D_OT_soft_selection_reset(Operator):
+    bl_idname = "view3d.soft_selection_reset"
+    bl_label = "Reset Soft Selection"
+    bl_description = "Restore Maya factory soft-selection settings"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        tool_settings = context.tool_settings
+        settings = tool_settings.soft_selection
+        settings.radius = 5.0
+        settings.falloff_mode = 'VOLUME'
+        settings.active_curve_point = 0
+        _soft_selection_curve_set(settings, _MAYA_SOFT_SELECTION_PRESETS['SOFT'])
+        _soft_selection_color_reset(settings)
+        # Maya has one Soft Select state. Blender stores separate component/object proportional
+        # editing toggles internally, so Reset must clear both to avoid mode-dependent stale state.
+        tool_settings.use_proportional_edit = False
+        tool_settings.use_proportional_edit_objects = False
+        return {'FINISHED'}
+
+
+class VIEW3D_OT_soft_selection_curve_preset(Operator):
+    bl_idname = "view3d.soft_selection_curve_preset"
+    bl_label = "Set Soft Selection Curve Preset"
+    bl_description = "Replace the falloff curve with the matching Maya preset"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    preset: bpy.props.EnumProperty(
+        name="Preset",
+        items=[
+            ('SOFT', "Soft", "Maya soft curve"),
+            ('MEDIUM', "Medium", "Maya medium curve"),
+            ('LINEAR', "Linear", "Maya linear curve"),
+            ('HARD', "Hard", "Maya hard curve"),
+            ('CRATER', "Crater", "Maya crater curve"),
+            ('WAVE', "Wave", "Maya wave curve"),
+            ('STAIRS', "Stairs", "Maya stairs curve"),
+            ('RING', "Ring", "Maya ring curve"),
+            ('SINE', "Sine", "Maya sine curve"),
+        ],
+    )
+
+    def execute(self, context):
+        _soft_selection_curve_set(
+            context.tool_settings.soft_selection,
+            _MAYA_SOFT_SELECTION_PRESETS[self.preset],
+        )
+        return {'FINISHED'}
+
+
+class VIEW3D_OT_soft_selection_curve_point_add(Operator):
+    bl_idname = "view3d.soft_selection_curve_point_add"
+    bl_label = "Add Soft Selection Curve Point"
+    bl_description = "Add a point in the largest empty section of the Maya falloff curve"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        settings = context.tool_settings.soft_selection
+        count = settings.curve_point_count
+        if count >= 32:
+            self.report({'WARNING'}, "Maya ramps support at most 32 points")
+            return {'CANCELLED'}
+
+        ordered = sorted(
+            (point.position, point.value) for point in settings.curve_points
+        )
+        if len(ordered) >= 2:
+            left, right = max(zip(ordered, ordered[1:]), key=lambda pair: pair[1][0] - pair[0][0])
+            position = (left[0] + right[0]) * 0.5
+            value = (left[1] + right[1]) * 0.5
+        elif ordered:
+            position = min(1.0, ordered[0][0] + 0.5)
+            value = ordered[0][1]
+        else:
+            position, value = 0.5, 0.5
+
+        settings.curve_point_count = count + 1
+        point = settings.curve_points[count]
+        point.position = position
+        point.value = value
+        point.interpolation = 'SMOOTH'
+        settings.active_curve_point = count
+        return {'FINISHED'}
+
+
+class VIEW3D_OT_soft_selection_curve_point_remove(Operator):
+    bl_idname = "view3d.soft_selection_curve_point_remove"
+    bl_label = "Remove Soft Selection Curve Point"
+    bl_description = "Remove the active Maya falloff curve point"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        settings = context.tool_settings.soft_selection
+        count = settings.curve_point_count
+        if count <= 1:
+            self.report({'WARNING'}, "A Maya ramp must keep at least one point")
+            return {'CANCELLED'}
+        index = min(max(settings.active_curve_point, 0), count - 1)
+        for destination in range(index, count - 1):
+            source = settings.curve_points[destination + 1]
+            target = settings.curve_points[destination]
+            target.position = source.position
+            target.value = source.value
+            target.interpolation = source.interpolation
+        settings.curve_point_count = count - 1
+        settings.active_curve_point = min(index, count - 2)
+        return {'FINISHED'}
+
+
+def _soft_selection_world_center(context):
+    from mathutils import Vector
+
+    coordinates = []
+    if context.mode == 'EDIT_MESH':
+        import bmesh
+
+        for obj in context.objects_in_mode_unique_data:
+            if obj.type != 'MESH':
+                continue
+            edit_mesh = bmesh.from_edit_mesh(obj.data)
+            coordinates.extend(
+                obj.matrix_world @ vertex.co
+                for vertex in edit_mesh.verts
+                if vertex.select and not vertex.hide
+            )
+    else:
+        coordinates.extend(obj.matrix_world.translation for obj in context.selected_objects)
+
+    if not coordinates and context.active_object:
+        coordinates.append(context.active_object.matrix_world.translation)
+    if not coordinates:
+        return None
+
+    center = Vector((0.0, 0.0, 0.0))
+    for coordinate in coordinates:
+        center += coordinate
+    return center / len(coordinates)
+
+
+class VIEW3D_OT_soft_selection_hotkey(Operator):
+    """Maya B gesture: tap toggles, LMB is relative radius, MMB is absolute radius."""
+
+    bl_idname = "view3d.soft_selection_hotkey"
+    bl_label = "Maya Soft Selection Radius"
+    bl_description = (
+        "Tap B to toggle Soft Select; hold B and drag LMB for relative radius or MMB for "
+        "absolute radius"
+    )
+    bl_options = {'REGISTER', 'UNDO', 'BLOCKING'}
+
+    _MIN_RADIUS = 0.00001
+    _MAX_RADIUS = 5000.0
+
+    @classmethod
+    def poll(cls, context):
+        return (
+            context.area is not None and
+            context.area.type == 'VIEW_3D' and
+            context.region is not None and
+            context.region.type == 'WINDOW' and
+            context.mode in {'EDIT_MESH', 'OBJECT'}
+        )
+
+    @staticmethod
+    def _radius_from_drag(initial_radius, delta_pixels, pixels_per_unit, absolute):
+        pixels_per_unit = max(float(pixels_per_unit), 1.0e-8)
+        if absolute:
+            radius = abs(float(delta_pixels)) / pixels_per_unit
+        else:
+            radius = float(initial_radius) + float(delta_pixels) / pixels_per_unit
+        return min(max(radius, VIEW3D_OT_soft_selection_hotkey._MIN_RADIUS),
+                   VIEW3D_OT_soft_selection_hotkey._MAX_RADIUS)
+
+    @staticmethod
+    def _project_radius(context, center, radius, fallback_mouse):
+        from bpy_extras import view3d_utils
+        from mathutils import Vector
+
+        if center is not None and context.region_data is not None:
+            center_2d = view3d_utils.location_3d_to_region_2d(
+                context.region, context.region_data, center)
+            view_right = context.region_data.view_rotation @ Vector((1.0, 0.0, 0.0))
+            right_2d = view3d_utils.location_3d_to_region_2d(
+                context.region, context.region_data, center + view_right)
+            if center_2d is not None and right_2d is not None:
+                pixels_per_unit = (right_2d - center_2d).length
+                if pixels_per_unit > 1.0e-5:
+                    return tuple(center_2d), pixels_per_unit
+
+        # A stable screen-space fallback keeps the gesture usable for an empty/edge-on view.
+        pixels_per_unit = 80.0 / max(float(radius), 0.001)
+        return fallback_mouse, pixels_per_unit
+
+    def _tag_redraw(self):
+        if self._area is not None:
+            self._area.tag_redraw()
+
+    def _status_update(self):
+        if self._area is None:
+            return
+        mode = {
+            None: "Tap B: Toggle | B + LMB: Relative | B + MMB: Absolute",
+            'RELATIVE': "Relative radius (last value + horizontal drag)",
+            'ABSOLUTE': "Absolute radius (zero + horizontal drag)",
+        }[self._drag_mode]
+        self._area.header_text_set("Soft Selection Radius: {:.4g}  |  {}".format(
+            self._settings.radius, mode))
+
+    def _draw_radius(self):
+        import blf
+        import gpu
+        from gpu_extras.batch import batch_for_shader
+        from math import cos, sin, tau
+
+        radius_pixels = min(
+            max(self._settings.radius * self._pixels_per_unit, 1.0), 10000.0)
+        shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+        gpu.state.blend_set('ALPHA')
+        gpu.state.line_width_set(1.5)
+        try:
+            for ratio in (1.0, 0.75, 0.5, 0.25):
+                ring_radius = radius_pixels * ratio
+                coordinates = [
+                    (
+                        self._screen_center[0] + cos(tau * index / 64.0) * ring_radius,
+                        self._screen_center[1] + sin(tau * index / 64.0) * ring_radius,
+                    )
+                    for index in range(65)
+                ]
+                if self._settings.use_falloff_color:
+                    weight = _soft_selection_curve_evaluate(self._settings, ratio)
+                    color = tuple(self._settings.falloff_color.evaluate(weight))
+                    # Maya's zero-weight stop is black; keep the boundary legible on a dark
+                    # viewport.
+                    if ratio == 1.0:
+                        color = (0.8, 0.8, 0.8, 0.9)
+                    else:
+                        color = (color[0], color[1], color[2], 0.85)
+                else:
+                    color = (0.85, 0.85, 0.85, 0.85)
+                batch = batch_for_shader(shader, 'LINE_STRIP', {"pos": coordinates})
+                shader.uniform_float("color", color)
+                batch.draw(shader)
+        finally:
+            # Draw handlers share state with the rest of the viewport. Always restore it even if
+            # a theme/GPU backend rejects a batch while the modal operator is active.
+            gpu.state.line_width_set(1.0)
+            gpu.state.blend_set('NONE')
+
+        font_id = 0
+        blf.size(font_id, 13)
+        blf.color(font_id, 1.0, 1.0, 1.0, 0.95)
+        blf.position(
+            font_id,
+            self._screen_center[0] + 12.0,
+            self._screen_center[1] + radius_pixels + 10.0,
+            0.0,
+        )
+        blf.draw(font_id, "Radius {:.4g}".format(self._settings.radius))
+
+    def _cleanup(self, context, cancel):
+        if cancel:
+            self._settings.radius = self._initial_radius
+        if self._draw_handle is not None:
+            try:
+                bpy.types.SpaceView3D.draw_handler_remove(self._draw_handle, 'WINDOW')
+            except (ReferenceError, RuntimeError, ValueError):
+                pass
+            self._draw_handle = None
+        if self._area is not None:
+            self._area.header_text_set(None)
+            self._area.tag_redraw()
+        if context.window is not None:
+            try:
+                context.window.cursor_modal_restore()
+            except (ReferenceError, RuntimeError):
+                pass
+
+    def invoke(self, context, event):
+        self._settings = context.tool_settings.soft_selection
+        self._tool_settings = context.tool_settings
+        self._enabled_property = (
+            "use_proportional_edit_objects" if context.mode == 'OBJECT' else
+            "use_proportional_edit"
+        )
+        self._initial_radius = self._settings.radius
+        self._drag_initial_radius = self._initial_radius
+        self._drag_mode = None
+        self._drag_button = None
+        self._anchor_x = event.mouse_region_x
+        self._did_resize = False
+        self._b_released = False
+        self._area = context.area
+        self._draw_handle = None
+
+        center = _soft_selection_world_center(context)
+        fallback_mouse = (event.mouse_region_x, event.mouse_region_y)
+        self._screen_center, self._pixels_per_unit = self._project_radius(
+            context, center, self._initial_radius, fallback_mouse)
+
+        self._draw_handle = bpy.types.SpaceView3D.draw_handler_add(
+            self._draw_radius, (), 'WINDOW', 'POST_PIXEL')
+        context.window.cursor_modal_set('SCROLL_X')
+        context.window_manager.modal_handler_add(self)
+        self._status_update()
+        self._tag_redraw()
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        if event.type in {'ESC', 'RIGHTMOUSE', 'WINDOW_DEACTIVATE'}:
+            if event.type == 'WINDOW_DEACTIVATE' or event.value == 'PRESS':
+                self._cleanup(context, cancel=True)
+                return {'CANCELLED'}
+
+        if event.type == 'B' and event.value == 'RELEASE':
+            self._b_released = True
+            if self._drag_mode is None and not self._did_resize:
+                current = getattr(self._tool_settings, self._enabled_property)
+                enabled = not current
+                self._tool_settings.use_proportional_edit = enabled
+                self._tool_settings.use_proportional_edit_objects = enabled
+                self._cleanup(context, cancel=False)
+                return {'FINISHED'}
+            return {'RUNNING_MODAL'}
+
+        if self._drag_mode is None and event.value == 'PRESS' and event.type in {
+                'LEFTMOUSE', 'MIDDLEMOUSE'}:
+            self._drag_mode = 'ABSOLUTE' if event.type == 'MIDDLEMOUSE' else 'RELATIVE'
+            self._drag_button = event.type
+            self._anchor_x = event.mouse_region_x
+            self._drag_initial_radius = self._settings.radius
+            self._did_resize = True
+            if self._drag_mode == 'ABSOLUTE':
+                self._settings.radius = self._MIN_RADIUS
+            self._status_update()
+            self._tag_redraw()
+            return {'RUNNING_MODAL'}
+
+        if self._drag_mode is not None and event.type == 'MOUSEMOVE':
+            delta = event.mouse_region_x - self._anchor_x
+            self._settings.radius = self._radius_from_drag(
+                self._drag_initial_radius,
+                delta,
+                self._pixels_per_unit,
+                self._drag_mode == 'ABSOLUTE',
+            )
+            self._status_update()
+            self._tag_redraw()
+            return {'RUNNING_MODAL'}
+
+        if (
+                self._drag_mode is not None and
+                event.type == self._drag_button and
+                event.value == 'RELEASE'):
+            self._cleanup(context, cancel=False)
+            return {'FINISHED'}
+
+        return {'RUNNING_MODAL'}
+
+
+class VIEW3D_PT_soft_selection(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'HEADER'
+    bl_label = "Soft Selection"
+    bl_ui_units_x = 19
+
+    def draw(self, context):
+        layout = self.layout
+        tool_settings = context.tool_settings
+        settings = tool_settings.soft_selection
+        enabled_property = (
+            "use_proportional_edit_objects" if context.mode == 'OBJECT' else
+            "use_proportional_edit"
+        )
+
+        row = layout.row(align=True)
+        row.scale_y = 1.15
+        row.operator(
+            "view3d.soft_selection_toggle",
+            text="Soft Select",
+            icon='PROP_ON',
+            depress=getattr(tool_settings, enabled_property),
+        )
+        row.operator("view3d.soft_selection_reset", text="Reset")
+
+        body = layout.column(align=False)
+        body.prop(settings, "falloff_mode", text="Falloff Mode")
+        body.prop(settings, "radius", text="Falloff Radius", slider=True)
+
+        body.separator()
+        split = body.split(factor=0.24)
+        split.label(text="Falloff Curve")
+        curve_column = split.column(align=True)
+        curve_column.template_soft_selection_curve(settings)
+        row = curve_column.row(align=True)
+        row.alignment = 'RIGHT'
+        row.operator("view3d.soft_selection_curve_point_add", text="", icon='ADD')
+        row.operator("view3d.soft_selection_curve_point_remove", text="", icon='REMOVE')
+        if settings.curve_point_count:
+            active = settings.curve_points[
+                min(settings.active_curve_point, settings.curve_point_count - 1)
+            ]
+            body.prop(active, "interpolation")
+
+        split = body.split(factor=0.24)
+        split.label(text="Curve Presets")
+        row = split.row(align=True)
+        row.scale_y = 1.3
+        for preset, icon in (
+                ('SOFT', 'SMOOTHCURVE'),
+                ('MEDIUM', 'SPHERECURVE'),
+                ('LINEAR', 'LINCURVE'),
+                ('HARD', 'NOCURVE'),
+                ('CRATER', 'ROOTCURVE'),
+                ('WAVE', 'RNDCURVE'),
+                ('STAIRS', 'SHARPCURVE'),
+                ('RING', 'INVERSESQUARECURVE'),
+                ('SINE', 'SMOOTHCURVE')):
+            operator = row.operator(
+                "view3d.soft_selection_curve_preset", text="", icon=icon)
+            operator.preset = preset
+
+        body.separator()
+        body.prop(settings, "use_falloff_color", text="Viewport Color")
+        split = body.split(factor=0.24)
+        split.label(text="Falloff Color")
+        color = split.column()
+        color.active = settings.use_falloff_color
+        color.template_color_ramp(settings, "falloff_color", expand=True)
+
+
+class VIEW3D_OT_clarity_symmetry_reset(Operator):
+    bl_idname = "view3d.clarity_symmetry_reset"
+    bl_label = "Reset Symmetry"
+    bl_description = "Restore Maya symmetry defaults while preserving the on/off state"
+
+    def execute(self, context):
+        window_manager = context.window_manager
+        was_enabled = window_manager.clarity_symmetry_mode != 'OFF'
+        window_manager.clarity_symmetry_tolerance = 0.001
+        window_manager.clarity_symmetry_preserve_seam = True
+        window_manager.clarity_symmetry_seam_tolerance = 0.001
+        window_manager.clarity_symmetry_allow_partial = True
+        bpy.ops.clarity.symmetry_set(preset='OBJECT_X' if was_enabled else 'OFF')
+        return {'FINISHED'}
+
+
+class VIEW3D_PT_clarity_symmetry(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'HEADER'
+    bl_label = "Symmetry"
+    bl_ui_units_x = 14
+
+    @classmethod
+    def poll(cls, context):
+        return context.window_manager.clarity_interaction_enabled
+
+    def draw(self, context):
+        layout = self.layout
+        window_manager = context.window_manager
+        mode = window_manager.clarity_symmetry_mode
+        axis = window_manager.clarity_symmetry_axis
+
+        header = layout.row(align=True)
+        header.operator(
+            "clarity.symmetry_toggle",
+            text="Enabled" if mode != 'OFF' else "Disabled",
+            icon='MOD_MIRROR',
+            depress=mode != 'OFF',
+        )
+        header.operator(
+            "view3d.clarity_symmetry_reset",
+            text="",
+            icon='LOOP_BACK',
+        )
+
+        layout.separator(factor=0.35)
+
+        modes = layout.box()
+
+        def draw_mode_row(label, presets):
+            row = modes.row(align=True)
+            split = row.split(factor=0.35, align=True)
+            split.label(text=label)
+            buttons = split.row(align=True)
+            buttons.scale_x = 0.82
+            for text, preset, depressed in presets:
+                operator = buttons.operator(
+                    "clarity.symmetry_set",
+                    text=text,
+                    depress=depressed,
+                )
+                operator.preset = preset
+
+        draw_mode_row("Mode", (
+            ("Off", 'OFF', mode == 'OFF'),
+            ("Topology", 'TOPOLOGY', mode == 'TOPOLOGY'),
+        ))
+        draw_mode_row("Object", tuple(
+            (
+                current_axis,
+                'OBJECT_' + current_axis,
+                mode == 'OBJECT' and axis == current_axis,
+            )
+            for current_axis in ('X', 'Y', 'Z')
+        ))
+        draw_mode_row("World", tuple(
+            (
+                current_axis,
+                'WORLD_' + current_axis,
+                mode == 'WORLD' and axis == current_axis,
+            )
+            for current_axis in ('X', 'Y', 'Z')
+        ))
+
+        settings = layout.column(align=True)
+        settings.use_property_split = True
+        settings.use_property_decorate = False
+        settings.prop(window_manager, "clarity_symmetry_tolerance", text="Tolerance")
+        settings.prop(window_manager, "clarity_symmetry_preserve_seam", text="Preserve Seam")
+        seam = settings.column()
+        seam.active = window_manager.clarity_symmetry_preserve_seam
+        seam.prop(window_manager, "clarity_symmetry_seam_tolerance", text="Seam Tolerance")
+        partial = settings.column()
+        partial.active = mode == 'TOPOLOGY'
+        partial.prop(window_manager, "clarity_symmetry_allow_partial", text="Allow Partial")
 
 
 class VIEW3D_PT_proportional_edit(Panel):
@@ -10064,7 +10858,17 @@ classes = (
     VIEW3D_PT_overlay_sculpt,
     VIEW3D_PT_overlay_sculpt_curves,
     VIEW3D_PT_snapping,
+    VIEW3D_PT_clarity_live_surface,
     VIEW3D_PT_sculpt_snapping,
+    VIEW3D_OT_soft_selection_toggle,
+    VIEW3D_OT_soft_selection_reset,
+    VIEW3D_OT_soft_selection_curve_preset,
+    VIEW3D_OT_soft_selection_curve_point_add,
+    VIEW3D_OT_soft_selection_curve_point_remove,
+    VIEW3D_OT_soft_selection_hotkey,
+    VIEW3D_PT_soft_selection,
+    VIEW3D_OT_clarity_symmetry_reset,
+    VIEW3D_PT_clarity_symmetry,
     VIEW3D_PT_proportional_edit,
     VIEW3D_PT_grease_pencil_origin,
     VIEW3D_PT_grease_pencil_lock,

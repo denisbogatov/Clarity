@@ -22,6 +22,7 @@
 
 #include "DNA_ID.h"
 #include "DNA_brush_enums.h"
+#include "DNA_colorband_types.h"
 #include "DNA_color_types.h" /* color management */
 #include "DNA_curve_enums.h"
 #include "DNA_customdata_types.h" /* Scene's runtime custom-data masks. */
@@ -1766,7 +1767,7 @@ struct MeshStatVis {
   char _pad1[2] = {};
 
   /* Overhang. */
-  char overhang_axis = OB_NEGZ;
+  char overhang_axis = OB_NEGY;
   float overhang_min = 0, overhang_max = DEG2RADF(45.0f);
 
   /* Thickness. */
@@ -2019,6 +2020,58 @@ enum eTool_ProportionalEdit : char {
   PROP_EDIT_PROJECTED = (1 << 2),
 };
 ENUM_OPERATORS(eTool_ProportionalEdit)
+
+/** Maya-compatible soft-selection distance policy. */
+enum eTool_SoftSelectionFalloffMode : char {
+  /** World-space straight-line distance, limited to meshes containing an explicit selection. */
+  SOFT_SELECT_FALLOFF_VOLUME = 0,
+  /** Geodesic distance following the visible mesh surface. */
+  SOFT_SELECT_FALLOFF_SURFACE = 1,
+  /** World-space straight-line distance across every mesh participating in component editing. */
+  SOFT_SELECT_FALLOFF_GLOBAL = 2,
+};
+
+/** Values intentionally match Maya's ramp interpolation identifiers. */
+enum eTool_SoftSelectionInterpolation : char {
+  SOFT_SELECT_INTERP_NONE = 0,
+  SOFT_SELECT_INTERP_LINEAR = 1,
+  SOFT_SELECT_INTERP_SMOOTH = 2,
+  SOFT_SELECT_INTERP_SPLINE = 3,
+};
+
+#define SOFT_SELECTION_CURVE_POINT_MAX 32
+
+/** One Maya ramp entry: output value, normalized-distance input, and outgoing interpolation. */
+struct SoftSelectionCurvePoint {
+  float value = 0.0f;
+  float position = 0.0f;
+  eTool_SoftSelectionInterpolation interpolation = SOFT_SELECT_INTERP_SMOOTH;
+  char _pad[3] = {};
+};
+
+/**
+ * Persistent viewport soft-selection state.
+ *
+ * This does not reuse #CurveMapping: Maya stores interpolation per outgoing ramp segment,
+ * including step interpolation, while CurveMapping stores Bezier handles. Keeping Maya's data
+ * model here makes MEL ramp strings round-trip without a lossy conversion.
+ */
+struct SoftSelectionSettings {
+  float radius = 5.0f;
+  int curve_point_count = 2;
+  int active_curve_point = 0;
+  eTool_SoftSelectionFalloffMode falloff_mode = SOFT_SELECT_FALLOFF_VOLUME;
+  char _pad[3] = {};
+  SoftSelectionCurvePoint curve_points[/*SOFT_SELECTION_CURVE_POINT_MAX*/ 32] = {
+      {1.0f, 0.0f, SOFT_SELECT_INTERP_SMOOTH, {}},
+      {0.0f, 1.0f, SOFT_SELECT_INTERP_SMOOTH, {}},
+  };
+
+  /** Maya-style false-color visualization ramp, evaluated from soft-selection weight. */
+  char use_falloff_color = 1;
+  char _pad_color[7] = {};
+  struct ColorBand falloff_color;
+};
 
 /** #ToolSettings::weightuser */
 enum eTool_WeightUser : char {
@@ -2298,6 +2351,9 @@ struct ToolSettings {
   /** Particle Editing. */
   struct ParticleEditSettings particle;
 
+  /** Maya-compatible component/object soft selection used by the 3D viewport. */
+  SoftSelectionSettings soft_selection;
+
   /** Transform Proportional Area of Effect. */
   float proportional_size = 1.0f;
 
@@ -2414,7 +2470,7 @@ struct ToolSettings {
 
   eSnapMode snap_mode_tools =
       SCE_SNAP_TO_GEOM; /* If SCE_SNAP_TO_NONE, use #ToolSettings::snap_mode. */
-  char plane_axis = 2;  /* X, Y or Z. */
+  char plane_axis = 1;  /* X, Y or Z. */
   eV3DPlaceDepth plane_depth = V3D_PLACE_DEPTH_SURFACE;
   eV3DPlaceOrient plane_orient = V3D_PLACE_ORIENT_SURFACE;
   char use_plane_axis_auto = 0;
@@ -2510,7 +2566,7 @@ enum ePhysics_Flag : int {
 ENUM_OPERATORS(ePhysics_Flag)
 
 struct PhysicsSettings {
-  float gravity[3] = {0.0f, 0.0f, -9.81f};
+  float gravity[3] = {0.0f, -9.81f, 0.0f};
   ePhysics_Flag flag = PHYS_GLOBAL_GRAVITY;
   int quick_cache_step = 0;
   char _pad0[4] = {};

@@ -443,6 +443,32 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
     FROM_DEFAULT_V4_UCHAR(tui.wcol_state.error);
   }
 
+  if (!USER_VERSION_ATLEAST(502, 48)) {
+    /* Adopt Maya's white selection and green lead-object colors without replacing custom themes. */
+    const uchar old_view_selected[4] = {0xed, 0x57, 0x00, 0xff};
+    const uchar old_view_active[4] = {0xff, 0xa0, 0x28, 0xff};
+    const uchar old_outliner_selected[4] = {0xe9, 0x6a, 0x00, 0xff};
+    const uchar old_outliner_active[4] = {0xff, 0xaf, 0x29, 0xff};
+    if (memcmp(btheme->space_view3d.select, old_view_selected, sizeof(old_view_selected)) == 0) {
+      FROM_DEFAULT_V4_UCHAR(space_view3d.select);
+    }
+    if (memcmp(btheme->space_view3d.active, old_view_active, sizeof(old_view_active)) == 0) {
+      FROM_DEFAULT_V4_UCHAR(space_view3d.active);
+    }
+    if (memcmp(btheme->space_outliner.selected_object,
+               old_outliner_selected,
+               sizeof(old_outliner_selected)) == 0)
+    {
+      FROM_DEFAULT_V4_UCHAR(space_outliner.selected_object);
+    }
+    if (memcmp(btheme->space_outliner.active_object,
+               old_outliner_active,
+               sizeof(old_outliner_active)) == 0)
+    {
+      FROM_DEFAULT_V4_UCHAR(space_outliner.active_object);
+    }
+  }
+
   /**
    * Always bump subversion in BKE_blender_version.h when adding versioning
    * code here, and wrap it inside a USER_VERSION_ATLEAST check.

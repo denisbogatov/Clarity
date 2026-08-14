@@ -1082,8 +1082,8 @@ Span<float3> CurvesGeometry::evaluated_normals() const
       for (const int curve_index : curves_range) {
         const IndexRange evaluated_points = evaluated_points_by_curve[curve_index];
         switch (NormalMode(normal_mode[curve_index])) {
-          case NORMAL_MODE_Z_UP:
-            curves::poly::calculate_normals_z_up(evaluated_tangents.slice(evaluated_points),
+          case NORMAL_MODE_Y_UP:
+            curves::poly::calculate_normals_y_up(evaluated_tangents.slice(evaluated_points),
                                                  evaluated_normals.slice(evaluated_points));
             break;
           case NORMAL_MODE_MINIMUM_TWIST:
@@ -1093,7 +1093,7 @@ Span<float3> CurvesGeometry::evaluated_normals() const
             break;
           case NORMAL_MODE_FREE:
             if (custom_normal_span.is_empty()) {
-              curves::poly::calculate_normals_z_up(evaluated_tangents.slice(evaluated_points),
+              curves::poly::calculate_normals_y_up(evaluated_tangents.slice(evaluated_points),
                                                    evaluated_normals.slice(evaluated_points));
             }
             else {

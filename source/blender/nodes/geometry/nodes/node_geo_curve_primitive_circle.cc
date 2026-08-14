@@ -39,7 +39,7 @@ static void node_declare(NodeDeclarationBuilder &b)
                         "circle's direction")
                     .make_available(endable_points);
   auto &middle = b.add_input<decl::Vector>("Point 2"_ustr)
-                     .default_value({0.0f, 1.0f, 0.0f})
+                     .default_value({0.0f, 0.0f, -1.0f})
                      .subtype(PROP_TRANSLATION)
                      .description(
                          "One of the three points on the circle. The point order determines the "
@@ -167,8 +167,8 @@ static Curves *create_radius_circle_curve(const int resolution, const float radi
   for (int i : IndexRange(resolution)) {
     const float theta = theta_step * i;
     const float x = radius * cos(theta);
-    const float y = radius * sin(theta);
-    positions[i] = float3(x, y, 0.0f);
+    const float z = -radius * sin(theta);
+    positions[i] = float3(x, 0.0f, z);
   }
 
   return curves_id;

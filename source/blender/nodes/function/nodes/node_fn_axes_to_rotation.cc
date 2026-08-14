@@ -18,14 +18,14 @@ namespace blender::nodes::node_fn_axes_to_rotation_cc {
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.is_function_node();
-  b.add_input<decl::Vector>("Primary Axis"_ustr).default_value(float3(0, 0, 1));
+  b.add_input<decl::Vector>("Primary Axis"_ustr).default_value(float3(0, 1, 0));
   b.add_input<decl::Vector>("Secondary Axis"_ustr).default_value(float3(1, 0, 0));
   b.add_output<decl::Rotation>("Rotation"_ustr);
 }
 
 static void node_init(bNodeTree * /*tree*/, bNode *node)
 {
-  node->custom1 = int(math::Axis::Z);
+  node->custom1 = int(math::Axis::Y);
   node->custom2 = int(math::Axis::X);
 }
 

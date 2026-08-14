@@ -326,6 +326,7 @@ set(SRC
   BLI_math_vector_swizzle.hh
   BLI_math_vector_types.hh
   BLI_math_vector_unroll.hh
+  BLI_math_world.hh
   BLI_memarena.h
   BLI_memblock.h
   BLI_memiter.h

@@ -155,7 +155,7 @@ static Array<float3> curve_normal_point_domain(const CurvesGeometry &curves)
   const VArray<bool> curves_cyclic = curves.cyclic();
   const AttributeAccessor attributes = curves.attributes();
   const VArray<float3> custom_normals = *attributes.lookup_or_default<float3>(
-      "custom_normal", AttrDomain::Point, float3(0, 0, 1));
+      "custom_normal", AttrDomain::Point, float3(0, 1, 0));
 
   const Span<float3> positions = curves.positions();
   const VArray<int8_t> normal_modes = curves.normal_mode();
@@ -203,8 +203,8 @@ static Array<float3> curve_normal_point_domain(const CurvesGeometry &curves)
           const Span<float3> curve_positions = positions.slice(points);
           curves::poly::calculate_tangents(curve_positions, cyclic, nurbs_tangents);
           switch (NormalMode(normal_modes[i_curve])) {
-            case NORMAL_MODE_Z_UP:
-              curves::poly::calculate_normals_z_up(nurbs_tangents, curve_normals);
+            case NORMAL_MODE_Y_UP:
+              curves::poly::calculate_normals_y_up(nurbs_tangents, curve_normals);
               break;
             case NORMAL_MODE_MINIMUM_TWIST:
               curves::poly::calculate_normals_minimum(nurbs_tangents, cyclic, curve_normals);

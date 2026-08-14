@@ -99,35 +99,43 @@ class Bounds : Overlay {
           break;
         }
         case OB_BOUND_CYLINDER: {
-          float4x4 scale = math::from_scale<float4x4>(
-              float3(float2(math::max(size.x, size.y)), size.z));
-          scale.location() = center;
-          ExtraInstanceData data(object_mat * scale, color, 1.0f);
+          const float radius = math::max(size.x, size.z);
+          /* The shared cylinder batch is Z-long. Map its local Z to native object Y and its
+           * circular XY section to XZ. */
+          float4x4 mat = float4x4::identity();
+          mat.x_axis() = float3(radius, 0.0f, 0.0f);
+          mat.y_axis() = float3(0.0f, 0.0f, -radius);
+          mat.z_axis() = float3(0.0f, size.y, 0.0f);
+          mat.location() = center;
+          ExtraInstanceData data(object_mat * mat, color, 1.0f);
           call_buffers_.cylinder.append(data, select_id);
           break;
         }
         case OB_BOUND_CONE: {
-          float4x4 mat = math::from_scale<float4x4>(
-              float3(float2(math::max(size.x, size.y)), size.z));
+          const float radius = math::max(size.x, size.z);
+          /* The cone batch already points along local +Y from base 0 to tip 2. */
+          float4x4 mat = math::from_scale<float4x4>(float3(radius, size.y, radius));
           mat.location() = center;
-          /* Cone batch has base at 0 and is pointing towards +Y. */
-          std::swap(mat[1], mat[2]);
-          mat.location().z -= size.z;
+          mat.location().y -= size.y;
           ExtraInstanceData data(object_mat * mat, color, 1.0f);
           call_buffers_.cone.append(data, select_id);
           break;
         }
         case OB_BOUND_CAPSULE: {
-          float4x4 mat = math::from_scale<float4x4>(float3(math::max(size.x, size.y)));
-          mat.location() = center;
-          mat.location().z = center.z + std::max(0.0f, size.z - size.x);
+          const float radius = math::max(size.x, size.z);
+          const float cap_offset = math::max(0.0f, size.y - radius);
+          float4x4 mat = float4x4::identity();
+          mat.x_axis() = float3(radius, 0.0f, 0.0f);
+          mat.y_axis() = float3(0.0f, 0.0f, -radius);
+          mat.z_axis() = float3(0.0f, radius, 0.0f);
+          mat.location() = center + float3(0.0f, cap_offset, 0.0f);
           ExtraInstanceData data(object_mat * mat, color, 1.0f);
           call_buffers_.capsule_cap.append(data, select_id);
           mat.z_axis() *= -1;
-          mat.location().z = center.z - std::max(0.0f, size.z - size.x);
+          mat.location() = center - float3(0.0f, cap_offset, 0.0f);
           data.object_to_world = object_mat * mat;
           call_buffers_.capsule_cap.append(data, select_id);
-          mat.z_axis().z = std::max(0.0f, size.z * 2.0f - size.x * 2.0f);
+          mat.z_axis().y = math::max(0.0f, size.y * 2.0f - radius * 2.0f);
           data.object_to_world = object_mat * mat;
           call_buffers_.capsule_body.append(data, select_id);
           break;

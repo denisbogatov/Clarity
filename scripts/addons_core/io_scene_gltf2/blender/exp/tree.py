@@ -126,9 +126,6 @@ class VExportTree:
         self.tree_troncated = False
 
         self.axis_basis_change = Matrix.Identity(4)
-        if self.export_settings['gltf_yup']:
-            self.axis_basis_change = Matrix(
-                ((1.0, 0.0, 0.0, 0.0), (0.0, 0.0, 1.0, 0.0), (0.0, -1.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)))
 
     def add_node(self, node):
         self.nodes[node.uuid] = node
@@ -300,16 +297,10 @@ class VExportTree:
                 new_delta = True
 
             if node.blender_type == VExportNode.CAMERA and self.export_settings['gltf_cameras']:
-                if self.export_settings['gltf_yup']:
-                    correction = Quaternion((2**0.5 / 2, -2**0.5 / 2, 0.0, 0.0))
-                else:
-                    correction = Matrix.Identity(4).to_quaternion()
+                correction = Matrix.Identity(4).to_quaternion()
                 node.matrix_world @= correction.to_matrix().to_4x4()
             elif node.blender_type == VExportNode.LIGHT and self.export_settings['gltf_lights']:
-                if self.export_settings['gltf_yup']:
-                    correction = Quaternion((2**0.5 / 2, -2**0.5 / 2, 0.0, 0.0))
-                else:
-                    correction = Matrix.Identity(4).to_quaternion()
+                correction = Matrix.Identity(4).to_quaternion()
                 node.matrix_world @= correction.to_matrix().to_4x4()
         elif node.blender_type == VExportNode.BONE:
             if self.export_settings['gltf_rest_position_armature'] is False:

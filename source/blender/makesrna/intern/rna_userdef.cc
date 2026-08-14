@@ -6558,7 +6558,7 @@ static void rna_def_userdef_input(BlenderRNA *brna)
   StructRNA *srna;
 
   static const EnumPropertyItem view_rotation_items[] = {
-      {0, "TURNTABLE", 0, "Turntable", "Turntable keeps the Z-axis upright while orbiting"},
+      {0, "TURNTABLE", 0, "Turntable", "Turntable keeps the Y-axis upright while orbiting"},
       {USER_TRACKBALL,
        "TRACKBALL",
        0,

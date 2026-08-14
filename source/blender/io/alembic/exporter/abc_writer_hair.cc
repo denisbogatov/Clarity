@@ -234,8 +234,7 @@ void ABCHairWriter::write_hair_sample(const HierarchyContext &context,
       copy_v3_v3(vert, path->co);
       mul_m4_v3(inv_mat, vert);
 
-      /* Convert Z-up to Y-up. */
-      verts.emplace_back(vert[0], vert[2], -vert[1]);
+      verts.emplace_back(vert[0], vert[1], vert[2]);
     }
   }
 }
@@ -301,8 +300,7 @@ void ABCHairWriter::write_hair_child_sample(const HierarchyContext &context,
                             nullptr,
                             nullptr);
 
-      /* Convert Z-up to Y-up. */
-      norm_values.emplace_back(tmpnor[0], tmpnor[2], -tmpnor[1]);
+      norm_values.emplace_back(tmpnor[0], tmpnor[1], tmpnor[2]);
     }
     else {
       if (!uv_values.empty()) {
@@ -321,8 +319,7 @@ void ABCHairWriter::write_hair_child_sample(const HierarchyContext &context,
       copy_v3_v3(vert, path->co);
       mul_m4_v3(inv_mat, vert);
 
-      /* Convert Z-up to Y-up. */
-      verts.emplace_back(vert[0], vert[2], -vert[1]);
+      verts.emplace_back(vert[0], vert[1], vert[2]);
 
       path++;
     }

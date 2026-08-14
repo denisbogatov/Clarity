@@ -18,7 +18,11 @@ float sky_angle_between(float thetav, float phiv, float theta, float phi)
 
 float3 sky_spherical_coordinates(float3 dir)
 {
-  return float3(M_PI_2 - atan(dir.z, length(dir.xy)), atan(dir.x, dir.y), 0.0f);
+  /* Native Y-up (X, Y, Z) to the analytic sky models' Z-up frame (X, -Z, Y). */
+  float3 sky_dir = float3(dir.x, -dir.z, dir.y);
+  return float3(M_PI_2 - atan(sky_dir.z, length(sky_dir.xy)),
+                atan(sky_dir.x, sky_dir.y),
+                0.0f);
 }
 
 /* Preetham */

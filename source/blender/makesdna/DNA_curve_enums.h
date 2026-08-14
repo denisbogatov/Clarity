@@ -50,8 +50,8 @@ ENUM_OPERATORS(eCurveFlag)
 
 /** #Curve.twist_mode */
 enum eCurveTwistMode : short {
-  CU_TWIST_Z_UP = 0,
-  /* CU_TWIST_Y_UP      = 1, */ /* not used yet */
+  CU_TWIST_Y_UP = 0,
+  /* CU_TWIST_Z_UP      = 1, */ /* not used */
   /* CU_TWIST_X_UP      = 2, */
   CU_TWIST_MINIMUM = 3,
   CU_TWIST_TANGENT = 4,

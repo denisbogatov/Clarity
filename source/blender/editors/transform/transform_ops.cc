@@ -133,6 +133,8 @@ static void transform_clarity_snap_apply(const bContext *C,
   t->tsnap.clarity_mode_active = false;
   t->tsnap.clarity_curve_targets_only = false;
   t->tsnap.clarity_include_object_pivots = false;
+  t->tsnap.clarity_live_surface = false;
+  t->tsnap.clarity_live_surface_fallback = false;
   t->tsnap.clarity_view_plane = false;
   t->tsnap.clarity_mesh_center = false;
   t->tsnap.clarity_collapse_components = false;
@@ -154,6 +156,8 @@ static void transform_clarity_snap_apply(const bContext *C,
   plan_input.keep_spacing = ED_clarity_move_keep_spacing_get(C);
   plan_input.transform_constraint = ED_clarity_transform_constraint_get(C);
   plan_input.is_component_edit = CTX_data_edit_object(C) != nullptr;
+  plan_input.live_surface_active = ED_clarity_live_surface_active(C);
+  plan_input.live_surface_snap_mode = ED_clarity_live_surface_snap_mode_get(C);
   plan_input.step = ED_clarity_snap_step_settings_get(C);
   const ClaritySnapPlan plan = transform_snap_clarity_plan_get(plan_input);
 
@@ -165,6 +169,8 @@ static void transform_clarity_snap_apply(const bContext *C,
   t->tsnap.mode = plan.snap_to;
   t->tsnap.clarity_curve_targets_only = plan.curve_targets_only;
   t->tsnap.clarity_include_object_pivots = plan.include_object_pivots;
+  t->tsnap.clarity_live_surface = plan.live_surface;
+  t->tsnap.clarity_live_surface_fallback = plan.live_surface_fallback;
   t->tsnap.clarity_mesh_center = plan.mesh_center;
   t->tsnap.clarity_collapse_components = plan.collapse_components;
   t->tsnap.clarity_view_plane = plan.view_plane;
@@ -883,7 +889,7 @@ void properties_register(wmOperatorType *ot, int flags)
   if (flags & P_ORIENT_AXIS) {
     prop = RNA_def_property(ot->srna, "orient_axis", PROP_ENUM, PROP_NONE);
     RNA_def_property_ui_text(prop, "Axis", "");
-    RNA_def_property_enum_default(prop, 2);
+    RNA_def_property_enum_default(prop, 1);
     RNA_def_property_enum_items(prop, rna_enum_axis_xyz_items);
     RNA_def_property_flag(prop, PROP_SKIP_SAVE);
   }

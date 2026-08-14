@@ -29,15 +29,15 @@ def add_torus(major_rad, minor_rad, major_seg, minor_seg):
     i1 = 0
     tot_verts = major_seg * minor_seg
     for major_index in range(major_seg):
-        matrix = Matrix.Rotation((major_index / major_seg) * pi_2, 3, 'Z')
+        matrix = Matrix.Rotation((major_index / major_seg) * pi_2, 3, 'Y')
 
         for minor_index in range(minor_seg):
             angle = pi_2 * minor_index / minor_seg
 
             vec = matrix @ Vector((
                 major_rad + (cos(angle) * minor_rad),
-                0.0,
                 sin(angle) * minor_rad,
+                0.0,
             ))
 
             verts.extend(vec[:])

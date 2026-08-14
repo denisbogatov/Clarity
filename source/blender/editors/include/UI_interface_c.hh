@@ -2638,6 +2638,8 @@ void template_curve_mapping(Layout *layout,
                             bool neg_slope,
                             bool tone,
                             bool presets);
+/** Compact editor for the exact Maya-style ramp stored by #SoftSelectionSettings. */
+void template_soft_selection_curve(Layout *layout, PointerRNA *ptr);
 /**
  * Template for a path creation widget intended for custom bevel profiles.
  * This section is quite similar to #template_curve_mapping, but with reduced complexity.

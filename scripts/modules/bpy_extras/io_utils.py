@@ -187,7 +187,7 @@ class ImportHelper:
         return _check_axis_conversion(self)
 
 
-def orientation_helper(axis_forward='Y', axis_up='Z'):
+def orientation_helper(axis_forward='Z', axis_up='Y'):
     """
     A decorator for import/export classes, generating properties needed by the axis conversion system and IO helpers,
     with specified default values (axes).
@@ -366,7 +366,7 @@ _axis_convert_lut = (
 _axis_convert_num = {'X': 0, 'Y': 1, 'Z': 2, '-X': 3, '-Y': 4, '-Z': 5}
 
 
-def axis_conversion(from_forward='Y', from_up='Z', to_forward='Y', to_up='Z'):
+def axis_conversion(from_forward='Z', from_up='Y', to_forward='Z', to_up='Y'):
     """
     Each argument is an axis
     where the first 2 are a source and the second 2 are the target.

@@ -1270,8 +1270,10 @@ void LightManager::device_update_background(Device *device,
         /* Determine Sun direction from lat/long and texture mapping. */
         const float latitude = sky->get_sun_elevation();
         const float longitude = sky->get_sun_rotation() + M_PI_2_F;
-        float3 sun_direction = make_float3(
+        const float3 sun_direction_z_up = make_float3(
             cosf(latitude) * cosf(longitude), cosf(latitude) * sinf(longitude), sinf(latitude));
+        float3 sun_direction = make_float3(
+            sun_direction_z_up.x, sun_direction_z_up.z, -sun_direction_z_up.y);
         const Transform sky_transform = transform_inverse(sky->tex_mapping.compute_transform());
         sun_direction = transform_direction(&sky_transform, sun_direction);
 
