@@ -48,11 +48,10 @@ namespace blender {
 #define WIDGET_RADIUS ((U.gizmo_size_navigate_v3d / 2.0f) * UI_SCALE_FAC)
 
 /* Clarity-style view-cube dimensions in normalized gizmo space. */
-#define VIEWCUBE_HALF_SIZE 0.68f
-#define VIEWCUBE_BEVEL_SIZE 0.10f
+#define VIEWCUBE_HALF_SIZE 0.82f
+#define VIEWCUBE_BEVEL_SIZE 0.18f
 #define VIEWCUBE_BOUND_RADIUS (VIEWCUBE_HALF_SIZE * 1.74f)
-#define VIEWCUBE_CORNER_HIT_RADIUS 0.48f
-#define VIEWCUBE_HIT_BOUND_RADIUS (VIEWCUBE_BOUND_RADIUS + VIEWCUBE_CORNER_HIT_RADIUS)
+#define VIEWCUBE_HIT_BOUND_RADIUS VIEWCUBE_BOUND_RADIUS
 #define VIEWCUBE_LINE_WIDTH ((U.gizmo_size_navigate_v3d / 120.0f) * UI_SCALE_FAC)
 /* Render labels at a higher internal resolution, then scale them onto each face. */
 #define VIEWCUBE_TEXT_SIZE (WIDGET_RADIUS * 0.60f)
@@ -441,40 +440,30 @@ static int gizmo_axis_test_select(bContext * /*C*/, wmGizmo *gz, const int mval[
     }
   }
 
-  float best_corner_distance_squared = FLT_MAX;
-  float best_corner_depth = 0.0f;
-  int best_corner_part = -1;
   int corner_index = 0;
   for (int sign_x = -1; sign_x <= 1; sign_x += 2) {
     for (int sign_y = -1; sign_y <= 1; sign_y += 2) {
       for (int sign_z = -1; sign_z <= 1; sign_z += 2) {
-        const float corner[3] = {sign_x * VIEWCUBE_HALF_SIZE,
-                                 sign_y * VIEWCUBE_HALF_SIZE,
-                                 sign_z * VIEWCUBE_HALF_SIZE};
-        float corner_screen[2];
-        viewcube_project_point(gz, corner, corner_screen);
-        const float distance_squared = len_squared_v2v2(point_local, corner_screen);
-        const float depth = corner[0] * gz->matrix_offset[0][2] +
-                            corner[1] * gz->matrix_offset[1][2] +
-                            corner[2] * gz->matrix_offset[2][2];
-        const bool is_closer = distance_squared < best_corner_distance_squared;
-        const bool is_same_distance_frontmost =
-            fabsf(distance_squared - best_corner_distance_squared) < 1e-6f &&
-            depth > best_corner_depth;
-        if (depth > 0.0f &&
-            distance_squared <= VIEWCUBE_CORNER_HIT_RADIUS * VIEWCUBE_CORNER_HIT_RADIUS &&
-            (is_closer || is_same_distance_frontmost))
-        {
-          best_corner_distance_squared = distance_squared;
-          best_corner_depth = depth;
-          best_corner_part = corner_index + 19;
+        float vertices[3][3];
+        float triangle[3][2];
+        viewcube_corner_vertices(sign_x, sign_y, sign_z, vertices);
+        float depth = 0.0f;
+        for (int i = 0; i < 3; i++) {
+          viewcube_project_point(gz, vertices[i], triangle[i]);
+          depth += vertices[i][0] * gz->matrix_offset[0][2] +
+                   vertices[i][1] * gz->matrix_offset[1][2] +
+                   vertices[i][2] * gz->matrix_offset[2][2];
+        }
+        depth /= 3.0f;
+        if (depth > best_depth && viewcube_point_in_polygon(point_local, triangle, 3)) {
+          best_depth = depth;
+          best_part = corner_index + 19;
         }
         corner_index++;
       }
     }
   }
-  /* Give the generous circular corner targets priority over adjacent face and bevel targets. */
-  return best_corner_part != -1 ? best_corner_part : best_part;
+  return best_part;
 }
 
 static int gizmo_axis_cursor_get(wmGizmo * /*gz*/)
