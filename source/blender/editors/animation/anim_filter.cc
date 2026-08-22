@@ -400,6 +400,7 @@ bool ANIM_animdata_context_getdata(bAnimContext *ac)
       case SPACE_SPREADSHEET:
       case SPACE_SHELF:
       case SPACE_ITEM:
+      case SPACE_SCRIPT_TOOL:
         break;
     }
   }

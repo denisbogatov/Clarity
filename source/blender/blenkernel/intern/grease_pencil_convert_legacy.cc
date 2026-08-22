@@ -3040,6 +3040,7 @@ static void legacy_gpencil_sanitize_annotations(Main &bmain)
           case SPACE_SPREADSHEET:
           case SPACE_SHELF:
           case SPACE_ITEM:
+          case SPACE_SCRIPT_TOOL:
             break;
         }
       }

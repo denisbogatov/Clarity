@@ -88,6 +88,7 @@ void ED_spacetypes_init()
   ED_spacetype_topbar();
   ED_spacetype_shelf();
   ED_spacetype_item();
+  ED_spacetype_script_tool();
   spreadsheet::register_spacetype();
 
   /* Register operator types for screen and all spaces. */

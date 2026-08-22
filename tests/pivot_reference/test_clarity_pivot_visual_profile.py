@@ -17,13 +17,31 @@ FIXTURE = ROOT / "tests/pivot_reference/fixtures/maya_2025_pivot_visual.json"
 
 
 def _profile_float(source: str, name: str) -> float:
+    """
+    One `static constexpr float` of the profile, resolved.
+
+    Part of the profile is measured from Maya and written as a literal, and part of it is derived
+    from those measurements - Edit Pivot is drawn at Maya's proportions times one boost factor. Both
+    forms have to be readable here, or the test that binds this fork to the fixture would be pinning
+    only the half that is spelled out as a number.
+    """
     match = re.search(
-        r"static constexpr float\s+{}\s*=\s*([0-9.]+)f\s*;".format(re.escape(name)),
+        r"static constexpr float\s+{}\s*=\s*([^;]+);".format(re.escape(name)),
         source,
     )
     if match is None:
         raise AssertionError("missing profile float {}".format(name))
-    return float(match.group(1))
+    expression = re.sub(r"\s+", " ", match.group(1)).strip()
+    expression = re.sub("([0-9.]+)f", lambda match: match.group(1), expression)
+    for identifier in sorted(set(re.findall(r"[A-Za-z_][A-Za-z_0-9]*", expression)), key=len,
+                             reverse=True):
+        if identifier == name:
+            raise AssertionError("profile float {} refers to itself".format(name))
+        expression = expression.replace(
+            identifier, repr(_profile_float(source, identifier)))
+    if not re.fullmatch(r"[0-9.eE+\-*/() ]+", expression):
+        raise AssertionError("profile float {} is not a number: {}".format(name, expression))
+    return float(eval(expression))  # noqa: S307 - the pattern above is the whole grammar.
 
 
 def _profile_rgb(source: str, name: str) -> tuple[int, int, int]:
@@ -125,13 +143,14 @@ class ClarityPivotVisualProfileTest(unittest.TestCase):
             "radiusPixels"
         ]
         self.assertAlmostEqual(
-            math.sqrt(2.0) * (self.value("edit_pivot_plane_length") + 0.10) * self.unit,
+            math.sqrt(2.0) * (self.value("maya_edit_pivot_plane_length") + 0.10) * self.unit,
             measured_edit_plane_radius,
             delta=1.0,
         )
 
-        # Maya's arcball remains selectable without drawing Blender's translucent filled disc.
-        self.assertEqual(self.value("trackball_alpha"), 0.0)
+        # Maya draws the sphere as an outline, not as Blender's translucent filled disc: the line is
+        # opaque, and what makes it a line rather than a disc is the draw flag, not this value.
+        self.assertEqual(self.value("trackball_alpha"), 1.0)
         self.assertLess(
             self.captures["rotate_perspective_handle_arcball"]["pixelMetrics"]["visiblePixels"],
             2000,
@@ -162,16 +181,42 @@ class ClarityPivotVisualProfileTest(unittest.TestCase):
             measured_edit_radius,
             delta=1.0,
         )
-        self.assertGreater(
-            self.value("edit_pivot_rotate_scale"), self.value("maya_edit_pivot_rotate_scale")
-        )
         self.assertEqual(self.value("line_width"), 1.0)
 
+    def test_edit_pivot_keeps_mayas_proportions_at_a_larger_size(self):
+        """
+        Maya's pivot manipulator fits an 80 px arrow and a 30 px ring; this fork draws that layout
+        one size up, because it also has to leave room for what Maya's does not draw at all. What is
+        pinned here is the proportion, not the size: every handle carries the same boost.
+        """
+        boost = self.value("edit_pivot_size_boost")
+        self.assertGreater(boost, 1.0)
+        for drawn, measured in (
+            ("edit_pivot_axis_start", "translate_axis_start"),
+            ("edit_pivot_axis_end", "translate_axis_end"),
+            ("edit_pivot_rotate_scale", "maya_edit_pivot_rotate_scale"),
+            ("edit_pivot_plane_length", "maya_edit_pivot_plane_length"),
+        ):
+            self.assertAlmostEqual(
+                self.value(drawn), self.value(measured) * boost, delta=1.0e-6, msg=drawn
+            )
+        # The centre square is the exception: it competes with the arrows for the pixels where they
+        # begin, so it keeps the size Maya measured.
+        self.assertEqual(
+            self.value("edit_pivot_center_scale"), self.value("translate_center_scale")
+        )
+
     def test_edit_pivot_axes_keep_thin_lines_with_a_wider_hit_target(self):
+        """
+        The stem stays Maya's one pixel of line and the cylinder that answers for it does not: what
+        the eye follows and what the hand has to land on are two different sizes here. The ring band
+        is the other half of the same argument - it is what the axis has to win against.
+        """
         hit_width = self.value("edit_pivot_axis_select_radius") * self.unit * 2.0
-        self.assertAlmostEqual(hit_width, 18.0, delta=0.01)
+        self.assertAlmostEqual(hit_width, 30.0, delta=0.01)
         self.assertGreater(hit_width, self.value("line_width"))
-        self.assertEqual(self.value("edit_pivot_ring_select_width"), 14.0)
+        self.assertEqual(self.value("ring_select_width"), 3.0)
+        self.assertGreater(hit_width, self.value("ring_select_width"))
 
     def test_palette_matches_dominant_fixture_colors(self):
         dominant = set()
@@ -193,6 +238,9 @@ class ClarityPivotVisualProfileTest(unittest.TestCase):
             "scale_axis_end",
             "plane_length",
             "edit_pivot_plane_length",
+            "edit_pivot_axis_start",
+            "edit_pivot_axis_end",
+            "edit_pivot_center_scale",
             "plane_fill_alpha",
             "trackball_alpha",
             "translate_center_scale",
@@ -202,13 +250,16 @@ class ClarityPivotVisualProfileTest(unittest.TestCase):
             "edit_pivot_rotate_scale",
             "line_width",
             "edit_pivot_axis_select_radius",
-            "edit_pivot_ring_select_width",
+            "ring_select_width",
         ):
             self.assertIn("ClarityGizmoVisualProfile::" + name, transform)
         for name in ("axis_x", "axis_y", "axis_z", "view", "selected"):
             self.assertIn("ClarityGizmoVisualProfile::" + name, transform)
         self.assertIn('RNA_float_get(arrow->gizmo.ptr, "fill_alpha")', arrow)
         self.assertIn('RNA_float_get(arrow->gizmo.ptr, "stem_select_radius")', arrow)
+        # The stem is picked through a cone, not a tube: narrow where the three arrows leave the
+        # same point, full width where they have the screen to themselves.
+        self.assertIn("select_radius * ARROW_STEM_SELECT_TAPER, select_radius", arrow)
         dial = (
             ROOT
             / "source/blender/editors/gizmo_library/gizmo_types/dial3d_gizmo.cc"

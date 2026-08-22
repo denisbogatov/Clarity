@@ -992,7 +992,20 @@ static void wm_window_ensure_eventstate(wmWindow *win)
   wm_window_update_eventstate(win);
 }
 
-static bool wm_window_update_size_position(wmWindow *win);
+/** What #wm_window_update_size_position found had changed. */
+enum eWinGeometryChange {
+  WIN_GEOMETRY_UNCHANGED = 0,
+  /**
+   * The window moved but kept its client size. Every region rect is still valid, so
+   * the window only has to be drawn again - not laid out again.
+   */
+  WIN_GEOMETRY_POSITION = (1 << 0),
+  /** The client area resized, so region rects have to be recomputed. */
+  WIN_GEOMETRY_SIZE = (1 << 1),
+};
+ENUM_OPERATORS(eWinGeometryChange)
+
+static eWinGeometryChange wm_window_update_size_position(wmWindow *win);
 
 /* Belongs to below. */
 static void wm_window_ghostwindow_add(wmWindowManager *wm,
@@ -1233,7 +1246,7 @@ void wm_window_ghostwindows_remove_invalid(bContext *C, wmWindowManager *wm)
 }
 
 /* Update window size and position based on data from GHOST window. */
-static bool wm_window_update_size_position(wmWindow *win)
+static eWinGeometryChange wm_window_update_size_position(wmWindow *win)
 {
   const GHOST_IWindow *ghost_window = static_cast<GHOST_IWindow *>(win->runtime->ghostwin);
 
@@ -1254,14 +1267,21 @@ static bool wm_window_update_size_position(wmWindow *win)
     }
   }
 
-  if (win->sizex != sizex || win->sizey != sizey || win->posx != posx || win->posy != posy) {
+  eWinGeometryChange changed = WIN_GEOMETRY_UNCHANGED;
+  if (win->sizex != sizex || win->sizey != sizey) {
+    changed |= WIN_GEOMETRY_SIZE;
+  }
+  if (win->posx != posx || win->posy != posy) {
+    changed |= WIN_GEOMETRY_POSITION;
+  }
+
+  if (changed != WIN_GEOMETRY_UNCHANGED) {
     win->sizex = sizex;
     win->sizey = sizey;
     win->posx = posx;
     win->posy = posy;
-    return true;
   }
-  return false;
+  return changed;
 }
 
 wmWindow *WM_window_open(bContext *C,
@@ -1913,7 +1933,8 @@ static bool ghost_event_proc(const GHOST_IEvent *ghost_event, GHOST_TUserDataPtr
          *
          * It might be good to eventually do that at GHOST level, but that is for another time.
          */
-        if (wm_window_update_size_position(win)) {
+        const eWinGeometryChange geometry_changed = wm_window_update_size_position(win);
+        if (geometry_changed != WIN_GEOMETRY_UNCHANGED) {
           const bScreen *screen = WM_window_get_active_screen(win);
 
           /* Debug prints. */
@@ -1948,10 +1969,29 @@ static bool ghost_event_proc(const GHOST_IEvent *ghost_event, GHOST_TUserDataPtr
             }
           }
 
-          wm_window_make_drawable(wm, win);
-          BKE_icon_changed(screen->id.icon_id);
-          WM_event_add_notifier_ex(wm, win, NC_SCREEN | NA_EDITED, nullptr);
-          WM_event_add_notifier_ex(wm, win, NC_WINDOW | NA_EDITED, nullptr);
+          /* Only a resize invalidates anything drawn. `NC_SCREEN | NA_EDITED` sets
+           * `do_refresh`, re-running `ED_area_init` for every area - region rects,
+           * handlers and a full re-layout including each panel's Python `draw()` -
+           * and `NC_WINDOW | NA_EDITED` sets `do_draw`, which alone is enough to make
+           * `wm_draw_update` below acquire and release the swap buffer for this
+           * window. That release blocks on vsync, so with one move event per mouse
+           * step the OS drag loop spends a refresh interval per step and the window
+           * visibly trails the cursor.
+           *
+           * A pure move changes no pixel and no region rect: `winrct` is
+           * window-relative, so nothing needs laying out or drawing again. When the OS
+           * really does need the window repainted it says so separately, as
+           * `GHOST_kEventWindowUpdate`, and changed DPI arrives as
+           * `GHOST_kEventWindowDPIHintChanged` - both of which refresh on their own.
+           *
+           * The event pump below still runs, so timers keep firing and anything else
+           * that legitimately tagged itself is still drawn while the window is held. */
+          if (geometry_changed & WIN_GEOMETRY_SIZE) {
+            wm_window_make_drawable(wm, win);
+            BKE_icon_changed(screen->id.icon_id);
+            WM_event_add_notifier_ex(wm, win, NC_SCREEN | NA_EDITED, nullptr);
+            WM_event_add_notifier_ex(wm, win, NC_WINDOW | NA_EDITED, nullptr);
+          }
 
 #if defined(__APPLE__) || defined(WIN32)
           /* MACOS and WIN32 don't return to the main-loop while resize. */

@@ -57,6 +57,9 @@ namespace blender {
 /* Margin to add when selecting the arrow. */
 #define ARROW_SELECT_THRESHOLD_PX (5)
 
+/** How much narrower the stem's selection volume is where the arrow starts than where it ends. */
+#define ARROW_STEM_SELECT_TAPER (0.25f)
+
 struct ArrowGizmo3D {
   wmGizmo gizmo;
   GizmoCommonData data;
@@ -163,10 +166,16 @@ static void arrow_draw_geom(const ArrowGizmo3D *arrow,
          * no samples from the stem. Keep the visible line unchanged, but make selection
          * independent of that backend-specific warm-up. */
         const float select_radius = RNA_float_get(arrow->gizmo.ptr, "stem_select_radius");
+        /* Tapered, not a cylinder: the three stems all leave the same point, so near it they are a
+         * few pixels apart and the cursor has to say which one it means, while further out they
+         * have the screen to themselves and can afford to be generous. A tube of one radius has to
+         * choose one of those two places to be wrong about. The base keeps the width an arrow has
+         * upstream; the tip is as wide as the handle is easy to aim at. */
         immUnbindProgram();
         immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
         immUniformColor4fv(color);
-        imm_draw_cylinder_fill_3d(pos, select_radius, select_radius, arrow_length, 8, 1);
+        imm_draw_cylinder_fill_3d(
+            pos, select_radius * ARROW_STEM_SELECT_TAPER, select_radius, arrow_length, 8, 1);
       }
       else {
         immUniform1f("lineWidth", arrow->gizmo.line_width * U.pixelsize);

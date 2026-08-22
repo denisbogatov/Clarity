@@ -196,6 +196,111 @@ _CLARITY_SHELF_ITEMS = {
     ),
 }
 
+# Scripts bundled with the fork so a fresh `clarity_shelf.json` ships with working
+# tools instead of an empty Custom tab. Synced into every build tree next to this
+# file, so the path below resolves the same way on a Ninja fast build, the MSBuild
+# tree, and the macOS stand.
+#
+# Each entry is a folder under this directory, laid out like an addon package
+# (any number of sibling modules or subfolders) plus one small entry-point
+# script that the shelf button actually points to and that wires the folder's
+# real modules into Blender. `tree_vertex_data_baker/` is the template: the
+# heavy logic lives in `baker.py`, and `entry.py` just imports it and calls
+# `register()`. `_clarity_shelf_run_script` puts the entry script's own folder
+# on `sys.path` for the duration of the call, so a plain `import baker` (or a
+# subpackage import, given an `__init__.py`) resolves without any path setup
+# in the entry script itself.
+_CLARITY_SHELF_BUILTIN_SCRIPTS_DIR = "clarity_shelf_scripts"
+
+# Button images live in their own folder rather than inside the tool that happens to
+# use one first: an icon is not the property of a script, and any shelf button -
+# including one for a plain operator, with no script behind it at all - can be given
+# any icon from here. Drop a PNG in and it can be picked from the button's Custom
+# Icon field.
+_CLARITY_SHELF_BUILTIN_ICONS_DIR = "clarity_shelf_icons"
+
+# `assets/clarity_shelf_default*.json` cannot hardcode absolute paths - the same file
+# has to resolve on every build tree and every machine. It writes these placeholder
+# prefixes instead, and every path is rewritten through
+# `_clarity_shelf_resolve_bundled_path` on load.
+_CLARITY_SHELF_BUNDLED_DIRS = {
+    "{shelf_scripts}/": _CLARITY_SHELF_BUILTIN_SCRIPTS_DIR,
+    "{shelf_icons}/": _CLARITY_SHELF_BUILTIN_ICONS_DIR,
+}
+
+
+def _clarity_shelf_bundled_path(directory, relative_path):
+    return os.path.join(
+        os.path.dirname(__file__),
+        directory,
+        *relative_path.split("/"),
+    )
+
+
+def _clarity_shelf_bundled_script_path(relative_path):
+    return _clarity_shelf_bundled_path(_CLARITY_SHELF_BUILTIN_SCRIPTS_DIR, relative_path)
+
+
+def _clarity_shelf_resolve_bundled_path(path):
+    """Expand a `{shelf_scripts}/` or `{shelf_icons}/` prefix; leave anything else be.
+
+    Anything else is a path the user chose, which is already absolute and stays
+    exactly as they wrote it.
+    """
+    for placeholder, directory in _CLARITY_SHELF_BUNDLED_DIRS.items():
+        if path.startswith(placeholder):
+            return _clarity_shelf_bundled_path(directory, path[len(placeholder):])
+    return path
+
+
+def _clarity_shelf_bundled_script_key(script_file):
+    """The bundled-relative path a stored `script_file` was resolved from, or
+    its basename when it predates the folder-per-tool layout."""
+    normalized = script_file.replace("\\", "/")
+    marker = "/" + _CLARITY_SHELF_BUILTIN_SCRIPTS_DIR + "/"
+    index = normalized.find(marker)
+    if index == -1:
+        return os.path.basename(normalized)
+    return normalized[index + len(marker):]
+
+
+# "topbar" seeds the Top Bar shelf (`TOPBAR` scope). "panel" seeds a Shelf-editor
+# area (any `SHELF:...` scope, e.g. the floating shelf docked in a viewport) -
+# a distinct default from the Top Bar's, not a clone of it, so the two can be
+# laid out differently on purpose.
+_CLARITY_SHELF_DEFAULT_CONFIG_FILENAMES = {
+    "topbar": "clarity_shelf_default.json",
+    "panel": "clarity_shelf_default_panel.json",
+}
+
+
+def _clarity_shelf_default_config_variant(scope):
+    return "panel" if scope.startswith("SHELF:") else "topbar"
+
+
+def _clarity_shelf_default_config_path(variant="topbar"):
+    return os.path.join(
+        os.path.dirname(__file__), "assets", _CLARITY_SHELF_DEFAULT_CONFIG_FILENAMES[variant],
+    )
+
+
+def _clarity_shelf_builtin_script_items(variant="topbar"):
+    """Every `PYTHON`/`FILE` button one default shelf variant ships with, as read
+    from its `assets/clarity_shelf_default*.json`. Used to patch a missing button
+    into an existing user config on a version bump (see
+    `_clarity_shelf_migrate_config`).
+
+    Scans every tab, not just one hardcoded name - "topbar" and "panel" keep
+    their script buttons on differently-named tabs (`Custom` vs `Panel`).
+    """
+    return [
+        copy.deepcopy(item)
+        for tab in _clarity_shelf_default_config(variant)["tabs"]
+        for item in tab["items"]
+        if item.get("command_type") == 'PYTHON' and item.get("script_file")
+    ]
+
+
 _CLARITY_SHELF_ITEMS["Surfaces"] = _CLARITY_SHELF_ITEMS["Curves"]
 _CLARITY_SHELF_ITEMS["Motion Graphics"] = _CLARITY_SHELF_ITEMS["Animation"]
 _CLARITY_SHELF_ITEMS["XGen"] = _CLARITY_SHELF_ITEMS["FX"]
@@ -762,8 +867,32 @@ _clarity_shelf_pending_scopes = set()
 
 _CLARITY_SHELF_ROW_COUNT = 2
 
+# Button metrics, in UI units. Two draw paths share them: the Top Bar rows, which are
+# tighter because their region height is fixed, and the Shelf editor grid, which has a
+# whole area to spend.
+#
+# `_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y` is the one number coupled to C++: the Top Bar
+# shelf row is a fixed-height region (`art->prefsizey` of the footer region in
+# `space_topbar.cc`), so growing the icons here without growing that clips them.
+# The two are meant to be changed together.
+#
+# The gap between two icons is what the cell has left over once the button is placed
+# in its middle - `COLUMN_UNITS_X` minus `BUTTON_UNITS_X` - so the two paths are kept
+# at the same difference and the shelf spaces its icons the same way wherever it is
+# drawn. Widening a button without widening its cell tightens the gap rather than
+# growing the icon.
+_CLARITY_SHELF_TOPBAR_COLUMN_UNITS_X = 1.45
+_CLARITY_SHELF_TOPBAR_BUTTON_UNITS_X = 1.10
+_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y = 1.05
+_CLARITY_SHELF_TOPBAR_LABEL_SCALE_Y = 0.68
+
+_CLARITY_SHELF_PANEL_CELL_UNITS_X = 1.55
+_CLARITY_SHELF_PANEL_BUTTON_UNITS_X = 1.20
+_CLARITY_SHELF_PANEL_ICON_SCALE_Y = 1.15
+_CLARITY_SHELF_PANEL_LABEL_SCALE_Y = 0.70
+
 # Schema version of a single shelf config, see `_clarity_shelf_migrate_config`.
-_CLARITY_SHELF_VERSION = 3
+_CLARITY_SHELF_VERSION = 4
 _CLARITY_SHELF_STORAGE_VERSION = 1
 _CLARITY_SHELF_DEFAULT_BACKGROUND_COLOR = (0.18, 0.18, 0.18, 1.0)
 _CLARITY_SHELF_DEFAULT_ICON_COLOR = (1.0, 1.0, 1.0, 1.0)
@@ -1122,23 +1251,36 @@ def _clarity_shelf_json_float(value):
     return number
 
 
-def _clarity_shelf_default_config():
-    tabs = []
-    for tab_name in _CLARITY_SHELF_TABS:
-        source_items = [item for item in _CLARITY_SHELF_ITEMS.get(tab_name, ()) if item is not None]
-        split = (len(source_items) + 1) // 2
-        items = []
-        for index, (action, label, icon) in enumerate(source_items):
-            items.append({
-                "id": uuid.uuid4().hex,
-                "label": label,
-                "icon": icon,
-                "action": action,
-                "operator": "",
-                "row": 0 if index < split else 1,
-            })
-        tabs.append({"name": tab_name, "items": items, "separators": []})
-    return {"version": _CLARITY_SHELF_VERSION, "active": "Modeling", "tabs": tabs}
+def _clarity_shelf_default_config(variant="topbar"):
+    """The shelf a fresh scope of `variant` gets: `"topbar"` for the Top Bar
+    shelf, `"panel"` for a Shelf-editor area (see `_clarity_shelf_scope_config`).
+
+    Read straight from `assets/clarity_shelf_default*.json`, which is tracked
+    in git and synced into every build tree the same way the shelf scripts
+    are - so editing the layout during development means editing that file,
+    not this function, and the result ships with the fork instead of living
+    only in one machine's `AppData` config.
+    """
+    with open(_clarity_shelf_default_config_path(variant), "r", encoding="utf-8") as handle:
+        config = json.loads(
+            handle.read(),
+            parse_constant=_clarity_shelf_reject_json_constant,
+            parse_float=_clarity_shelf_json_float,
+        )
+    # Both keys hold a path into the bundled tool folders, and neither can be stored
+    # absolute in a tracked file - the tree lives somewhere different on every machine.
+    for tab in config.get("tabs", ()):
+        if not isinstance(tab, dict):
+            continue
+        for item in tab.get("items", ()):
+            if not isinstance(item, dict):
+                continue
+            for key in ("script_file", "custom_icon"):
+                if item.get(key):
+                    item[key] = _clarity_shelf_resolve_bundled_path(item[key])
+    _clarity_shelf_normalize_config(config)
+    config["version"] = _CLARITY_SHELF_VERSION
+    return config
 
 
 def _clarity_shelf_config_clone(source):
@@ -1462,8 +1604,13 @@ def _clarity_shelf_tab_is_unmodified_builtin(tab):
     return True
 
 
-def _clarity_shelf_migrate_config(config):
-    """Bring one shelf config up to the current version. Returns True when changed."""
+def _clarity_shelf_migrate_config(config, variant="topbar"):
+    """Bring one shelf config up to the current version. Returns True when changed.
+
+    `variant` picks which default (`"topbar"` or `"panel"`) supplies fallback
+    tabs and patched-in builtin script buttons, so a Shelf-editor area gets
+    patched from its own default instead of the Top Bar's.
+    """
     migrated = False
     version = _clarity_shelf_version(config.get("version", 1))
     if version > _CLARITY_SHELF_VERSION:
@@ -1483,7 +1630,7 @@ def _clarity_shelf_migrate_config(config):
             None,
         )
         if modeling is None:
-            modeling = _clarity_shelf_default_config()["tabs"][0]
+            modeling = _clarity_shelf_default_config(variant)["tabs"][0]
         modeling["name"] = "Modeling"
         if custom is None:
             custom = {"name": "Custom", "items": [], "separators": []}
@@ -1515,6 +1662,27 @@ def _clarity_shelf_migrate_config(config):
                     if color and len(color) == 4 and color[3] == 0.0:
                         item[key] = [color[0], color[1], color[2], 1.0]
         config["version"] = 3
+        migrated = True
+    if version < 4:
+        # Ship the bundled shelf scripts into every existing config too, not just
+        # freshly created ones, matched by filename so a user's own edits to the
+        # item (label, icon, row) are not clobbered on repeated migration.
+        custom = next(
+            (tab for tab in config["tabs"] if tab["name"] == "Custom"),
+            None,
+        )
+        if custom is None:
+            custom = {"name": "Custom", "items": [], "separators": []}
+            config["tabs"].append(custom)
+        existing_keys = {
+            _clarity_shelf_bundled_script_key(item.get("script_file", ""))
+            for item in custom["items"]
+            if item.get("script_file")
+        }
+        for item in _clarity_shelf_builtin_script_items(variant):
+            if _clarity_shelf_bundled_script_key(item["script_file"]) not in existing_keys:
+                custom["items"].append(item)
+        config["version"] = 4
         migrated = True
     if config.get("version") != _CLARITY_SHELF_VERSION:
         config["version"] = _CLARITY_SHELF_VERSION
@@ -1680,7 +1848,9 @@ def _clarity_shelf_load():
                 if discarded and not future_schema:
                     destructive_repair = True
                     repair_reasons.append("discarded invalid entries in {:s}".format(scope))
-                migrated |= _clarity_shelf_migrate_config(config)
+                migrated |= _clarity_shelf_migrate_config(
+                    config, _clarity_shelf_default_config_variant(scope),
+                )
             except (AttributeError, OverflowError, ValueError, TypeError) as ex:
                 print("Clarity shelf: resetting unreadable shelf {:s}: {:s}".format(
                     scope, str(ex)))
@@ -1688,7 +1858,9 @@ def _clarity_shelf_load():
                     # The raw graph remains the source of truth until the user edits
                     # this scope explicitly.
                     future_schema = True
-                storage["shelves"][scope] = _clarity_shelf_default_config()
+                storage["shelves"][scope] = _clarity_shelf_default_config(
+                    _clarity_shelf_default_config_variant(scope),
+                )
                 if not future_schema:
                     migrated = True
                     destructive_repair = True
@@ -1719,7 +1891,12 @@ def _clarity_shelf_load():
 
 
 def _clarity_shelf_scope_config(scope, uuid_scope=None):
-    """Config for `scope`, created from the Top Bar shelf when it does not exist yet.
+    """Config for `scope`, created from its default when it does not exist yet.
+
+    A `SHELF:...` scope (a Shelf-editor area, e.g. one docked in a viewport)
+    gets its own `"panel"` default - a distinct layout from the Top Bar's, not
+    a clone of it. Every other scope still clones the Top Bar shelf, since it
+    is the only variant that predates per-variant defaults.
 
     Returns the config and whether the storage had to be changed to produce it.
     """
@@ -1735,6 +1912,8 @@ def _clarity_shelf_scope_config(scope, uuid_scope=None):
             _clarity_shelf_future_scope_storage[scope] = (
                 _clarity_shelf_future_scope_storage.pop(uuid_scope)
             )
+    elif _clarity_shelf_default_config_variant(scope) == "panel":
+        shelves[scope] = _clarity_shelf_default_config("panel")
     else:
         source = shelves.get("TOPBAR")
         shelves[scope] = (
@@ -3294,12 +3473,44 @@ def _clarity_shelf_call_operator(idname, properties, invoke=False):
     return status
 
 
+def _clarity_shelf_module_under_directory(module, directory):
+    module_path = getattr(module, "__file__", None) or (
+        next(iter(getattr(module, "__path__", ()) or ()), None)
+    )
+    if not module_path:
+        return False
+    return os.path.normcase(os.path.abspath(module_path)).startswith(
+        os.path.normcase(directory) + os.sep,
+    )
+
+
+def _clarity_shelf_purge_script_modules(script_directory, modules_before):
+    """Drop modules a shelf script imported from its own folder.
+
+    A FILE-source button gets its folder added to `sys.path`, so a plain
+    `import helper` next to the entry script resolves like a normal package
+    import - including nested subfolders, the same way an addon would be
+    laid out. `sys.modules` is process-global and outlives the call though,
+    so two unrelated tool folders that each happen to name a submodule the
+    same (both ship a `utils.py`, say) would otherwise have the second one
+    silently reuse the first one's cached module. Forgetting every module
+    this call newly loaded from `script_directory` keeps each run's imports
+    scoped to that run, so the folder name is the only thing that has to
+    stay unique between tools, not every file inside it.
+    """
+    for name in set(sys.modules) - modules_before:
+        module = sys.modules.get(name)
+        if module is not None and _clarity_shelf_module_under_directory(module, script_directory):
+            del sys.modules[name]
+
+
 def _clarity_shelf_run_script(context, item):
     """Run a Python shelf button. Returns an error message, empty when it succeeded."""
     source = item.get("script_source", "INLINE")
     filename = "<Shelf Button>"
     script_directory = ""
     path_inserted = False
+    modules_before = set(sys.modules)
     try:
         if source == 'TEXT':
             text_name = item.get("script_text", "")
@@ -3343,6 +3554,8 @@ def _clarity_shelf_run_script(context, item):
         traceback.print_exc()
         return f"Shelf script failed: {ex}"
     finally:
+        if script_directory:
+            _clarity_shelf_purge_script_modules(script_directory, modules_before)
         if path_inserted:
             try:
                 sys.path.remove(script_directory)
@@ -4245,14 +4458,14 @@ def _clarity_shelf_draw_icon_row(layout, row_index, context):
             continue
 
         item_column = row.column(align=True)
-        item_column.ui_units_x = 1.45
+        item_column.ui_units_x = _CLARITY_SHELF_TOPBAR_COLUMN_UNITS_X
         item_column.context_string_set("clarity_shelf_item_id", entry["id"])
         _clarity_shelf_draw_item_button(
             item_column,
             entry,
-            button_units_x=0.85,
-            icon_scale_y=0.82,
-            label_scale_y=0.68,
+            button_units_x=_CLARITY_SHELF_TOPBAR_BUTTON_UNITS_X,
+            icon_scale_y=_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y,
+            label_scale_y=_CLARITY_SHELF_TOPBAR_LABEL_SCALE_Y,
         )
 
     if entries and entries[-1][0] == "SEPARATOR":
@@ -4299,7 +4512,7 @@ def _clarity_shelf_draw_adaptive(layout, context):
 
     for entry_type, entry in _clarity_shelf_adaptive_entries(tab):
         cell = flow.column(align=True)
-        cell.ui_units_x = 1.55
+        cell.ui_units_x = _CLARITY_SHELF_PANEL_CELL_UNITS_X
 
         cell.context_string_set("clarity_shelf_item_id", entry["id"])
         if entry_type == "SEPARATOR":
@@ -4313,9 +4526,9 @@ def _clarity_shelf_draw_adaptive(layout, context):
         _clarity_shelf_draw_item_button(
             cell,
             entry,
-            button_units_x=0.95,
-            icon_scale_y=0.9,
-            label_scale_y=0.7,
+            button_units_x=_CLARITY_SHELF_PANEL_BUTTON_UNITS_X,
+            icon_scale_y=_CLARITY_SHELF_PANEL_ICON_SCALE_Y,
+            label_scale_y=_CLARITY_SHELF_PANEL_LABEL_SCALE_Y,
         )
 
 

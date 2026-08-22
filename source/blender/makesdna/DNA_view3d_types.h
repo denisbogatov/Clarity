@@ -76,6 +76,16 @@ enum eView3D_Runtime_Flag : int {
   V3D_RUNTIME_LOCAL_MAYBE_EMPTY = (1 << 2),
   /** Last offset is valid. */
   V3D_RUNTIME_OFS_LAST_CENTER_IS_VALID = (1 << 3),
+  /**
+   * Clarity is asking the user to read a marker of its own in this viewport.
+   *
+   * The 3D cursor is not drawn while it is. Maya has none, and in the two modes that put a marker
+   * in the viewport and ask the user to read where it stands - editing the pivot, and snapping - a
+   * second marker sitting at the world origin is read as the thing being edited having jumped
+   * there. Runtime, because it describes what the viewport is doing right now and nothing a file
+   * should remember.
+   */
+  V3D_RUNTIME_CLARITY_HIDE_CURSOR = (1 << 4),
 };
 ENUM_OPERATORS(eView3D_Runtime_Flag)
 

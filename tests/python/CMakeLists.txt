@@ -274,6 +274,12 @@ add_blender_test(
   --python ${CMAKE_CURRENT_LIST_DIR}/clarity_symmetry.py
 )
 
+add_blender_test(
+  clarity_script_tool_api
+  --factory-startup
+  --python ${CMAKE_CURRENT_LIST_DIR}/clarity_script_tool_api.py
+)
+
 # test running operators doesn't segfault under various conditions
 if(WITH_TESTS_EXPERIMENTAL)
   add_blender_test(
@@ -1769,6 +1775,10 @@ if(WITH_UI_TESTS)
     test_clarity_pivot.pivot_frame_goes_with_the_selection
     test_clarity_pivot.pivot_snap_drag_lands_on_the_target
     test_clarity_pivot.pivot_axis_handle_drags_the_pivot_along_one_axis
+    test_clarity_pivot.pivot_axis_handles_answer_all_along_the_arrow
+    test_clarity_pivot.pivot_rings_answer_beside_their_line
+    test_clarity_pivot.pivot_axis_drag_is_undone
+    test_clarity_pivot.pivot_component_drag_is_undone
     test_clarity_pivot.viewcube_angled_presets_preserve_y_up_and_perspective
 
     # Maya Soft Selection. These must drive actual press/move/release ordering through the window

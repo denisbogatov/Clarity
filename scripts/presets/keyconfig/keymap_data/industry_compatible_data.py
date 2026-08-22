@@ -253,6 +253,11 @@ def km_screen(params):
         # Undo
         ("ed.undo", {"type": 'Z', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
         ("ed.redo", {"type": 'Z', "value": 'PRESS', "shift": True, "ctrl": True, "repeat": True}, None),
+        # Maya's own redo chord, and here the only one that arrives: the Clarity dispatcher reads
+        # events before the keymap does, and it claims `Ctrl Shift Z` for the face-centre toggle, so
+        # the binding above never runs while the Clarity model owns the viewport. Undo kept its key
+        # and redo had lost one.
+        ("ed.redo", {"type": 'Y', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
         ("ed.undo_history", {"type": 'Z', "value": 'PRESS', "alt": True, "ctrl": True}, None),
         # Render
         ("render.view_cancel", {"type": 'ESC', "value": 'PRESS'}, None),
@@ -681,6 +686,15 @@ def km_view3d(params):
          {"type": 'Z', "value": 'PRESS', "ctrl": True, "shift": True}, None),
         ("view3d.clarity_wireframe_on_shaded_toggle",
          {"type": 'FIVE', "value": 'PRESS', "alt": True}, None),
+        # Manipulator size, the way Maya resizes its own from the keyboard. Every manipulator is
+        # drawn from this preference, Edit Pivot's included, and a pivot that is hard to aim at is
+        # usually a pivot drawn too small for the display it is on.
+        ("wm.context_scale_int",
+         {"type": 'EQUAL', "value": 'PRESS', "shift": -1, "repeat": True},
+         {"properties": [("data_path", 'preferences.view.gizmo_size'), ("value", 1.15)]}),
+        ("wm.context_scale_int",
+         {"type": 'MINUS', "value": 'PRESS', "shift": -1, "repeat": True},
+         {"properties": [("data_path", 'preferences.view.gizmo_size'), ("value", 0.87)]}),
         op_panel("TOPBAR_PT_name", {"type": 'RET', "value": 'PRESS'}, [("keep_open", False)]),
         ("wm.search_menu", {"type": 'TAB', "value": 'PRESS'}, None),
         # 3D Cursor

@@ -153,6 +153,7 @@ void ED_undo_push(bContext *C, const char *str)
     WM_main_add_notifier(NC_WM | ND_LIB_OVERRIDE_CHANGED, nullptr);
   }
   if (push_retval & UNDO_PUSH_RET_SUCCESS) {
+    ED_clarity_undo_step_pushed_trace(C, str);
     ED_clarity_undo_step_store(C);
   }
   else {

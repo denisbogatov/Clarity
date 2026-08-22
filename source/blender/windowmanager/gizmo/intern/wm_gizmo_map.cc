@@ -708,14 +708,32 @@ static int gizmo_find_intersected_3d_intern(wmGizmo **visible_gizmos,
 static wmGizmo *gizmo_find_intersected_3d(bContext *C,
                                           const int co[2],
                                           wmGizmo **visible_gizmos,
-                                          const int visible_gizmos_len,
+                                          const int visible_gizmos_len_init,
                                           int *r_part)
 {
   wmGizmo *result = nullptr;
-  int visible_gizmos_len_trim = visible_gizmos_len;
+  int visible_gizmos_len = visible_gizmos_len_init;
   int hit = -1;
 
   *r_part = 0;
+
+  /* The Clarity manipulator answers for its own handles, by the distance from the cursor to each
+   * of them rather than by which one is nearest the camera. It removes them from the array, so
+   * whatever it does not speak for still takes the path below. */
+  {
+    wmGizmo *clarity_gz = nullptr;
+    int clarity_part = 0;
+    if (ED_clarity_gizmo_pick(
+            C, co, visible_gizmos, &visible_gizmos_len, &clarity_gz, &clarity_part))
+    {
+      if (clarity_gz != nullptr) {
+        *r_part = clarity_part;
+        return clarity_gz;
+      }
+    }
+  }
+
+  int visible_gizmos_len_trim = visible_gizmos_len;
 
   /* Set up view matrices. */
   view3d_operator_needs_gpu(C);
@@ -774,11 +792,27 @@ static wmGizmo *gizmo_find_intersected_3d(bContext *C,
      * - As this runs on cursor-motion, avoid doing too many tests (currently 2x).
      */
     const int hotspot_radii[] = {
-        /* Use a small value so it's possible to accurately pick a gizmo
-         * when multiple are overlapping. */
+        /* Maya's manipulator "Pick Range": the range within which the cursor must land before a
+         * handle is highlighted, 8 pixels by default (`selectPref -manipClickBoxSize`). The
+         * tolerance belongs to the cursor there, not to the handle - a rotate ring is drawn one
+         * pixel wide and picked one pixel wide (`manipOptions -lineSize 1 -linePick 1`), and it is
+         * still comfortable to grab, because the cursor carries eight pixels of slack with it.
+         *
+         * The range is granted in steps rather than all at once, and the first step that finds
+         * anything wins. Inside one pass the winner is decided by depth, so a single wide range
+         * hands the cursor to whichever handle is nearest the camera rather than to the one nearest
+         * the cursor - which in a manipulator of three rings and three arrows around one point is
+         * routinely the wrong one. Stepping keeps Maya's reach for the handle that has the pixels
+         * to itself, and keeps precision where two handles are both in range.
+         *
+         * The first step grants no slack at all, only the cursor's own pixel. Two rings that cross
+         * are both in range of anything wider, and the pass then answers with the one nearest the
+         * camera - which is how a cursor sitting exactly on the X ring highlights the Y one. */
+        int(1.0f * UI_SCALE_FAC),
         int(3.0f * UI_SCALE_FAC),
-        /* Use a larger value as a fallback so wire gizmos aren't difficult to click on. */
-        int(10.0f * UI_SCALE_FAC),
+        int(8.0f * UI_SCALE_FAC),
+        /* A larger value as a fallback so wire gizmos aren't difficult to click on. */
+        int(12.0f * UI_SCALE_FAC),
     };
     for (int i = 0; i < ARRAY_SIZE(hotspot_radii); i++) {
       hit = gizmo_find_intersected_3d_intern(

@@ -156,6 +156,8 @@ static const char *debug_area_name(const int area_type)
       return "SHELF";
     case SPACE_ITEM:
       return "ITEM";
+    case SPACE_SCRIPT_TOOL:
+      return "SCRIPT_TOOL";
     case SPACE_OUTLINER:
       return "OUTLINER";
     case SPACE_PROPERTIES:

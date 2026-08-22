@@ -34,6 +34,7 @@ set(LIB
   bf_editor_space_node
   bf_editor_space_outliner
   bf_editor_space_script
+  bf_editor_space_script_tool
   bf_editor_space_sequencer
   bf_editor_space_spreadsheet
   bf_editor_space_statusbar

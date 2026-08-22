@@ -366,6 +366,15 @@ enum {
    * Otherwise it's not possible to see what's being transformed.
    */
   G_TRANSFORM_CURSOR = (1 << 5),
+  /**
+   * Set while the Clarity pivot itself is being transformed.
+   *
+   * Its own bit rather than #G_TRANSFORM_CURSOR, which it used to borrow: that flag exists to keep
+   * the 3D cursor drawn while it is the thing being dragged, and borrowing it made the cursor
+   * appear during every pivot drag - in the one mode where a second marker in the viewport is read
+   * as the pivot having jumped there.
+   */
+  G_TRANSFORM_CLARITY_PIVOT = (1 << 6),
 };
 
 /** Defined in `blender.cc` */

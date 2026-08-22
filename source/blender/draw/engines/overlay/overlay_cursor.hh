@@ -148,6 +148,14 @@ class Cursor : Overlay {
       return false;
     }
 
+    /* Clarity hides it while the viewport is asking the user to read a marker of its own: the pivot
+     * being edited, or a snap target. Maya, whose pivot editing this follows, has no 3D cursor, and
+     * a second marker at the world origin is read as the thing being edited having jumped there.
+     * After the rule above, which still holds: a cursor being dragged is drawn, in any mode. */
+    if (v3d->runtime.flag & V3D_RUNTIME_CLARITY_HIDE_CURSOR) {
+      return false;
+    }
+
     /* don't draw cursor in paint modes, but with a few exceptions */
     if ((state.object_mode & (OB_MODE_ALL_PAINT | OB_MODE_SCULPT_CURVES)) != 0) {
       /* exception: object is in weight paint and has deforming armature in pose mode */

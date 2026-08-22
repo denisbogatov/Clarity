@@ -134,10 +134,15 @@ static int rna_Area_type_get(PointerRNA *ptr)
 
 static void rna_Area_type_set(PointerRNA *ptr, int value)
 {
-  if (ELEM(value, SPACE_TOPBAR, SPACE_STATUSBAR)) {
+  if (ELEM(value, SPACE_TOPBAR, SPACE_STATUSBAR, SPACE_SCRIPT_TOOL)) {
     /* Special case: An area can not be set to show the top-bar editor (or
      * other global areas). However it should still be possible to identify
-     * its type from Python. */
+     * its type from Python.
+     *
+     * `SPACE_SCRIPT_TOOL` is excluded for a different reason: it exists so Python
+     * can register panels against it, but a window of it is only meaningful with
+     * the identity `wm.script_tool_window_open` gives it. Switching an ordinary
+     * area to it by hand would produce one with no `tool_id` and no panels. */
     return;
   }
 
@@ -214,7 +219,7 @@ static const EnumPropertyItem *rna_Area_ui_type_itemf(bContext *C,
   }
 
   for (; item_from->identifier; item_from++) {
-    if (ELEM(item_from->value, SPACE_TOPBAR, SPACE_STATUSBAR)) {
+    if (ELEM(item_from->value, SPACE_TOPBAR, SPACE_STATUSBAR, SPACE_SCRIPT_TOOL)) {
       continue;
     }
 

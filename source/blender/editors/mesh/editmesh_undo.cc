@@ -1213,6 +1213,10 @@ static bool mesh_undosys_step_encode(bContext *C, Main *bmain, UndoStep *us_p)
                            mesh->vertex_group_active_index,
                            um_references ? um_references[i] : nullptr);
 
+    /* The pivot Edit Pivot authored for this selection travels with the mesh it belongs to, so the
+     * ordinary queue undoes it in order with the edits around it. */
+    elem->data.mesh->clarity_component_pivot = mesh->clarity_component_pivot;
+
     em->needs_flush_to_id = 1;
     us->step.data_size += elem->data.undo_size;
 
@@ -1260,6 +1264,7 @@ static void mesh_undosys_step_decode(
     BMEditMesh *em = mesh->runtime->edit_mesh.get();
     undomesh_to_editmesh(
         &elem->data, em, &mesh->vertex_group_names, &mesh->vertex_group_active_index);
+    mesh->clarity_component_pivot = elem->data.mesh->clarity_component_pivot;
 
     obedit->shapenr = em->bm->shapenr;
 

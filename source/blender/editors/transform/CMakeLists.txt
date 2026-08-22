@@ -105,6 +105,7 @@ set(SRC
   transform_draw_cursors.hh
   transform_gizmo.hh
   transform_gizmo_clarity_cache.hh
+  transform_gizmo_clarity_pick.hh
   transform_mode.hh
   transform_orientations.hh
   transform_snap.hh

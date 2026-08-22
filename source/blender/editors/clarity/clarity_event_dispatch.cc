@@ -9,12 +9,14 @@
 #include "clarity_event_dispatch.hh"
 
 #include "DNA_screen_types.h"
+#include "DNA_view3d_types.h"
 #include "DNA_space_enums.h"
 #include "DNA_userdef_types.h"
 #include "DNA_vec_types.h"
 #include "DNA_workspace_types.h"
 
 #include "BLI_assert.h"
+#include "BLI_listbase.h"
 #include "BLI_time.h"
 #include "BLI_utildefines.h"
 
@@ -25,6 +27,8 @@
 #include "WM_toolsystem.hh"
 #include "WM_types.hh"
 #include "wm_event_types.hh"
+
+#include "ED_screen.hh"
 
 #include "UI_interface_c.hh"
 
@@ -575,6 +579,7 @@ ed::clarity::ClarityDispatchResult ED_clarity_event_dispatch(bContext *C, const 
   ed::clarity::transform_orientation_defaults_ensure(C);
 
   ed::clarity::pivot_edit_validate(C, *runtime);
+  ED_clarity_viewport_cursor_state_sync(C);
   /* Same reason, one step further: the authored pivot frame belongs to the selection it was aimed at,
    * and an ordinary object pick is handled by Blender's keymap, so this is the only place that sees
    * the selection it left behind. */

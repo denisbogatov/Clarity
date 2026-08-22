@@ -436,6 +436,14 @@ static void dial_draw_intern(const bContext *C,
      * While this works, it may be worth restoring the old behavior, see #111060. */
     clip_plane[3] += (DIAL_CLIP_BIAS *
                       ED_view3d_pixel_size_no_ui_scale(rv3d, gz->matrix_basis[2]));
+
+    /* And the part of the cut that belongs to the dial rather than to the pixel grid: a ring
+     * turned towards the camera keeps more of itself, and one facing it keeps all of it. See
+     * #ED_gizmo_dial_clip_radius_bias. */
+    float axis[3];
+    normalize_v3_v3(axis, matrix_final[2]);
+    const float radius = len_v3(matrix_final[0]);
+    clip_plane[3] += radius * ED_gizmo_dial_clip_radius_bias(dot_v3v3(rv3d->viewinv[2], axis));
   }
 
   const float arc_partial_angle = RNA_float_get(gz->ptr, "arc_partial_angle");
@@ -479,7 +487,16 @@ static void dial_draw_intern(const bContext *C,
   float line_width = (gz->line_width * U.pixelsize) + WM_gizmo_select_bias(select);
   if (select) {
     const float select_line_width = RNA_float_get(gz->ptr, "select_line_width") * U.pixelsize;
-    line_width = std::max(line_width, select_line_width);
+    if (select_line_width > 0.0f) {
+      /* An explicit width replaces the wire bias instead of widening past it. The bias exists so a
+       * lone one-pixel dial can be grabbed at all, but three rings around one point cross each
+       * other, and inside a selection pass the winner is decided by depth: every pixel the band of
+       * one ring adds is a pixel where the ring nearest the camera answers for a cursor that is
+       * sitting exactly on another one. The tolerance belongs to the cursor - see the stepped
+       * hit-radii in #gizmo_find_intersected_3d - so a dial that states its own pick width gets
+       * that width and nothing more, the way Maya's `manipOptions -linePick` does. */
+      line_width = select_line_width;
+    }
   }
   dial_3d_draw_util(matrix_final, line_width, color, select, &params);
 }
@@ -706,7 +723,8 @@ static void GIZMO_GT_dial_3d(wmGizmoType *gzt)
                 0.0f,
                 FLT_MAX,
                 "Select Line Width",
-                "Minimum logical-pixel width used only while selecting the dial",
+                "Logical-pixel width used only while selecting the dial, zero to widen the drawn "
+                "line by the wire selection bias instead",
                 0.0f,
                 100.0f);
   RNA_def_float_factor(

@@ -646,6 +646,7 @@ static const char *wm_area_name(const ScrArea *area)
     SPACE_NAME(SPACE_SPREADSHEET);
     SPACE_NAME(SPACE_SHELF);
     SPACE_NAME(SPACE_ITEM);
+    SPACE_NAME(SPACE_SCRIPT_TOOL);
   }
 #undef SPACE_NAME
 

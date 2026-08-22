@@ -11,14 +11,18 @@
  */
 
 #include <cmath>
+#include <cstdio>
 
 #include "BLI_array_utils.h"
 #include "BLI_bounds.hh"
 #include "BLI_function_ref.hh"
 #include "BLI_listbase.h"
+#include "BLI_math_constants.h"
 #include "BLI_math_geom.h"
 #include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
+#include "BLI_path_utils.hh"
+#include "BLI_vector.hh"
 
 #include "DNA_armature_types.h"
 #include "DNA_lattice_types.h"
@@ -69,6 +73,7 @@
 #include "transform_convert.hh"
 #include "transform_gizmo.hh"
 #include "transform_gizmo_clarity_cache.hh"
+#include "transform_gizmo_clarity_pick.hh"
 #include "transform_snap.hh"
 
 namespace blender::ed::transform {
@@ -452,6 +457,13 @@ static void gizmo_get_axis_color(const int axis_idx,
       }
       break;
     case MAN_AXIS_ROT_C:
+      if (use_clarity_palette) {
+        clarity_gizmo_color_set(ClarityGizmoVisualProfile::view_rotate, r_col);
+      }
+      else {
+        ui::theme::get_color_4fv(TH_GIZMO_VIEW_ALIGN, r_col);
+      }
+      break;
     case MAN_AXIS_ROT_T:
       if (use_clarity_palette) {
         clarity_gizmo_color_set(ClarityGizmoVisualProfile::view, r_col);
@@ -1118,10 +1130,7 @@ int calc_gizmo_stats(const bContext *C,
      * centre on those frames. The axes themselves still belong to the orientation setting - the
      * pivot frame replaces them later, in #gizmo_prepare_mat, and only when it owns them. */
     if (clarity_pivot_override) {
-      for (int axis = 0; axis < 3; axis++) {
-        copy_v3_v3(rv3d->twmat[axis], tbounds->axis[axis]);
-        rv3d->twmat[axis][3] = 0.0f;
-      }
+      clarity_gizmo_matrix_axes_set(rv3d->twmat, tbounds->axis);
     }
     else {
       copy_m4_m3(rv3d->twmat, tbounds->axis);
@@ -1266,6 +1275,30 @@ static bool gizmo_3d_calc_pos(const bContext *C,
   }
 
   return false;
+}
+
+/**
+ * One line per manipulator placement, on stderr, when `BLENDER_CLARITY_GIZMO_TRACE` is set.
+ *
+ * `go.bat --trace` sets that variable and redirects stderr to `gizmo-trace.log`. Where the
+ * manipulator sits during a drag is decided across three places - the group refresh, the gizmo
+ * modal handler and the draw prepare - and each of them can be one event behind the others, so the
+ * only way to tell which one placed a handle is to have each of them say so.
+ */
+static void clarity_gizmo_trace(const char *what, const float position[3], const char *detail)
+{
+  static const bool enabled = BLI_getenv("BLENDER_CLARITY_GIZMO_TRACE") != nullptr;
+  if (!enabled) {
+    return;
+  }
+  fprintf(stderr,
+          "clarity-gizmo %s pos=(%.4f %.4f %.4f) %s\n",
+          what,
+          double(position[0]),
+          double(position[1]),
+          double(position[2]),
+          detail);
+  fflush(stderr);
 }
 
 void gizmo_prepare_mat(const bContext *C, RegionView3D *rv3d, const TransformBounds *tbounds)
@@ -1918,6 +1951,9 @@ static wmOperatorStatus gizmo_modal(bContext *C,
       float pivot_matrix[4][4];
       const bool pivot_is_live = gizmo_3d_clarity_pivot_matrix_get(C, rv3d, pivot_matrix);
       copy_m4_m4(twmat, pivot_is_live ? pivot_matrix : rv3d->twmat);
+      clarity_gizmo_trace("modal-in",
+                          twmat[3],
+                          pivot_is_live ? "source=pivot-drag" : "source=twmat");
 
       if (axis_type == MAN_AXES_SCALE) {
         scale = scale_buf;
@@ -1959,6 +1995,7 @@ static wmOperatorStatus gizmo_modal(bContext *C,
       }
 
       if (update) {
+        clarity_gizmo_trace("modal-out", twmat[3], "applied");
         gizmogroup_refresh_from_matrix(gzgroup, twmat, scale, true);
         ED_region_tag_redraw_editor_overlays(region);
       }
@@ -2191,6 +2228,16 @@ static void gizmo_clarity_axis_range_set(wmGizmo *axis, const float start, const
   WM_gizmo_set_flag(axis, WM_GIZMO_DRAW_OFFSET_SCALE, true);
 }
 
+/** The translate arrow of the Clarity layout, one size up while the pivot is being edited. */
+static void gizmo_clarity_translate_axis_range_set(wmGizmo *axis, const bool edit_pivot)
+{
+  gizmo_clarity_axis_range_set(axis,
+                               edit_pivot ? ClarityGizmoVisualProfile::edit_pivot_axis_start :
+                                            ClarityGizmoVisualProfile::translate_axis_start,
+                               edit_pivot ? ClarityGizmoVisualProfile::edit_pivot_axis_end :
+                                            ClarityGizmoVisualProfile::translate_axis_end);
+}
+
 static void gizmogroup_apply_clarity_center_style(GizmoGroup *ggd,
                                                    const bool use_clarity_style,
                                                    const bool use_edit_pivot_style)
@@ -2209,8 +2256,11 @@ static void gizmogroup_apply_clarity_center_style(GizmoGroup *ggd,
                gizmo_3d_translate_center_style_get(use_clarity_style, false, use_edit_pivot_style));
   RNA_boolean_set(translate_center->ptr, "draw_inner", false);
   WM_gizmo_set_scale(translate_center,
-                     use_clarity_style ? ClarityGizmoVisualProfile::translate_center_scale :
-                                         0.2f);
+                     use_clarity_style ?
+                         (use_clarity_edit_pivot_style ?
+                              ClarityGizmoVisualProfile::edit_pivot_center_scale :
+                              ClarityGizmoVisualProfile::translate_center_scale) :
+                         0.2f);
   WM_gizmo_set_line_width(translate_center,
                           use_clarity_style ? ClarityGizmoVisualProfile::line_width :
                                               GIZMO_AXIS_LINE_WIDTH);
@@ -2239,9 +2289,7 @@ static void gizmogroup_apply_clarity_center_style(GizmoGroup *ggd,
   }
   if (use_clarity_style) {
     for (const int axis_idx : {MAN_AXIS_TRANS_X, MAN_AXIS_TRANS_Y, MAN_AXIS_TRANS_Z}) {
-      gizmo_clarity_axis_range_set(ggd->gizmos[axis_idx],
-                                   ClarityGizmoVisualProfile::translate_axis_start,
-                                   ClarityGizmoVisualProfile::translate_axis_end);
+      gizmo_clarity_translate_axis_range_set(ggd->gizmos[axis_idx], use_clarity_edit_pivot_style);
     }
     for (const int axis_idx : {MAN_AXIS_SCALE_X, MAN_AXIS_SCALE_Y, MAN_AXIS_SCALE_Z}) {
       gizmo_clarity_axis_range_set(ggd->gizmos[axis_idx],
@@ -2258,12 +2306,14 @@ static void gizmogroup_apply_clarity_center_style(GizmoGroup *ggd,
           MAN_AXIS_SCALE_PLANE_SCALE;
   const float scale_plane_length = use_clarity_style ? ClarityGizmoVisualProfile::plane_length :
                                                       MAN_AXIS_SCALE_PLANE_SCALE;
+  const float plane_select_bias = clarity_gizmo_plane_select_bias_get(use_clarity_edit_pivot_style);
   for (const int axis_idx : {MAN_AXIS_TRANS_XY, MAN_AXIS_TRANS_YZ, MAN_AXIS_TRANS_ZX}) {
     wmGizmo *axis = ggd->gizmos[axis_idx];
     RNA_float_set(axis->ptr, "length", translate_plane_length);
     RNA_float_set(axis->ptr,
                   "fill_alpha",
                   use_clarity_style ? ClarityGizmoVisualProfile::plane_fill_alpha : 0.5f);
+    axis->select_bias = plane_select_bias;
   }
   for (const int axis_idx : {MAN_AXIS_SCALE_XY, MAN_AXIS_SCALE_YZ, MAN_AXIS_SCALE_ZX}) {
     wmGizmo *axis = ggd->gizmos[axis_idx];
@@ -2273,11 +2323,18 @@ static void gizmogroup_apply_clarity_center_style(GizmoGroup *ggd,
                   use_clarity_style ? ClarityGizmoVisualProfile::plane_fill_alpha : 0.5f);
   }
 
-  /* Clarity draws the whole ring, not just the half facing the view. Maya's lineSize=1 applies to
-   * rings, centre outlines and axis stems alike. */
+  const bool scale_and_rotate = (ggd->twtype & V3D_GIZMO_SHOW_OBJECT_SCALE) &&
+                                (ggd->twtype & V3D_GIZMO_SHOW_OBJECT_ROTATE);
+  const float ring_select_bias = clarity_gizmo_rotate_select_bias_get(use_clarity_edit_pivot_style,
+                                                                     scale_and_rotate);
+  /* Maya draws an axis ring as the half sphere that faces the camera: the far arc of each ring is
+   * clipped away, in Edit Pivot and in the rotate tool alike, which is what makes three rings
+   * around one point read as an orientation instead of as three overlapping ellipses. The clip
+   * applies to the selection pass too, so the hidden half does not answer the cursor either.
+   * Maya's lineSize=1 applies to rings, centre outlines and axis stems alike. */
   for (int axis_idx = MAN_AXIS_ROT_X; axis_idx <= MAN_AXIS_ROT_Z; axis_idx++) {
     wmGizmo *axis = ggd->gizmos[axis_idx];
-    RNA_enum_set(axis->ptr, "draw_options", use_clarity_style ? 0 : ED_GIZMO_DIAL_DRAW_FLAG_CLIP);
+    RNA_enum_set(axis->ptr, "draw_options", ED_GIZMO_DIAL_DRAW_FLAG_CLIP);
     const float ring_scale = use_clarity_edit_pivot_style ?
                                  ClarityGizmoVisualProfile::edit_pivot_rotate_scale :
                                  ClarityGizmoVisualProfile::rotate_axis_scale;
@@ -2285,27 +2342,43 @@ static void gizmogroup_apply_clarity_center_style(GizmoGroup *ggd,
     WM_gizmo_set_line_width(axis,
                             use_clarity_style ? ClarityGizmoVisualProfile::line_width :
                                              GIZMO_AXIS_LINE_WIDTH + 1.0f);
+    /* The width of the band the depth-buffer path rasterizes for this ring. That path is the
+     * fallback now - #ED_clarity_gizmo_pick answers first and measures the drawn line itself - but
+     * it still runs wherever the analytic rule declines, so the band stays honest about the line. */
     RNA_float_set(axis->ptr,
                   "select_line_width",
-                  use_clarity_edit_pivot_style ?
-                      ClarityGizmoVisualProfile::edit_pivot_ring_select_width :
-                      0.0f);
+                  use_clarity_style ? ClarityGizmoVisualProfile::ring_select_width : 0.0f);
+    axis->select_bias = ring_select_bias;
   }
-  const float view_ring_scale = use_clarity_edit_pivot_style ?
-                                    ClarityGizmoVisualProfile::edit_pivot_rotate_scale :
-                                    ClarityGizmoVisualProfile::rotate_view_scale;
-  WM_gizmo_set_scale(
-      ggd->gizmos[MAN_AXIS_ROT_C], use_clarity_style ? view_ring_scale : 1.2f);
+  WM_gizmo_set_scale(ggd->gizmos[MAN_AXIS_ROT_C],
+                     use_clarity_style ? ClarityGizmoVisualProfile::rotate_view_scale : 1.2f);
   WM_gizmo_set_line_width(ggd->gizmos[MAN_AXIS_ROT_C],
                           use_clarity_style ? ClarityGizmoVisualProfile::line_width :
                                               GIZMO_AXIS_LINE_WIDTH);
+  /* The view ring encloses the other three and touches them at its own rim, so it picks by the same
+   * narrow band: a ring that answers wider than it is drawn takes the pixels of the ring the cursor
+   * is actually on. */
   RNA_float_set(ggd->gizmos[MAN_AXIS_ROT_C]->ptr,
                 "select_line_width",
-                use_clarity_edit_pivot_style ?
-                    ClarityGizmoVisualProfile::edit_pivot_ring_select_width :
-                    0.0f);
-  WM_gizmo_set_scale(ggd->gizmos[MAN_AXIS_ROT_T],
-                     use_clarity_style ? ClarityGizmoVisualProfile::rotate_axis_scale : 1.0f);
+                use_clarity_style ? ClarityGizmoVisualProfile::ring_select_width : 0.0f);
+  /* The sphere. Its outline is what the three axis rings end on, so it shares their radius, and
+   * it is drawn rather than only picked: the disc is kept for the selection pass alone through
+   * #ED_GIZMO_DIAL_DRAW_FLAG_FILL_SELECT, and the hover-only flag goes, because a silhouette that
+   * appears when the cursor reaches it is not a silhouette. */
+  wmGizmo *sphere = ggd->gizmos[MAN_AXIS_ROT_T];
+  WM_gizmo_set_scale(sphere,
+                     use_clarity_style ? (use_clarity_edit_pivot_style ?
+                                              ClarityGizmoVisualProfile::edit_pivot_rotate_scale :
+                                              ClarityGizmoVisualProfile::rotate_axis_scale) :
+                                         1.0f);
+  RNA_enum_set(sphere->ptr,
+               "draw_options",
+               use_clarity_style ? ED_GIZMO_DIAL_DRAW_FLAG_FILL_SELECT :
+                                   ED_GIZMO_DIAL_DRAW_FLAG_FILL);
+  WM_gizmo_set_line_width(sphere,
+                          use_clarity_style ? ClarityGizmoVisualProfile::line_width :
+                                              GIZMO_AXIS_LINE_WIDTH);
+  WM_gizmo_set_flag(sphere, WM_GIZMO_DRAW_HOVER, !use_clarity_style);
   for (const int axis_idx : {MAN_AXIS_TRANS_X,
                              MAN_AXIS_TRANS_Y,
                              MAN_AXIS_TRANS_Z,
@@ -2319,7 +2392,9 @@ static void gizmogroup_apply_clarity_center_style(GizmoGroup *ggd,
   }
   for (const int axis_idx : {MAN_AXIS_TRANS_X, MAN_AXIS_TRANS_Y, MAN_AXIS_TRANS_Z}) {
     /* Keep Maya's one-pixel stem visible, but make Edit Pivot forgiving to acquire. At the
-     * reference 75 px gizmo size, radius 0.12 produces an 18 px-wide invisible hit cylinder. */
+     * reference 75 px gizmo size, radius 0.16 produces a 24 px-wide invisible hit cylinder: the
+     * stem is a hairline drawn among rings and plane handles, so the target it offers has to be
+     * the one a hand can hit rather than the one the eye can see. */
     RNA_float_set(
         ggd->gizmos[axis_idx]->ptr,
         "stem_select_radius",
@@ -2396,10 +2471,12 @@ static void WIDGETGROUP_gizmo_refresh(const bContext *C, wmGizmoGroup *gzgroup)
     else {
       copy_v3_v3(rv3d->twmat[3], clarity_pivot_matrix[3]);
     }
+    clarity_gizmo_trace("refresh", rv3d->twmat[3], "source=pivot");
   }
   else {
     gizmo_3d_calc_pos(
         C, scene, &tbounds, scene->toolsettings->transform_pivot_point, rv3d->twmat[3]);
+    clarity_gizmo_trace("refresh", rv3d->twmat[3], "source=selection-stats");
   }
 
   gizmogroup_refresh_from_matrix(gzgroup, rv3d->twmat, nullptr, false);
@@ -2478,6 +2555,7 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
    * recalculated the pivot - #gizmo_modal on its own can be one event behind. */
   if (is_modal) {
     float pivot_matrix[4][4];
+    clarity_gizmo_trace("draw-prepare", rv3d->twmat[3], "modal twmat");
     if (gizmo_3d_clarity_pivot_matrix_get(C, rv3d, pivot_matrix)) {
       wmGizmo *modal_gizmo = WM_gizmomap_get_modal(gzgroup->parent_gzmap);
       const int modal_axis_idx = modal_gizmo != nullptr ?
@@ -2525,11 +2603,17 @@ static void WIDGETGROUP_gizmo_draw_prepare(const bContext *C, wmGizmoGroup *gzgr
                                                                              ggd->twtype) :
                                         ggd->twtype;
       /* Edit Pivot turns the rotate layout on to get the orientation rings, and Blender's trackball
-       * comes with it. Maya's pivot manipulator has no trackball handle; hiding it also keeps its
-       * selection disc from covering the translate arrows. */
-      if (axis_idx == MAN_AXIS_ROT_T && ggd->use_clarity_edit_pivot_style) {
+       * and view ring come with it. The view ring stays out: it is a screen-facing circle crossing
+       * all three arrows at the same radius, which is where aiming at an axis went wrong. The
+       * trackball stays as the sphere its three rings end on - drawn, since the arcs need something
+       * to end against, and not offered to the cursor, since the pivot is rotated by its rings and
+       * a disc over the whole manipulator would answer for the arrows underneath it. */
+      if (axis_idx == MAN_AXIS_ROT_C && ggd->use_clarity_edit_pivot_style) {
         WM_gizmo_set_flag(axis, WM_GIZMO_HIDDEN, true);
         continue;
+      }
+      if (axis_idx == MAN_AXIS_ROT_T) {
+        WM_gizmo_set_flag(axis, WM_GIZMO_HIDDEN_SELECT, ggd->use_clarity_edit_pivot_style);
       }
       if (gizmo_is_axis_visible(rv3d, visibility_twtype, idot, axis_type, axis_idx)) {
         /* XXX maybe unset _HIDDEN flag on redraw? */
@@ -2672,6 +2756,12 @@ static void gizmo_3d_draw_invoke(wmGizmoGroup *gzgroup,
       gizmo_3d_setup_draw_default(axis, axis_idx);
       gizmo_3d_setup_draw_from_twtype(axis, axis_idx, ggd->twtype);
       RNA_enum_set(axis->ptr, "draw_options", ED_GIZMO_ARROW_DRAW_FLAG_STEM);
+      if (use_clarity_style) {
+        /* The two calls above restore Blender's own arrow, and a running drag does not re-apply the
+         * Clarity style: without this the arrows beside the one being dragged change length under
+         * the cursor, by the whole Edit Pivot boost. */
+        gizmo_clarity_translate_axis_range_set(axis, ggd->use_clarity_edit_pivot_style);
+      }
     }
   }
   else if (axis_active_type == MAN_AXES_ROTATE && axis_idx_active != MAN_AXIS_ROT_T) {
@@ -2884,6 +2974,331 @@ static bool WIDGETGROUP_gizmo_poll_tool(const bContext *C, wmGizmoGroupType *gzg
 
   return true;
 }
+
+/* -------------------------------------------------------------------- */
+/** \name Clarity Handle Picking
+ *
+ * The geometry behind the rule in `transform_gizmo_clarity_pick.hh`: where each handle is drawn on
+ * screen, so the cursor can be measured against it rather than against the depth buffer.
+ *
+ * \{ */
+
+/** How many segments a ring is measured as. Four degrees of arc is well inside the pick range. */
+static constexpr int clarity_pick_ring_samples = 90;
+
+struct ClarityPickScreen {
+  const ARegion *region;
+  const RegionView3D *rv3d;
+  float cursor[2];
+};
+
+/** A world position in region pixels, or false when it sits behind the camera. */
+static bool clarity_pick_project(const ClarityPickScreen &screen,
+                                 const float world[3],
+                                 float r_co[2])
+{
+  float vec[4] = {world[0], world[1], world[2], 1.0f};
+  mul_m4_v4(screen.rv3d->persmat, vec);
+  if (!(vec[3] > 1e-6f)) {
+    return false;
+  }
+  r_co[0] = float(screen.region->winx) * 0.5f * (1.0f + vec[0] / vec[3]);
+  r_co[1] = float(screen.region->winy) * 0.5f * (1.0f + vec[1] / vec[3]);
+  return true;
+}
+
+static bool clarity_pick_project_local(const ClarityPickScreen &screen,
+                                       const float matrix[4][4],
+                                       const float local[3],
+                                       float r_co[2])
+{
+  float world[3];
+  mul_v3_m4v3(world, matrix, local);
+  return clarity_pick_project(screen, world, r_co);
+}
+
+static float clarity_pick_segment_distance(const ClarityPickScreen &screen,
+                                           const float matrix[4][4],
+                                           const float from[3],
+                                           const float to[3])
+{
+  float a[2], b[2];
+  if (!clarity_pick_project_local(screen, matrix, from, a) ||
+      !clarity_pick_project_local(screen, matrix, to, b))
+  {
+    return FLT_MAX;
+  }
+  return sqrtf(dist_squared_to_line_segment_v2(screen.cursor, a, b));
+}
+
+/** Distance to the outline of a convex quad, zero anywhere inside it. */
+static float clarity_pick_quad_distance(const ClarityPickScreen &screen,
+                                        const float matrix[4][4],
+                                        const float corners[4][3])
+{
+  float points[4][2];
+  for (int corner = 0; corner < 4; corner++) {
+    if (!clarity_pick_project_local(screen, matrix, corners[corner], points[corner])) {
+      return FLT_MAX;
+    }
+  }
+  if (isect_point_quad_v2(screen.cursor, points[0], points[1], points[2], points[3])) {
+    return 0.0f;
+  }
+  float best = FLT_MAX;
+  for (int corner = 0; corner < 4; corner++) {
+    best = min_ff(best,
+                  sqrtf(dist_squared_to_line_segment_v2(
+                      screen.cursor, points[corner], points[(corner + 1) % 4])));
+  }
+  return best;
+}
+
+/**
+ * Distance to a ring of radius one lying in the XY plane of \a matrix.
+ *
+ * `clip_far_half` follows the drawing rather than the shape: an axis ring is drawn with
+ * #ED_GIZMO_DIAL_DRAW_FLAG_CLIP, so the arc behind the plane through the pivot is not there to be
+ * aimed at. Measuring the whole circle would answer for a curve the user cannot see.
+ */
+static float clarity_pick_ring_distance(const ClarityPickScreen &screen,
+                                        const float matrix[4][4],
+                                        const bool clip_far_half)
+{
+  const float *towards_view = screen.rv3d->viewinv[2];
+  float centre_depth = dot_v3v3(towards_view, matrix[3]);
+  if (clip_far_half) {
+    /* The same cut the drawing makes, or the two would disagree about the half that is there. */
+    float axis[3];
+    normalize_v3_v3(axis, matrix[2]);
+    const float bias = ED_gizmo_dial_clip_radius_bias(dot_v3v3(towards_view, axis));
+    centre_depth -= len_v3(matrix[0]) * bias;
+  }
+
+  float points[clarity_pick_ring_samples][2];
+  bool usable[clarity_pick_ring_samples];
+  for (int sample = 0; sample < clarity_pick_ring_samples; sample++) {
+    const float angle = float(2.0 * M_PI) * (float(sample) / float(clarity_pick_ring_samples));
+    const float local[3] = {cosf(angle), sinf(angle), 0.0f};
+    float world[3];
+    mul_v3_m4v3(world, matrix, local);
+    usable[sample] = clarity_pick_project(screen, world, points[sample]);
+    if (usable[sample] && clip_far_half) {
+      usable[sample] = dot_v3v3(towards_view, world) >= centre_depth;
+    }
+  }
+
+  float best = FLT_MAX;
+  for (int sample = 0; sample < clarity_pick_ring_samples; sample++) {
+    const int next = (sample + 1) % clarity_pick_ring_samples;
+    if (!usable[sample] || !usable[next]) {
+      continue;
+    }
+    best = min_ff(
+        best, sqrtf(dist_squared_to_line_segment_v2(screen.cursor, points[sample], points[next])));
+  }
+  return best;
+}
+
+/**
+ * What one handle is, and how far the cursor sits from the geometry it is drawn as.
+ *
+ * Every case mirrors the drawing code it names: a handle measured as something other than what is
+ * on screen is exactly the defect this replaces.
+ */
+static bool clarity_pick_handle_measure(const ClarityPickScreen &screen,
+                                        wmGizmo *gz,
+                                        const int axis_idx,
+                                        ClarityPickKind *r_kind,
+                                        float *r_distance)
+{
+  float matrix[4][4];
+  WM_gizmo_calc_matrix_final(gz, matrix);
+
+  switch (axis_idx) {
+    case MAN_AXIS_TRANS_X:
+    case MAN_AXIS_TRANS_Y:
+    case MAN_AXIS_TRANS_Z:
+    case MAN_AXIS_SCALE_X:
+    case MAN_AXIS_SCALE_Y:
+    case MAN_AXIS_SCALE_Z: {
+      /* The stem runs along local Z from the offset already folded into the matrix, and the head
+       * continues past its end: a cone of 0.25 units for a translate arrow, a cube of 0.05
+       * half-width for a scale handle. Both are the handle. See #arrow_draw_geom. */
+      const bool is_scale = axis_idx >= MAN_AXIS_SCALE_X;
+      const float head = is_scale ? 0.10f : 0.25f;
+      const float from[3] = {0.0f, 0.0f, 0.0f};
+      const float to[3] = {0.0f, 0.0f, RNA_float_get(gz->ptr, "length") + head};
+      *r_kind = ClarityPickKind::Axis;
+      *r_distance = clarity_pick_segment_distance(screen, matrix, from, to);
+      return true;
+    }
+    case MAN_AXIS_TRANS_XY:
+    case MAN_AXIS_TRANS_YZ:
+    case MAN_AXIS_TRANS_ZX:
+    case MAN_AXIS_SCALE_XY:
+    case MAN_AXIS_SCALE_YZ:
+    case MAN_AXIS_SCALE_ZX: {
+      /* A diamond in the local XZ plane, sitting at the end of the arrow it is drawn along. */
+      const float length = RNA_float_get(gz->ptr, "length");
+      const float half = 0.1f;
+      const float corners[4][3] = {
+          {0.0f, 0.0f, length},
+          {half, 0.0f, length + half},
+          {0.0f, 0.0f, length + 2.0f * half},
+          {-half, 0.0f, length + half},
+      };
+      *r_kind = ClarityPickKind::Plane;
+      *r_distance = clarity_pick_quad_distance(screen, matrix, corners);
+      return true;
+    }
+    case MAN_AXIS_ROT_X:
+    case MAN_AXIS_ROT_Y:
+    case MAN_AXIS_ROT_Z:
+    case MAN_AXIS_ROT_C: {
+      const bool clip = (RNA_enum_get(gz->ptr, "draw_options") & ED_GIZMO_DIAL_DRAW_FLAG_CLIP) != 0;
+      *r_kind = ClarityPickKind::Ring;
+      *r_distance = clarity_pick_ring_distance(screen, matrix, clip);
+      return true;
+    }
+    case MAN_AXIS_ROT_T: {
+      /* The trackball disc. It has no line of its own - anywhere inside it is on it. */
+      float centre[2], edge[2];
+      const float origin[3] = {0.0f, 0.0f, 0.0f};
+      const float across[3] = {1.0f, 0.0f, 0.0f};
+      if (!clarity_pick_project_local(screen, matrix, origin, centre) ||
+          !clarity_pick_project_local(screen, matrix, across, edge))
+      {
+        return false;
+      }
+      const float radius = len_v2v2(centre, edge);
+      *r_kind = ClarityPickKind::Trackball;
+      *r_distance = max_ff(0.0f, len_v2v2(screen.cursor, centre) - radius);
+      return true;
+    }
+    case MAN_AXIS_TRANS_C: {
+      /* Free movement answers inside the small circle drawn within the centre square, and nowhere
+       * else - not even within the pick range that every other handle carries. See
+       * #ClarityGizmoVisualProfile::center_select_radius: this handle is the one an aim has to
+       * mean, because it sits where all six arrows begin. */
+      float centre[2], edge[2];
+      const float origin[3] = {0.0f, 0.0f, 0.0f};
+      const float across[3] = {ClarityGizmoVisualProfile::center_select_radius, 0.0f, 0.0f};
+      if (!clarity_pick_project_local(screen, matrix, origin, centre) ||
+          !clarity_pick_project_local(screen, matrix, across, edge))
+      {
+        return false;
+      }
+      if (len_v2v2(screen.cursor, centre) > len_v2v2(centre, edge)) {
+        return false;
+      }
+      *r_kind = ClarityPickKind::Center;
+      *r_distance = 0.0f;
+      return true;
+    }
+    case MAN_AXIS_SCALE_C: {
+      /* Uniform scale is the annulus drawn around everything else. */
+      float ring[4][4];
+      copy_m4_m4(ring, matrix);
+      const float factor = RNA_float_get(gz->ptr, "arc_inner_factor");
+      for (int axis = 0; axis < 3; axis++) {
+        mul_v3_fl(ring[axis], factor);
+      }
+      *r_kind = ClarityPickKind::Center;
+      *r_distance = clarity_pick_ring_distance(screen, ring, false);
+      return true;
+    }
+  }
+  return false;
+}
+
+/** The Clarity transform manipulator this gizmo belongs to, or null for anything else. */
+static GizmoGroup *clarity_pick_group_get(const wmGizmo *gz)
+{
+  const wmGizmoGroup *gzgroup = gz->parent_gzgroup;
+  if (gzgroup == nullptr || gzgroup->type == nullptr ||
+      gzgroup->type->setup != WIDGETGROUP_gizmo_setup)
+  {
+    return nullptr;
+  }
+  GizmoGroup *ggd = static_cast<GizmoGroup *>(gzgroup->customdata);
+  if (ggd == nullptr || !ggd->use_clarity_center_style) {
+    return nullptr;
+  }
+  return ggd;
+}
+
+static int clarity_pick_axis_index_get(const GizmoGroup *ggd, const wmGizmo *gz)
+{
+  for (int axis_idx = 0; axis_idx < MAN_AXIS_LAST; axis_idx++) {
+    if (ggd->gizmos[axis_idx] == gz) {
+      return axis_idx;
+    }
+  }
+  return -1;
+}
+
+static bool clarity_gizmo_pick(const bContext *C,
+                               const int mval[2],
+                               wmGizmo **visible_gizmos,
+                               int *visible_gizmos_len,
+                               wmGizmo **r_gizmo,
+                               int *r_part)
+{
+  *r_gizmo = nullptr;
+  *r_part = 0;
+
+  const ScrArea *area = CTX_wm_area(C);
+  const ARegion *region = CTX_wm_region(C);
+  if (area == nullptr || area->spacetype != SPACE_VIEW3D || region == nullptr ||
+      region->regiondata == nullptr)
+  {
+    /* The manipulator only exists in a 3D view, and only there is `regiondata` a #RegionView3D. */
+    return false;
+  }
+  const ClarityPickScreen screen = {
+      region,
+      static_cast<const RegionView3D *>(region->regiondata),
+      {float(mval[0]), float(mval[1])},
+  };
+
+  Vector<wmGizmo *, 32> handles;
+  Vector<ClarityPickCandidate, 32> candidates;
+  bool found_manipulator = false;
+  int kept = 0;
+  for (int index = 0; index < *visible_gizmos_len; index++) {
+    wmGizmo *gz = visible_gizmos[index];
+    const GizmoGroup *ggd = clarity_pick_group_get(gz);
+    if (ggd == nullptr) {
+      /* Everything else keeps the depth-buffer path, in the order it arrived in. */
+      visible_gizmos[kept++] = gz;
+      continue;
+    }
+    found_manipulator = true;
+    if (gz->flag & WM_GIZMO_HIDDEN_SELECT) {
+      continue;
+    }
+    const int axis_idx = clarity_pick_axis_index_get(ggd, gz);
+    ClarityPickKind kind;
+    float distance;
+    if (axis_idx != -1 && clarity_pick_handle_measure(screen, gz, axis_idx, &kind, &distance)) {
+      candidates.append({int(handles.append_and_get_index(gz)), kind, distance});
+    }
+  }
+
+  if (!found_manipulator) {
+    return false;
+  }
+  *visible_gizmos_len = kept;
+
+  const ClarityPickCandidate best = clarity_pick_resolve(candidates.as_span());
+  if (best.handle >= 0) {
+    *r_gizmo = handles[best.handle];
+  }
+  return true;
+}
+
+/** \} */
 
 /* Expose as multiple gizmos so tools use one, persistent context another.
  * Needed because they use different options which isn't so simple to dynamically update. */
@@ -3115,3 +3530,18 @@ bool calc_pivot_pos(const bContext *C, const short pivot_type, float r_pivot_pos
 }
 
 }  // namespace blender::ed::transform
+
+namespace blender {
+
+bool ED_clarity_gizmo_pick(const bContext *C,
+                           const int mval[2],
+                           wmGizmo **visible_gizmos,
+                           int *visible_gizmos_len,
+                           wmGizmo **r_gizmo,
+                           int *r_part)
+{
+  return ed::transform::clarity_gizmo_pick(
+      C, mval, visible_gizmos, visible_gizmos_len, r_gizmo, r_part);
+}
+
+}  // namespace blender

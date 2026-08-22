@@ -1,0 +1,164 @@
+{
+  "active": "Helpfull Panel",
+  "tabs": [
+    {
+      "name": "Modeling",
+      "items": [
+        {
+          "label": "Box Select",
+          "icon": "RESTRICT_SELECT_OFF",
+          "action": "select_box",
+          "row": 0
+        },
+        {
+          "label": "Move",
+          "icon": "ORIENTATION_GLOBAL",
+          "action": "move",
+          "row": 0
+        },
+        {
+          "label": "Rotate",
+          "icon": "DRIVER_ROTATIONAL_DIFFERENCE",
+          "action": "rotate",
+          "row": 0
+        },
+        {
+          "label": "Scale",
+          "icon": "FULLSCREEN_ENTER",
+          "action": "scale",
+          "row": 0
+        },
+        {
+          "label": "Add Plane",
+          "icon": "MESH_PLANE",
+          "action": "plane",
+          "row": 0
+        },
+        {
+          "label": "Add Cube",
+          "icon": "MESH_CUBE",
+          "action": "cube",
+          "row": 0
+        },
+        {
+          "label": "Add UV Sphere",
+          "icon": "MESH_UVSPHERE",
+          "action": "sphere",
+          "row": 0
+        },
+        {
+          "label": "Add Cylinder",
+          "icon": "MESH_CYLINDER",
+          "action": "cylinder",
+          "row": 0
+        },
+        {
+          "label": "Add Cone",
+          "icon": "MESH_CONE",
+          "action": "cone",
+          "row": 0
+        },
+        {
+          "label": "Add Torus",
+          "icon": "MESH_TORUS",
+          "action": "torus",
+          "row": 1
+        },
+        {
+          "label": "Toggle Edit Mode",
+          "icon": "EDITMODE_HLT",
+          "action": "edit_mode",
+          "row": 1
+        },
+        {
+          "label": "Extrude",
+          "icon": "MOD_SOLIDIFY",
+          "action": "extrude",
+          "row": 1
+        },
+        {
+          "label": "Inset Faces",
+          "icon": "FACESEL",
+          "action": "inset",
+          "row": 1
+        },
+        {
+          "label": "Bevel",
+          "icon": "MOD_BEVEL",
+          "action": "bevel",
+          "row": 1
+        },
+        {
+          "label": "Loop Cut",
+          "icon": "MOD_MULTIRES",
+          "action": "loop_cut",
+          "row": 1
+        },
+        {
+          "label": "Mirror Modifier",
+          "icon": "MOD_MIRROR",
+          "action": "mirror",
+          "row": 1
+        },
+        {
+          "label": "Array Modifier",
+          "icon": "MOD_ARRAY",
+          "action": "array",
+          "row": 1
+        },
+        {
+          "label": "Subdivision Surface",
+          "icon": "MOD_SUBSURF",
+          "action": "subsurf",
+          "row": 1
+        }
+      ],
+      "separators": []
+    },
+    {
+      "name": "Helpfull Panel",
+      "items": [
+        {
+          "label": "Save File",
+          "icon": "FILE_TICK",
+          "action": "save",
+          "row": 0
+        },
+        {
+          "label": "Preferences",
+          "icon": "PREFERENCES",
+          "action": "preferences",
+          "row": 0
+        },
+        {
+          "label": "Add Cube",
+          "icon": "MESH_CUBE",
+          "action": "cube",
+          "row": 0
+        },
+        {
+          "label": "New Material",
+          "icon": "MATERIAL",
+          "action": "material",
+          "row": 1
+        },
+        {
+          "label": "Render Image",
+          "icon": "RENDER_STILL",
+          "action": "render",
+          "row": 1
+        },
+        {
+          "label": "Tree Vertex Data Baker",
+          "icon": "MESH_DATA",
+          "command_type": "PYTHON",
+          "script_source": "FILE",
+          "script_file": "{shelf_scripts}/tree_vertex_data_baker/entry.py",
+          "row": 1,
+          "custom_icon": "{shelf_icons}/tree_vertex_data_baker.png"
+        }
+      ],
+      "separators": []
+    }
+  ]
+}

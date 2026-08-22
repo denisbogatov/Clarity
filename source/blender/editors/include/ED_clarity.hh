@@ -25,6 +25,7 @@ struct Main;
 struct Object;
 struct UndoStep;
 struct wmEvent;
+struct wmGizmo;
 struct wmOperator;
 struct wmWindow;
 
@@ -274,6 +275,26 @@ void ED_operatortypes_clarity();
 ed::clarity::ClarityDispatchResult ED_clarity_event_dispatch(bContext *C, const wmEvent *event);
 int ED_clarity_interaction_frame_rate_limit(const bContext *C);
 bool ED_clarity_navigation_debug_active(const bContext *C);
+/**
+ * Pick a handle of the Clarity transform manipulator the way Maya does: by the distance from the
+ * cursor to the geometry each handle is drawn as, with the kind of handle deciding a tie.
+ *
+ * Blender's own picking draws the handles into a selection buffer and keeps whichever fragment is
+ * nearest the camera, which around a manipulator answers "what is in front" instead of "what is
+ * being aimed at". Two rings that cross are the plain case: the cursor sits on one and the other,
+ * a few pixels nearer the camera, wins.
+ *
+ * Returns true when the manipulator took part, which is also when  visible_gizmos has been
+ * compacted: its handles are removed from the array and  visible_gizmos_len lowered, so the
+ * depth-buffer path that follows sees only the gizmos this rule does not speak for. `r_gizmo` is
+ * null when the cursor is out of range of every handle.
+ */
+bool ED_clarity_gizmo_pick(const bContext *C,
+                           const int mval[2],
+                           wmGizmo **visible_gizmos,
+                           int *visible_gizmos_len,
+                           wmGizmo **r_gizmo,
+                           int *r_part);
 ed::clarity::ClarityPivotEditTarget ED_clarity_pivot_edit_target_get(const bContext *C);
 /**
  * True while a running modal transform is the one editing the pivot. Edit Pivot being on is not the
@@ -360,6 +381,16 @@ bool ED_clarity_snap_key_event_apply(const bContext *C,
  * reach the dispatcher — the pointer left the 3D View, a popup swallowed the event — which is what
  * used to leave temporary snapping stuck on.
  */
+/**
+ * Tell the viewports of this window whether Clarity is holding the viewport's attention.
+ *
+ * The 3D cursor is hidden while it is: Maya has none, and in the two modes that ask the user to
+ * read a marker in the viewport - editing the pivot, and snapping - a second marker sitting at the
+ * world origin is read as the thing being edited having jumped there. The overlay cannot ask the
+ * editors anything, so the answer is published to #View3D_Runtime for it to read.
+ */
+void ED_clarity_viewport_cursor_state_sync(const bContext *C);
+
 bool ED_clarity_snap_override_release_all(const bContext *C);
 ed::clarity::ClaritySnapMode ED_clarity_snap_override_get(const bContext *C);
 bool ED_clarity_snap_mode_set(const bContext *C, ed::clarity::ClaritySnapMode mode);
@@ -397,6 +428,8 @@ void ED_clarity_transform_begin(
     bool is_clarity_pivot_transform);
 void ED_clarity_transform_update(const bContext *C, const float world_translation[3]);
 void ED_clarity_transform_end(bContext *C, bool cancelled);
+/** Temporary: names every undo step as it is pushed, into the pivot trace. */
+void ED_clarity_undo_step_pushed_trace(const bContext *C, const char *name);
 void ED_clarity_undo_step_store(const bContext *C);
 void ED_clarity_undo_step_clear(const bContext *C);
 void ED_clarity_undo_steps_restore(

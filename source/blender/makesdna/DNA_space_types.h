@@ -1084,6 +1084,35 @@ struct SpaceTopBar {
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Script Tool
+ * \{ */
+
+/**
+ * Host space for script-defined Blender-native utility windows.
+ *
+ * Holds identity only. `tool_id` selects which registered panels this window
+ * draws (matched against `Panel.bl_context`), and `instance_id` separates
+ * several windows of the same tool. No tool-specific data is stored here: a
+ * tool keeps its state in its own #PropertyGroup, as any add-on would.
+ */
+struct SpaceScriptTool {
+  SpaceLink *next = nullptr, *prev = nullptr;
+  /** Storage of regions for inactive spaces. */
+  ListBaseT<ARegion> regionbase = {nullptr, nullptr};
+  char spacetype = 0;
+  eSpace_Link_Flag link_flag = {};
+  char _pad0[6] = {};
+  /* End 'SpaceLink' header. */
+
+  /** Which tool's panels this window shows. */
+  char tool_id[64] = "";
+  /** Which window of that tool this is. */
+  char instance_id[64] = "";
+};
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Status Bar
  * \{ */
 

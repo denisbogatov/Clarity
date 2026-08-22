@@ -65,7 +65,8 @@ static bool clarity_view3d_gizmo_state_matches(const View3D &v3d,
 {
   return v3d.gizmo_show_object == gizmo_type &&
          (v3d.gizmo_flag & V3D_GIZMO_HIDE_CONTEXT) == 0 &&
-         (v3d.gizmo_flag & V3D_GIZMO_HIDE_TOOL) != 0;
+         (v3d.gizmo_flag & V3D_GIZMO_HIDE_TOOL) != 0 &&
+         (v3d.overlay.flag & V3D_OVERLAY_HIDE_OBJECT_ORIGINS) != 0;
 }
 
 static bool clarity_view3d_gizmo_state_apply(ScrArea &area,
@@ -82,6 +83,11 @@ static bool clarity_view3d_gizmo_state_apply(ScrArea &area,
   v3d->gizmo_show_object = gizmo_type;
   v3d->gizmo_flag &= ~V3D_GIZMO_HIDE_CONTEXT;
   v3d->gizmo_flag |= V3D_GIZMO_HIDE_TOOL;
+  /* Maya draws no marker at an object's origin. What answers for an object's frame is the
+   * manipulator, and a second dot beside it - at a point the user did not put anything - reads as
+   * something meaningful. It belongs with the tool gizmo above: both are Blender presentation that
+   * the Clarity viewport replaces rather than adds to. */
+  v3d->overlay.flag |= V3D_OVERLAY_HIDE_OBJECT_ORIGINS;
 
   for (ARegion &region : area.regionbase) {
     if (region.regiontype == RGN_TYPE_WINDOW) {

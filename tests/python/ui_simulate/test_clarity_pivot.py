@@ -24,6 +24,7 @@ this one's. ``run.py`` starts a process per test for that reason.
         --tests test_clarity_pivot.pivot_click_aligns_the_pivot_to_the_clicked_edge
 """
 
+import math
 import os
 import tempfile
 
@@ -870,23 +871,51 @@ def pivot_snap_drag_lands_on_the_target():
                     "the target and the pointer agree, so this drag proves nothing")
 
 
-def _pivot_axis_arrow_pixels(object, region, region_3d, axis_index):
+_PROFILE_CACHE = {}
+
+
+def _profile_value(name):
     """
-    Where one pivot axis arrow runs on screen: its centre, its direction, and the two distances the
-    stem spans, in window pixels.
+    One geometry constant of the drawn manipulator, in gizmo units.
+
+    The test aims where the C++ profile says the arrow is drawn instead of repeating its numbers, so
+    that changing the size of the manipulator moves the aim with it and never silently turns this
+    into a test of empty screen space.
+    """
+    if not _PROFILE_CACHE:
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[3]
+        sys.path.insert(0, str(root / "tests" / "pivot_reference"))
+        try:
+            from test_clarity_pivot_visual_profile import _profile_float
+        finally:
+            del sys.path[0]
+        source = (
+            root / "source/blender/editors/transform/transform_gizmo_clarity_cache.hh"
+        ).read_text(encoding="utf-8")
+        _PROFILE_CACHE["source"] = source
+        _PROFILE_CACHE["read"] = _profile_float
+    return _PROFILE_CACHE["read"](_PROFILE_CACHE["source"], name)
+
+
+def _pivot_direction_screen(object, region, region_3d, direction, origin=None):
+    """
+    Where one direction out of the pivot runs on screen: the centre, the screen direction, and how
+    many pixels one gizmo unit spans along it.
 
     The manipulator is drawn at a constant pixel size - one gizmo unit is `gizmo_size` pixels in the
-    view plane. The Maya visual fixture measures the stem from 0.25 to 0.80 units; its cone continues
-    to 1.05. A world axis is foreshortened by however far it leans out of that plane, which is the
-    ratio between its projected length and a view-plane vector's.
+    view plane. A world direction is foreshortened by however far it leans out of that plane, which
+    is the ratio between its projected length and a view-plane vector's.
     """
     import bpy
     from bpy_extras.view3d_utils import location_3d_to_region_2d
     from mathutils import Vector
 
-    origin = object.matrix_world.translation
-    axis = Vector((0.0, 0.0, 0.0))
-    axis[axis_index] = 1.0
+    if origin is None:
+        origin = object.matrix_world.translation
+    axis = direction.normalized()
     in_view_plane = region_3d.view_rotation @ Vector((1.0, 0.0, 0.0))
 
     here = location_3d_to_region_2d(region, region_3d, origin)
@@ -899,7 +928,57 @@ def _pivot_axis_arrow_pixels(object, region, region_3d, axis_index):
 
     unit = bpy.context.preferences.view.gizmo_size * ((along - here).length / (across - here).length)
     centre = Vector((region.x + here.x, region.y + here.y))
-    return centre, (along - here).normalized(), 0.25 * unit, 0.80 * unit
+    return centre, (along - here).normalized(), unit
+
+
+def _pivot_axis_screen(object, region, region_3d, axis_index, origin=None):
+    """Where one pivot axis runs on screen. See #_pivot_direction_screen."""
+    from mathutils import Vector
+
+    axis = Vector((0.0, 0.0, 0.0))
+    axis[axis_index] = 1.0
+    return _pivot_direction_screen(object, region, region_3d, axis, origin)
+
+
+def _pivot_axis_arrow_pixels(object, region, region_3d, axis_index):
+    """The stem of one pivot arrow: centre, direction, and the distances it spans, in pixels."""
+    centre, direction, unit = _pivot_axis_screen(object, region, region_3d, axis_index)
+    return (
+        centre,
+        direction,
+        _profile_value("edit_pivot_axis_start") * unit,
+        _profile_value("edit_pivot_axis_end") * unit,
+    )
+
+
+def _pivot_drag_probe(e, point):
+    """
+    Aim at one point, press, drag, cancel. Yields once per simulated step.
+
+    Returns the `pivot-drag-begin` line this gesture wrote, or None when the press started no pivot
+    drag at all - which is the whole measurement: the line exists only for a press that a pivot
+    handle answered.
+
+    The cursor is moved twice before the press because a handle is offered a press only once it is
+    highlighted, and the highlight is computed from the move that precedes it. The drag is cancelled
+    so that the manipulator is still in the same place for the next probe.
+    """
+    before = len(_trace_lines("pivot-drag-begin"))
+    x, y = int(round(point.x)), int(round(point.y))
+    e.cursor_position_set(x, y, move=True)
+    yield
+    e.cursor_position_set(x, y, move=True)
+    yield
+    e.leftmouse.press()
+    yield
+    for step in range(1, 4):
+        e.cursor_position_set(x + step * 6, y, move=True)
+        yield
+    yield e.esc()
+    e.leftmouse.release()
+    yield
+    lines = _trace_lines("pivot-drag-begin")
+    return lines[-1] if len(lines) > before else None
 
 
 def pivot_axis_handle_drags_the_pivot_along_one_axis():
@@ -974,6 +1053,452 @@ def pivot_axis_handle_drags_the_pivot_along_one_axis():
     t.assertTrue(constraint & 2, "the drag is constrained, but not to the pivot's X axis")
 
 
+def pivot_axis_handles_answer_all_along_the_arrow():
+    """
+    Every part of an axis arrow answers a press, and answers with its own axis.
+
+    The complaint this pins down is not that the handles never work - it is that hitting them is a
+    matter of luck. Picking is decided by the depth buffer among everything Edit Pivot draws: three
+    rings cross the three arrows, plane handles sit between them and a centre square sits on top of
+    where they all meet, so an arrow can be highlighted at one distance from the centre and lost at
+    the next. A single press in the middle of the stem cannot see that; a sweep of the whole arrow
+    can, and it reports which distances failed rather than only that something did.
+
+    Each probe presses, drags and cancels, so the manipulator stays where it was and the next probe
+    aims at the same geometry. `pivot-drag-begin` carries the transform mode and the constraint the
+    pressed handle asked for: mode 1 is a translation, and the constraint bits are X, Y and Z from
+    bit 1 up, with bit 0 saying a constraint applies at all.
+    """
+    import bpy
+    from mathutils import Vector
+
+    e, t, window = ui.test_window()
+    trace = _trace_reset()
+
+    bpy.context.preferences.inputs.interaction_preset = 'CLARITY'
+    yield
+
+    area, region = _view3d_area_region(window)
+    region_3d = area.spaces[0].region_3d
+    object = bpy.data.objects["Cube"]
+    with bpy.context.temp_override(window=window, area=area, region=region):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.context.view_layer.objects.active = object
+        object.select_set(True)
+    yield
+
+    start = _profile_value("edit_pivot_axis_start")
+    end = _profile_value("edit_pivot_axis_end")
+    # The cone continues 0.25 gizmo units past the stem, and the tip is a handle like the rest of it.
+    tip = end + 0.25
+    # Along the stem: just inside both ends, the middle, and the two quarters between - the ring
+    # band crosses one of them, the plane handles sit beside another, and the centre square is
+    # nearest the first. Six pixels off the line is the other half of what the hit cylinder around
+    # the stem promises, and the cone is probed down its middle because it narrows to a point.
+    # The innermost aim clears the centre square: it is drawn 0.19 units across, so its corners
+    # reach further than its edges and the first tenth of the stem is inside them. That square is a
+    # handle of its own and is allowed to answer there.
+    probes = [
+        (start + (end - start) * fraction, offset)
+        for fraction in (0.15, 0.3, 0.5, 0.7, 0.95)
+        for offset in (0.0, 6.0)
+    ]
+    probes.append((end + 0.12, 0.0))
+
+    centre, _, _ = _pivot_axis_screen(object, region, region_3d, 0)
+    e.cursor_position_set(int(round(centre.x)), int(round(centre.y)), move=True)
+    yield
+    # `D` toggles Edit Pivot. Without the mode these presses belong to the object manipulator.
+    yield e.d()
+
+    misses = []
+    for axis_index, axis_name in enumerate("XYZ"):
+        for aim, offset in probes:
+            centre, direction, unit = _pivot_axis_screen(object, region, region_3d, axis_index)
+            across = Vector((-direction.y, direction.x))
+            point = centre + direction * (aim * unit) + across * offset
+            line = yield from _pivot_drag_probe(e, point)
+            where = "{:s} at {:.0f} px out, {:.0f} px across".format(
+                axis_name, aim * unit, offset)
+            if line is None:
+                misses.append(where + ": no drag started")
+                continue
+            fields = _trace_fields(line)
+            constraint = int(fields["con"])
+            if fields["mode"] != "1":
+                misses.append(where + ": transform mode " + fields["mode"])
+            elif not constraint & 1:
+                misses.append(where + ": the drag carries no constraint")
+            elif not constraint & (1 << (axis_index + 1)):
+                misses.append(where + ": constrained to {:d}, not to {:s}".format(
+                    constraint, axis_name))
+
+    t.assertFalse(
+        misses,
+        "{:d} of {:d} aims at an axis arrow did not start that axis, see {:s}:\n  {:s}".format(
+            len(misses), 3 * len(probes), trace, "\n  ".join(misses)),
+    )
+
+    # And the same gesture past the end of the arrow starts nothing, which is what makes the sweep
+    # above a measurement of the arrow rather than of the whole screen.
+    centre, direction, unit = _pivot_axis_screen(object, region, region_3d, 0)
+    beyond = centre + direction * ((tip + 0.5) * unit)
+    line = yield from _pivot_drag_probe(e, beyond)
+    t.assertIsNone(
+        line,
+        "a press {:.0f} px out, past the {:.0f} px tip of the X arrow, still started a pivot "
+        "drag".format((tip + 0.5) * unit, tip * unit),
+    )
+
+
+def _ring_facing_view(region_3d, around):
+    """How far one point of a ring leans towards the camera, from -1 behind to 1 in front."""
+    from mathutils import Vector
+
+    return around.normalized().dot(region_3d.view_rotation @ Vector((0.0, 0.0, 1.0)))
+
+
+def _ring_screen_points(object, region, region_3d, axis_index, radius):
+    """
+    The drawn half of one ring as a screen polyline, sampled every ten degrees.
+
+    Maya clips a ring at the plane through the pivot: only the arc facing the camera is drawn, and
+    the selection pass is clipped with it, so the half that is not there answers nothing.
+    """
+    from mathutils import Vector
+
+    points = []
+    for step in range(36):
+        angle = step * (math.pi / 18.0)
+        around = Vector((0.0, 0.0, 0.0))
+        around[(axis_index + 1) % 3] = math.cos(angle)
+        around[(axis_index + 2) % 3] = math.sin(angle)
+        if _ring_facing_view(region_3d, around) < 0.0:
+            continue
+        centre, direction, unit = _pivot_direction_screen(object, region, region_3d, around)
+        points.append(centre + direction * (radius * unit))
+    return points
+
+
+def _ring_probe_direction(object, region, region_3d, axis_index, radius, offsets):
+    """
+    A direction out of the pivot where one ring is alone on screen, at every offset probed.
+
+    A ring lies in the plane of the other two axes and crosses both of them, and those crossings
+    belong to the arrows. Halfway between them it is clear of both - in three dimensions. On screen
+    it need not be: a view can lay the diagonal of two axes right along the third, which is the same
+    coincidence that lets a plane handle sit on an arrow. So the place is found rather than assumed:
+    the ring is walked - the drawn half of it - and the angle whose probes stand furthest from all
+    three arrows wins.
+
+    The offsets are part of the search because they move along the radius, and every arrow runs out
+    of the same centre: a step towards it is a step towards all three of them. The other two rings
+    count as well - three rings around one point cross each other, and a crossing is a place where
+    either of them may fairly answer.
+    """
+    from mathutils import Vector
+
+    others = [_ring_screen_points(object, region, region_3d, other, radius)
+              for other in range(3) if other != axis_index]
+
+    def walk(facing_min):
+        best = None
+        for step in range(72):
+            angle = step * (math.pi / 36.0)
+            around = Vector((0.0, 0.0, 0.0))
+            around[(axis_index + 1) % 3] = math.cos(angle)
+            around[(axis_index + 2) % 3] = math.sin(angle)
+            if _ring_facing_view(region_3d, around) < facing_min:
+                continue
+            centre, direction, unit = _pivot_direction_screen(object, region, region_3d, around)
+            clearance = None
+            for offset in offsets:
+                point = centre + direction * (radius * unit + offset)
+                near = min(_distance_to_axis(object, region, region_3d, other, point)
+                           for other in range(3))
+                for ring in others:
+                    near = min(near, min((point - other).length for other in ring))
+                clearance = near if clearance is None else min(clearance, near)
+            if best is None or clearance > best[0]:
+                best = (clearance, centre, direction, unit)
+        return best
+
+    # Only the half that is drawn, with a margin that keeps the probe off the clip plane itself,
+    # where the ring ends. A ring seen face on has no such half - it lies in the view plane, the
+    # clip takes nothing away from it, and then the whole of it is fair game.
+    best = walk(0.25) or walk(-1.0)
+    clearance, centre, direction, unit = best
+    return centre, direction, unit, clearance
+
+
+def _distance_to_axis(object, region, region_3d, axis_index, point):
+    """How far a screen point is from the line one arrow runs along."""
+    centre, direction, _ = _pivot_axis_screen(object, region, region_3d, axis_index)
+    offset = point - centre
+    return abs(offset.x * direction.y - offset.y * direction.x)
+
+
+def pivot_rings_answer_beside_their_line():
+    """
+    A rotation ring answers the cursor near it, not only on it.
+
+    Maya gives the tolerance to the cursor rather than to the handle: its rings are drawn one pixel
+    wide and picked one pixel wide, and what makes them comfortable is the manipulator Pick Range,
+    the eight pixels within which the cursor must land before a handle highlights. A ring is the
+    handle that shows this most plainly - it is a curve, so the only way to be on it is to be
+    exactly on it, and every pixel of slack has to come from somewhere else.
+
+    Six and ten pixels off the line are past the ring's own selection band, so this passes only
+    while the cursor carries a range of its own.
+    """
+    import bpy
+    from mathutils import Vector
+
+    e, t, window = ui.test_window()
+    trace = _trace_reset()
+
+    bpy.context.preferences.inputs.interaction_preset = 'CLARITY'
+    yield
+
+    area, region = _view3d_area_region(window)
+    region_3d = area.spaces[0].region_3d
+    object = bpy.data.objects["Cube"]
+    with bpy.context.temp_override(window=window, area=area, region=region):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.context.view_layer.objects.active = object
+        object.select_set(True)
+    yield
+
+    centre, _, _ = _pivot_axis_screen(object, region, region_3d, 0)
+    e.cursor_position_set(int(round(centre.x)), int(round(centre.y)), move=True)
+    yield
+    # `D` toggles Edit Pivot, which is the layout that draws the rings.
+    yield e.d()
+
+    radius = _profile_value("edit_pivot_rotate_scale")
+    # Outwards only. Every arrow leaves the same centre, so a step from the ring towards it is a
+    # step towards all three of them, and those pixels are the arrows' by the rule that made the
+    # axes reachable at all. Outside the ring nothing else is drawn until the plane handles, which
+    # is where a ring has to answer for itself. Six pixels is already past its own selection band;
+    # ten is past anything the band could explain.
+    offsets = (6.0, 10.0)
+    misses = []
+    for axis_index, axis_name in enumerate("XYZ"):
+        centre, direction, unit, clearance = _ring_probe_direction(
+            object, region, region_3d, axis_index, radius, offsets)
+        # A neighbour reaches about sixteen pixels from itself here - its own selection width, or a
+        # few pixels of tapered stem, plus the corner of the cursor's square range - and it is meant
+        # to win those. A probe inside that is not a probe of this ring. Three rings and three
+        # arrows around one point leave little more than that, which is the measurement this
+        # threshold really carries: the manipulator is crowded, and every pixel of clearance it has
+        # left is spoken for.
+        t.assertGreater(clearance, 17.0,
+                        "no place on the {:s} ring stands clear of the other handles in this view, "
+                        "the best is {:.0f} px".format(axis_name, clearance))
+        for offset in offsets:
+            # Off the line along the radius: the ring runs across that direction, so the whole
+            # offset is distance from it.
+            point = centre + direction * (radius * unit + offset)
+            line = yield from _pivot_drag_probe(e, point)
+            where = "{:s} ring, {:.0f} px off its line, {:.0f} px clear of every arrow".format(
+                axis_name, offset, clearance)
+            if line is None:
+                misses.append(where + ": no drag started")
+                continue
+            fields = _trace_fields(line)
+            if fields["mode"] != "2":
+                misses.append(where + ": transform mode " + fields["mode"] + " constraint " +
+                              fields["con"] + ", not a rotation")
+            elif not int(fields["con"]) & (1 << (axis_index + 1)):
+                misses.append(where + ": rotated around {:s}, not {:s}".format(
+                    fields["con"], axis_name))
+
+    t.assertFalse(
+        misses,
+        "{:d} of {:d} aims beside a ring did not reach it, see {:s}:\n  {:s}".format(
+            len(misses), 6, trace, "\n  ".join(misses)),
+    )
+
+
+def _pivot_drag_along_axis(e, object, region, region_3d, axis_index, steps=5):
+    """
+    Grab an axis arrow and carry it. Yields once per simulated step, and lets go at the end.
+
+    The manipulator is aimed at from where the pivot is now, not from the object's origin: once it
+    has been moved the two are no longer the same point, and a second drag aimed at the origin grabs
+    nothing at all.
+    """
+    import bpy
+    from mathutils import Vector
+
+    origin = Vector(bpy.context.window_manager.clarity_pivot_position)
+    centre, direction, unit = _pivot_axis_screen(object, region, region_3d, axis_index, origin)
+    start = _profile_value("edit_pivot_axis_start")
+    end = _profile_value("edit_pivot_axis_end")
+    grab = centre + direction * ((start + end) * 0.5 * unit)
+    x, y = int(round(grab.x)), int(round(grab.y))
+
+    e.cursor_position_set(x, y, move=True)
+    yield
+    e.cursor_position_set(x, y, move=True)
+    yield
+    e.leftmouse.press()
+    yield
+    for step in range(1, steps + 1):
+        e.cursor_position_set(int(round(x + direction.x * step * 8)),
+                              int(round(y + direction.y * step * 8)), move=True)
+        yield
+    e.leftmouse.release()
+    yield
+
+
+def pivot_axis_drag_is_undone():
+    """
+    One Undo puts a dragged pivot back where it was.
+
+    Maya keeps the pivot in the transform node, so moving it is an edit to the scene like any other
+    and the undo queue carries it without being asked. Here the pivot of a component lives in the
+    window runtime, which no undo step knows about, so the runtime has to hand its own before-and-
+    after to the step being pushed. That handoff was wired for the click and for the reset commands
+    and never for the drag - the one gesture that could not be performed at all until the handles
+    became reachable, which is why nothing noticed.
+
+    The manipulator's own position is what is checked, not the storage behind it: object pivots and
+    component pivots are kept in different places, and what the user undoes is the manipulator they
+    moved.
+    """
+    import bpy
+    from mathutils import Vector
+
+    e, t, window = ui.test_window()
+    _trace_reset()
+
+    bpy.context.preferences.inputs.interaction_preset = 'CLARITY'
+    yield
+
+    area, region = _view3d_area_region(window)
+    region_3d = area.spaces[0].region_3d
+    object = bpy.data.objects["Cube"]
+    with bpy.context.temp_override(window=window, area=area, region=region):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.context.view_layer.objects.active = object
+        object.select_set(True)
+    yield
+
+    centre, _, _ = _pivot_axis_screen(object, region, region_3d, 0)
+    e.cursor_position_set(int(round(centre.x)), int(round(centre.y)), move=True)
+    yield
+    # `D` toggles Edit Pivot.
+    yield e.d()
+
+    manager = bpy.context.window_manager
+    start = Vector(manager.clarity_pivot_position)
+    yield from _pivot_drag_along_axis(e, object, region, region_3d, 0)
+    once = Vector(manager.clarity_pivot_position)
+    yield from _pivot_drag_along_axis(e, object, region, region_3d, 1)
+    twice = Vector(manager.clarity_pivot_position)
+    t.assertGreater((once - start).length, 0.05, "the first drag did not move the pivot")
+    t.assertGreater((twice - once).length, 0.05, "the second drag did not move the pivot")
+
+    # Two moves and one Undo: what comes back is the pivot as the first drag left it. Undoing to
+    # where it started would mean the pivot was dropped rather than restored - the same result a
+    # pivot that simply recomputes itself from the selection would give, and not undo at all.
+    yield e.ctrl.z()
+    for _ in range(3):
+        yield
+    restored = Vector(manager.clarity_pivot_position)
+    t.assertLess((restored - once).length, 1.0e-4,
+                 "Undo left the pivot at {!r}, not back at {!r} where the first drag left it "
+                 "(it started at {!r})".format(tuple(restored), tuple(once), tuple(start)))
+    t.assertTrue(manager.clarity_pivot_edit_active, "Undo left Edit Pivot")
+
+    # And Redo carries it forward again: the step holds both sides of the move, so the runtime
+    # follows the queue in either direction rather than only being able to go back. `Ctrl Y` is
+    # Maya's redo and the only chord that reaches the operator here - the Clarity dispatcher claims
+    # `Ctrl Shift Z` for the face-centre toggle before the keymap sees it.
+    yield e.ctrl.y()
+    for _ in range(3):
+        yield
+    redone = Vector(manager.clarity_pivot_position)
+    t.assertLess((redone - twice).length, 1.0e-4,
+                 "Redo left the pivot at {!r}, not forward at {!r}".format(
+                     tuple(redone), tuple(twice)))
+
+
+def pivot_component_drag_is_undone():
+    """
+    The same Undo for the pivot of a component selection.
+
+    The sibling of `pivot_axis_drag_is_undone`, and the one that can fail on its own: an object's
+    pivot is stored on the object, so the memory-file step a transform pushes carries it back
+    whether anyone arranged for that or not. A component's pivot is stored in the window runtime,
+    which no undo step reaches unless the runtime hands its own before-and-after to the step.
+    """
+    import bpy
+    from mathutils import Vector
+
+    e, t, window = ui.test_window()
+    _trace_reset()
+
+    bpy.context.preferences.inputs.interaction_preset = 'CLARITY'
+    yield
+
+    area, region = _view3d_area_region(window)
+    region_3d = area.spaces[0].region_3d
+    object = bpy.data.objects["Cube"]
+    with bpy.context.temp_override(window=window, area=area, region=region):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.context.view_layer.objects.active = object
+        object.select_set(True)
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_mode(type='EDGE')
+        bpy.ops.mesh.select_all(action='SELECT')
+    for _ in range(4):
+        yield
+
+    centre, _, _ = _pivot_axis_screen(object, region, region_3d, 0)
+    e.cursor_position_set(int(round(centre.x)), int(round(centre.y)), move=True)
+    yield
+    yield e.d()
+
+    manager = bpy.context.window_manager
+    start = Vector(manager.clarity_pivot_position)
+    yield from _pivot_drag_along_axis(e, object, region, region_3d, 0)
+    once = Vector(manager.clarity_pivot_position)
+    yield from _pivot_drag_along_axis(e, object, region, region_3d, 1)
+    twice = Vector(manager.clarity_pivot_position)
+    t.assertGreater((once - start).length, 0.05, "the first drag did not move the component pivot")
+    t.assertGreater((twice - once).length, 0.05, "the second drag did not move the component pivot")
+
+    # As in the object case: one Undo has to give back the pivot the first drag authored, not the
+    # selection centre it started from. A runtime pivot that is dropped on undo lands on that
+    # centre, which is exactly the failure this arrangement is here to tell apart.
+    yield e.ctrl.z()
+    for _ in range(3):
+        yield
+    restored = Vector(manager.clarity_pivot_position)
+    t.assertLess((restored - once).length, 1.0e-4,
+                 "Undo left the component pivot at {!r}, not back at {!r} where the first drag "
+                 "left it (it started at {!r})".format(tuple(restored), tuple(once), tuple(start)))
+    t.assertTrue(manager.clarity_pivot_edit_active, "Undo left Edit Pivot")
+
+    # And Redo carries it forward again: the step holds both sides of the move, so the runtime
+    # follows the queue in either direction rather than only being able to go back. `Ctrl Y` is
+    # Maya's redo and the only chord that reaches the operator here - the Clarity dispatcher claims
+    # `Ctrl Shift Z` for the face-centre toggle before the keymap sees it.
+    yield e.ctrl.y()
+    for _ in range(3):
+        yield
+    redone = Vector(manager.clarity_pivot_position)
+    t.assertLess((redone - twice).length, 1.0e-4,
+                 "Redo left the pivot at {!r}, not forward at {!r}".format(
+                     tuple(redone), tuple(twice)))
+
+
 def pivot_click_aligns_the_pivot_to_the_clicked_vertex():
     """
     A click on a vertex aims the pivot along that vertex's normal.
@@ -1042,3 +1567,76 @@ def pivot_click_aligns_the_pivot_to_the_clicked_vertex():
             tuple(round(value, 3) for value in normal),
         ),
     )
+
+
+def diag_green_dot():
+    """TEMPORARY diagnostic: capture the viewport and the screen positions of every candidate."""
+    import bpy
+    from bpy_extras.view3d_utils import location_3d_to_region_2d
+    from mathutils import Vector
+
+    e, t, window = ui.test_window()
+    _trace_reset()
+
+    bpy.context.preferences.inputs.interaction_preset = 'CLARITY'
+    yield
+
+    area, region = _view3d_area_region(window)
+    region_3d = area.spaces[0].region_3d
+    object = bpy.data.objects["Cube"]
+    with bpy.context.temp_override(window=window, area=area, region=region):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.context.view_layer.objects.active = object
+        object.select_set(True)
+    for _ in range(3):
+        yield
+
+    manager = bpy.context.window_manager
+    centre, direction, unit = _pivot_axis_screen(object, region, region_3d, 0)
+    e.cursor_position_set(int(round(centre.x)), int(round(centre.y)), move=True)
+    yield
+    yield e.d()
+    for _ in range(4):
+        yield
+    # Move the pivot well away from the object so every candidate is distinguishable.
+    grab = centre + direction * (0.45 * unit)
+    x, y = int(round(grab.x)), int(round(grab.y))
+    e.cursor_position_set(x, y, move=True)
+    yield
+    e.cursor_position_set(x, y, move=True)
+    yield
+    e.leftmouse.press()
+    yield
+    for step in range(1, 10):
+        e.cursor_position_set(x + step * 12, y - step * 6, move=True)
+        yield
+    e.leftmouse.release()
+    for _ in range(6):
+        yield
+    # Park the cursor away from everything so no hover marker is drawn.
+    e.cursor_position_set(int(round(centre.x)) + 300, int(round(centre.y)) + 200, move=True)
+    for _ in range(4):
+        yield
+
+    def screen(point):
+        position = location_3d_to_region_2d(region, region_3d, Vector(point))
+        if position is None:
+            return None
+        return (round(region.x + position.x, 1), round(region.y + position.y, 1))
+
+    lines = ["region=({:d},{:d},{:d},{:d})".format(region.x, region.y, region.width, region.height)]
+    lines.append("pivot {!r}".format(screen(manager.clarity_pivot_position)))
+    lines.append("object_origin {!r}".format(screen(object.matrix_world.translation)))
+    mesh = object.data
+    for index, polygon in enumerate(mesh.polygons):
+        lines.append("face_center {:d} {!r}".format(
+            index, screen(object.matrix_world @ polygon.center)))
+    for index, vertex in enumerate(mesh.vertices):
+        lines.append("vertex {:d} {!r}".format(index, screen(object.matrix_world @ vertex.co)))
+    with open("S:/Clarity/diag-dot.txt", "w", encoding="utf-8") as file:
+        file.write("\n".join(lines))
+
+    with bpy.context.temp_override(window=window, area=area, region=region):
+        bpy.ops.screen.screenshot(filepath="S:/Clarity/diag-dot.png")
+    yield

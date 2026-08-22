@@ -188,6 +188,11 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      ICON_OBJECT_DATA,
      "Transform",
      "Persistent transform properties for the active selection"},
+    {SPACE_SCRIPT_TOOL,
+     "SCRIPT_TOOL",
+     ICON_NONE,
+     "Script Tool",
+     "Host for script-defined Blender-native utility windows"},
     {SPACE_USERPREF,
      "PREFERENCES",
      ICON_PREFERENCES,
@@ -807,6 +812,8 @@ static StructRNA *rna_Space_refine(PointerRNA *ptr)
       return RNA_SpaceShelf;
     case SPACE_ITEM:
       return RNA_SpaceView3D;
+    case SPACE_SCRIPT_TOOL:
+      return RNA_SpaceScriptTool;
 
       /* Currently no type info. */
     case SPACE_SCRIPT:
@@ -9571,6 +9578,29 @@ static void rna_def_space_shelf(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Shelf ID", "Persistent identifier of this shelf editor");
 }
 
+static void rna_def_space_script_tool(BlenderRNA *brna)
+{
+  StructRNA *srna = RNA_def_struct(brna, "SpaceScriptTool", "Space");
+  RNA_def_struct_sdna(srna, "SpaceScriptTool");
+  RNA_def_struct_ui_text(
+      srna, "Script Tool Space", "Host for script-defined Blender-native utility windows");
+
+  /* Both are read-only on purpose: they are the window's identity, handed out by
+   * `wm.script_tool_window_open`. Letting a panel rewrite them would change which
+   * panels the window draws while it is drawing them. */
+  PropertyRNA *prop = RNA_def_property(srna, "tool_id", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, nullptr, "tool_id");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(
+      prop, "Tool ID", "Identifier this window's panels are matched against");
+
+  prop = RNA_def_property(srna, "instance_id", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, nullptr, "instance_id");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(
+      prop, "Instance ID", "Distinguishes several windows of the same tool");
+}
+
 void RNA_def_space(BlenderRNA *brna)
 {
   rna_def_space(brna);
@@ -9600,6 +9630,7 @@ void RNA_def_space(BlenderRNA *brna)
   rna_def_space_clip(brna);
   rna_def_space_spreadsheet(brna);
   rna_def_space_shelf(brna);
+  rna_def_space_script_tool(brna);
 }
 
 }  // namespace blender

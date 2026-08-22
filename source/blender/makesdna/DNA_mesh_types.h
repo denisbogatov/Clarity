@@ -141,6 +141,43 @@ enum eMeshSymmetryType : char {
 };
 ENUM_OPERATORS(eMeshSymmetryType)
 
+/**
+ * The pivot a component selection of this mesh was given, as authored in Edit Pivot.
+ *
+ * It lives on the mesh because that is what the undo queue of edit mode carries: an edit-mesh step
+ * stores a whole #Mesh and restores it, so a pivot kept here is undone and redone by the ordinary
+ * queue, in order, alongside the edits it was authored between. Kept in the window runtime instead
+ * - which is where it used to live - it was outside the file and outside the queue, and the only
+ * thing that carried it through an undo was a payload hung on whichever step happened to be pushed
+ * next.
+ *
+ * The binding to a live selection (the #BMesh it was measured against) stays in the runtime: it is
+ * a pointer, and a pointer means nothing to the next session.
+ */
+typedef struct ClarityComponentPivot {
+  /** Signature of the component selection this pivot was authored for. */
+  uint64_t selection_hash;
+  float location[3];
+  float rotation_quaternion[4];
+  int selection_mode;
+  int pivot_point;
+  int selected_counts[3];
+  int element_counts[3];
+  int active_element_index;
+  char active_element_type;
+  /** #eClarityComponentPivotFlag. */
+  char flag;
+  char _pad[6];
+} ClarityComponentPivot;
+
+/** #ClarityComponentPivot::flag */
+typedef enum eClarityComponentPivotFlag {
+  CLARITY_COMPONENT_PIVOT_POSITION_VALID = 1 << 0,
+  CLARITY_COMPONENT_PIVOT_ORIENTATION_VALID = 1 << 1,
+  CLARITY_COMPONENT_PIVOT_PINNED = 1 << 2,
+  CLARITY_COMPONENT_PIVOT_SIGNATURE_VALID = 1 << 3,
+} eClarityComponentPivotFlag;
+
 struct Mesh {
 #ifdef __cplusplus
   DNA_DEFINE_CXX_METHODS(Mesh)
@@ -338,6 +375,9 @@ struct Mesh {
 
   char _pad1 = {};
   int8_t radial_symmetry[3] = {1, 1, 1};
+
+  /** The pivot Edit Pivot authored for a component selection of this mesh. */
+  ClarityComponentPivot clarity_component_pivot = {};
 
   /**
    * Data that isn't saved in files, including caches of derived data, temporary data to improve

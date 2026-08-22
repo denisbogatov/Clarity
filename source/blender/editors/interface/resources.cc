@@ -202,6 +202,19 @@ const uchar *get_color_ptr(bTheme *btheme, int spacetype, int colorid)
         case SPACE_ITEM:
           ts = &btheme->space_outliner;
           break;
+        case SPACE_SCRIPT_TOOL:
+          /* The body is a window of panels, so it reads as the Properties editor does -
+           * the theme every other panel-hosting editor is matched to.
+           *
+           * The header is asked for by something else entirely: this space has no header
+           * region, and the only caller that reaches for one is
+           * #wm_window_decoration_style_set_from_theme, which colours the OS title bar of
+           * a single-area floating window from its space's header. Answering with the
+           * top bar's header gives these utility windows the same dark title bar as
+           * Blender's main window instead of a lighter Properties-grey one. */
+          ts = (g_theme_state.regionid == RGN_TYPE_HEADER) ? &btheme->space_topbar :
+                                                             &btheme->space_properties;
+          break;
         default:
           ts = &btheme->space_view3d;
           break;

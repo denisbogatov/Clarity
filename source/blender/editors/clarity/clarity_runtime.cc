@@ -13,6 +13,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdarg>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
@@ -32,6 +34,7 @@
 #include "BLI_math_rotation.h"
 #include "BLI_math_vector.h"
 #include "BLI_math_vector.hh"
+#include "BLI_compiler_attrs.h"
 #include "BLI_path_utils.hh"
 #include "BLI_string.h"
 #include "BLI_time.h"
@@ -53,6 +56,7 @@
 #include "BKE_undo_system.hh"
 #include "BKE_wm_runtime.hh"
 
+#include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
@@ -90,6 +94,43 @@ void ClaritySnapObjectContextDeleter::operator()(ed::transform::SnapObjectContex
   ed::transform::snap_object_context_destroy(context);
 }
 
+/**
+ * Where a pivot undo step went, in the file `BLENDER_CLARITY_SNAP_TRACE_FILE` names.
+ *
+ * The pivot click and the pivot drag already report into it and `go.bat --trace` sets it, so this
+ * is the same log read for everything else the pivot does. An undo that fails to bring the pivot
+ * back has several places to fail in - the snapshot may never be taken, the step it belongs to may
+ * not be the one pushed, the payload may be rejected when it is read back - and none of them are
+ * reachable from a test that does not drive real events in the session where it happens.
+ */
+static std::FILE *pivot_undo_trace_open()
+{
+  const char *filepath = std::getenv("BLENDER_CLARITY_SNAP_TRACE_FILE");
+  if (filepath == nullptr) {
+    filepath = std::getenv("BLENDER_MAYA_SNAP_TRACE_FILE");
+  }
+  if (filepath == nullptr) {
+    return nullptr;
+  }
+  return std::fopen(filepath, "a");
+}
+
+static void pivot_undo_trace(const char *format, ...) ATTR_PRINTF_FORMAT(1, 2);
+static void pivot_undo_trace(const char *format, ...)
+{
+  std::FILE *file = pivot_undo_trace_open();
+  if (file == nullptr) {
+    return;
+  }
+  va_list args;
+  va_start(args, format);
+  std::vfprintf(file, format, args);
+  va_end(args);
+  std::fputc('\n', file);
+  std::fflush(file);
+  std::fclose(file);
+}
+
 std::FILE *navigation_trace_file_open()
 {
   char filepath[FILE_MAX];
@@ -122,33 +163,37 @@ std::FILE *navigation_trace_file_open()
   return BLI_fopen(filepath, "a");
 }
 
+/**
+ * What an undo step still has to carry for the pivot beyond the data itself.
+ *
+ * The pivots are in the file now: an object's in its own DNA, a component selection's on the mesh
+ * it belongs to, where the queue of each mode already carries it. What is left here is the state
+ * that is not data - where the manipulator was standing, and the live surfaces - and restoring it
+ * is refreshing a view of something already undone, not undoing it.
+ */
 struct ClarityPivotUndoSnapshot {
   ClarityLiveSurfaceRegistry live_surfaces;
-  uint32_t scene_session_uid = 0;
-  uint32_t object_session_uid = 0;
   ClarityObjectRuntimeRef manipulator_object;
-  float location[3] = {};
-  float rotation_quaternion[4] = {1.0f, 0.0f, 0.0f, 0.0f};
   double manipulator_position[3] = {};
   double manipulator_orientation[4] = {1.0, 0.0, 0.0, 0.0};
-  int selection_mode = 0;
-  int pivot_point = 0;
-  int selected_counts[3] = {};
-  int element_counts[3] = {};
-  uint64_t selection_hash = 0;
-  int active_element_index = -1;
-  char active_element_type = 0;
-  bool selection_signature_valid = false;
-  bool position_valid = false;
-  bool orientation_valid = false;
   bool pinned = false;
-  bool has_custom = false;
   bool manipulator_position_valid = false;
   bool manipulator_orientation_valid = false;
 };
 
 struct ClarityPivotUndoState {
   std::optional<ClarityPivotUndoSnapshot> pending_before;
+  /**
+   * The step that was active when #pending_before was taken.
+   *
+   * The snapshot is armed before an edit and read again after the step for that edit is pushed,
+   * and nothing in between guarantees that the push which arrives is the one it was armed for: a
+   * path may arm it and then not push at all, and the next unrelated operator would inherit the
+   * snapshot and be undone as if it had moved the pivot. Anchoring the snapshot to the step it was
+   * taken over makes that recognizable - the step it belongs to is the one pushed directly after
+   * it, and any other is somebody else's.
+   */
+  const UndoStep *pending_anchor = nullptr;
 };
 
 struct ClarityTransformTransaction::Impl {
@@ -879,26 +924,7 @@ static std::optional<ClarityPivotUndoSnapshot> pivot_undo_snapshot_create(
   if (live_surfaces != nullptr) {
     snapshot.live_surfaces = *live_surfaces;
   }
-  snapshot.has_custom = has_custom;
-  if (has_custom) {
-    BKE_lib_libblock_session_uid_ensure(&custom->scene->id);
-    BKE_lib_libblock_session_uid_ensure(&custom->object->id);
-    snapshot.scene_session_uid = custom->scene->id.session_uid;
-    snapshot.object_session_uid = custom->object->id.session_uid;
-    copy_v3_v3(snapshot.location, custom->location);
-    copy_qt_qt(snapshot.rotation_quaternion, custom->rotation_quaternion);
-    snapshot.selection_mode = custom->selection_mode;
-    snapshot.pivot_point = custom->pivot_point;
-    std::copy(custom->selected_counts, custom->selected_counts + 3, snapshot.selected_counts);
-    std::copy(custom->element_counts, custom->element_counts + 3, snapshot.element_counts);
-    snapshot.selection_hash = custom->selection_hash;
-    snapshot.active_element_index = custom->active_element_index;
-    snapshot.active_element_type = custom->active_element_type;
-    snapshot.selection_signature_valid = custom->selection_signature_valid;
-    snapshot.position_valid = custom->position_valid;
-    snapshot.orientation_valid = custom->orientation_valid;
-    snapshot.pinned = custom->pinned;
-  }
+  snapshot.pinned = runtime.tool.manipulator_pivot.pin_component_pivot;
 
   const ClarityManipulatorPivotState &pivot = runtime.tool.manipulator_pivot;
   std::copy_n(
@@ -911,6 +937,35 @@ static std::optional<ClarityPivotUndoSnapshot> pivot_undo_snapshot_create(
   snapshot.manipulator_orientation_valid = pivot.orientation_valid;
   snapshot.manipulator_object = pivot.last_object;
   return snapshot;
+}
+
+/**
+ * Whether an edit moved the pivot at all.
+ *
+ * A step that carries a snapshot pair which says nothing changed is worse than a step that carries
+ * none: undoing it restores a pivot to where it already is, so the queue spends a press of the key
+ * and the viewport does not move. From the user's side that is indistinguishable from undo being
+ * broken, and it is the reason to keep such a step out of the pivot's business entirely.
+ */
+static bool pivot_undo_snapshot_equal(const ClarityPivotUndoSnapshot &a,
+                                      const ClarityPivotUndoSnapshot &b)
+{
+  if (a.manipulator_position_valid != b.manipulator_position_valid ||
+      a.manipulator_orientation_valid != b.manipulator_orientation_valid || a.pinned != b.pinned)
+  {
+    return false;
+  }
+  for (int axis = 0; axis < 3; axis++) {
+    if (a.manipulator_position[axis] != b.manipulator_position[axis]) {
+      return false;
+    }
+  }
+  for (int index = 0; index < 4; index++) {
+    if (a.manipulator_orientation[index] != b.manipulator_orientation[index]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 static void pivot_undo_step_begin(const bContext *C,
@@ -930,12 +985,15 @@ static void pivot_undo_step_begin(const bContext *C,
     runtime.pivot_undo = std::make_unique<ClarityPivotUndoState>();
   }
   runtime.pivot_undo->pending_before = *snapshot;
+  const UndoStack *undo_stack = ED_undo_stack_get();
+  runtime.pivot_undo->pending_anchor = undo_stack != nullptr ? undo_stack->step_active : nullptr;
 }
 
 static void pivot_undo_pending_clear(ClarityWindowRuntime &runtime)
 {
   if (runtime.pivot_undo) {
     runtime.pivot_undo->pending_before.reset();
+    runtime.pivot_undo->pending_anchor = nullptr;
   }
 }
 
@@ -960,6 +1018,13 @@ static bool pivot_undo_snapshot_restore(bContext *C,
 {
   ClarityWindowRuntime *runtime = runtimes().lookup_ptr(payload.owner_window);
   if (runtime == nullptr || runtime->instance_id != payload.owner_runtime_id) {
+    pivot_undo_trace("pivot-undo restore-refused window=%llu found=%d want_runtime=%llu got=%llu",
+                     static_cast<unsigned long long>(
+                         reinterpret_cast<uintptr_t>(payload.owner_window)),
+                     int(runtime != nullptr),
+                     static_cast<unsigned long long>(payload.owner_runtime_id),
+                     static_cast<unsigned long long>(runtime != nullptr ? runtime->instance_id :
+                                                                          0));
     return false;
   }
 
@@ -981,52 +1046,6 @@ static bool pivot_undo_snapshot_restore(bContext *C,
   pivot.pin_component_pivot = snapshot.pinned;
   pivot.last_object = snapshot.manipulator_object;
   manipulator_pivot_last_object_resolve(C, *runtime);
-
-  if (!snapshot.has_custom) {
-    runtime->pivot_edit.custom.reset();
-    WM_main_add_notifier(NC_SPACE | ND_SPACE_VIEW3D, nullptr);
-    return true;
-  }
-
-  Scene *scene = id_cast<Scene *>(
-      BKE_libblock_find_session_uid(bmain, ID_SCE, snapshot.scene_session_uid));
-  Object *object = id_cast<Object *>(
-      BKE_libblock_find_session_uid(bmain, ID_OB, snapshot.object_session_uid));
-  if (scene == nullptr || object == nullptr) {
-    return false;
-  }
-  auto custom = std::make_unique<ClarityCustomPivotData>();
-  custom->scene = scene;
-  custom->object = object;
-  copy_v3_v3(custom->location, snapshot.location);
-  copy_qt_qt(custom->rotation_quaternion, snapshot.rotation_quaternion);
-  custom->selection_mode = snapshot.selection_mode;
-  custom->pivot_point = snapshot.pivot_point;
-  std::copy(snapshot.selected_counts, snapshot.selected_counts + 3, custom->selected_counts);
-  std::copy(snapshot.element_counts, snapshot.element_counts + 3, custom->element_counts);
-  custom->selection_hash = snapshot.selection_hash;
-  custom->active_element_index = snapshot.active_element_index;
-  custom->active_element_type = snapshot.active_element_type;
-  custom->selection_signature_valid = snapshot.selection_signature_valid;
-  custom->position_valid = snapshot.position_valid;
-  custom->orientation_valid = snapshot.orientation_valid;
-  custom->pinned = snapshot.pinned;
-
-  BMEditMesh *em = BKE_editmesh_from_object(object);
-  if (em != nullptr) {
-    /* Edit-mesh undo recreates the BMesh. Rebind the signature without recalculating the
-     * explicitly restored pivot position or orientation. */
-    custom->bmesh_identity = em->bm;
-  }
-  else {
-    custom->selection_signature_valid = false;
-  }
-  runtime->pivot_edit.custom = std::move(custom);
-  runtime->pivot_mode = ClarityPivotMode::Custom;
-  if (runtime->pivot_edit.target == ClarityPivotEditTarget::ComponentPivot) {
-    runtime->pivot_edit.scene = scene;
-    runtime->pivot_edit.object = object;
-  }
 
   if (payload.owner_window == CTX_wm_window(C)) {
     ED_clarity_tool_presentation_refresh(C, *runtime);
@@ -1340,6 +1359,141 @@ static bool pivot_component_matrix_get(const Scene *scene,
   return true;
 }
 
+/**
+ * The mesh the component pivot of this selection is stored on.
+ *
+ * The authored values live in #Mesh::clarity_component_pivot, which is what the undo queue of edit
+ * mode carries. The runtime copy beside it is a working set: it holds the pointers a live session
+ * needs and nothing a file can keep.
+ */
+static Mesh *component_pivot_mesh_get(const ClarityCustomPivotData &custom)
+{
+  if (custom.object == nullptr || custom.object->type != OB_MESH) {
+    return nullptr;
+  }
+  return id_cast<Mesh *>(custom.object->data);
+}
+
+/**
+ * The object frame the mesh's stored pivot is expressed in.
+ *
+ * Rotation only, and normalized: a scaled object must not scale the pivot's frame, and the pivot
+ * carries no scale of its own.
+ */
+static void component_pivot_object_frame_get(const Object &object, float r_frame[3][3])
+{
+  copy_m3_m4(r_frame, object.object_to_world().ptr());
+  normalize_m3(r_frame);
+}
+
+/**
+ * Publish the authored pivot to the mesh, where undo and the file can reach it.
+ *
+ * Converted into the mesh's own space on the way in. The runtime works in world coordinates,
+ * because that is where the manipulator stands, but the mesh knows nothing about where its object
+ * is: a world position written here stays behind the moment the object is moved, and the pivot
+ * reappears at the point in the world the object has left.
+ */
+static void component_pivot_store(const ClarityCustomPivotData &custom)
+{
+  Mesh *mesh = component_pivot_mesh_get(custom);
+  if (mesh == nullptr) {
+    return;
+  }
+  ClarityComponentPivot &stored = mesh->clarity_component_pivot;
+  float world_to_object[4][4];
+  invert_m4_m4(world_to_object, custom.object->object_to_world().ptr());
+  copy_v3_v3(stored.location, custom.location);
+  mul_m4_v3(world_to_object, stored.location);
+
+  float object_frame[3][3];
+  component_pivot_object_frame_get(*custom.object, object_frame);
+  float object_frame_inverse[3][3];
+  transpose_m3_m3(object_frame_inverse, object_frame);
+  float world_frame[3][3];
+  quat_to_mat3(world_frame, custom.rotation_quaternion);
+  float local_frame[3][3];
+  mul_m3_m3m3(local_frame, object_frame_inverse, world_frame);
+  mat3_normalized_to_quat(stored.rotation_quaternion, local_frame);
+  stored.selection_mode = custom.selection_mode;
+  stored.pivot_point = custom.pivot_point;
+  std::copy(custom.selected_counts, custom.selected_counts + 3, stored.selected_counts);
+  std::copy(custom.element_counts, custom.element_counts + 3, stored.element_counts);
+  stored.selection_hash = custom.selection_hash;
+  stored.active_element_index = custom.active_element_index;
+  stored.active_element_type = custom.active_element_type;
+  stored.flag = 0;
+  if (custom.position_valid) {
+    stored.flag |= CLARITY_COMPONENT_PIVOT_POSITION_VALID;
+  }
+  if (custom.orientation_valid) {
+    stored.flag |= CLARITY_COMPONENT_PIVOT_ORIENTATION_VALID;
+  }
+  if (custom.pinned) {
+    stored.flag |= CLARITY_COMPONENT_PIVOT_PINNED;
+  }
+  if (custom.selection_signature_valid) {
+    stored.flag |= CLARITY_COMPONENT_PIVOT_SIGNATURE_VALID;
+  }
+}
+
+/**
+ * Take the authored pivot back from the mesh.
+ *
+ * Returns false when the mesh carries none, which is the state a file has before Edit Pivot has
+ * ever been used on it and the state an undo returns it to.
+ */
+static bool component_pivot_load(ClarityCustomPivotData &custom)
+{
+  const Mesh *mesh = component_pivot_mesh_get(custom);
+  if (mesh == nullptr) {
+    return false;
+  }
+  const ClarityComponentPivot &stored = mesh->clarity_component_pivot;
+  if ((stored.flag & CLARITY_COMPONENT_PIVOT_SIGNATURE_VALID) == 0) {
+    return false;
+  }
+  copy_v3_v3(custom.location, stored.location);
+  mul_m4_v3(custom.object->object_to_world().ptr(), custom.location);
+
+  float object_frame[3][3];
+  component_pivot_object_frame_get(*custom.object, object_frame);
+  float local_frame[3][3];
+  quat_to_mat3(local_frame, stored.rotation_quaternion);
+  float world_frame[3][3];
+  mul_m3_m3m3(world_frame, object_frame, local_frame);
+  mat3_normalized_to_quat(custom.rotation_quaternion, world_frame);
+  custom.selection_mode = stored.selection_mode;
+  custom.pivot_point = stored.pivot_point;
+  std::copy(stored.selected_counts, stored.selected_counts + 3, custom.selected_counts);
+  std::copy(stored.element_counts, stored.element_counts + 3, custom.element_counts);
+  custom.selection_hash = stored.selection_hash;
+  custom.active_element_index = stored.active_element_index;
+  custom.active_element_type = stored.active_element_type;
+  custom.position_valid = (stored.flag & CLARITY_COMPONENT_PIVOT_POSITION_VALID) != 0;
+  custom.orientation_valid = (stored.flag & CLARITY_COMPONENT_PIVOT_ORIENTATION_VALID) != 0;
+  custom.pinned = (stored.flag & CLARITY_COMPONENT_PIVOT_PINNED) != 0;
+  custom.selection_signature_valid = true;
+  /* The signature is half a file value and half a session one: the counts and the hash describe a
+   * selection, and the #BMesh they were measured against is a pointer this session owns. Rebound
+   * here, because a signature that cannot name its mesh reads as a selection that has changed - and
+   * a changed selection is recomputed from its centre, which is the authored pivot thrown away. */
+  custom.bmesh_identity = nullptr;
+  if (const BMEditMesh *em = BKE_editmesh_from_object(custom.object)) {
+    custom.bmesh_identity = em->bm;
+  }
+  return true;
+}
+
+/**
+ * Take the component pivot back from the mesh after the queue moved.
+ *
+ * The mesh is the record; the runtime beside it is a working copy, and after an undo it is the
+ * only thing still holding the value the queue has just discarded. Reading it back here is what
+ * makes the manipulator answer to the queue rather than to whichever cache outlived it.
+ */
+static void component_pivot_adopt_after_undo(bContext *C);
+
 static bool pivot_custom_sync_to_selection(const bContext *C,
                                            ClarityWindowRuntime &runtime,
                                            const bool force)
@@ -1436,6 +1590,7 @@ static bool pivot_custom_sync_to_selection(const bContext *C,
   custom->selection_signature_valid = true;
   custom->position_valid = true;
   custom->orientation_valid = true;
+  component_pivot_store(*custom);
   return true;
 }
 
@@ -1546,6 +1701,28 @@ static void manipulator_pivot_sync_from_component(ClarityWindowRuntime &runtime,
   pivot.last_object = custom.object != nullptr ?
                           ED_clarity_object_runtime_ref_create(*custom.object) :
                           ClarityObjectRuntimeRef{};
+}
+
+static void component_pivot_adopt_after_undo(bContext *C)
+{
+  ClarityWindowRuntime *runtime = runtime_get(C);
+  if (runtime == nullptr || !runtime->pivot_edit.custom) {
+    return;
+  }
+  ClarityCustomPivotData &custom = *runtime->pivot_edit.custom;
+  if (custom.object == nullptr || custom.scene != CTX_data_scene(C)) {
+    return;
+  }
+  if (component_pivot_load(custom)) {
+    /* The signature was measured against a #BMesh the undo has just replaced. */
+    if (const BMEditMesh *em = BKE_editmesh_from_object(custom.object)) {
+      custom.bmesh_identity = em->bm;
+    }
+    manipulator_pivot_sync_from_component(*runtime, custom);
+    return;
+  }
+  /* The mesh carries none any more: the undo went back past the pivot's authoring. */
+  runtime->pivot_edit.custom.reset();
 }
 
 /**
@@ -1856,6 +2033,7 @@ class ClarityComponentPivotEditTarget final : public ClarityPivotEditTargetBacke
     runtime_.tool.manipulator_pivot.position_valid = true;
     copy_v3fl_v3db(custom_.location, static_cast<const double *>(position_world));
     custom_.position_valid = true;
+    component_pivot_store(custom_);
     return true;
   }
 
@@ -1870,6 +2048,7 @@ class ClarityComponentPivotEditTarget final : public ClarityPivotEditTargetBacke
     custom_.rotation_quaternion[2] = float(normalized.y);
     custom_.rotation_quaternion[3] = float(normalized.z);
     custom_.orientation_valid = true;
+    component_pivot_store(custom_);
     orientation_custom_select(context_, runtime_);
     return true;
   }
@@ -1882,6 +2061,7 @@ class ClarityComponentPivotEditTarget final : public ClarityPivotEditTargetBacke
     }
     if (pivot_custom_sync_to_selection(context_, runtime_, true)) {
       manipulator_pivot_sync_from_component(runtime_, custom_);
+      component_pivot_store(custom_);
     }
   }
 
@@ -1896,6 +2076,7 @@ class ClarityComponentPivotEditTarget final : public ClarityPivotEditTargetBacke
     copy_v3_v3(custom_.location, position);
     custom_.position_valid = position_valid;
     manipulator_pivot_sync_from_component(runtime_, custom_);
+    component_pivot_store(custom_);
     orientation_custom_clear_all(context_);
   }
 
@@ -1903,9 +2084,13 @@ class ClarityComponentPivotEditTarget final : public ClarityPivotEditTargetBacke
   {
     custom_ = initial_custom_;
     runtime_.tool.manipulator_pivot = initial_pivot_;
+    component_pivot_store(custom_);
   }
 
-  void commit() override {}
+  void commit() override
+  {
+    component_pivot_store(custom_);
+  }
 };
 
 /**
@@ -2166,13 +2351,16 @@ static bool pivot_edit_begin(bContext *C, ClarityWindowRuntime &runtime)
   else {
     const bool create_custom = !state.custom || state.custom->scene != scene ||
                                (state.custom->object != object && !state.custom->pinned);
+    bool adopted = false;
     if (create_custom) {
       auto custom = std::make_unique<ClarityCustomPivotData>();
       custom->scene = scene;
       custom->object = object;
+      /* The mesh may already carry one, authored earlier in this file or restored by an undo. */
+      adopted = component_pivot_load(*custom);
       state.custom = std::move(custom);
     }
-    if (!pivot_custom_sync_to_selection(C, runtime, create_custom)) {
+    if (!pivot_custom_sync_to_selection(C, runtime, create_custom && !adopted)) {
       if (create_custom) {
         state.custom.reset();
       }
@@ -2269,13 +2457,15 @@ bool pivot_edit_pin_toggle(bContext *C, ClarityWindowRuntime &runtime)
   ClarityPivotEditState &state = runtime.pivot_edit;
   const bool create_custom = !state.custom || state.custom->scene != scene ||
                              (state.custom->object != object && !state.custom->pinned);
+  bool adopted = false;
   if (create_custom) {
     auto custom = std::make_unique<ClarityCustomPivotData>();
     custom->scene = scene;
     custom->object = object;
+    adopted = component_pivot_load(*custom);
     state.custom = std::move(custom);
   }
-  if (!pivot_custom_sync_to_selection(C, runtime, create_custom)) {
+  if (!pivot_custom_sync_to_selection(C, runtime, create_custom && !adopted)) {
     if (create_custom) {
       state.custom.reset();
     }
@@ -3270,12 +3460,22 @@ std::unique_ptr<ed::clarity::ClarityPivotEditTargetBackend> ED_clarity_pivot_edi
     {
       return nullptr;
     }
-    if (use_active_object ||
-        ed::clarity::manipulator_pivot_last_object_resolve(C, *runtime) != object)
+    /* The cache holds a world-space frame, and the object carries a local one. Every move or
+     * rotation of the object therefore moves its pivot in the world and leaves the cache behind -
+     * the manipulator, drawn from the object, is already in the new place while the cache still
+     * names the old one. Synchronising only on a change of active object left that gap open, and a
+     * drag would start from the stale frame: the pivot jumped on the first modal step and came back
+     * when the button was released, and a rotation turned around the stale axes rather than those
+     * on screen.
+     *
+     * A failure to read the object is only fatal when there is nothing to fall back on - when the
+     * cache belongs to some other object, or the caller asked for the active one regardless. */
+    const bool cache_holds_this_object = ed::clarity::manipulator_pivot_last_object_resolve(
+                                             C, *runtime) == object;
+    if (!ed::clarity::manipulator_pivot_sync_from_object(*runtime, *object) &&
+        (use_active_object || !cache_holds_this_object))
     {
-      if (!ed::clarity::manipulator_pivot_sync_from_object(*runtime, *object)) {
-        return nullptr;
-      }
+      return nullptr;
     }
     return std::make_unique<ed::clarity::ClarityObjectPivotEditTarget>(C, *runtime, *object);
   }
@@ -3326,6 +3526,9 @@ void ED_clarity_pivot_undo_begin(const bContext *C)
 {
   if (ed::clarity::ClarityWindowRuntime *runtime = ed::clarity::runtime_ensure(C)) {
     ed::clarity::pivot_undo_step_begin(C, *runtime);
+    ed::clarity::pivot_undo_trace(
+        "pivot-undo begin pending=%d",
+        int(bool(runtime->pivot_undo) && bool(runtime->pivot_undo->pending_before)));
   }
 }
 
@@ -3835,6 +4038,36 @@ float ED_clarity_snap_tolerance_px_get(const bContext *C, const int region_size_
       ED_clarity_snap_tolerance_settings_get(C), region_size_px, U.pixelsize);
 }
 
+void ED_clarity_viewport_cursor_state_sync(const bContext *C)
+{
+  bScreen *screen = CTX_wm_screen(C);
+  if (screen == nullptr) {
+    return;
+  }
+  /* Both modes put a marker in the viewport that the user is asked to read. Snapping is included
+   * because it is most often held during a drag, which is exactly when a second marker at the world
+   * origin is mistaken for the thing being dragged. */
+  const bool hide_cursor = ED_clarity_pivot_edit_target_get(C) !=
+                               ed::clarity::ClarityPivotEditTarget::None ||
+                           ED_clarity_snap_override_get(C) != ed::clarity::ClaritySnapMode::None;
+  for (ScrArea *area = static_cast<ScrArea *>(screen->areabase.first); area != nullptr;
+       area = area->next)
+  {
+    if (area->spacetype != SPACE_VIEW3D) {
+      continue;
+    }
+    View3D *v3d = static_cast<View3D *>(area->spacedata.first);
+    if (v3d == nullptr) {
+      continue;
+    }
+    const int flag_before = v3d->runtime.flag;
+    SET_FLAG_FROM_TEST(v3d->runtime.flag, hide_cursor, V3D_RUNTIME_CLARITY_HIDE_CURSOR);
+    if (v3d->runtime.flag != flag_before) {
+      ED_area_tag_redraw(area);
+    }
+  }
+}
+
 void ED_clarity_pivot_event_pre_modal(bContext *C, const wmEvent *event)
 {
   if (event == nullptr) {
@@ -3854,6 +4087,9 @@ void ED_clarity_pivot_event_pre_modal(bContext *C, const wmEvent *event)
   else if (event->type == WINDEACTIVATE) {
     ed::clarity::pivot_edit_input_reset(C, *runtime);
   }
+  /* A snap key held during a drag never reaches the idle dispatcher, and that is the moment the
+   * cursor most needs to be out of the way. */
+  ED_clarity_viewport_cursor_state_sync(C);
 }
 
 void ED_clarity_transform_begin(const bContext *C,
@@ -3867,6 +4103,14 @@ void ED_clarity_transform_begin(const bContext *C,
     return;
   }
   ed::clarity::pivot_undo_step_begin(C, *runtime);
+  ed::clarity::pivot_undo_trace(
+      "pivot-undo transform-begin operator='%s' mode=%d select_mode=%d pivot_transform=%d "
+      "pending=%d",
+      operator_id != nullptr ? operator_id : "(none)",
+      context_mode,
+      mesh_select_mode,
+      int(is_clarity_pivot_transform),
+      int(bool(runtime->pivot_undo) && bool(runtime->pivot_undo->pending_before)));
   runtime->transform_active = true;
   ed::clarity::ClarityPivotEditState &pivot = runtime->pivot_edit;
   ed::clarity::pivot_edit_snap_preview_clear(*runtime);
@@ -3965,6 +4209,15 @@ void ED_clarity_transform_end(bContext *C, const bool cancelled)
   }
 }
 
+void ED_clarity_undo_step_pushed_trace(const bContext *C, const char *name)
+{
+  const ed::clarity::ClarityWindowRuntime *runtime = ed::clarity::runtime_get(C);
+  ed::clarity::pivot_undo_trace("pivot-undo pushed name='%s' pending=%d",
+                                name != nullptr ? name : "(none)",
+                                int(runtime != nullptr && bool(runtime->pivot_undo) &&
+                                    bool(runtime->pivot_undo->pending_before)));
+}
+
 void ED_clarity_undo_step_store(const bContext *C)
 {
   ed::clarity::ClarityWindowRuntime *runtime = ed::clarity::runtime_get(C);
@@ -3973,13 +4226,44 @@ void ED_clarity_undo_step_store(const bContext *C)
   if (runtime == nullptr || undo_stack == nullptr || step == nullptr || !runtime->pivot_undo ||
       !runtime->pivot_undo->pending_before)
   {
+    ed::clarity::pivot_undo_trace(
+        "pivot-undo store-skipped runtime=%d stack=%d step=%s pending=%d",
+        int(runtime != nullptr),
+        int(undo_stack != nullptr),
+        step != nullptr ? step->name : "(none)",
+        int(runtime != nullptr && runtime->pivot_undo &&
+            bool(runtime->pivot_undo->pending_before)));
     return;
   }
+  if (step->prev != runtime->pivot_undo->pending_anchor) {
+    /* Somebody else's step: this one was pushed after the snapshot was armed, but not for it. */
+    ed::clarity::pivot_undo_trace("pivot-undo store-not-mine step='%s' prev='%s' anchor='%s'",
+                                  step->name,
+                                  step->prev != nullptr ? step->prev->name : "(none)",
+                                  runtime->pivot_undo->pending_anchor != nullptr ?
+                                      runtime->pivot_undo->pending_anchor->name :
+                                      "(none)");
+    ed::clarity::pivot_undo_pending_clear(*runtime);
+    return;
+  }
+
   ed::clarity::manipulator_pivot_last_object_resolve(C, *runtime);
 
   const std::optional<ed::clarity::ClarityPivotUndoSnapshot> after =
       ed::clarity::pivot_undo_snapshot_create(C, *runtime);
+  if (after && ed::clarity::pivot_undo_snapshot_equal(*runtime->pivot_undo->pending_before, *after))
+  {
+    /* The step is somebody else's work; the pivot only happened to be armed across it. */
+    ed::clarity::pivot_undo_trace("pivot-undo store-unchanged step='%s'", step->name);
+    ed::clarity::pivot_undo_pending_clear(*runtime);
+    return;
+  }
   if (!after || ed::clarity::pivot_undo_step_payload_get(undo_stack, step) != nullptr) {
+    ed::clarity::pivot_undo_trace("pivot-undo store-dropped step='%s' after=%d already=%d",
+                                  step->name,
+                                  int(bool(after)),
+                                  int(ed::clarity::pivot_undo_step_payload_get(undo_stack, step) !=
+                                      nullptr));
     ed::clarity::pivot_undo_pending_clear(*runtime);
     return;
   }
@@ -3992,6 +4276,24 @@ void ED_clarity_undo_step_store(const bContext *C)
   BKE_undosys_step_user_data_set(
       undo_stack, step, payload, ed::clarity::pivot_undo_step_payload_free);
   step->data_size += sizeof(*payload);
+  /* The step is the pivot's, so it says so. It is pushed by whatever operator carried the edit -
+   * a translation, a rotation, the click - and left under that operator's name it is
+   * indistinguishable in the undo history from moving the object itself. A queue that cannot be
+   * read is a queue the user cannot trust: the first thing asked of Edit Pivot's undo was whether
+   * the pivot is in there at all. */
+  BLI_strncpy(step->name, "Edit Pivot", sizeof(step->name));
+  ed::clarity::pivot_undo_trace(
+      "pivot-undo stored step='%s' window=%llu runtime=%llu before=%.4f %.4f %.4f "
+      "after=%.4f %.4f %.4f",
+      step->name,
+      static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(payload->owner_window)),
+      static_cast<unsigned long long>(payload->owner_runtime_id),
+      payload->before.manipulator_position[0],
+      payload->before.manipulator_position[1],
+      payload->before.manipulator_position[2],
+      payload->after.manipulator_position[0],
+      payload->after.manipulator_position[1],
+      payload->after.manipulator_position[2]);
   ed::clarity::pivot_undo_pending_clear(*runtime);
 }
 
@@ -4007,6 +4309,10 @@ void ED_clarity_undo_steps_restore(bContext *C,
                                 const UndoStep *step_to,
                                 const bool is_undo)
 {
+  ed::clarity::pivot_undo_trace("pivot-undo restore dir=%s from='%s' to='%s'",
+                                is_undo ? "undo" : "redo",
+                                step_from != nullptr ? step_from->name : "(none)",
+                                step_to != nullptr ? step_to->name : "(none)");
   if (step_from == step_to) {
     return;
   }
@@ -4017,24 +4323,31 @@ void ED_clarity_undo_steps_restore(bContext *C,
       if (step == nullptr) {
         break;
       }
-      if (const ed::clarity::ClarityPivotUndoStepPayload *payload =
-              ed::clarity::pivot_undo_step_payload_get(undo_stack, step))
-      {
+      const ed::clarity::ClarityPivotUndoStepPayload *payload =
+          ed::clarity::pivot_undo_step_payload_get(undo_stack, step);
+      ed::clarity::pivot_undo_trace("pivot-undo walk dir=undo step='%s' payload=%d",
+                                    step->name,
+                                    int(payload != nullptr));
+      if (payload != nullptr) {
         ed::clarity::pivot_undo_snapshot_restore(C, *payload, payload->before);
       }
     }
     if (ed::clarity::live_surface_registry_get(C) != nullptr) {
       ed::clarity::live_surface_registry_changed(C);
     }
+    ed::clarity::component_pivot_adopt_after_undo(C);
     return;
   }
 
   for (const UndoStep *step = step_from != nullptr ? step_from->next : nullptr; step != nullptr;
        step = step->next)
   {
-    if (const ed::clarity::ClarityPivotUndoStepPayload *payload =
-            ed::clarity::pivot_undo_step_payload_get(undo_stack, step))
-    {
+    const ed::clarity::ClarityPivotUndoStepPayload *payload =
+        ed::clarity::pivot_undo_step_payload_get(undo_stack, step);
+    ed::clarity::pivot_undo_trace("pivot-undo walk dir=redo step='%s' payload=%d",
+                                  step->name,
+                                  int(payload != nullptr));
+    if (payload != nullptr) {
       ed::clarity::pivot_undo_snapshot_restore(C, *payload, payload->after);
     }
     if (step == step_to) {
@@ -4044,6 +4357,7 @@ void ED_clarity_undo_steps_restore(bContext *C,
   if (ed::clarity::live_surface_registry_get(C) != nullptr) {
     ed::clarity::live_surface_registry_changed(C);
   }
+  ed::clarity::component_pivot_adopt_after_undo(C);
 }
 
 void ED_clarity_navigation_debug_stage_sample(

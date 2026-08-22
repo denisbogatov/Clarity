@@ -844,7 +844,12 @@ void ED_spacetype_topbar()
   /* regions: upper shelf row */
   art = MEM_new_zeroed<ARegionType>("spacetype topbar shelf footer region");
   art->regionid = RGN_TYPE_FOOTER;
-  art->prefsizey = HEADERY + 9;
+  /* Fixed height, so it has to cover whatever the row draws into it: one shelf icon
+   * plus its short label, at `_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y` and
+   * `_CLARITY_SHELF_TOPBAR_LABEL_SCALE_Y` in `space_topbar.py`. Those two and this
+   * are one setting split across two languages - raise the icon scale without
+   * raising this and the icons are simply clipped. */
+  art->prefsizey = HEADERY + 16;
   art->prefsizex = UI_UNIT_X * 5;
   art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FOOTER;
   art->listener = topbar_main_region_listener;

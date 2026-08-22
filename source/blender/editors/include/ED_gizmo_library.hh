@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include <cmath>
+
 #include "DNA_scene_types.h"
 
 namespace blender {
@@ -205,6 +207,45 @@ enum {
   /* Always show the angle value as an arc in the dial. */
   ED_GIZMO_DIAL_DRAW_FLAG_ANGLE_VALUE = (1 << 5),
 };
+
+/**
+ * How nearly a ring has to face the camera before its clip plane starts to move.
+ *
+ * A cosine of 0.97 is a ring within about fourteen degrees of lying in the plane of the view - by
+ * then it is drawn as an all but circular ellipse, and opening it up has nowhere visible to put the
+ * extra arc. Every other angle keeps the plain half.
+ */
+constexpr float ED_GIZMO_DIAL_CLIP_FACING = 0.97f;
+
+/**
+ * How far behind its own centre the clip plane of a dial sits, in units of the dial's radius.
+ *
+ * #ED_GIZMO_DIAL_DRAW_FLAG_CLIP hides the part of a ring that faces away from the camera, which is
+ * what makes three rings around one point read as a sphere rather than as three overlapping
+ * ellipses. Maya cuts at the centre, and every arc then ends exactly on the silhouette of the
+ * sphere the three of them share - the circle it draws around them.
+ *
+ * That cut is right everywhere except one place: a ring seen face on lies in the plane of the cut,
+ * every point of it is a rounding error away from it, and it vanishes - when it is its own
+ * silhouette and should be whole. So the plane leaves the centre only there. \a view_dot_axis is
+ * the cosine between the view direction and the ring's own axis, and the plane stays put until that
+ * cosine is within #ED_GIZMO_DIAL_CLIP_FACING of one, then drops smoothly to a full radius behind
+ * the centre.
+ *
+ * The threshold is the whole point of the shape. Anything gentler gives a tilted ring an arc longer
+ * than half of it, and the extra runs back along the far branch of its own ellipse - which on
+ * screen is nowhere near the end of the arc, so it reads as loose fragments rather than as a
+ * longer arc. Half, or the whole circle: nothing in between looks like anything.
+ */
+inline float ED_gizmo_dial_clip_radius_bias(const float view_dot_axis)
+{
+  const float facing = fabsf(view_dot_axis);
+  if (facing <= ED_GIZMO_DIAL_CLIP_FACING) {
+    return 0.0f;
+  }
+  const float t = (facing - ED_GIZMO_DIAL_CLIP_FACING) / (1.0f - ED_GIZMO_DIAL_CLIP_FACING);
+  return t * t * (3.0f - 2.0f * t);
+}
 
 /* -------------------------------------------------------------------- */
 /* Move Gizmo */
