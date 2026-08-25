@@ -21,6 +21,7 @@
 GPU_SHADER_INTERFACE_INFO(overlay_wireframe_iface)
 SMOOTH(float4, final_color)
 FLAT(float2, edge_start)
+FLAT(float, clarity_hard_edge)
 NO_PERSPECTIVE(float2, edge_pos)
 GPU_SHADER_INTERFACE_END()
 
@@ -32,6 +33,8 @@ PUSH_CONSTANT(bool, use_coloring)
 PUSH_CONSTANT(bool, is_transform)
 PUSH_CONSTANT(int, color_type)
 PUSH_CONSTANT(bool, is_hair)
+PUSH_CONSTANT(bool, show_clarity_hard_edges)
+PUSH_CONSTANT(bool, clarity_hard_edges_only)
 PUSH_CONSTANT(float4x4, hair_dupli_matrix)
 /* Scene Depth texture copy for manual depth test. */
 SAMPLER(0, sampler2DDepth, depth_tx)

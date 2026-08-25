@@ -318,14 +318,10 @@ struct OpaqueOut {
   }
 
   if (srt.lighting_mode == WORKBENCH_LIGHTING_MATCAP) [[static_branch]] {
-    /* For matcaps, save front facing in alpha channel. */
-    frag_out.material.a = float(facing);
+    /* Preserve MatCap's intentional black back-face marker. */
+    frag_out.material.a = facing ? 1.0f : 256.0f;
   }
 
-  if (!facing) {
-    /* Use a value outside the packed material range as a marker for the deferred resolve pass. */
-    frag_out.material.a = 256.0f;
-  }
 }
 
 struct TransparentOut {
@@ -347,7 +343,9 @@ struct TransparentOut {
   float2 uv_viewport = frag_co.xy * world.world_data.viewport_size_inv;
   float3 vP = view.point_screen_to_view(float3(uv_viewport, 0.5f));
   float3 I = view.view_incident_vector(vP);
-  float3 N = normalize(v_out.normal);
+  /* Maya Viewport 2.0 enables Two Sided Lighting by default. Flip the lighting
+   * normal for a back-face instead of turning transparent foliage cards black. */
+  float3 N = normalize(facing ? v_out.normal : -v_out.normal);
 
   float3 color = v_out.color;
 
@@ -358,16 +356,15 @@ struct TransparentOut {
   float3 shaded_color = float3(0.0f, 1.0f, 1.0f);
   if (srt.lighting_mode == WORKBENCH_LIGHTING_MATCAP) [[static_branch]] {
     shaded_color = get_matcap_lighting(world, srt.matcap_tx, color, N, I);
+    if (!facing) {
+      shaded_color = float3(0.0f);
+    }
   }
   else if (srt.lighting_mode == WORKBENCH_LIGHTING_STUDIO) [[static_branch]] {
     shaded_color = get_world_lighting(world, color, v_out.roughness, v_out.metallic, N, I);
   }
   else if (srt.lighting_mode == WORKBENCH_LIGHTING_FLAT) [[static_branch]] {
     shaded_color = color;
-  }
-
-  if (!facing) {
-    shaded_color = float3(0.0f);
   }
 
   shaded_color *= get_shadow(world, N, srt.force_shadowing);

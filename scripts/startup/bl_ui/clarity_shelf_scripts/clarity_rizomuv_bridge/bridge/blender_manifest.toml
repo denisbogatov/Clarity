@@ -1,0 +1,14 @@
+schema_version = "1.0.0"
+
+id = "rizomuvbridge_ultimate"
+version = "3.3.3"
+name = "RizomUV Bridge - Ultimate Edition"
+maintainer = "Matt Ashpole"
+tagline = "Enables a seamless workflow between Blender and RizomUV."
+type = "add-on"
+webite = "https://blendermarket.com/products/rizomuv-bridge"
+blender_version_min = "4.2.0"
+license = ["SPDX:GPL-3.0-or-later"]
+
+[permissions]
+files = "Import/Export files and write configuration files."

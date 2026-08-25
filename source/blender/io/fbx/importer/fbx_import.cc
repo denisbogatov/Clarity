@@ -106,7 +106,8 @@ void FbxImportContext::import_materials()
     Material *mat = nullptr;
     /* Check if a material with this name already exists in the main database */
     if (this->params.mtl_name_collision_mode == eFBXMtlNameCollisionMode::ReferenceExisting) {
-      mat = (Material *)BKE_libblock_find_name(this->bmain, ID_MA, fmat->name.data);
+      const std::string material_name = get_fbx_name(fmat->name, "Material");
+      mat = (Material *)BKE_libblock_find_name(this->bmain, ID_MA, material_name.c_str());
     }
 
     if (mat == nullptr) {
@@ -157,7 +158,8 @@ void FbxImportContext::import_cameras()
     }
     const ufbx_node *node = fcam->instances[0];
 
-    Camera *bcam = BKE_camera_add(this->bmain, get_fbx_name(fcam->name, "Camera"));
+    Camera *bcam = BKE_camera_add(
+        this->bmain, get_fbx_name(fcam->name, "Camera").c_str());
     if (this->params.use_custom_props) {
       read_custom_properties(fcam->props, bcam->id, this->params.props_enum_as_string);
     }
@@ -183,7 +185,8 @@ void FbxImportContext::import_cameras()
     bcam->clip_start = fcam->near_plane * this->fbx.metadata.root_scale;
     bcam->clip_end = fcam->far_plane * this->fbx.metadata.root_scale;
 
-    Object *obj = BKE_object_add_only_object(this->bmain, OB_CAMERA, get_fbx_name(node->name));
+    Object *obj = BKE_object_add_only_object(
+        this->bmain, OB_CAMERA, get_fbx_name(node->name).c_str());
     obj->data = id_cast<ID *>(bcam);
     if (!node->visible) {
       obj->visibility_flag |= OB_HIDE_VIEWPORT;
@@ -205,7 +208,7 @@ void FbxImportContext::import_lights()
     }
     const ufbx_node *node = flight->instances[0];
 
-    Light *lamp = BKE_light_add(this->bmain, get_fbx_name(flight->name, "Light"));
+    Light *lamp = BKE_light_add(this->bmain, get_fbx_name(flight->name, "Light").c_str());
     if (this->params.use_custom_props) {
       read_custom_properties(flight->props, lamp->id, this->params.props_enum_as_string);
     }
@@ -235,7 +238,8 @@ void FbxImportContext::import_lights()
     }
     //@TODO: if hasattr(lamp, "cycles"): lamp.cycles.cast_shadow = lamp.use_shadow
 
-    Object *obj = BKE_object_add_only_object(this->bmain, OB_LAMP, get_fbx_name(node->name));
+    Object *obj = BKE_object_add_only_object(
+        this->bmain, OB_LAMP, get_fbx_name(node->name).c_str());
     obj->data = id_cast<ID *>(lamp);
     if (!node->visible) {
       obj->visibility_flag |= OB_HIDE_VIEWPORT;
@@ -272,7 +276,8 @@ void FbxImportContext::import_empties()
     {
       continue;
     }
-    Object *obj = BKE_object_add_only_object(this->bmain, OB_EMPTY, get_fbx_name(node->name));
+    Object *obj = BKE_object_add_only_object(
+        this->bmain, OB_EMPTY, get_fbx_name(node->name).c_str());
     obj->data = nullptr;
     if (!node->visible) {
       obj->visibility_flag |= OB_HIDE_VIEWPORT;
@@ -354,7 +359,8 @@ void importer_main(Main *bmain, Scene *scene, ViewLayer *view_layer, const FBXIm
   opts.geometry_transform_handling = UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY;
   opts.pivot_handling = UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT;
 
-  opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+  /* Bake unit conversion into geometry and translations so object scale remains unchanged. */
+  opts.space_conversion = UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY;
   /* Convert every imported FBX scene into Clarity's native Maya-compatible world basis. */
   opts.target_axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
   opts.target_axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;

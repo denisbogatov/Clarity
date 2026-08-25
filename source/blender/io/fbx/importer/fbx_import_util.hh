@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "BLI_map.hh"
 #include "BLI_set.hh"
 
@@ -23,7 +25,7 @@ struct bPoseChannel;
 
 namespace io::fbx {
 
-const char *get_fbx_name(const ufbx_string &name, const char *def = "Untitled");
+std::string get_fbx_name(const ufbx_string &name, const char *def = "Untitled");
 
 struct FbxElementMapping {
   Set<Object *> imported_objects;

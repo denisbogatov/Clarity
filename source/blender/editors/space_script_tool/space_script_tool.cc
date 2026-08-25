@@ -66,10 +66,10 @@ static void script_tool_init(wmWindowManager * /*wm*/, ScrArea * /*area*/) {}
 
 static SpaceLink *script_tool_duplicate(SpaceLink *sl)
 {
-  /* `tool_id` and `instance_id` are copied with the struct on purpose: a duplicated
-   * area keeps showing the same tool. Window identity is not stored here - it is
-   * derived from these two strings by #ED_script_tool_window_find - so a duplicate
-   * that ends up in a second window is found by it just like the original. */
+  /* Identity and title are copied with the struct on purpose: a duplicated area keeps
+   * showing the same tool. Window identity is derived from `tool_id` and `instance_id`
+   * by #ED_script_tool_window_find, so a duplicate that ends up in a second window is
+   * found by it just like the original. */
   return reinterpret_cast<SpaceLink *>(MEM_dupalloc(reinterpret_cast<SpaceScriptTool *>(sl)));
 }
 

@@ -457,13 +457,6 @@ static void gizmo_get_axis_color(const int axis_idx,
       }
       break;
     case MAN_AXIS_ROT_C:
-      if (use_clarity_palette) {
-        clarity_gizmo_color_set(ClarityGizmoVisualProfile::view_rotate, r_col);
-      }
-      else {
-        ui::theme::get_color_4fv(TH_GIZMO_VIEW_ALIGN, r_col);
-      }
-      break;
     case MAN_AXIS_ROT_T:
       if (use_clarity_palette) {
         clarity_gizmo_color_set(ClarityGizmoVisualProfile::view, r_col);
@@ -2836,8 +2829,34 @@ static void WIDGETGROUP_gizmo_invoke_prepare(const bContext *C,
     PropertyRNA *prop_orient_type = RNA_struct_find_property(ptr, "orient_type");
     const TransformOrientationSlot *orient_slot = BKE_scene_orientation_slot_get_from_flag(
         scene, ggd->twtype_init);
-    if ((gz == ggd->gizmos[MAN_AXIS_ROT_C]) ||
-        (orient_slot == &scene->orientation_slots[SCE_ORIENT_DEFAULT]))
+    if (ggd->use_clarity_center_style && gz != ggd->gizmos[MAN_AXIS_ROT_C] &&
+        ED_clarity_pivot_orientation_owns_axes(C))
+    {
+      /* One case, and only one: the authored pivot frame owns the axes. Then the handles are drawn
+       * in a frame the scene's orientation slots cannot name - it belongs to the pivot, not to the
+       * scene - and a drag left with the slot turns around axes other than the ones on screen.
+       *
+       * Every other orientation is left alone. `Global`, `Local` and the rest are resolved from the
+       * slot for the drawing as well, so the slot is already the right answer, and overriding it
+       * here with the manipulator's matrix took `Local` away from the transform that had it.
+       *
+       * The matrix is passed without an orientation type, which is what makes the transform read it
+       * as #V3D_ORIENT_CUSTOM_MATRIX - see #initTransformOrientation. */
+      const RegionView3D *rv3d = static_cast<const RegionView3D *>(
+          CTX_wm_region(C)->regiondata);
+      float orient_matrix[3][3];
+      copy_m3_m4(orient_matrix, rv3d->twmat);
+      normalize_m3(orient_matrix);
+      RNA_float_set_array(ptr, "orient_matrix", &orient_matrix[0][0]);
+      RNA_property_unset(ptr, prop_orient_type);
+      if (PropertyRNA *prop_orient_matrix_type = RNA_struct_find_property(ptr,
+                                                                         "orient_matrix_type"))
+      {
+        RNA_property_unset(ptr, prop_orient_matrix_type);
+      }
+    }
+    else if ((gz == ggd->gizmos[MAN_AXIS_ROT_C]) ||
+             (orient_slot == &scene->orientation_slots[SCE_ORIENT_DEFAULT]))
     {
       /* #MAN_AXIS_ROT_C always uses the #V3D_ORIENT_VIEW orientation,
        * optionally we could set this orientation instead of unset the property. */

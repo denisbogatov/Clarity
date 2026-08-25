@@ -1108,6 +1108,8 @@ struct SpaceScriptTool {
   char tool_id[64] = "";
   /** Which window of that tool this is. */
   char instance_id[64] = "";
+  /** OS window title supplied by the script-tool API. */
+  char title[128] = "Script Tool";
 };
 
 /** \} */

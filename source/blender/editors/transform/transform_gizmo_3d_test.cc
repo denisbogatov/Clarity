@@ -145,9 +145,6 @@ TEST(transform_gizmo_3d, ClarityVisualProfileMatchesMayaReferenceColors)
   EXPECT_EQ(Profile::view.r, 100);
   EXPECT_EQ(Profile::view.g, 220);
   EXPECT_EQ(Profile::view.b, 255);
-  EXPECT_EQ(Profile::view_rotate.r, 255);
-  EXPECT_EQ(Profile::view_rotate.g, 255);
-  EXPECT_EQ(Profile::view_rotate.b, 0);
   EXPECT_EQ(Profile::selected.r, 253);
   EXPECT_EQ(Profile::selected.g, 255);
   EXPECT_EQ(Profile::selected.b, 136);

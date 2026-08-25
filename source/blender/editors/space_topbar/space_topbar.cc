@@ -849,7 +849,7 @@ void ED_spacetype_topbar()
    * `_CLARITY_SHELF_TOPBAR_LABEL_SCALE_Y` in `space_topbar.py`. Those two and this
    * are one setting split across two languages - raise the icon scale without
    * raising this and the icons are simply clipped. */
-  art->prefsizey = HEADERY + 16;
+  art->prefsizey = HEADERY + 22;
   art->prefsizex = UI_UNIT_X * 5;
   art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FOOTER;
   art->listener = topbar_main_region_listener;

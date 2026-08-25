@@ -113,6 +113,7 @@
 #include "ED_outliner.hh"
 #include "ED_render.hh"
 #include "ED_screen.hh"
+#include "ED_script_tool.hh"
 #include "ED_undo.hh"
 #include "ED_util.hh"
 #include "ED_view3d.hh"
@@ -437,13 +438,14 @@ static void wm_file_read_setup_wm_use_new(bContext *C,
  *
  * Counterpart of #wm_file_read_setup_wm_init.
  */
-static void wm_file_read_setup_wm_finalize(bContext *C,
+static bool wm_file_read_setup_wm_finalize(bContext *C,
                                            Main *bmain,
                                            BlendFileReadWMSetupData *wm_setup_data)
 {
   BLI_assert(BLI_listbase_count_at_most(&bmain->wm, 2) <= 1);
   BLI_assert(wm_setup_data != nullptr);
   wmWindowManager *wm = static_cast<wmWindowManager *>(bmain->wm.first);
+  const bool is_using_loaded_wm = wm != nullptr && wm_setup_data->old_wm != wm;
 
   /* If reading factory startup file, and there was no previous WM, clear the size of the windows
    * in newly read WM so that they get resized to occupy the whole available space on current
@@ -479,6 +481,7 @@ static void wm_file_read_setup_wm_finalize(bContext *C,
   }
   /* Else just using the new WM read from file, nothing to do. */
   BLI_assert(wm_setup_data->old_wm == nullptr);
+
   MEM_delete(wm_setup_data);
 
   /* UI Updates. */
@@ -495,6 +498,7 @@ static void wm_file_read_setup_wm_finalize(bContext *C,
       }
     }
   }
+  return is_using_loaded_wm;
 }
 
 /** \} */
@@ -1084,7 +1088,8 @@ bool WM_file_read(bContext *C,
 
       /* Finalize handling of WM, using the read WM and/or the current WM depending on things like
        * whether the UI is loaded from the .blend file or not, etc. */
-      wm_file_read_setup_wm_finalize(C, bmain, wm_setup_data);
+      const bool close_loaded_script_tool_windows =
+          wm_file_read_setup_wm_finalize(C, bmain, wm_setup_data);
 
       if (G.f != G_f_orig) {
         const int flags_keep = G_FLAG_ALL_RUNTIME;
@@ -1101,6 +1106,11 @@ bool WM_file_read(bContext *C,
       }
 
       WM_check(C); /* Opens window(s), checks keymaps. */
+      if (close_loaded_script_tool_windows) {
+        /* Loaded Script Tool windows are transient. Close them only after #WM_check has created
+         * the new window-manager message bus and initialized its windows. */
+        ED_script_tool_windows_close_all(C, CTX_wm_manager(C));
+      }
 
       if (do_history_file_update) {
         wm_history_file_update();
@@ -1274,6 +1284,7 @@ void wm_homefile_read_ex(bContext *C,
     SET_FLAG_FROM_TEST(G.f, (U.flag & USER_SCRIPT_AUTOEXEC_DISABLE) == 0, G_FLAG_SCRIPT_AUTOEXEC);
   }
 
+  bool close_loaded_script_tool_windows = false;
   if (use_data) {
     if (reset_app_template) {
       /* Always load UI when switching to another template. */
@@ -1513,7 +1524,7 @@ void wm_homefile_read_ex(bContext *C,
     /* Finalize handling of WM, using the read WM and/or the current WM depending on things like
      * whether the UI is loaded from the .blend file or not, etc. */
     wm_setup_data->is_factory_startup = loaded_factory_settings;
-    wm_file_read_setup_wm_finalize(C, bmain, wm_setup_data);
+    close_loaded_script_tool_windows = wm_file_read_setup_wm_finalize(C, bmain, wm_setup_data);
   }
 
   if (use_userdef) {
@@ -1528,6 +1539,9 @@ void wm_homefile_read_ex(bContext *C,
 
   if (use_data) {
     WM_check(C); /* Opens window(s), checks keymaps. */
+    if (close_loaded_script_tool_windows) {
+      ED_script_tool_windows_close_all(C, CTX_wm_manager(C));
+    }
 
     bmain->filepath[0] = '\0';
   }

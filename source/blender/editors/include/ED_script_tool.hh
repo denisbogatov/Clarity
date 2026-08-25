@@ -15,6 +15,7 @@ struct ScriptToolWindowParams {
 };
 
 bool ED_script_tool_window_is(const wmWindow *win);
+const char *ED_script_tool_window_title_get(const wmWindow *win);
 wmWindow *ED_script_tool_window_find(wmWindowManager *wm,
                                      const char *tool_id,
                                      const char *instance_id);
@@ -30,4 +31,5 @@ bool ED_script_tool_window_close(bContext *C,
 int ED_script_tool_window_close_all(bContext *C,
                                     wmWindowManager *wm,
                                     const char *tool_id);
+int ED_script_tool_windows_close_all(bContext *C, wmWindowManager *wm);
 }  // namespace blender

@@ -44,6 +44,36 @@ Columns:
 | Object, Edit Pivot active | Edit Pivot | `W` | none | unchanged | unchanged | Move active, Edit Pivot ended cleanly | unchanged | n/a | TODO |
 | Object, modal transform running | Move | `E` during modal | none | TODO | TODO | TODO — decide whether modal blocks the switch | TODO | TODO | TODO |
 
+## Object visibility
+
+`H` uses Maya's independent visibility toggle: every selected object flips its own viewport
+visibility. Visibility is inherited through the object hierarchy without overwriting descendant
+state, and the raw selection is retained so the same `H` press can show the objects again. The
+shortcut is available while the pointer is over either the 3D View or the Outliner.
+
+| Start state | Keys | Own visibility | Descendant visibility | Selection | Undo |
+| --- | --- | --- | --- | --- | --- |
+| Visible selected object | `H` | hidden | hidden through inheritance | retained | visible again |
+| Hidden selected object | `H` | visible | follows its own and ancestor state | retained | hidden again |
+| Visible selected parent, visible unselected child | `H`, then `H` | hidden, then visible | hidden, then visible; child state stays visible | parent retained | restores the previous toggle |
+| Visible selected parent, independently hidden child | `H`, then `H` | hidden, then visible | remains hidden after the parent returns | parent retained | restores the previous toggle |
+| Several selected objects with mixed own visibility | `H` | each object toggles independently | inherited per hierarchy | retained | all own states restored |
+| Objects selected in the Outliner, pointer over the Outliner | `H` | each selected object toggles | inherited per hierarchy | retained | all own states restored |
+| No selected objects | `H` | unchanged | unchanged | unchanged | no undo step |
+
+## Isolate selected
+
+`Ctrl+1` toggles an isolated set for the 3D View under the mouse. Entering captures the current
+object selection without moving or reframing the view. Isolation changes viewport display only;
+object visibility and render state remain untouched. Each 3D View owns its isolation independently.
+
+| Start state | Keys | Current 3D View | Other 3D Views | Selection | Object visibility | View framing |
+| --- | --- | --- | --- | --- | --- | --- |
+| One or several selected objects, isolation off | `Ctrl+1` | only the captured selection is shown | unchanged | retained | unchanged | unchanged |
+| Isolation on | `Ctrl+1` | isolation exits and the normal scene display returns | unchanged | retained | unchanged | unchanged |
+| Isolation off, no selected objects | `Ctrl+1` | unchanged | unchanged | unchanged | unchanged | unchanged |
+| Isolation on, selection changed after entry | `Ctrl+1` | isolation exits; the captured set is not replaced automatically | unchanged | retained | unchanged | unchanged |
+
 ## Edit Pivot toggle (task item 6)
 
 `D` and `Insert` are equivalent toggles, matching Maya: one press turns Edit Pivot on and it stays

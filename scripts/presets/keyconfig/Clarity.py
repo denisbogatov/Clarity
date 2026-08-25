@@ -123,6 +123,30 @@ def apply_clarity_modeling_shortcuts(keyconfig_data):
         ))
 
 
+def apply_clarity_visibility_shortcut(keyconfig_data):
+    """Toggle selected object visibility from the 3D View or Outliner."""
+    for keymap_name, _keymap_args, keymap_content in keyconfig_data:
+        if keymap_name not in {"Object Mode", "Outliner"}:
+            continue
+        keymap_content["items"].append((
+            "object.clarity_visibility_toggle",
+            {"type": 'H', "value": 'PRESS'},
+            None,
+        ))
+
+
+def apply_clarity_isolate_shortcut(keyconfig_data):
+    """Toggle the current 3D View's isolated selection without changing its framing."""
+    for keymap_name, _keymap_args, keymap_content in keyconfig_data:
+        if keymap_name != "3D View":
+            continue
+        keymap_content["items"].append((
+            "view3d.localview",
+            {"type": 'ONE', "value": 'PRESS', "ctrl": True},
+            {"properties": [("frame_selected", False)]},
+        ))
+
+
 def allow_modifiers_on_gizmo_tweak(keyconfig_data):
     """Let a held modifier reach the manipulator.
 
@@ -172,6 +196,8 @@ def load():
     allow_modifiers_on_gizmo_tweak(keyconfig_data)
     apply_clarity_selection_shortcuts(keyconfig_data)
     apply_clarity_modeling_shortcuts(keyconfig_data)
+    apply_clarity_visibility_shortcut(keyconfig_data)
+    apply_clarity_isolate_shortcut(keyconfig_data)
 
     if platform == "darwin":
         from bl_keymap_utils.platform_helpers import keyconfig_data_oskey_from_ctrl_for_macos

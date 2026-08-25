@@ -37,8 +37,21 @@ void main()
   frag_color = float4(color * color, final_color.a);
 
 #elif !defined(SELECT_ENABLE)
+#  if !defined(CURVES)
+  if (clarity_hard_edges_only && clarity_hard_edge < 0.5f) {
+    gpu_discard_fragment();
+    return;
+  }
+#  endif
+
   line_output = pack_line_data(gl_FragCoord.xy, edge_start, edge_pos);
   frag_color = final_color;
+
+#  if !defined(CURVES)
+  if (clarity_hard_edge > 0.5f) {
+    frag_color = theme.colors.edge_sharp;
+  }
+#  endif
 
 #  if !defined(CURVES)
   gl_FragDepth = gl_FragCoord.z;

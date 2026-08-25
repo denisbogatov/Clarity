@@ -273,6 +273,71 @@ _CLARITY_SHELF_DEFAULT_CONFIG_FILENAMES = {
     "panel": "clarity_shelf_default_panel.json",
 }
 
+_CLARITY_SHELF_SMART_DETRIANGULATE_ITEM = {
+    "label": "Smart Detriangulate",
+    "icon": "MOD_TRIANGULATE",
+    "command_type": "PYTHON",
+    "script_source": "FILE",
+    "script_file": "{shelf_scripts}/clarity_smart_detriangulate/entry.py",
+    "row": 1,
+    "custom_icon": "{shelf_icons}/clarity_smart_detriangulate.png",
+}
+
+_CLARITY_SHELF_UNLOCK_NORMALS_ITEM = {
+    "label": "Unlock Normals",
+    "icon": "NORMALS_FACE",
+    "command_type": "PYTHON",
+    "script_source": "FILE",
+    "script_file": "{shelf_scripts}/clarity_unlock_normals/entry.py",
+    "row": 1,
+    "custom_icon": "{shelf_icons}/clarity_unlock_normals.png",
+}
+
+_CLARITY_SHELF_RIZOMUV_BRIDGE_ITEM = {
+    "label": "RizomUV Bridge",
+    "icon": "UV_DATA",
+    "command_type": "PYTHON",
+    "script_source": "FILE",
+    "script_file": "{shelf_scripts}/clarity_rizomuv_bridge/entry.py",
+    "row": 1,
+    "custom_icon": "{shelf_icons}/clarity_rizomuv_bridge.png",
+}
+
+_CLARITY_SHELF_EDGE_NORMAL_ITEMS = (
+    {
+        "label": "Soften/Harden Edges",
+        "icon": "MOD_EDGESPLIT",
+        "command_type": "PYTHON",
+        "script_source": "FILE",
+        "script_file": "{shelf_scripts}/clarity_edge_normals/soften_harden.py",
+        "row": 0,
+    },
+    {
+        "label": "Show Hard Edges",
+        "icon": "OVERLAY",
+        "command_type": "PYTHON",
+        "script_source": "FILE",
+        "script_file": "{shelf_scripts}/clarity_edge_normals/toggle_display.py",
+        "row": 0,
+    },
+    {
+        "label": "Soften All Edges",
+        "icon": "MOD_SMOOTH",
+        "command_type": "PYTHON",
+        "script_source": "FILE",
+        "script_file": "{shelf_scripts}/clarity_edge_normals/soften_all.py",
+        "row": 1,
+    },
+    {
+        "label": "Harden All Edges",
+        "icon": "EDGE_SHARP",
+        "command_type": "PYTHON",
+        "script_source": "FILE",
+        "script_file": "{shelf_scripts}/clarity_edge_normals/harden_all.py",
+        "row": 1,
+    },
+)
+
 
 def _clarity_shelf_default_config_variant(scope):
     return "panel" if scope.startswith("SHELF:") else "topbar"
@@ -876,23 +941,23 @@ _CLARITY_SHELF_ROW_COUNT = 2
 # `space_topbar.cc`), so growing the icons here without growing that clips them.
 # The two are meant to be changed together.
 #
-# The gap between two icons is what the cell has left over once the button is placed
-# in its middle - `COLUMN_UNITS_X` minus `BUTTON_UNITS_X` - so the two paths are kept
-# at the same difference and the shelf spaces its icons the same way wherever it is
-# drawn. Widening a button without widening its cell tightens the gap rather than
-# growing the icon.
-_CLARITY_SHELF_TOPBAR_COLUMN_UNITS_X = 1.45
+# Cell width controls the step between icons. The button row is scaled equally on
+# both axes in `_clarity_shelf_draw_item_button`, keeping the larger buttons square;
+# the cell and button values below leave only a narrow visual gap.
+_CLARITY_SHELF_TOPBAR_COLUMN_UNITS_X = 1.65
 _CLARITY_SHELF_TOPBAR_BUTTON_UNITS_X = 1.10
-_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y = 1.05
-_CLARITY_SHELF_TOPBAR_LABEL_SCALE_Y = 0.68
+_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y = 1.35
+_CLARITY_SHELF_TOPBAR_LABEL_SCALE_Y = 0.70
 
-_CLARITY_SHELF_PANEL_CELL_UNITS_X = 1.55
-_CLARITY_SHELF_PANEL_BUTTON_UNITS_X = 1.20
-_CLARITY_SHELF_PANEL_ICON_SCALE_Y = 1.15
-_CLARITY_SHELF_PANEL_LABEL_SCALE_Y = 0.70
+_CLARITY_SHELF_PANEL_BUTTON_UNITS_X = 1.15
+_CLARITY_SHELF_PANEL_ICON_SCALE_Y = 1.40
+_CLARITY_SHELF_PANEL_CELL_UNITS_X = (
+    _CLARITY_SHELF_PANEL_BUTTON_UNITS_X * _CLARITY_SHELF_PANEL_ICON_SCALE_Y
+)
+_CLARITY_SHELF_PANEL_LABEL_SCALE_Y = 0.72
 
 # Schema version of a single shelf config, see `_clarity_shelf_migrate_config`.
-_CLARITY_SHELF_VERSION = 4
+_CLARITY_SHELF_VERSION = 8
 _CLARITY_SHELF_STORAGE_VERSION = 1
 _CLARITY_SHELF_DEFAULT_BACKGROUND_COLOR = (0.18, 0.18, 0.18, 1.0)
 _CLARITY_SHELF_DEFAULT_ICON_COLOR = (1.0, 1.0, 1.0, 1.0)
@@ -1267,6 +1332,17 @@ def _clarity_shelf_default_config(variant="topbar"):
             parse_constant=_clarity_shelf_reject_json_constant,
             parse_float=_clarity_shelf_json_float,
         )
+    default_tab_name = "Helpfull Panel" if variant == "panel" else "Default"
+    default_tab = next(
+        (tab for tab in config.get("tabs", ()) if tab.get("name") == default_tab_name),
+        None,
+    )
+    if default_tab is not None:
+        default_items = default_tab.setdefault("items", [])
+        default_items.append(copy.deepcopy(_CLARITY_SHELF_SMART_DETRIANGULATE_ITEM))
+        default_items.append(copy.deepcopy(_CLARITY_SHELF_UNLOCK_NORMALS_ITEM))
+        default_items.append(copy.deepcopy(_CLARITY_SHELF_RIZOMUV_BRIDGE_ITEM))
+        default_items.extend(copy.deepcopy(_CLARITY_SHELF_EDGE_NORMAL_ITEMS))
     # Both keys hold a path into the bundled tool folders, and neither can be stored
     # absolute in a tracked file - the tree lives somewhere different on every machine.
     for tab in config.get("tabs", ()):
@@ -1683,6 +1759,113 @@ def _clarity_shelf_migrate_config(config, variant="topbar"):
             if _clarity_shelf_bundled_script_key(item["script_file"]) not in existing_keys:
                 custom["items"].append(item)
         config["version"] = 4
+        migrated = True
+    if version < 5:
+        # Add newly bundled shelf scripts without disturbing existing buttons or
+        # user-created tabs. Filename matching keeps this migration idempotent.
+        default_tab_name = "Helpfull Panel" if variant == "panel" else "Default"
+        target = next(
+            (tab for tab in config["tabs"] if tab["name"] == default_tab_name),
+            None,
+        )
+        if target is None:
+            target = next(
+                (tab for tab in config["tabs"] if tab["name"] == "Custom"),
+                None,
+            )
+        if target is None:
+            target = {"name": default_tab_name, "items": [], "separators": []}
+            config["tabs"].append(target)
+        existing_keys = {
+            _clarity_shelf_bundled_script_key(item.get("script_file", ""))
+            for tab in config["tabs"]
+            for item in tab["items"]
+            if item.get("script_file")
+        }
+        for item in _clarity_shelf_builtin_script_items(variant):
+            if _clarity_shelf_bundled_script_key(item["script_file"]) not in existing_keys:
+                target["items"].append(item)
+        config["version"] = 5
+        migrated = True
+    if version < 6:
+        # Add tools bundled after schema 5 to existing shelves without replacing
+        # user-edited labels, icons, rows, or tabs.
+        default_tab_name = "Helpfull Panel" if variant == "panel" else "Default"
+        target = next(
+            (tab for tab in config["tabs"] if tab["name"] == default_tab_name),
+            None,
+        )
+        if target is None:
+            target = next(
+                (tab for tab in config["tabs"] if tab["name"] == "Custom"),
+                None,
+            )
+        if target is None:
+            target = {"name": default_tab_name, "items": [], "separators": []}
+            config["tabs"].append(target)
+        existing_keys = {
+            _clarity_shelf_bundled_script_key(item.get("script_file", ""))
+            for tab in config["tabs"]
+            for item in tab["items"]
+            if item.get("script_file")
+        }
+        for item in _clarity_shelf_builtin_script_items(variant):
+            if _clarity_shelf_bundled_script_key(item["script_file"]) not in existing_keys:
+                target["items"].append(item)
+        config["version"] = 6
+        migrated = True
+    if version < 7:
+        # Add the Maya-style edge-normal tools while preserving every existing
+        # shelf item and user layout choice.
+        default_tab_name = "Helpfull Panel" if variant == "panel" else "Default"
+        target = next(
+            (tab for tab in config["tabs"] if tab["name"] == default_tab_name),
+            None,
+        )
+        if target is None:
+            target = next(
+                (tab for tab in config["tabs"] if tab["name"] == "Custom"),
+                None,
+            )
+        if target is None:
+            target = {"name": default_tab_name, "items": [], "separators": []}
+            config["tabs"].append(target)
+        existing_keys = {
+            _clarity_shelf_bundled_script_key(item.get("script_file", ""))
+            for tab in config["tabs"]
+            for item in tab["items"]
+            if item.get("script_file")
+        }
+        for item in _clarity_shelf_builtin_script_items(variant):
+            if _clarity_shelf_bundled_script_key(item["script_file"]) not in existing_keys:
+                target["items"].append(item)
+        config["version"] = 7
+        migrated = True
+    if version < 8:
+        # Add the bundled RizomUV bridge without changing existing shelf items.
+        default_tab_name = "Helpfull Panel" if variant == "panel" else "Default"
+        target = next(
+            (tab for tab in config["tabs"] if tab["name"] == default_tab_name),
+            None,
+        )
+        if target is None:
+            target = next(
+                (tab for tab in config["tabs"] if tab["name"] == "Custom"),
+                None,
+            )
+        if target is None:
+            target = {"name": default_tab_name, "items": [], "separators": []}
+            config["tabs"].append(target)
+        existing_keys = {
+            _clarity_shelf_bundled_script_key(item.get("script_file", ""))
+            for tab in config["tabs"]
+            for item in tab["items"]
+            if item.get("script_file")
+        }
+        for item in _clarity_shelf_builtin_script_items(variant):
+            if _clarity_shelf_bundled_script_key(item["script_file"]) not in existing_keys:
+                target["items"].append(item)
+        config["version"] = 8
         migrated = True
     if config.get("version") != _CLARITY_SHELF_VERSION:
         config["version"] = _CLARITY_SHELF_VERSION
@@ -3474,9 +3657,14 @@ def _clarity_shelf_call_operator(idname, properties, invoke=False):
 
 
 def _clarity_shelf_module_under_directory(module, directory):
-    module_path = getattr(module, "__file__", None) or (
-        next(iter(getattr(module, "__path__", ()) or ()), None)
-    )
+    try:
+        module_path = getattr(module, "__file__", None) or (
+            next(iter(getattr(module, "__path__", ()) or ()), None)
+        )
+    except (AttributeError, KeyError, RuntimeError):
+        # Namespace-package paths can be invalidated while their parent package is
+        # being removed from sys.modules. Treat an unreadable path as external.
+        return False
     if not module_path:
         return False
     return os.path.normcase(os.path.abspath(module_path)).startswith(
@@ -3498,10 +3686,17 @@ def _clarity_shelf_purge_script_modules(script_directory, modules_before):
     scoped to that run, so the folder name is the only thing that has to
     stay unique between tools, not every file inside it.
     """
+    modules_to_purge = []
     for name in set(sys.modules) - modules_before:
         module = sys.modules.get(name)
         if module is not None and _clarity_shelf_module_under_directory(module, script_directory):
-            del sys.modules[name]
+            modules_to_purge.append(name)
+
+    # Discover every path before mutating sys.modules. Namespace packages lazily
+    # resolve their path through the parent package and fail if that parent has
+    # already disappeared. Children first also keeps the removal order predictable.
+    for name in sorted(modules_to_purge, key=lambda item: item.count("."), reverse=True):
+        sys.modules.pop(name, None)
 
 
 def _clarity_shelf_run_script(context, item):
@@ -4389,6 +4584,7 @@ def _clarity_shelf_draw_item_button(
         button_units_x,
         icon_scale_y,
         label_scale_y,
+        reserve_label_space=True,
 ):
     """Draw one shelf icon plus its short label into `cell`.
 
@@ -4397,6 +4593,7 @@ def _clarity_shelf_draw_item_button(
     """
     icon_line = cell.row(align=True)
     icon_line.alignment = 'CENTER'
+    icon_line.scale_x = icon_scale_y
     icon_line.scale_y = icon_scale_y
     button = icon_line.row(align=True)
     button.ui_units_x = button_units_x
@@ -4433,17 +4630,19 @@ def _clarity_shelf_draw_item_button(
     props.item_id = item["id"]
     props.tooltip = item.get("label", "Shelf Command")
 
-    label_line = cell.row(align=True)
-    label_line.alignment = 'CENTER'
-    label_line.scale_y = label_scale_y
-    label_line.label(text=item.get("short_text", ""))
+    short_text = item.get("short_text", "")
+    if short_text or reserve_label_space:
+        label_line = cell.row(align=True)
+        label_line.alignment = 'CENTER'
+        label_line.scale_y = label_scale_y
+        label_line.label(text=short_text)
 
 
 def _clarity_shelf_draw_icon_row(layout, row_index, context):
     tab = _clarity_shelf_active_tab(context)
     row = layout.row(align=False)
     row.alignment = 'LEFT'
-    row.scale_x = 1.2
+    row.scale_x = 1.0
     row.scale_y = 1.0
 
     entries = _clarity_shelf_row_entries(tab, row_index)
@@ -4500,18 +4699,24 @@ def _clarity_shelf_adaptive_entries(tab, scope=None):
 
 def _clarity_shelf_draw_adaptive(layout, context):
     tab = _clarity_shelf_active_tab(context)
-    flow = layout.grid_flow(
-        row_major=True,
-        columns=0,
-        even_columns=True,
-        even_rows=True,
-        align=True,
-    )
-    flow.scale_x = 1.05
-    flow.scale_y = 1.0
+    entries = _clarity_shelf_adaptive_entries(tab)
 
-    for entry_type, entry in _clarity_shelf_adaptive_entries(tab):
-        cell = flow.column(align=True)
+    # `grid_flow(columns=0)` stretches cells to consume the complete editor width,
+    # which makes both icon size and gaps change whenever a Shelf window is resized.
+    # Use fixed-width cells and only adapt the number of cells per row instead.
+    ui_scale = max(context.preferences.system.ui_scale, 0.25)
+    cell_width_px = _CLARITY_SHELF_PANEL_CELL_UNITS_X * 20.0 * ui_scale
+    available_width_px = max(context.region.width - (12.0 * ui_scale), cell_width_px)
+    columns = max(1, int(available_width_px // cell_width_px))
+
+    rows = layout.column(align=True)
+    row = None
+    for index, (entry_type, entry) in enumerate(entries):
+        if index % columns == 0:
+            row = rows.row(align=True)
+            row.alignment = 'LEFT'
+
+        cell = row.column(align=True)
         cell.ui_units_x = _CLARITY_SHELF_PANEL_CELL_UNITS_X
 
         cell.context_string_set("clarity_shelf_item_id", entry["id"])
@@ -4529,6 +4734,7 @@ def _clarity_shelf_draw_adaptive(layout, context):
             button_units_x=_CLARITY_SHELF_PANEL_BUTTON_UNITS_X,
             icon_scale_y=_CLARITY_SHELF_PANEL_ICON_SCALE_Y,
             label_scale_y=_CLARITY_SHELF_PANEL_LABEL_SCALE_Y,
+            reserve_label_space=False,
         )
 
 

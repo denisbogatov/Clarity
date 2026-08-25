@@ -53,14 +53,14 @@ Object *ArmatureImportContext::create_armature_for_node(const ufbx_node *node)
 {
   BLI_assert_msg(node != nullptr, "fbx: node for armature creation should not be null");
 
-  const char *arm_name = get_fbx_name(node->name, "Armature");
-  const char *obj_name = get_fbx_name(node->name, "Armature");
+  const std::string arm_name = get_fbx_name(node->name, "Armature");
+  const std::string obj_name = get_fbx_name(node->name, "Armature");
 #ifdef FBX_DEBUG_PRINT
-  fprintf(g_debug_file, "create ARMATURE %s\n", arm_name);
+  fprintf(g_debug_file, "create ARMATURE %s\n", arm_name.c_str());
 #endif
 
-  bArmature *arm = BKE_armature_add(&this->bmain, arm_name);
-  Object *obj = BKE_object_add_only_object(&this->bmain, OB_ARMATURE, obj_name);
+  bArmature *arm = BKE_armature_add(&this->bmain, arm_name.c_str());
+  Object *obj = BKE_object_add_only_object(&this->bmain, OB_ARMATURE, obj_name.c_str());
   obj->dtx |= OB_DRAW_IN_FRONT;
   obj->data = id_cast<ID *>(arm);
   this->mapping.imported_objects.add(obj);

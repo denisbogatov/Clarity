@@ -2419,7 +2419,14 @@ void BKE_base_eval_flags(Base *base)
 
   /* Apply object restrictions. */
   const int object_restrict = base->object->visibility_flag;
-  if (object_restrict & OB_HIDE_VIEWPORT) {
+  bool clarity_hierarchy_hidden = false;
+  for (const Object *object = base->object; object != nullptr; object = object->parent) {
+    if (object->visibility_flag & OB_HIDE_VIEWPORT) {
+      clarity_hierarchy_hidden = true;
+      break;
+    }
+  }
+  if (clarity_hierarchy_hidden) {
     base->flag &= ~BASE_ENABLED_VIEWPORT;
   }
   if (object_restrict & OB_HIDE_RENDER) {
@@ -2428,6 +2435,9 @@ void BKE_base_eval_flags(Base *base)
   if (object_restrict & OB_HIDE_SELECT) {
     base->flag &= ~BASE_SELECTABLE;
   }
+  const bool clarity_keep_selection =
+      (clarity_hierarchy_hidden || (base->flag & BASE_HIDDEN)) &&
+      (base->flag & BASE_SELECTABLE);
 
   /* Apply viewport visibility by default. The dependency graph for render
    * can change these again, but for tools we always want the viewport
@@ -2438,7 +2448,7 @@ void BKE_base_eval_flags(Base *base)
   }
 
   /* Deselect unselectable objects. */
-  if (!(base->flag & BASE_SELECTABLE)) {
+  if (!(base->flag & BASE_SELECTABLE) && !clarity_keep_selection) {
     base->flag &= ~BASE_SELECTED;
   }
 }

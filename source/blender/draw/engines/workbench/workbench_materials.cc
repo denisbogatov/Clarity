@@ -14,6 +14,7 @@
 #include "BKE_node_legacy_types.hh"
 #include "DNA_material_types.h"
 #include "DNA_node_types.h"
+#include "DNA_userdef_types.h"
 #include "ED_uvedit.hh"
 /* get_image */
 
@@ -52,6 +53,11 @@ MaterialTexture::MaterialTexture(Object *ob, int material_index)
       const NodeTexImage *storage = static_cast<NodeTexImage *>(node->storage);
       const bool use_filter = (storage->interpolation != SHD_INTERP_CLOSEST);
       sampler_state.set_filtering_flag_from_test(GPU_SAMPLER_FILTERING_LINEAR, use_filter);
+      if (use_filter) {
+        sampler_state.enable_filtering_flag(GPU_SAMPLER_FILTERING_MIPMAP |
+                                            GPU_anisotropic_filtering_flags(
+                                                U.anisotropic_filter));
+      }
       switch (storage->extension) {
         case SHD_IMAGE_EXTENSION_EXTEND:
         default:

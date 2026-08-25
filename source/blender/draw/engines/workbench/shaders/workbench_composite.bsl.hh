@@ -75,14 +75,16 @@ struct FragOut {
   float3 N = workbench::normal_decode(texture(srt.normal_tx, uv));
   float4 mat_data = texture(srt.material_tx, uv);
 
-  bool backface = mat_data.a > 255.0f;
   float3 base_color = mat_data.rgb;
   float4 color = float4(1.0f);
 
   if (srt.lighting_mode == WORKBENCH_LIGHTING_MATCAP) [[static_branch]] {
-    /* When using matcaps, mat_data.a is the back-face sign. */
-    N = (mat_data.a > 0.0f) ? N : -N;
-    color.rgb = workbench::get_matcap_lighting(srt.world, srt.matcap_tx, base_color, N, V);
+    if (mat_data.a > 255.0f) {
+      color.rgb = float3(0.0f);
+    }
+    else {
+      color.rgb = workbench::get_matcap_lighting(srt.world, srt.matcap_tx, base_color, N, V);
+    }
   }
   else if (srt.lighting_mode == WORKBENCH_LIGHTING_STUDIO) [[static_branch]] {
     float roughness = 0.0f, metallic = 0.0f;
@@ -91,10 +93,6 @@ struct FragOut {
   }
   else if (srt.lighting_mode == WORKBENCH_LIGHTING_FLAT) [[static_branch]] {
     color.rgb = base_color;
-  }
-
-  if (backface) {
-    color.rgb = float3(0.0f);
   }
 
   float cavity = 0.0f, edges = 0.0f, curvature = 0.0f;

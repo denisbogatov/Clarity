@@ -82,6 +82,7 @@
 #include "ED_render.hh"
 #include "ED_scene.hh"
 #include "ED_screen.hh"
+#include "ED_script_tool.hh"
 
 #include "IMB_imbuf.hh"
 #include "IMB_imbuf_types.hh"
@@ -608,6 +609,9 @@ static std::string wm_window_title_text(
     const bool is_single = screen && BLI_listbase_is_single(&screen->areabase);
     ScrArea *area = (screen) ? static_cast<ScrArea *>(screen->areabase.first) : nullptr;
     if (is_single && area && area->spacetype != SPACE_EMPTY) {
+      if (const char *script_tool_title = ED_script_tool_window_title_get(win)) {
+        return script_tool_title;
+      }
       return IFACE_(ED_area_name(area).c_str());
     }
     return "Blender";

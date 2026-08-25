@@ -93,3 +93,8 @@ blendcache_*
 # Maya pivot visual golden-reference frames are test inputs, not temporary viewport captures.
 !tests/pivot_reference/fixtures/maya_2025_pivot_visual_*.png
 *.png
+!scripts/startup/bl_ui/clarity_shelf_icons/clarity_smart_detriangulate.png
+!scripts/startup/bl_ui/clarity_shelf_icons/tree_vertex_data_baker.png
+!scripts/startup/bl_ui/clarity_shelf_icons/clarity_unlock_normals.png
+!scripts/startup/bl_ui/clarity_shelf_icons/clarity_rizomuv_bridge.png
+!scripts/startup/bl_ui/clarity_shelf_scripts/clarity_rizomuv_bridge/bridge/lib/RizomUVLink/win/*.pyd

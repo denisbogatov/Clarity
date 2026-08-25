@@ -31,8 +31,6 @@ struct ClarityGizmoVisualProfile {
   static constexpr ClarityGizmoRGB8 axis_y = {0, 255, 15};
   static constexpr ClarityGizmoRGB8 axis_z = {0, 0, 255};
   static constexpr ClarityGizmoRGB8 view = {100, 220, 255};
-  /* The ring that rotates in the plane of the screen, outside the sphere. */
-  static constexpr ClarityGizmoRGB8 view_rotate = {255, 255, 0};
   static constexpr ClarityGizmoRGB8 selected = {253, 255, 136};
 
   static constexpr float translate_axis_start = 0.25f;

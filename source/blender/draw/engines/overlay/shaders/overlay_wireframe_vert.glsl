@@ -18,7 +18,8 @@ VERTEX_SHADER_CREATE_INFO(overlay_wireframe)
 #if !defined(POINTS) && !defined(CURVES)
 bool is_edge_sharpness_visible(float wire_data)
 {
-  return wire_data <= wire_step_param;
+  float edge_factor = (wire_data < 0.0f) ? (-wire_data - 1.0f) : wire_data;
+  return edge_factor <= wire_step_param;
 }
 #endif
 
@@ -90,6 +91,10 @@ void main()
 {
   select_id_set(drw_custom_id());
 
+#if !defined(POINTS)
+  clarity_hard_edge = 0.0f;
+#endif
+
   /* If no attribute is available, use a fixed facing value depending on the coloring mode.
    * This allow to keep most of the contrast between unselected and selected color
    * while keeping object coloring mode working (see #134011). */
@@ -108,6 +113,7 @@ void main()
   float facing = no_nor_facing;
 #else
   float3 wnor = safe_normalize(drw_normal_object_to_world(nor));
+  clarity_hard_edge = (show_clarity_hard_edges && wd < 0.0f) ? 1.0f : 0.0f;
 
   if (is_hair) {
     float4x4 obmat = hair_dupli_matrix;
@@ -128,7 +134,8 @@ void main()
   if (!use_custom_depth_bias) {
     float facing_ratio = clamp(1.0f - facing * facing, 0.0f, 1.0f);
     float flip = sign(facing); /* Flip when not facing the normal (i.e.: back-facing). */
-    float curvature = (1.0f - wd * 0.75f); /* Avoid making things worse for curvy areas. */
+    float edge_factor = (wd < 0.0f) ? (-wd - 1.0f) : wd;
+    float curvature = (1.0f - edge_factor * 0.75f); /* Avoid making things worse for curvy areas. */
     float3 wofs = wnor * (facing_ratio * curvature * flip);
     wofs = drw_normal_world_to_view(wofs);
 

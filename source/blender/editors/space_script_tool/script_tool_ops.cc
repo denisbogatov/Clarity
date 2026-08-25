@@ -84,6 +84,12 @@ bool ED_script_tool_window_is(const wmWindow *win)
   return script_tool_window_space_get(win) != nullptr;
 }
 
+const char *ED_script_tool_window_title_get(const wmWindow *win)
+{
+  const SpaceScriptTool *sscript_tool = script_tool_window_space_get(win);
+  return (sscript_tool && sscript_tool->title[0]) ? sscript_tool->title : nullptr;
+}
+
 static bool script_tool_space_matches(const SpaceScriptTool *sscript_tool,
                                       const char *tool_id,
                                       const char *instance_id)
@@ -128,6 +134,9 @@ wmWindow *ED_script_tool_window_open(bContext *C, const ScriptToolWindowParams &
                                                                            "main";
 
   wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm == nullptr) {
+    return nullptr;
+  }
   if (params.reuse) {
     if (wmWindow *win = ED_script_tool_window_find(wm, params.tool_id, instance_id)) {
       wm_window_raise(win);
@@ -135,7 +144,17 @@ wmWindow *ED_script_tool_window_open(bContext *C, const ScriptToolWindowParams &
     }
   }
 
-  const wmWindow *win_parent = CTX_wm_window(C);
+  wmWindow *win_parent = CTX_wm_window(C);
+  if (win_parent == nullptr) {
+    win_parent = static_cast<wmWindow *>(wm->windows.first);
+    if (win_parent == nullptr) {
+      return nullptr;
+    }
+    /* Script entry points can run immediately after a file/window transition, when the
+     * global context has already lost its previous window. WM_window_open requires a
+     * live parent and changes the context to the newly opened window itself. */
+    CTX_wm_window_set(C, win_parent);
+  }
   const int size_x = std::max(params.width, SCRIPT_TOOL_WIN_MINX);
   const int size_y = std::max(params.height, SCRIPT_TOOL_WIN_MINY);
   const rcti window_rect = {
@@ -174,6 +193,7 @@ wmWindow *ED_script_tool_window_open(bContext *C, const ScriptToolWindowParams &
   }
   STRNCPY_UTF8(sscript_tool->tool_id, params.tool_id);
   STRNCPY_UTF8(sscript_tool->instance_id, instance_id);
+  STRNCPY_UTF8(sscript_tool->title, params.title ? params.title : "Script Tool");
 
   /* The OS title bar is coloured from the header theme of the space a single-area
    * window holds, but the decoration style applied while the window was being created
@@ -226,6 +246,45 @@ int ED_script_tool_window_close_all(bContext *C, wmWindowManager *wm, const char
       break;
     }
   }
+  return closed;
+}
+
+int ED_script_tool_windows_close_all(bContext *C, wmWindowManager *wm)
+{
+  if (wm == nullptr) {
+    return 0;
+  }
+
+  int closed = 0;
+  while (true) {
+    wmWindow *script_tool_win = nullptr;
+    for (wmWindow &win : wm->windows) {
+      if (ED_script_tool_window_is(&win)) {
+        script_tool_win = &win;
+        break;
+      }
+    }
+    if (script_tool_win == nullptr) {
+      break;
+    }
+
+    CTX_wm_window_set(C, script_tool_win);
+    wm_window_close_request(C, wm, script_tool_win);
+    closed++;
+
+    bool close_was_refused = false;
+    for (wmWindow &win : wm->windows) {
+      if (&win == script_tool_win) {
+        close_was_refused = true;
+        break;
+      }
+    }
+    if (close_was_refused) {
+      break;
+    }
+  }
+
+  CTX_wm_window_set(C, static_cast<wmWindow *>(wm->windows.first));
   return closed;
 }
 

@@ -82,6 +82,7 @@ void OBJECT_OT_unlink_data(wmOperatorType *ot);
 
 void OBJECT_OT_hide_view_set(wmOperatorType *ot);
 void OBJECT_OT_hide_view_clear(wmOperatorType *ot);
+void OBJECT_OT_clarity_visibility_toggle(wmOperatorType *ot);
 void OBJECT_OT_hide_collection(wmOperatorType *ot);
 void OBJECT_OT_mode_set(wmOperatorType *ot);
 void OBJECT_OT_mode_set_with_submode(wmOperatorType *ot);

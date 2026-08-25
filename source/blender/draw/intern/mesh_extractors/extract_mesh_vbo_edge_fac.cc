@@ -8,6 +8,8 @@
 
 #include "BLI_math_vector.hh"
 
+#include "BKE_attribute.hh"
+
 #include "GPU_capabilities.hh"
 
 #include "draw_subdivision.hh"
@@ -91,6 +93,21 @@ static void extract_edge_factor_mesh(const MeshRenderData &mr, MutableSpan<float
       }
     }
   }
+
+  const bke::AttributeAccessor attributes = mr.mesh->attributes();
+  const VArraySpan<bool> sharp_edges = *attributes.lookup<bool>("sharp_edge",
+                                                                bke::AttrDomain::Edge);
+  if (!sharp_edges.is_empty()) {
+    threading::parallel_for(corner_edges.index_range(), 4096, [&](const IndexRange range) {
+      for (const int corner : range) {
+        if (sharp_edges[corner_edges[corner]]) {
+          /* Preserve the geometric edge factor while reserving the negative range for the
+           * Clarity hard-edge color in the object wire shader. */
+          vbo_data[corner] = -vbo_data[corner] - 1.0f;
+        }
+      }
+    });
+  }
 }
 
 static void extract_edge_factor_bm(const MeshRenderData &mr, MutableSpan<float> vbo_data)
@@ -109,6 +126,9 @@ static void extract_edge_factor_bm(const MeshRenderData &mr, MutableSpan<float> 
         }
         else {
           vbo_data[index] = 0.0f;
+        }
+        if (!BM_elem_flag_test(loop->e, BM_ELEM_SMOOTH)) {
+          vbo_data[index] = -vbo_data[index] - 1.0f;
         }
         loop = loop->next;
       }

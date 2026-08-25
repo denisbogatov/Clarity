@@ -26,6 +26,7 @@
 #include "IMB_imbuf_types.hh"
 
 #include "fbx_import_material.hh"
+#include "fbx_import_util.hh"
 
 #include "ufbx.h"
 
@@ -446,7 +447,7 @@ static void add_image_textures(Main *bmain,
 
 Material *import_material(Main *bmain, const std::string &base_dir, const ufbx_material &fmat)
 {
-  Material *mat = BKE_material_add(bmain, fmat.name.data);
+  Material *mat = BKE_material_add(bmain, get_fbx_name(fmat.name, "Material").c_str());
   id_us_min(&mat->id);
 
   bNodeTree *ntree = mat->nodetree;

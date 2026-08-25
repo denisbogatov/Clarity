@@ -12,6 +12,9 @@
 
 #include "BLI_string.h"
 
+#include "DNA_object_types.h"
+#include "DNA_scene_types.h"
+
 #include "RE_engine.h"
 
 #include "IMB_imbuf.hh"
@@ -25,6 +28,51 @@
 namespace blender::bke::tests {
 
 class ViewLayerTest : public bke::BlenderGTestBase {};
+
+TEST_F(ViewLayerTest, clarity_parent_viewport_visibility_is_inherited)
+{
+  Object parent = {};
+  Object child = {};
+  child.parent = &parent;
+
+  Base child_base = {};
+  child_base.object = &child;
+  child_base.flag = BASE_SELECTED;
+  child_base.flag_from_collection = BASE_ENABLED_VIEWPORT | BASE_ENABLED_RENDER | BASE_SELECTABLE |
+                                    BASE_ENABLED_AND_MAYBE_VISIBLE_IN_VIEWPORT |
+                                    BASE_ENABLED_AND_VISIBLE_IN_DEFAULT_VIEWPORT;
+
+  parent.visibility_flag = OB_HIDE_VIEWPORT;
+  BKE_base_eval_flags(&child_base);
+  EXPECT_EQ(child.visibility_flag & OB_HIDE_VIEWPORT, 0);
+  EXPECT_EQ(child_base.flag & BASE_ENABLED_VIEWPORT, 0);
+  EXPECT_NE(child_base.flag & BASE_SELECTED, 0);
+
+  parent.visibility_flag = 0;
+  BKE_base_eval_flags(&child_base);
+  EXPECT_NE(child_base.flag & BASE_ENABLED_VIEWPORT, 0);
+  EXPECT_NE(child_base.flag & BASE_SELECTED, 0);
+}
+
+TEST_F(ViewLayerTest, clarity_eye_hidden_selection_survives_evaluation)
+{
+  Object object = {};
+  Base base = {};
+  base.object = &object;
+  base.flag = BASE_SELECTED | BASE_HIDDEN;
+  base.flag_from_collection = BASE_ENABLED_VIEWPORT | BASE_ENABLED_RENDER | BASE_SELECTABLE |
+                              BASE_ENABLED_AND_MAYBE_VISIBLE_IN_VIEWPORT |
+                              BASE_ENABLED_AND_VISIBLE_IN_DEFAULT_VIEWPORT;
+
+  BKE_base_eval_flags(&base);
+  EXPECT_NE(base.flag & BASE_HIDDEN, 0);
+  EXPECT_NE(base.flag & BASE_SELECTED, 0);
+
+  base.flag &= ~BASE_HIDDEN;
+  BKE_base_eval_flags(&base);
+  EXPECT_EQ(base.flag & BASE_HIDDEN, 0);
+  EXPECT_NE(base.flag & BASE_SELECTED, 0);
+}
 
 TEST_F(ViewLayerTest, aov_unique_names)
 {

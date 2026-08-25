@@ -19,9 +19,33 @@
 
 namespace blender::io::fbx {
 
-const char *get_fbx_name(const ufbx_string &name, const char *def)
+std::string get_fbx_name(const ufbx_string &name, const char *def)
 {
-  return name.length > 0 ? name.data : def;
+  if (name.length == 0) {
+    return def;
+  }
+
+  std::string result;
+  result.reserve(name.length);
+  for (size_t i = 0; i < name.length;) {
+    const bool is_fbx_escape = i + 9 <= name.length &&
+                               memcmp(name.data + i, "FBXASC", 6) == 0 &&
+                               name.data[i + 6] >= '0' && name.data[i + 6] <= '9' &&
+                               name.data[i + 7] >= '0' && name.data[i + 7] <= '9' &&
+                               name.data[i + 8] >= '0' && name.data[i + 8] <= '9';
+    if (!is_fbx_escape) {
+      result.push_back(name.data[i++]);
+      continue;
+    }
+
+    const int value = (name.data[i + 6] - '0') * 100 + (name.data[i + 7] - '0') * 10 +
+                      (name.data[i + 8] - '0');
+    result.push_back(value > 0 && value <= 255 ? char(value) : '_');
+    i += 9;
+  }
+
+  result.resize(result.size() - BLI_str_utf8_invalid_strip(result.data(), result.size()));
+  return result.empty() ? std::string(def) : result;
 }
 
 void matrix_to_m44(const ufbx_matrix &src, float dst[4][4])

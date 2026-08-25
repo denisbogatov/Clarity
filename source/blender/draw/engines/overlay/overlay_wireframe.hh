@@ -37,6 +37,8 @@ class Wireframe : Overlay {
     PassMain::Sub *mesh_ps_ = nullptr;
     /* Variant for meshes that force drawing all edges. */
     PassMain::Sub *mesh_all_edges_ps_ = nullptr;
+    /* Variant that only draws Clarity hard edges. */
+    PassMain::Sub *mesh_hard_edges_ps_ = nullptr;
     PassMain::Sub *points_ps_ = nullptr;
     PassMain::Sub *pointcloud_ps_ = nullptr;
   } colored, non_colored;
@@ -47,6 +49,7 @@ class Wireframe : Overlay {
 
   /* Force display of wireframe on surface objects, regardless of the object display settings. */
   bool show_wire_ = false;
+  bool show_clarity_hard_edges_ = false;
 
  public:
   void begin_sync(Resources &res, const State &state) final
@@ -61,6 +64,8 @@ class Wireframe : Overlay {
     const bool is_selection = res.is_selection();
     const bool do_smooth_lines = (U.gpu_flag & USER_GPU_FLAG_OVERLAY_SMOOTH_WIRE) != 0;
     const bool is_transform = (G.moving & G_TRANSFORM_OBJ) != 0;
+    show_clarity_hard_edges_ = !is_selection &&
+                               (state.overlay.edit_flag & V3D_OVERLAY_EDIT_SHARP) != 0;
     const float wire_threshold = wire_discard_threshold_get(state.overlay.wireframe_threshold);
 
     gpu::Texture **depth_tex = (state.xray_enabled) ? &res.depth_tx : &tmp_depth_tx_;
@@ -82,12 +87,21 @@ class Wireframe : Overlay {
       res.select_bind(pass);
 
       auto shader_pass =
-          [&](gpu::Shader *shader, const char *name, bool use_coloring, float wire_threshold) {
+          [&](gpu::Shader *shader,
+              const char *name,
+              bool use_coloring,
+              float wire_threshold,
+              bool hard_edges_only = false) {
             auto &sub = pass.sub(name);
-            if (res.shaders->wireframe_mesh.get() == shader) {
+            const bool is_mesh_shader = res.shaders->wireframe_mesh.get() == shader;
+            if (is_mesh_shader) {
               sub.specialize_constant(shader, "use_custom_depth_bias", do_smooth_lines);
             }
             sub.shader_set(shader);
+            if (is_mesh_shader) {
+              sub.push_constant("show_clarity_hard_edges", show_clarity_hard_edges_);
+              sub.push_constant("clarity_hard_edges_only", hard_edges_only);
+            }
             sub.bind_texture("depth_tx", depth_tex);
             sub.push_constant("wire_opacity", state.overlay.wireframe_opacity);
             sub.push_constant("is_transform", is_transform);
@@ -103,6 +117,8 @@ class Wireframe : Overlay {
         overlay::ShaderModule &sh = *res.shaders;
         ps.mesh_ps_ = shader_pass(sh.wireframe_mesh.get(), "Mesh", use_color, wire_threshold);
         ps.mesh_all_edges_ps_ = shader_pass(sh.wireframe_mesh.get(), "Wire", use_color, 1.0f);
+        ps.mesh_hard_edges_ps_ = shader_pass(
+            sh.wireframe_mesh.get(), "Clarity Hard Edges", use_color, 1.0f, true);
         ps.points_ps_ = shader_pass(sh.wireframe_points.get(), "Points", use_color, 1.0f);
         ps.pointcloud_ps_ = shader_pass(
             sh.wireframe_points_with_radius.get(), "PtCloud", use_color, 1.0f);
@@ -196,7 +212,12 @@ class Wireframe : Overlay {
              * Otherwise the wireframe will conflict with the edit cage drawing and produce
              * unpleasant aliasing. */
             gpu::Batch *geom = DRW_cache_mesh_face_wireframe_get(ob_ref.object);
-            (all_edges ? coloring.mesh_all_edges_ps_ : coloring.mesh_ps_)
+            const bool object_forces_wire = (ob_ref.object->dtx & OB_DRAWWIRE) ||
+                                            (ob_ref.object->dt == OB_WIRE);
+            const bool hard_edges_only = show_clarity_hard_edges_ && selected_object_mesh &&
+                                         !show_wire_ && !object_forces_wire;
+            (hard_edges_only ? coloring.mesh_hard_edges_ps_ :
+                               (all_edges ? coloring.mesh_all_edges_ps_ : coloring.mesh_ps_))
                 ->draw(geom, manager.unique_handle(ob_ref), res.select_id(ob_ref).get());
           }
         }

@@ -840,6 +840,21 @@ static bool transform_poll_property(const bContext *C, wmOperator *op, const Pro
     return mode != TFM_ALIGN;
   }
 
+  /* Orientation. */
+  if (STREQ(prop_id, "orient_type")) {
+    /* A drag that brought its own frame is not using any of the orientations this menu can name.
+     * The Clarity manipulator does that when an authored pivot frame owns its axes: it passes the
+     * matrix the handles are drawn in and leaves the type unset, which the transform reads as
+     * #V3D_ORIENT_CUSTOM_MATRIX. The menu would then show the enum's default, `Global`, for a drag
+     * that turned around something else entirely - so it is not shown at all. */
+    if (RNA_struct_property_is_set(op->ptr, "orient_matrix") &&
+        !RNA_struct_property_is_set(op->ptr, "orient_type"))
+    {
+      return false;
+    }
+    return true;
+  }
+
   /* Proportional Editing. */
   if (STRPREFIX(prop_id, "proportional") || STRPREFIX(prop_id, "use_proportional")) {
     ScrArea *area = CTX_wm_area(C);

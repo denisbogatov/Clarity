@@ -158,7 +158,13 @@ void SceneResources::init(const SceneState &scene_state, const DRWContext *ctx)
 
   if (studio_light != nullptr) {
     world_buf.ambient_color = float4(float3(studio_light->light_ambient), 0.0f);
-    world_buf.use_specular = shading.flag & V3D_SHADING_SPECULAR_HIGHLIGHT &&
+    /* Maya's default textured viewport lights the assigned material with a directional light.
+     * Workbench cannot evaluate the full material node tree in Solid mode, so its generic studio
+     * specular is misleading here. */
+    const bool clarity_textured_solid = shading.type == OB_SOLID &&
+                                        shading.color_type == V3D_SHADING_TEXTURE_COLOR;
+    world_buf.use_specular = !clarity_textured_solid &&
+                             shading.flag & V3D_SHADING_SPECULAR_HIGHLIGHT &&
                              studio_light->flag & STUDIOLIGHT_SPECULAR_HIGHLIGHT_PASS;
   }
   else {

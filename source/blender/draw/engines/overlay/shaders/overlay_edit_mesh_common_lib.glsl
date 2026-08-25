@@ -25,7 +25,6 @@ float4 EDIT_MESH_edge_color_outer(uint edge_flag, uint /*face_flag*/, float crea
 {
   float4 color = float4(0.0f);
   color = ((edge_flag & EDGE_FREESTYLE) != 0u) ? theme.colors.edge_freestyle : color;
-  color = ((edge_flag & EDGE_SHARP) != 0u) ? theme.colors.edge_sharp : color;
   color = (crease > 0.0f) ? float4(theme.colors.edge_crease.rgb, crease) : color;
   color = (bweight > 0.0f) ? float4(theme.colors.edge_bweight.rgb, bweight) : color;
   color = ((edge_flag & EDGE_SEAM) != 0u) ? theme.colors.edge_seam : color;
@@ -34,6 +33,10 @@ float4 EDIT_MESH_edge_color_outer(uint edge_flag, uint /*face_flag*/, float crea
 
 float4 EDIT_MESH_edge_color_inner(uint edge_flag)
 {
+  if ((edge_flag & EDGE_SHARP) != 0u) {
+    return theme.colors.edge_sharp;
+  }
+
   float4 color = float4(1.0f);
   color = ((edge_flag & EDGE_SELECTED) != 0u && EDIT_MESH_show_edge_selection()) ?
               COMPONENT_SELECTED_COLOR :

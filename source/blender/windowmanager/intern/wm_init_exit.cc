@@ -96,6 +96,7 @@
 #include "ED_node.hh"
 #include "ED_render.hh"
 #include "ED_screen.hh"
+#include "ED_script_tool.hh"
 #include "ED_space_api.hh"
 #include "ED_undo.hh"
 #include "ED_util.hh"
@@ -578,6 +579,10 @@ void WM_exit_ex(bContext *C, const bool do_python_exit, const bool do_user_exit_
   /* Modal handlers are on window level freed, others too? */
   /* NOTE: same code copied in `wm_files.cc`. */
   if (C && wm) {
+    /* Script Tool windows are transient UI. Remove them before writing quit.blend so session
+     * recovery never restores tools that the user did not explicitly reopen. */
+    ED_script_tool_windows_close_all(C, wm);
+
     if (do_user_exit_actions) {
       /* Save quit.blend. */
       Main *bmain = CTX_data_main(C);

@@ -60,7 +60,8 @@ void main()
   float2 uv_viewport = gl_FragCoord.xy * world_data.viewport_size_inv;
   float3 vP = drw_point_screen_to_view(float3(uv_viewport, 0.5f));
   float3 I = drw_view_incident_vector(vP);
-  float3 N = normalize(normal_interp);
+  /* Match Maya Viewport 2.0's default Two Sided Lighting. */
+  float3 N = normalize(gl_FrontFacing ? normal_interp : -normal_interp);
 
   float3 color = color_interp;
 

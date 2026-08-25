@@ -291,6 +291,8 @@ Object *object_in_mode_from_index(const Main &bmain,
 /** \name Hide Operator
  * \{ */
 
+static ListBaseT<LinkData> selected_objects_get(bContext *C);
+
 static bool object_hide_poll(bContext *C)
 {
   if (CTX_wm_space_outliner(C) != nullptr) {
@@ -420,6 +422,82 @@ void OBJECT_OT_hide_view_set(wmOperatorType *ot)
   prop = RNA_def_boolean(
       ot->srna, "unselected", false, "Unselected", "Hide unselected rather than selected objects");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE | PROP_HIDDEN);
+}
+
+static wmOperatorStatus object_clarity_visibility_toggle_exec(bContext *C, wmOperator * /*op*/)
+{
+  Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  bool changed = false;
+  bool global_visibility_changed = false;
+
+  BKE_view_layer_synced_ensure(*bmain, scene, view_layer);
+  auto clarity_visibility_toggle = [&](Object *object, Base *base) {
+    if (object->visibility_flag & OB_HIDE_VIEWPORT) {
+      /* Compatibility with the previous Clarity H behavior, which accidentally
+       * changed the global monitor flag instead of the view-layer eye. An explicit
+       * H on that selected Outliner row means the user is asking to reveal it. */
+      object->visibility_flag &= ~OB_HIDE_VIEWPORT;
+      base->flag &= ~BASE_HIDDEN;
+      DEG_id_tag_update(&object->id, ID_RECALC_SYNC_TO_EVAL);
+      global_visibility_changed = true;
+    }
+    else {
+      base->flag ^= BASE_HIDDEN;
+    }
+    /* View-layer resync recreates bases and restores their selection from
+     * Object::base_flag. Keep the target selected across both eye states. */
+    BKE_scene_object_base_flag_sync_from_base(base);
+    changed = true;
+  };
+
+  if (CTX_wm_space_outliner(C) != nullptr) {
+    /* Outliner tree selection is independent of Base visibility, so it still
+     * contains rows whose eye is closed. */
+    ListBaseT<LinkData> objects = selected_objects_get(C);
+    for (LinkData &link : objects) {
+      Object *object = static_cast<Object *>(link.data);
+      if (Base *base = BKE_view_layer_base_find(view_layer, object)) {
+        clarity_visibility_toggle(object, base);
+      }
+    }
+    objects.free_no_destruct();
+  }
+  else {
+    /* Viewport context collections intentionally omit hidden objects. The Base
+     * retains its selection bit when only its eye is toggled, which gives H the
+     * same targets on the second press and makes the shortcut truly symmetric. */
+    for (Base &base : *BKE_view_layer_object_bases_get(view_layer)) {
+      if (base.flag & BASE_SELECTED) {
+        clarity_visibility_toggle(base.object, &base);
+      }
+    }
+  }
+
+  if (!changed) {
+    return OPERATOR_CANCELLED;
+  }
+
+  if (global_visibility_changed) {
+    BKE_main_collection_sync_remap(bmain);
+    DEG_relations_tag_update(bmain);
+  }
+  BKE_view_layer_need_resync_tag(view_layer);
+  DEG_id_tag_update(&scene->id, ID_RECALC_BASE_FLAGS);
+  WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, scene);
+  WM_event_add_notifier(C, NC_SCENE | ND_OB_VISIBLE, scene);
+  return OPERATOR_FINISHED;
+}
+
+void OBJECT_OT_clarity_visibility_toggle(wmOperatorType *ot)
+{
+  ot->name = "Toggle Object Visibility";
+  ot->description = "Toggle the eye visibility of selected objects in the current view layer";
+  ot->idname = "OBJECT_OT_clarity_visibility_toggle";
+  ot->exec = object_clarity_visibility_toggle_exec;
+  ot->poll = object_hide_poll;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
 static wmOperatorStatus object_hide_collection_exec(bContext *C, wmOperator *op)

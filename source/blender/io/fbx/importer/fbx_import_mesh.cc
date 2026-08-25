@@ -161,7 +161,8 @@ static void import_uvs(const ufbx_mesh *fmesh,
 {
   bool set_active_uv = true;
   for (const ufbx_uv_set &fuv_set : fmesh->uv_sets) {
-    std::string attr_name = BKE_attribute_calc_unique_name(attr_owner, fuv_set.name.data);
+    std::string attr_name = BKE_attribute_calc_unique_name(
+        attr_owner, get_fbx_name(fuv_set.name, "UVMap"));
     if (set_active_uv) {
       mesh->uv_maps_active_set(attr_name);
       mesh->uv_maps_default_set(attr_name);
@@ -187,7 +188,8 @@ static void import_colors(const ufbx_mesh *fmesh,
 {
   std::string first_color_name;
   for (const ufbx_color_set &fcol_set : fmesh->color_sets) {
-    std::string attr_name = BKE_attribute_calc_unique_name(attr_owner, fcol_set.name.data);
+    std::string attr_name = BKE_attribute_calc_unique_name(
+        attr_owner, get_fbx_name(fcol_set.name, "Color"));
     if (first_color_name.empty()) {
       first_color_name = attr_name;
     }
@@ -336,7 +338,8 @@ static bool import_blend_shapes(Main &bmain,
         BKE_keyblock_convert_from_mesh(mesh, mesh_key, kb);
       }
 
-      KeyBlock *kb = BKE_keyblock_add(mesh_key, fchan->target_shape->name.data);
+      const std::string shape_name = get_fbx_name(fchan->target_shape->name, "Key");
+      KeyBlock *kb = BKE_keyblock_add(mesh_key, shape_name.c_str());
       kb->curval = fchan->weight;
       BKE_keyblock_convert_from_mesh(mesh, mesh_key, kb);
       if (!kb->data) {
@@ -375,7 +378,8 @@ static void import_blend_shape_full_weights(const FbxElementMapping &mapping,
         continue;
       }
 
-      KeyBlock *kb = BKE_keyblock_find_name(key, fchan->target_shape->name.data);
+      const std::string shape_name = get_fbx_name(fchan->target_shape->name, "Key");
+      KeyBlock *kb = BKE_keyblock_find_name(key, shape_name.c_str());
       if (kb == nullptr) {
         continue;
       }
@@ -419,6 +423,14 @@ static void import_blend_shape_full_weights(const FbxElementMapping &mapping,
       STRNCPY_UTF8(kb->vgroup, kb->name);
     }
   }
+}
+
+static std::string get_mesh_instance_name(const ufbx_node &node)
+{
+  if (node.is_geometry_transform_helper && node.parent != nullptr) {
+    return get_fbx_name(node.parent->name) + "_GeomAdjust";
+  }
+  return get_fbx_name(node.name, "Mesh");
 }
 
 void import_meshes(Main &bmain,
@@ -515,8 +527,11 @@ void import_meshes(Main &bmain,
     const ufbx_mesh *fmesh = fbx.meshes[index];
     BLI_assert(fmesh != nullptr);
 
+    const std::string mesh_name = fmesh->instances.count > 0 ?
+                                      get_mesh_instance_name(*fmesh->instances[0]) :
+                                      get_fbx_name(fmesh->name, "Mesh");
     Mesh *mesh_main = static_cast<Mesh *>(
-        BKE_object_obdata_add_from_type(&bmain, OB_MESH, get_fbx_name(fmesh->name, "Mesh")));
+        BKE_object_obdata_add_from_type(&bmain, OB_MESH, mesh_name.c_str()));
     BKE_mesh_nomain_to_mesh(mesh, mesh_main, nullptr);
     meshes[index] = mesh_main;
     mesh = mesh_main;
@@ -528,14 +543,7 @@ void import_meshes(Main &bmain,
 
     /* Create objects that use this mesh. */
     for (const ufbx_node *node : fmesh->instances) {
-      std::string name;
-      if (node->is_geometry_transform_helper) {
-        /* Name geometry transform adjustment helpers with parent name and _GeomAdjust suffix. */
-        name = get_fbx_name(node->parent->name) + std::string("_GeomAdjust");
-      }
-      else {
-        name = get_fbx_name(node->name);
-      }
+      const std::string name = get_mesh_instance_name(*node);
       Object *obj = BKE_object_add_only_object(&bmain, OB_MESH, name.c_str());
       obj->data = id_cast<ID *>(mesh_main);
       if (!node->visible) {

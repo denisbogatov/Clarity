@@ -496,8 +496,8 @@ static void create_blend_shape_curves(const ElementAnimations &anim,
 {
   const ufbx_blend_channel *fchan = ufbx_as_blend_channel(anim.prop_blend_shape->element);
   BLI_assert(fchan != nullptr);
-  std::string rna_path = std::string("key_blocks[\"") + fchan->target_shape->name.data +
-                         "\"].value";
+  std::string rna_path = std::string("key_blocks[\"") +
+                         get_fbx_name(fchan->target_shape->name, "Key") + "\"].value";
   const ufbx_anim_curve *input_curve = anim.prop_blend_shape->anim_value->curves[0];
   FCurve *curve = create_fcurve(channelbag, {rna_path, 0}, input_curve->keyframes.count);
   for (int64_t i = 0; i < curve->totvert; i++) {
@@ -526,10 +526,10 @@ void import_animations(Main &bmain,
       }
 
       /* Create action for this layer. */
-      std::string action_name = fstack->name.data;
+      std::string action_name = get_fbx_name(fstack->name, "Action");
       if (!STREQ(fstack->name.data, flayer->name.data) && fstack->layers.count != 1) {
         action_name += '|';
-        action_name += flayer->name.data;
+        action_name += get_fbx_name(flayer->name, "Layer");
       }
       animrig::Action &action = animrig::action_add(bmain, action_name);
       id_fake_user_set(&action.id);
