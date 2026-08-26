@@ -8,6 +8,9 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cmath>
+
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 #include "DNA_userdef_types.h"
@@ -265,6 +268,86 @@ void ED_area_newspace(bContext *C, ScrArea *area, int type, bool skip_region_exi
 void ED_area_prevspace(bContext *C, ScrArea *area);
 void ED_area_swapspace(bContext *C, ScrArea *sa1, ScrArea *sa2);
 int ED_area_headersize();
+
+/**
+ * The vertical layout of the Clarity shelf, in scaled pixels.
+ *
+ * Four places have to agree on these numbers, and each of them used to carry its own: the height of
+ * the Top Bar as a whole (#screen_global_topbar_area_refresh, `header * 3 + 19`), the region size
+ * of the upper row (`HEADERY + 10`), the height the region layout actually gives that row
+ * (#region_rect_recursive, `footer + 9` - the one that wins, which is why changing the other two
+ * did nothing at all), and the size the icon buttons are laid out at in `space_topbar.py`. The
+ * lower row was left with whatever the others happened not to spend, so its icons ran off the
+ * bottom of the window.
+ *
+ * Now they are derived, here, from what a row actually holds. The icon scale is
+ * `_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y`; the padding is the room a header region leaves around its
+ * content; and the trim moves two pixels of it from the gap under the menu, where they are dead
+ * space, to the lower row, which is the one against the window edge.
+ */
+/** Pixels of empty space asked for above, between and below the two rows of icons. */
+#define CLARITY_SHELF_GAP_TOP 6.0f
+#define CLARITY_SHELF_GAP_BETWEEN 6.0f
+#define CLARITY_SHELF_GAP_BOTTOM 6.0f
+
+struct ClarityShelfMetrics {
+  /** The icon as it is drawn: what a user measures the gaps against. */
+  int icon;
+  /** The button around it, which is a little larger. */
+  int button;
+  /** Half of that difference: the space the button already gives the icon on each side. */
+  int inner;
+  /** The gaps as asked for, above, between and below the rows. */
+  int gap_top;
+  int gap_between;
+  int gap_bottom;
+  /** What the upper row leaves under its button, over and above #inner. */
+  int upper_bottom_padding;
+  /** The same for the lower row. */
+  int lower_bottom_padding;
+  /** Heights of the two row regions. */
+  int upper_row;
+  int lower_row;
+  /** Menu header and both rows: the whole Top Bar. */
+  int total;
+};
+
+/**
+ * \a icon_scale is the multiplier #draw_button applies to the 16 px icon grid, and \a icon_scale_y
+ * the one `space_topbar.py` lays the button out at. The gaps are measured from the icon, because
+ * that is the thing on screen: the button is slightly larger, and the difference is already empty
+ * space that a gap must not count twice.
+ */
+inline ClarityShelfMetrics ED_clarity_shelf_metrics_calc(const int header_size,
+                                                         const int widget_unit,
+                                                         const float icon_scale,
+                                                         const float icon_scale_y,
+                                                         const float ui_scale)
+{
+  ClarityShelfMetrics metrics{};
+  metrics.icon = int(ceilf(16.0f * icon_scale * ui_scale));
+  metrics.button = int(ceilf(float(widget_unit) * icon_scale_y));
+  metrics.inner = std::max(0, (metrics.button - metrics.icon) / 2);
+
+  metrics.gap_top = int(ceilf(CLARITY_SHELF_GAP_TOP * ui_scale));
+  metrics.gap_between = int(ceilf(CLARITY_SHELF_GAP_BETWEEN * ui_scale));
+  metrics.gap_bottom = int(ceilf(CLARITY_SHELF_GAP_BOTTOM * ui_scale));
+
+  /* The gap between the rows is shared by the two of them. */
+  const int between_half = metrics.gap_between / 2;
+  metrics.upper_bottom_padding = std::max(0, between_half - metrics.inner);
+  metrics.lower_bottom_padding = std::max(0, metrics.gap_bottom - metrics.inner);
+
+  const int upper_top_padding = std::max(0, metrics.gap_top - metrics.inner);
+  const int lower_top_padding = std::max(0, (metrics.gap_between - between_half) - metrics.inner);
+  metrics.upper_row = upper_top_padding + metrics.button + metrics.upper_bottom_padding;
+  metrics.lower_row = lower_top_padding + metrics.button + metrics.lower_bottom_padding;
+  metrics.total = header_size + metrics.upper_row + metrics.lower_row;
+  return metrics;
+}
+
+/** #ClarityShelfMetrics for the running interface scale and font size. */
+ClarityShelfMetrics ED_clarity_shelf_metrics();
 int ED_area_footersize();
 /**
  * \return the final height of a global \a area, accounting for DPI.

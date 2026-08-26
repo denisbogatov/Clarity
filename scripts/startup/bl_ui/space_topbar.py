@@ -941,25 +941,28 @@ _CLARITY_SHELF_ROW_COUNT = 2
 # `space_topbar.cc`), so growing the icons here without growing that clips them.
 # The two are meant to be changed together.
 #
-# Cell width controls the step between icons. The button row is scaled equally on
-# both axes in `_clarity_shelf_draw_item_button`, keeping the larger buttons square;
-# the cell and button values below leave only a narrow visual gap.
-_CLARITY_SHELF_TOPBAR_COLUMN_UNITS_X = 1.65
-_CLARITY_SHELF_TOPBAR_BUTTON_UNITS_X = 1.10
-_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y = 1.35
-_CLARITY_SHELF_TOPBAR_LABEL_SCALE_Y = 0.70
+# Cell width controls the step between icons, and the two axes are set apart on
+# purpose. The height carries the icon - it is what makes the artwork large - while
+# the width is only the room the icon needs beside its neighbour. Scaling both by the
+# same number made every button square, so the step could not be tightened: a narrower
+# cell was simply stretched back out by the button inside it.
+_CLARITY_SHELF_TOPBAR_COLUMN_UNITS_X = 1.25
+_CLARITY_SHELF_TOPBAR_BUTTON_UNITS_X = 1.00
+_CLARITY_SHELF_TOPBAR_ICON_SCALE_X = 1.25
+# The button is only as tall as the artwork inside it: `but->icon_scale` in
+# `interface_widgets.cc` draws the icon at 1.53 of the 16 px icon grid, about 24.5 px,
+# and anything past that is vertical space the row spends on nothing. Lower than this
+# and the icon starts being clipped rather than the padding.
+_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y = 1.32
 
-_CLARITY_SHELF_PANEL_BUTTON_UNITS_X = 1.15
-_CLARITY_SHELF_PANEL_ICON_SCALE_Y = 1.40
-_CLARITY_SHELF_PANEL_CELL_UNITS_X = (
-    _CLARITY_SHELF_PANEL_BUTTON_UNITS_X * _CLARITY_SHELF_PANEL_ICON_SCALE_Y
-)
-_CLARITY_SHELF_PANEL_LABEL_SCALE_Y = 0.72
+_CLARITY_SHELF_PANEL_BUTTON_UNITS_X = 1.00
+_CLARITY_SHELF_PANEL_ICON_SCALE_Y = 1.49
+_CLARITY_SHELF_PANEL_CELL_UNITS_X = 1.52
 
 # Schema version of a single shelf config, see `_clarity_shelf_migrate_config`.
-_CLARITY_SHELF_VERSION = 8
+_CLARITY_SHELF_VERSION = 10
 _CLARITY_SHELF_STORAGE_VERSION = 1
-_CLARITY_SHELF_DEFAULT_BACKGROUND_COLOR = (0.18, 0.18, 0.18, 1.0)
+_CLARITY_SHELF_DEFAULT_BACKGROUND_COLOR = (0.0, 0.0, 0.0, 0.0)
 _CLARITY_SHELF_DEFAULT_ICON_COLOR = (1.0, 1.0, 1.0, 1.0)
 _CLARITY_SHELF_DRAG_SOURCE_COLOR = (0.08, 0.32, 0.68, 1.0)
 _CLARITY_SHELF_CUSTOM_ICON_RECHECK_SECONDS = 1.0
@@ -1285,7 +1288,11 @@ def _clarity_shelf_draw_icon_preview(layout, operator):
             else operator.icon_color
         ),
     )
-    operator_args = {"text": "", "emboss": True}
+    preview_button.context_string_set(
+        "clarity_shelf_short_text", operator.short_text.strip(),
+    )
+    preview_button.context_string_set("clarity_shelf_button", "1")
+    operator_args = {"text": "", "emboss": False}
     if icon_value:
         operator_args["icon_value"] = icon_value
     preview_button.operator("topbar.clarity_shelf_preview", **operator_args)
@@ -1866,6 +1873,50 @@ def _clarity_shelf_migrate_config(config, variant="topbar"):
             if _clarity_shelf_bundled_script_key(item["script_file"]) not in existing_keys:
                 target["items"].append(item)
         config["version"] = 8
+        migrated = True
+    if version < 9:
+        # Maya's Reset Translation. The built-in operator applies the reset to
+        # every selected object, so the shelf button works on multi-selection.
+        default_tab_name = "Helpfull Panel" if variant == "panel" else "Default"
+        target = next(
+            (tab for tab in config["tabs"] if tab["name"] == default_tab_name),
+            None,
+        )
+        if target is None:
+            target = next(
+                (tab for tab in config["tabs"] if tab["name"] == "Custom"),
+                None,
+            )
+        if target is None:
+            target = {"name": default_tab_name, "items": [], "separators": []}
+            config["tabs"].append(target)
+        if not any(item.get("action") == "clear_location" for item in target["items"]):
+            target["items"].append({
+                "label": "Clear Location",
+                "icon": "OBJECT_ORIGIN",
+                "action": "clear_location",
+                "row": 1,
+            })
+        config["version"] = 9
+        migrated = True
+    if version < 10:
+        # The old opaque gray was the generated default, not an intentional
+        # customization. Make those buttons transparent while retaining any
+        # genuinely user-selected background color.
+        old_background = (0.18, 0.18, 0.18, 1.0)
+        for tab in config["tabs"]:
+            for item in tab["items"]:
+                color = item.get("background_color")
+                if (
+                    isinstance(color, (list, tuple)) and
+                    len(color) == 4 and
+                    all(abs(float(value) - expected) < 1.0e-4
+                        for value, expected in zip(color, old_background))
+                ):
+                    item["background_color"] = list(
+                        _CLARITY_SHELF_DEFAULT_BACKGROUND_COLOR,
+                    )
+        config["version"] = 10
         migrated = True
     if config.get("version") != _CLARITY_SHELF_VERSION:
         config["version"] = _CLARITY_SHELF_VERSION
@@ -2762,7 +2813,7 @@ class _ClarityShelfItemDialog:
     )
     short_text: StringProperty(
         name="Short Text",
-        description="Short label shown next to the icon",
+        description="Short Maya-style label drawn over the bottom of the icon",
         maxlen=5,
     )
 
@@ -4568,12 +4619,23 @@ def _clarity_shelf_draw_separator_button(
         divider.scale_y = scale_y
     divider.context_string_set("clarity_shelf_item_id", separator["id"])
     divider.context_string_set("clarity_shelf_separator", "1")
+    # Context strings chain onto one running store per block: the previous button's entries
+    # are cloned forward and only the keys set here override them. Without these two, a
+    # separator inherited whatever icon was drawn right before it - its short-text label
+    # and its "this is a shelf button" flag - and drew that icon's label, cramped and
+    # garbled, over the divider instead of nothing.
+    divider.context_string_set("clarity_shelf_button", "0")
+    divider.context_string_set("clarity_shelf_short_text", "")
     divider.context_string_set(
         "clarity_shelf_background_color",
         _clarity_shelf_color_string((0.0, 0.0, 0.0, 0.0)),
     )
     divider.enabled = enabled
-    props = divider.operator("topbar.clarity_shelf_action", text="|", emboss=False)
+    # No visible glyph here: the bar itself is drawn by
+    # `clarity_shelf_separators_draw` in `interface_widgets.cc`, bright and independent of this
+    # button's state, over everything else in the region. A disabled button's own text draws in
+    # the theme's dimmed color, which is exactly what made the old "|" glyph hard to see.
+    props = divider.operator("topbar.clarity_shelf_action", text="", emboss=False)
     props.item_id = separator["id"]
 
 
@@ -4583,17 +4645,16 @@ def _clarity_shelf_draw_item_button(
         *,
         button_units_x,
         icon_scale_y,
-        label_scale_y,
-        reserve_label_space=True,
+        icon_scale_x=None,
 ):
-    """Draw one shelf icon plus its short label into `cell`.
+    """Draw one shelf icon with an optional Maya-style text overlay.
 
     The colors travel to the C++ widget code as button context strings, which
     `topbar_shelf_button_colors_apply` reads back when laying the region out.
     """
     icon_line = cell.row(align=True)
     icon_line.alignment = 'CENTER'
-    icon_line.scale_x = icon_scale_y
+    icon_line.scale_x = icon_scale_y if icon_scale_x is None else icon_scale_x
     icon_line.scale_y = icon_scale_y
     button = icon_line.row(align=True)
     button.ui_units_x = button_units_x
@@ -4618,8 +4679,17 @@ def _clarity_shelf_draw_item_button(
     button.context_string_set(
         "clarity_shelf_icon_color", _clarity_shelf_color_string(icon_color),
     )
+    button.context_string_set(
+        "clarity_shelf_short_text", item.get("short_text", ""),
+    )
+    button.context_string_set("clarity_shelf_button", "1")
+    # Context strings chain onto one running store per block: an icon drawn right after a
+    # separator would otherwise inherit that separator's "clarity_shelf_separator" = "1" - nothing
+    # here ever set the key at all, so the value just carried forward - and get the bright divider
+    # bar drawn over its own icon, with no separator entry or logic behind it.
+    button.context_string_set("clarity_shelf_separator", "0")
 
-    operator_args = {"text": "", "emboss": True}
+    operator_args = {"text": "", "emboss": False}
     if custom_icon:
         operator_args["icon_value"] = custom_icon
     else:
@@ -4630,17 +4700,13 @@ def _clarity_shelf_draw_item_button(
     props.item_id = item["id"]
     props.tooltip = item.get("label", "Shelf Command")
 
-    short_text = item.get("short_text", "")
-    if short_text or reserve_label_space:
-        label_line = cell.row(align=True)
-        label_line.alignment = 'CENTER'
-        label_line.scale_y = label_scale_y
-        label_line.label(text=short_text)
-
-
 def _clarity_shelf_draw_icon_row(layout, row_index, context):
     tab = _clarity_shelf_active_tab(context)
-    row = layout.row(align=False)
+    # Aligned, so the row adds no padding of its own between the cells: the step from
+    # one icon to the next is the cell width and nothing else, which is what makes it
+    # adjustable at all. The buttons draw without an emboss, so nothing about them
+    # reads as one grouped widget.
+    row = layout.row(align=True)
     row.alignment = 'LEFT'
     row.scale_x = 1.0
     row.scale_y = 1.0
@@ -4648,10 +4714,14 @@ def _clarity_shelf_draw_icon_row(layout, row_index, context):
     entries = _clarity_shelf_row_entries(tab, row_index)
     for entry_type, entry in entries:
         if entry_type == "SEPARATOR":
+            # As tall as an icon and a little wider than the plain single line of text this is
+            # otherwise drawn as - a divider that reads as a line at button height, not as a thin
+            # stroke sitting in the middle of one.
             _clarity_shelf_draw_separator_button(
                 row,
                 entry,
-                units_x=0.55,
+                units_x=0.65,
+                scale_y=_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y,
                 enabled=False,
             )
             continue
@@ -4664,7 +4734,7 @@ def _clarity_shelf_draw_icon_row(layout, row_index, context):
             entry,
             button_units_x=_CLARITY_SHELF_TOPBAR_BUTTON_UNITS_X,
             icon_scale_y=_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y,
-            label_scale_y=_CLARITY_SHELF_TOPBAR_LABEL_SCALE_Y,
+            icon_scale_x=_CLARITY_SHELF_TOPBAR_ICON_SCALE_X,
         )
 
     if entries and entries[-1][0] == "SEPARATOR":
@@ -4733,8 +4803,6 @@ def _clarity_shelf_draw_adaptive(layout, context):
             entry,
             button_units_x=_CLARITY_SHELF_PANEL_BUTTON_UNITS_X,
             icon_scale_y=_CLARITY_SHELF_PANEL_ICON_SCALE_Y,
-            label_scale_y=_CLARITY_SHELF_PANEL_LABEL_SCALE_Y,
-            reserve_label_space=False,
         )
 
 

@@ -62,3 +62,13 @@ blender_add_lib(bf_editor_screen "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 
 # RNA_prototypes.hh
 add_dependencies(bf_editor_screen bf_rna)
+
+if(WITH_GTESTS)
+  set(TEST_SRC
+    screen_clarity_shelf_test.cc
+  )
+  set(TEST_LIB
+    bf_editor_screen
+  )
+  blender_add_test_suite_lib(editor_screen "${TEST_SRC}" "${INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
+endif()

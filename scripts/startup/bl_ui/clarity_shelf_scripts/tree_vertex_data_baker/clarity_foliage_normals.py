@@ -14,12 +14,191 @@ from clarity_sdf_proxy import clarity_build_sdf_proxy_generator
 
 CLARITY_PROXY_TAG = "clarity_foliage_normal_proxy"
 CLARITY_PROXY_NORMALS = "clarity_proxy_gradient_normals"
+CLARITY_PROXY_UP_WORLD = "clarity_proxy_up_world"
 CLARITY_NORMAL_BACKUP = "clarity_original_corner_normals"
 CLARITY_SMOOTH_BACKUP = "clarity_original_smooth_faces"
 
 
 def _clarity_proxy_name(clarity_leaves):
     return f"Clarity_NormalProxy::{clarity_leaves.name}"
+
+
+def _clarity_hemisphere_world_axes(clarity_leaves, clarity_trunk, clarity_fallback_axis):
+    clarity_world_vertices = [
+        clarity_leaves.matrix_world @ clarity_vertex.co
+        for clarity_vertex in clarity_leaves.data.vertices
+    ]
+    clarity_crown_center = sum(clarity_world_vertices, Vector()) / len(clarity_world_vertices)
+    clarity_tree_origin = (
+        clarity_trunk.matrix_world.translation.copy()
+        if clarity_trunk is not None
+        else clarity_leaves.matrix_world.translation.copy()
+    )
+    clarity_direction = clarity_crown_center - clarity_tree_origin
+    if clarity_direction.length_squared <= 1e-12:
+        clarity_up_index = {'X': 0, 'Y': 1, 'Z': 2}[clarity_fallback_axis]
+        clarity_up_sign = 1.0
+    else:
+        clarity_up_index = max(range(3), key=lambda clarity_axis: abs(clarity_direction[clarity_axis]))
+        clarity_up_sign = 1.0 if clarity_direction[clarity_up_index] >= 0.0 else -1.0
+
+    clarity_up = Vector((0.0, 0.0, 0.0))
+    clarity_up[clarity_up_index] = clarity_up_sign
+    clarity_first_index, clarity_second_index = {
+        0: (1, 2),
+        1: (2, 0),
+        2: (0, 1),
+    }[clarity_up_index]
+    clarity_first = Vector((0.0, 0.0, 0.0))
+    clarity_second = Vector((0.0, 0.0, 0.0))
+    clarity_first[clarity_first_index] = 1.0
+    clarity_second[clarity_second_index] = clarity_up_sign
+    clarity_axis_name = f"{'+' if clarity_up_sign > 0.0 else '-'}{'XYZ'[clarity_up_index]}"
+    return clarity_world_vertices, clarity_first, clarity_second, clarity_up, clarity_axis_name
+
+
+def _clarity_build_hemisphere_proxy_data(
+        clarity_leaves,
+        clarity_trunk,
+        clarity_resolution,
+        clarity_up_axis):
+    (
+        clarity_world_vertices,
+        clarity_first_axis,
+        clarity_second_axis,
+        clarity_up_axis_world,
+        clarity_axis_name,
+    ) = _clarity_hemisphere_world_axes(
+        clarity_leaves,
+        clarity_trunk,
+        clarity_up_axis,
+    )
+    clarity_first_values = [
+        clarity_vertex.dot(clarity_first_axis) for clarity_vertex in clarity_world_vertices
+    ]
+    clarity_second_values = [
+        clarity_vertex.dot(clarity_second_axis) for clarity_vertex in clarity_world_vertices
+    ]
+    clarity_up_values = [
+        clarity_vertex.dot(clarity_up_axis_world) for clarity_vertex in clarity_world_vertices
+    ]
+    clarity_first_center = (min(clarity_first_values) + max(clarity_first_values)) * 0.5
+    clarity_second_center = (min(clarity_second_values) + max(clarity_second_values)) * 0.5
+    clarity_base_up = min(clarity_up_values)
+    clarity_center_world = (
+        clarity_first_axis * clarity_first_center
+        + clarity_second_axis * clarity_second_center
+        + clarity_up_axis_world * clarity_base_up
+    )
+    clarity_first_radius = max(
+        (max(clarity_first_values) - min(clarity_first_values)) * 0.5,
+        1e-6,
+    )
+    clarity_second_radius = max(
+        (max(clarity_second_values) - min(clarity_second_values)) * 0.5,
+        1e-6,
+    )
+    clarity_up_radius = max(max(clarity_up_values) - clarity_base_up, 1e-6)
+    clarity_fit_scale = max(
+        math.sqrt(
+            (clarity_vertex.dot(clarity_first_axis) - clarity_first_center) ** 2
+            / (clarity_first_radius * clarity_first_radius)
+            + (clarity_vertex.dot(clarity_second_axis) - clarity_second_center) ** 2
+            / (clarity_second_radius * clarity_second_radius)
+            + (clarity_vertex.dot(clarity_up_axis_world) - clarity_base_up) ** 2
+            / (clarity_up_radius * clarity_up_radius)
+        )
+        for clarity_vertex in clarity_world_vertices
+    )
+    clarity_fit_scale = max(1.0, clarity_fit_scale) * 1.01
+    clarity_first_radius *= clarity_fit_scale
+    clarity_second_radius *= clarity_fit_scale
+    clarity_up_radius *= clarity_fit_scale
+    if max(clarity_first_radius, clarity_second_radius, clarity_up_radius) <= 1e-8:
+        raise RuntimeError("Leaves bounds are too small to build a hemisphere proxy.")
+
+    clarity_world_to_local = clarity_leaves.matrix_world.inverted()
+    clarity_world_to_local_normal = clarity_leaves.matrix_world.to_3x3().transposed()
+    clarity_segments = max(8, min(256, int(clarity_resolution)))
+    clarity_rings = max(2, clarity_segments // 4)
+    clarity_proxy_vertices = []
+    clarity_proxy_normals = []
+    for clarity_ring in range(clarity_rings):
+        clarity_elevation = (math.pi * 0.5) * clarity_ring / clarity_rings
+        clarity_planar = math.cos(clarity_elevation)
+        clarity_elevation_up = math.sin(clarity_elevation)
+        for clarity_segment in range(clarity_segments):
+            clarity_angle = math.tau * clarity_segment / clarity_segments
+            clarity_first = clarity_planar * math.cos(clarity_angle)
+            clarity_second = clarity_planar * math.sin(clarity_angle)
+            clarity_position_world = (
+                clarity_center_world
+                + clarity_first_axis * (clarity_first * clarity_first_radius)
+                + clarity_second_axis * (clarity_second * clarity_second_radius)
+                + clarity_up_axis_world * (clarity_elevation_up * clarity_up_radius)
+            )
+            clarity_normal_world = (
+                clarity_first_axis * (clarity_first / clarity_first_radius)
+                + clarity_second_axis * (clarity_second / clarity_second_radius)
+                + clarity_up_axis_world * (clarity_elevation_up / clarity_up_radius)
+            ).normalized()
+            clarity_normal_local = clarity_world_to_local_normal @ clarity_normal_world
+            clarity_proxy_normals.append(clarity_normal_local.normalized())
+            clarity_proxy_vertices.append(clarity_world_to_local @ clarity_position_world)
+
+    clarity_pole_normal = clarity_world_to_local_normal @ clarity_up_axis_world
+    clarity_pole_normal.normalize()
+    clarity_pole_index = len(clarity_proxy_vertices)
+    clarity_proxy_vertices.append(
+        clarity_world_to_local @ (
+            clarity_center_world + clarity_up_axis_world * clarity_up_radius
+        )
+    )
+    clarity_proxy_normals.append(clarity_pole_normal)
+
+    clarity_proxy_triangles = []
+    for clarity_ring in range(clarity_rings - 1):
+        clarity_lower = clarity_ring * clarity_segments
+        clarity_upper = (clarity_ring + 1) * clarity_segments
+        for clarity_segment in range(clarity_segments):
+            clarity_next = (clarity_segment + 1) % clarity_segments
+            clarity_proxy_triangles.append((
+                clarity_lower + clarity_segment,
+                clarity_lower + clarity_next,
+                clarity_upper + clarity_next,
+            ))
+            clarity_proxy_triangles.append((
+                clarity_lower + clarity_segment,
+                clarity_upper + clarity_next,
+                clarity_upper + clarity_segment,
+            ))
+    clarity_last_ring = (clarity_rings - 1) * clarity_segments
+    for clarity_segment in range(clarity_segments):
+        clarity_next = (clarity_segment + 1) % clarity_segments
+        clarity_proxy_triangles.append((
+            clarity_last_ring + clarity_segment,
+            clarity_last_ring + clarity_next,
+            clarity_pole_index,
+        ))
+
+    clarity_proxy_log(
+        "hemisphere-data-finalized",
+        requested_up_axis=clarity_up_axis,
+        resolved_up_axis=clarity_axis_name,
+        first_radius=clarity_first_radius,
+        second_radius=clarity_second_radius,
+        up_radius=clarity_up_radius,
+        segments=clarity_segments,
+        rings=clarity_rings,
+        vertices=len(clarity_proxy_vertices),
+        triangles=len(clarity_proxy_triangles),
+    )
+    return (
+        clarity_proxy_vertices,
+        clarity_proxy_triangles,
+        clarity_proxy_normals,
+        clarity_up_axis_world,
+    )
 
 
 def _clarity_replace_object_mesh(clarity_object, clarity_mesh):
@@ -172,7 +351,10 @@ def _clarity_proxy_mesh_from_data(
 
 def clarity_build_foliage_proxy_generator(
         clarity_leaves,
+        clarity_trunk,
         clarity_existing_proxy,
+        clarity_proxy_mode,
+        clarity_up_axis,
         clarity_resolution,
         clarity_tightness,
         clarity_smooth_iterations,
@@ -192,6 +374,8 @@ def clarity_build_foliage_proxy_generator(
     clarity_proxy_log(
         "source-read-begin",
         leaves=clarity_leaves.name,
+        proxy_mode=clarity_proxy_mode,
+        up_axis=clarity_up_axis,
         resolution=clarity_resolution,
         tightness=clarity_tightness,
         blur=clarity_smooth_iterations,
@@ -206,31 +390,47 @@ def clarity_build_foliage_proxy_generator(
         tuple(clarity_triangle.vertices)
         for clarity_triangle in clarity_source.loop_triangles
     ]
-    clarity_sdf_generator = clarity_build_sdf_proxy_generator(
-        clarity_vertices,
-        clarity_triangles,
-        clarity_resolution,
-        clarity_tightness,
-        clarity_smooth_iterations,
-        clarity_weld,
-        clarity_weld_distance,
-    )
-    while True:
-        try:
-            yield next(clarity_sdf_generator)
-        except StopIteration as clarity_stop:
-            (
-                clarity_proxy_vertices,
-                clarity_proxy_triangles,
-                clarity_proxy_normals,
-            ) = clarity_stop.value
-            break
-    clarity_proxy_log(
-        "sdf-generator-complete",
-        proxy_vertices=len(clarity_proxy_vertices),
-        proxy_triangles=len(clarity_proxy_triangles),
-        proxy_normals=len(clarity_proxy_normals),
-    )
+    if clarity_proxy_mode == 'HEMISPHERE':
+        yield 0.35, "Building upper hemisphere"
+        (
+            clarity_proxy_vertices,
+            clarity_proxy_triangles,
+            clarity_proxy_normals,
+            clarity_proxy_up_world,
+        ) = _clarity_build_hemisphere_proxy_data(
+            clarity_leaves,
+            clarity_trunk,
+            clarity_resolution,
+            clarity_up_axis,
+        )
+        yield 0.995, "Finalizing hemisphere proxy"
+    else:
+        clarity_proxy_up_world = None
+        clarity_sdf_generator = clarity_build_sdf_proxy_generator(
+            clarity_vertices,
+            clarity_triangles,
+            clarity_resolution,
+            clarity_tightness,
+            clarity_smooth_iterations,
+            clarity_weld,
+            clarity_weld_distance,
+        )
+        while True:
+            try:
+                yield next(clarity_sdf_generator)
+            except StopIteration as clarity_stop:
+                (
+                    clarity_proxy_vertices,
+                    clarity_proxy_triangles,
+                    clarity_proxy_normals,
+                ) = clarity_stop.value
+                break
+        clarity_proxy_log(
+            "sdf-generator-complete",
+            proxy_vertices=len(clarity_proxy_vertices),
+            proxy_triangles=len(clarity_proxy_triangles),
+            proxy_normals=len(clarity_proxy_normals),
+        )
 
     clarity_name = _clarity_proxy_name(clarity_leaves)
     yield 0.997, "Creating Blender proxy mesh"
@@ -261,6 +461,10 @@ def clarity_build_foliage_proxy_generator(
     clarity_proxy.name = clarity_name
     clarity_proxy.matrix_world = clarity_leaves.matrix_world
     clarity_proxy[CLARITY_PROXY_TAG] = True
+    if clarity_proxy_up_world is not None:
+        clarity_proxy[CLARITY_PROXY_UP_WORLD] = tuple(clarity_proxy_up_world)
+    elif CLARITY_PROXY_UP_WORLD in clarity_proxy:
+        del clarity_proxy[CLARITY_PROXY_UP_WORLD]
     clarity_proxy.display_type = 'WIRE'
     clarity_proxy.show_in_front = True
     clarity_proxy.hide_render = True
@@ -270,7 +474,10 @@ def clarity_build_foliage_proxy_generator(
 
 def clarity_build_foliage_proxy(
         clarity_leaves,
+        clarity_trunk,
         clarity_existing_proxy,
+        clarity_proxy_mode,
+        clarity_up_axis,
         clarity_resolution,
         clarity_tightness,
         clarity_smooth_iterations,
@@ -278,7 +485,10 @@ def clarity_build_foliage_proxy(
         clarity_weld_distance):
     clarity_generator = clarity_build_foliage_proxy_generator(
         clarity_leaves,
+        clarity_trunk,
         clarity_existing_proxy,
+        clarity_proxy_mode,
+        clarity_up_axis,
         clarity_resolution,
         clarity_tightness,
         clarity_smooth_iterations,
@@ -378,11 +588,18 @@ def clarity_transfer_foliage_normals_generator(
             else Vector((0.0, 1.0, 0.0))
         )
     yield 0.08, "Transforming proxy normals"
-    clarity_up = {
-        'X': Vector((1.0, 0.0, 0.0)),
-        'Y': Vector((0.0, 1.0, 0.0)),
-        'Z': Vector((0.0, 0.0, 1.0)),
-    }[clarity_up_axis]
+    clarity_proxy_up_world = clarity_proxy.get(CLARITY_PROXY_UP_WORLD)
+    if clarity_proxy_up_world is not None and len(clarity_proxy_up_world) == 3:
+        clarity_up = clarity_leaves.matrix_world.to_3x3().transposed() @ Vector(
+            clarity_proxy_up_world
+        )
+        clarity_up.normalize()
+    else:
+        clarity_up = {
+            'X': Vector((1.0, 0.0, 0.0)),
+            'Y': Vector((0.0, 1.0, 0.0)),
+            'Z': Vector((0.0, 0.0, 1.0)),
+        }[clarity_up_axis]
 
     clarity_original = [clarity_loop.normal.copy() for clarity_loop in clarity_mesh.loops]
     clarity_exact_generator = clarity_transfer_normals_exact_generator(

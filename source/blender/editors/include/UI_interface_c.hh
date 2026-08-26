@@ -1257,6 +1257,26 @@ void block_flag_enable(Block *block, int flag);
 void block_flag_disable(Block *block, int flag);
 void block_translate(Block *block, float x, float y);
 
+/**
+ * Draw the short labels of the Clarity shelf buttons of \a region, over everything else in it.
+ *
+ * A label belongs on top of its icon, and drawing it from #draw_button did not put it there: the
+ * icon is drawn immediately while the shelf label's plate and text go through the widget and font
+ * batches, and what came out was the icon over the plate - the label looked cut away and washed
+ * out rather than simply small. A pass of its own, after the region has finished drawing, has no
+ * ordering to argue with.
+ */
+void clarity_shelf_labels_draw(const ARegion *region);
+/**
+ * Draw the dividers between groups of Clarity shelf buttons of \a region, over everything else.
+ *
+ * Not the button's own text: a "|" glyph on a button that is deliberately non-interactive
+ * (`enabled=False` in `space_topbar.py`) is drawn in the theme's dimmed, disabled text color,
+ * which on a dark shelf reads as barely there. A divider is meant to be seen, so it is drawn as a
+ * plain bright bar instead, independent of button state.
+ */
+void clarity_shelf_separators_draw(const ARegion *region);
+
 using ButtonForeachFunc = void (*)(Button *button, void *user_data);
 void blocklist_buttons_foreach(
     ListBaseT<Block> *block_list, ButtonForeachFunc callback, void *user_data);

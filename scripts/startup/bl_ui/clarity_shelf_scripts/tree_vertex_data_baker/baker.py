@@ -2935,6 +2935,15 @@ class TREEVDB_Settings(PropertyGroup):
         type=bpy.types.Object,
         poll=mesh_object_poll,
     )
+    clarity_proxy_mode: EnumProperty(
+        name="Proxy Shape",
+        description="Choose a fitted SDF shell or an upward-facing hemisphere normal proxy",
+        items=(
+            ('SDF', "SDF Surface", "Build a tight surface around the foliage"),
+            ('HEMISPHERE', "Upper Hemisphere", "Build a hemisphere whose normals never point down"),
+        ),
+        default='SDF',
+    )
     clarity_proxy_resolution: IntProperty(
         name="Resolution", default=128, min=8, max=256
     )
@@ -3580,6 +3589,7 @@ class _ClarityNormalModalOperator:
                     blender=".".join(str(clarity_value) for clarity_value in bpy.app.version),
                     blend=bpy.data.filepath or "<unsaved>",
                     leaves=clarity_leaves.name if clarity_leaves else "<none>",
+                    proxy_mode=clarity_settings.clarity_proxy_mode,
                     resolution=clarity_settings.clarity_proxy_resolution,
                     tightness=clarity_settings.clarity_proxy_tightness,
                     blur=clarity_settings.clarity_proxy_smooth_iterations,
@@ -3729,7 +3739,10 @@ class CLARITY_OT_BuildFoliageNormalProxy(_ClarityNormalModalOperator, Operator):
     def _make_generator(self, clarity_settings):
         return clarity_build_foliage_proxy_generator(
             clarity_settings.leaves_object,
+            clarity_settings.trunk_object,
             clarity_settings.clarity_normal_proxy_object,
+            clarity_settings.clarity_proxy_mode,
+            clarity_settings.up_axis,
             clarity_settings.clarity_proxy_resolution,
             clarity_settings.clarity_proxy_tightness,
             clarity_settings.clarity_proxy_smooth_iterations,
@@ -3841,7 +3854,7 @@ class TREEVDB_OT_ResetDefaults(Operator):
             'preview_wind_spatial', 'preview_wind_direction', 'preview_flutter_strength',
             'preview_flutter_speed', 'modal_budget_ms',
             'clarity_debug_channel',
-            'clarity_proxy_resolution', 'clarity_proxy_tightness',
+            'clarity_proxy_mode', 'clarity_proxy_resolution', 'clarity_proxy_tightness',
             'clarity_proxy_smooth_iterations', 'clarity_proxy_weld',
             'clarity_proxy_weld_distance', 'clarity_normal_influence',
             'clarity_normal_upward_bias', 'clarity_normal_force_smooth',
@@ -4080,12 +4093,18 @@ def _draw_foliage_normals_body(layout, s):
     clarity_controls = layout.column()
     clarity_controls.enabled = not s.bake_running
     clarity_controls.prop(s, 'clarity_normal_proxy_object', text='Proxy')
-    clarity_controls.prop(s, 'clarity_proxy_resolution', text='Resolution')
-    _draw_pair(clarity_controls, s, 'clarity_proxy_tightness', 'Tightness',
-               'clarity_proxy_smooth_iterations', 'Blur')
-    clarity_controls.prop(s, 'clarity_proxy_weld', text='Weld Proxy')
-    if s.clarity_proxy_weld:
-        clarity_controls.prop(s, 'clarity_proxy_weld_distance', text='Weld Distance')
+    clarity_controls.prop(s, 'clarity_proxy_mode', text='Shape')
+    clarity_controls.prop(
+        s,
+        'clarity_proxy_resolution',
+        text='Segments' if s.clarity_proxy_mode == 'HEMISPHERE' else 'Resolution',
+    )
+    if s.clarity_proxy_mode == 'SDF':
+        _draw_pair(clarity_controls, s, 'clarity_proxy_tightness', 'Tightness',
+                   'clarity_proxy_smooth_iterations', 'Blur')
+        clarity_controls.prop(s, 'clarity_proxy_weld', text='Weld Proxy')
+        if s.clarity_proxy_weld:
+            clarity_controls.prop(s, 'clarity_proxy_weld_distance', text='Weld Distance')
 
     clarity_row = clarity_controls.row()
     clarity_row.scale_y = 1.15

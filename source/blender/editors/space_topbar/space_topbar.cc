@@ -544,7 +544,14 @@ static void topbar_shelf_region_layout(const bContext *C, ARegion *region)
 {
   ED_region_header_layout(C, region);
 
-  const int bottom_padding = int(4.0f * UI_SCALE_FAC + 0.5f);
+  /* Each row is pushed down onto the padding its own gap asks for, so what is left above it is the
+   * gap over that row. Doing it for both rows is what makes the three gaps - over, between, under -
+   * separately answerable; the upper row used to be laid out by the header default and could only
+   * be moved by resizing its region. */
+  const ClarityShelfMetrics metrics = ED_clarity_shelf_metrics();
+  const int bottom_padding = (region->regiontype == RGN_TYPE_FOOTER) ?
+                                 metrics.upper_bottom_padding :
+                                 metrics.lower_bottom_padding;
   const int offset_y = bottom_padding -
                        ui::blocklist_min_y_get(&region->runtime->uiblocks);
   if (offset_y > 0) {
@@ -563,12 +570,17 @@ static void topbar_shelf_region_draw(const bContext *C, ARegion *region)
   ui::theme::theme_set(SPACE_OUTLINER, RGN_TYPE_WINDOW);
   ED_region_header_draw(C, region);
   ui::theme::theme_restore(&theme_state);
+  /* After the buttons, so a label sits over its own icon rather than under it. */
+  ui::clarity_shelf_labels_draw(region);
+  ui::clarity_shelf_separators_draw(region);
   topbar_shelf_drag_marker_draw(C, region);
 }
 
 static void shelf_main_region_draw(const bContext *C, ARegion *region)
 {
   ED_region_panels_draw(C, region);
+  /* The Shelf editor's own separators, drawn the same way as the Top Bar's. */
+  ui::clarity_shelf_separators_draw(region);
   topbar_shelf_drag_marker_draw(C, region);
 }
 
@@ -844,17 +856,14 @@ void ED_spacetype_topbar()
   /* regions: upper shelf row */
   art = MEM_new_zeroed<ARegionType>("spacetype topbar shelf footer region");
   art->regionid = RGN_TYPE_FOOTER;
-  /* Fixed height, so it has to cover whatever the row draws into it: one shelf icon
-   * plus its short label, at `_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y` and
-   * `_CLARITY_SHELF_TOPBAR_LABEL_SCALE_Y` in `space_topbar.py`. Those two and this
-   * are one setting split across two languages - raise the icon scale without
-   * raising this and the icons are simply clipped. */
-  art->prefsizey = HEADERY + 22;
+  /* Both rows are one row high. The lower one has no size of its own - it is the main region of
+   * the area and takes what the upper row leaves - so this number decides both. */
+  art->prefsizey = int(ceilf(ED_clarity_shelf_metrics().upper_row / UI_SCALE_FAC));
   art->prefsizex = UI_UNIT_X * 5;
   art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FOOTER;
   art->listener = topbar_main_region_listener;
   art->init = topbar_shelf_region_init;
-  art->layout = ED_region_header_layout;
+  art->layout = topbar_shelf_region_layout;
   art->draw = topbar_shelf_region_draw;
 
   BLI_addhead(&st->regiontypes, art);

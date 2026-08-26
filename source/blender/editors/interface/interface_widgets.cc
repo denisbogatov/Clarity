@@ -29,6 +29,7 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_context.hh"
+#include "BKE_screen.hh"
 
 #include "RNA_access.hh"
 
@@ -5570,12 +5571,158 @@ static bool shelf_button_context_color_get(Button *but, const char *key, uchar c
   return true;
 }
 
+static void shelf_button_short_text_draw(const uiFontStyle *fstyle,
+                                         Button *but,
+                                         const rcti *rect)
+{
+  const std::optional<StringRefNull> text = button_context_string_get(
+      but, "clarity_shelf_short_text");
+  if (!text || text->is_empty()) {
+    return;
+  }
+
+  /* The label is read at a glance and is two or three characters long, so it is drawn as large as
+   * its own button allows. #fontstyle_draw_simple_backdrop was not used for that reason: it pads
+   * the text by a quarter of the line height on each side, and those eight-odd pixels are the
+   * difference between a legible label and one shrunk to fit around its own plate. This one keeps
+   * the plate tight and spends the width on the letters. */
+  const float margin = std::max(2.0f * UI_SCALE_FAC, 1.0f);
+  /* The cell is as wide as its icon and no wider - the shelf is packed that way on purpose - and
+   * three letters at a readable size do not fit inside it. Rather than shrink the label until it
+   * fits its own cell, which is what made it unreadable, it is allowed to overhang a little: the
+   * icons beside it are artwork with room at their edges, and a label is short and rare. Past that
+   * it does give way, but only down to a size still worth reading. */
+  const float overhang = 4.0f * UI_SCALE_FAC;
+  const float available = float(BLI_rcti_size_x(rect)) - 2.0f * margin + 2.0f * overhang;
+
+  uiFontStyle label_style = *fstyle;
+  label_style.points = std::max(9.0f, fstyle->points * 0.85f);
+  fontstyle_set(&label_style);
+  float text_width = BLF_width(label_style.uifont_id, text->data(), text->size());
+  while (text_width > available && label_style.points > 8.0f) {
+    label_style.points -= 0.5f;
+    fontstyle_set(&label_style);
+    text_width = BLF_width(label_style.uifont_id, text->data(), text->size());
+  }
+
+  /* The plate sits inside the button, over the lower part of the icon - Maya puts it there, and now
+   * that the button is no taller than its artwork there is nowhere else for it to go. Hung off the
+   * bottom edge instead, as it was, it fell into the gap between the rows: half of every letter was
+   * outside the button and the plate behind them was cut with it, which is what read as a
+   * transparent, unreadable label rather than a small one. */
+  /* Measured on the label itself rather than on the font: these are two or three capitals with
+   * nothing below the baseline, so the plate can be as short as they are. */
+  const float text_height = BLF_height(label_style.uifont_id, text->data(), text->size());
+  const float plate_padding = std::max(1.0f * UI_SCALE_FAC, 1.0f);
+  const float plate_bottom = float(rect->ymin) + std::max(2.0f * UI_SCALE_FAC, 1.0f);
+  const float x = (rect->xmin + rect->xmax - text_width) * 0.5f;
+  const float y = plate_bottom + plate_padding;
+  const uchar text_color[4] = {255, 255, 255, 255};
+  /* Opaque black. The letters are small, so every bit of the artwork showing through them costs
+   * legibility that the size cannot spare. */
+  const float backdrop_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+
+  widgetbase_draw_cache_flush();
+
+  rctf backdrop;
+  backdrop.xmin = x - plate_padding * 2.0f;
+  backdrop.xmax = x + text_width + plate_padding * 2.0f;
+  backdrop.ymin = plate_bottom;
+  backdrop.ymax = plate_bottom + text_height + plate_padding * 2.0f;
+  /* Barely rounded: a radius worth seeing on a plate this small only softens its corners into the
+   * icon behind it, and softened is what "not black enough" looked like. */
+  draw_roundbox_corner_set(CNR_ALL);
+  draw_roundbox_4fv(&backdrop, true, plate_padding, backdrop_color);
+
+  fontstyle_draw_simple(&label_style, x, y, text->c_str(), text_color);
+}
+
+void clarity_shelf_labels_draw(const ARegion *region)
+{
+  if (region == nullptr || region->runtime == nullptr) {
+    return;
+  }
+  const uiStyle style = *style_get_dpi();
+  for (Block &block : region->runtime->uiblocks) {
+    for (Button &but : block.buttons()) {
+      if (but.flag & (UI_HIDDEN | UI_SCROLLED)) {
+        continue;
+      }
+      /* "0" is the separator's explicit override, not a shelf button - see
+       * `_clarity_shelf_draw_separator_button` in `space_topbar.py`. Context strings chain onto
+       * one running store per block, so a button that never sets this key at all can still read
+       * a value some earlier button in the same block left behind; checking the value and not
+       * just its presence is what tells the two apart. */
+      const std::optional<StringRefNull> is_shelf_button = button_context_string_get(
+          &but, "clarity_shelf_button");
+      if (!is_shelf_button || *is_shelf_button != "1") {
+        continue;
+      }
+      rcti rect;
+      button_to_pixelrect(&rect, region, &block, &but);
+      shelf_button_short_text_draw(&style.widget, &but, &rect);
+    }
+  }
+}
+
+void clarity_shelf_separators_draw(const ARegion *region)
+{
+  if (region == nullptr || region->runtime == nullptr) {
+    return;
+  }
+
+  /* Bright and a little thicker than a single glyph's stroke: a divider earns its place on a dark
+   * shelf by being plainly visible, not by matching the weight of the text around it. */
+  const float bar_color[4] = {0.75f, 0.75f, 0.75f, 1.0f};
+  const float bar_width = std::max(2.0f * UI_SCALE_FAC, 1.0f);
+  const float vertical_margin = std::max(4.0f * UI_SCALE_FAC, 1.0f);
+
+  widgetbase_draw_cache_flush();
+
+  for (Block &block : region->runtime->uiblocks) {
+    for (Button &but : block.buttons()) {
+      if (but.flag & (UI_HIDDEN | UI_SCROLLED)) {
+        continue;
+      }
+      const std::optional<StringRefNull> is_separator = button_context_string_get(
+          &but, "clarity_shelf_separator");
+      if (!is_separator || *is_separator != "1") {
+        continue;
+      }
+
+      rcti rect;
+      button_to_pixelrect(&rect, region, &block, &but);
+      const float center_x = float(rect.xmin + rect.xmax) * 0.5f;
+      rctf bar;
+      bar.xmin = center_x - bar_width * 0.5f;
+      bar.xmax = center_x + bar_width * 0.5f;
+      bar.ymin = float(rect.ymin) + vertical_margin;
+      bar.ymax = float(rect.ymax) - vertical_margin;
+      if (bar.ymax <= bar.ymin) {
+        continue;
+      }
+      draw_roundbox_corner_set(CNR_ALL);
+      draw_roundbox_4fv(&bar, true, bar_width * 0.5f, bar_color);
+    }
+  }
+}
+
 void draw_button(const bContext *C, ARegion *region, uiStyle *style, Button *but, rcti *rect)
 {
   bTheme *btheme = theme::theme_get();
   const ThemeUI *tui = &btheme->tui;
   const uiFontStyle *fstyle = &style->widget;
   WidgetType *wt = nullptr;
+  const std::optional<StringRefNull> clarity_shelf_button_flag = button_context_string_get(
+      but, "clarity_shelf_button");
+  const bool is_clarity_shelf_button = clarity_shelf_button_flag &&
+                                       *clarity_shelf_button_flag == "1";
+
+  if (is_clarity_shelf_button) {
+    /* Regular UI icons are fixed at 16 px regardless of button size. Clarity
+     * shelf cells are intentionally larger, so let their artwork use the cell. */
+    but->icon_scale = 1.53f;
+  }
 
   /* handle menus separately */
   if (but->emboss == EmbossType::Pulldown) {

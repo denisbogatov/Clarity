@@ -7,6 +7,7 @@
  */
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -1651,7 +1652,9 @@ static void region_rect_recursive(
   else if (region->regiontype == RGN_TYPE_FOOTER) {
     prefsizey = ED_area_footersize();
     if (area->spacetype == SPACE_TOPBAR) {
-      prefsizey += int(9.0f * UI_SCALE_FAC + 0.5f);
+      /* The upper shelf row. This is the height that decides, whatever `prefsizey` or a saved
+       * `sizey` says, so it is the one place the shelf's own measurement belongs. */
+      prefsizey = ED_clarity_shelf_metrics().upper_row;
     }
   }
   else if (region->regiontype == RGN_TYPE_SCRUBBING) {
@@ -4039,6 +4042,16 @@ int ED_area_headersize()
 {
   /* Accommodate widget and padding. */
   return U.widget_unit + int(UI_SCALE_FAC * HEADER_PADDING_Y);
+}
+
+ClarityShelfMetrics ED_clarity_shelf_metrics()
+{
+  /* Keep in step with `but->icon_scale` in `interface_widgets.cc` and with
+   * `_CLARITY_SHELF_TOPBAR_ICON_SCALE_Y` in `space_topbar.py`. */
+  const float icon_scale = 1.53f;
+  const float icon_scale_y = 1.32f;
+  return ED_clarity_shelf_metrics_calc(
+      ED_area_headersize(), U.widget_unit, icon_scale, icon_scale_y, UI_SCALE_FAC);
 }
 
 int ED_area_footersize()

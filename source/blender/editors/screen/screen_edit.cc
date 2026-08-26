@@ -1292,6 +1292,11 @@ static void screen_global_topbar_shelf_regions_ensure(ScrArea *area)
     region->alignment = alignment;
     region->flag &= ~(RGN_FLAG_HIDDEN | RGN_FLAG_HIDDEN_BY_USER | RGN_FLAG_TOO_SMALL);
     region->flag |= RGN_FLAG_NO_USER_RESIZE;
+    /* The size is written on every refresh rather than left to `prefsizey`, which only reaches a
+     * region being created. A file saved before the shelf row height changed carries the old
+     * `sizey`, and the row would keep it forever - the reason a rebuilt shelf still looked exactly
+     * like the one before it. Nothing is lost by overwriting: the row cannot be resized by hand. */
+    region->sizey = short(ceilf(ED_clarity_shelf_metrics().upper_row / UI_SCALE_FAC));
   };
 
   if (ARegion *region = BKE_area_find_region_type(area, RGN_TYPE_TOOL_HEADER)) {
@@ -1302,7 +1307,9 @@ static void screen_global_topbar_shelf_regions_ensure(ScrArea *area)
 
 static void screen_global_topbar_area_refresh(wmWindow *win, bScreen *screen)
 {
-  const short size = screen_global_header_size() * 3 + 19;
+  /* The menu header and the two shelf rows, and nothing else: any spare height here lands in the
+   * lower row, which is laid out from what is left over rather than from its own size. */
+  const short size = short(ceilf(ED_clarity_shelf_metrics().total / UI_SCALE_FAC));
   rcti rect;
 
   /* Use content rect to account for CSD, converted to inclusive bounds for area geometry. */
